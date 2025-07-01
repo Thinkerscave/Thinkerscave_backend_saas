@@ -50,21 +50,27 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-            .csrf(csrf -> csrf.disable())
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/users/**", "/login").permitAll()
-                    .requestMatchers("/api/schema/**").permitAll()
-                    .requestMatchers("/api/organizations/**").permitAll()
-                .requestMatchers("/home/**").authenticated()
-
-            )
-            .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            .authenticationProvider(authenticationProvider())
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-            .build();
+                .csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/api/v1/users/**",
+                                "/login",
+                                "/api/schema/**",
+                                "/api/organizations/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+                        .requestMatchers("/home/**").authenticated()
+                )
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                .build();
     }
+
 
 
     /**
