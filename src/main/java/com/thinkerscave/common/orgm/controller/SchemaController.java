@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/schemas")
+@RequestMapping("/api/schema")
 @Tag(name = "Schema Management", description = "APIs for managing database schemas (tenants)")
 public class SchemaController {
 
