@@ -9,18 +9,24 @@ import lombok.NoArgsConstructor;
 import java.time.Instant;
 
 @Entity
+@Table(name = "refresh_token")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
 public class RefreshToken {
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private int id;
-	private String token;
-	private Instant expiryDate;
-	
-	@OneToOne
-	@JoinColumn(name="user_id", referencedColumnName = "id")
-	private User user;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true, length = 512)
+    private String token;
+
+    @Column(name = "expiry_date", nullable = false)
+    private Instant expiryDate;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, referencedColumnName = "id")
+    private User user;
 }

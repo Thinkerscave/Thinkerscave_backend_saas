@@ -1,9 +1,11 @@
 package com.thinkerscave.common.usrm.domain;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.MappedSuperclass;
 import jakarta.persistence.Temporal;
 import jakarta.persistence.TemporalType;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -22,16 +24,20 @@ import java.util.Date;
 public abstract class Auditable {
 
     @CreatedBy
+    @Column(name = "created_by")
     private String createdBy;
 
     @LastModifiedBy
+    @Column(name = "last_modified_by")
     private String lastModifiedBy;
 
     @CreatedDate
     @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "created_date")
     private Date createdDate;
 
     @LastModifiedDate
     @Temporal(TemporalType.TIMESTAMP)
+    @Column(name = "last_modified_date")
     private Date lastModifiedDate;
 }

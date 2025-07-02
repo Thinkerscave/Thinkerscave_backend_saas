@@ -33,7 +33,8 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
     @Transactional
     public void loginFailed(String userName) {
         userRepository.findByUserName(userName).ifPresent(user -> {
-            int attempts = user.getAttempts() + 1;
+            int previousAttempts = user.getAttempts() != null ? user.getAttempts() : 0;
+            int attempts = previousAttempts + 1;
             user.setAttempts(attempts);
 
             if (attempts >= MAX_ATTEMPTS) {
