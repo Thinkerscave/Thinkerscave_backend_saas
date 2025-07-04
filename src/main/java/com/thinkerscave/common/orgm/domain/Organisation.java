@@ -62,8 +62,6 @@ public class Organisation extends Auditable {
     @Column(name = "is_active")
     private Boolean isActive = true;
 
-
-
     @Column(name = "is_group")
     private Boolean isGroup = false;
 }

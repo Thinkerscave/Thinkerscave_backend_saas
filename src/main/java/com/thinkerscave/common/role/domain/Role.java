@@ -1,26 +1,20 @@
 package com.thinkerscave.common.role.domain;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.thinkerscave.common.usrm.domain.Auditable;
-import com.thinkerscave.common.usrm.domain.User;
-
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Data;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-@Entity
-@Table(name = "roles")
+import java.util.UUID;
+
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class Role extends Auditable{
-    
+@EntityListeners(AuditingEntityListener.class)
+@Entity
+public class Role extends Auditable {
+
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "role_id")
-	private Long id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "role_id")
+    private Long roleId;
 
     @Column(name = "role_name", length = 50, nullable = false)
     private String roleName;
@@ -33,9 +27,23 @@ public class Role extends Auditable{
 
     @Column(name = "is_active")
     private Boolean isActive=true;
-    
-    @ManyToMany(mappedBy = "roles")
-    @JsonIgnore
-    private List<User> users = new ArrayList<>();
+
+
+    @PrePersist
+    public void prePersist() {
+        if (this.isActive == null) {
+            this.isActive = false;
+        }
+        if (this.roleCode == null || this.roleCode.isBlank()) {
+            if (this.roleName != null && !this.roleName.isBlank()) {
+                this.roleCode = "ROLE_" + roleName.trim().toUpperCase().replace(" ", "_");
+            } else {
+                this.roleCode = "ROLE_" + UUID.randomUUID().toString().replace("-", "")
+                                             .substring(0, 6).toUpperCase();
+            }
+        }
+    }
+
+
 
 }
