@@ -1,6 +1,6 @@
 package com.thinkerscave.common.role.controller;
 
-import com.thinkerscave.common.role.DTO.RoleDTO;
+import com.thinkerscave.common.role.dto.RoleDTO;
 import com.thinkerscave.common.role.service.RoleService;
 import com.thinkerscave.common.role.domain.Role;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RestController
 @CrossOrigin("*")
+@RestController
 @RequestMapping("/api/roles")
 public class RoleController {
 

@@ -2,8 +2,8 @@ package com.thinkerscave.common.orgm.controller;
 
 import com.thinkerscave.common.exception.SchemaCreationException;
 import com.thinkerscave.common.orgm.config.TenantContext;
-import com.thinkerscave.common.orgm.requestDto.OrgRegistrationRequest;
-import com.thinkerscave.common.orgm.responseDto.OrgRegistrationResponse;
+import com.thinkerscave.common.orgm.dto.OrgRegistrationRequest;
+import com.thinkerscave.common.orgm.dto.OrgRegistrationResponse;
 import com.thinkerscave.common.orgm.service.OrganizationService;
 import com.thinkerscave.common.orgm.service.SchemaInitializer;
 import com.thinkerscave.common.orgm.service.SchemaService;
@@ -19,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+@CrossOrigin("*")
 @RestController
 @RequestMapping("/api/organizations")
 @Tag(name = "Organization Management", description = "APIs related to organization registration and management")

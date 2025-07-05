@@ -1,7 +1,14 @@
 package com.thinkerscave.common.usrm.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.List;
 
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class UserResponseDTO {
 	private Long id;
 	private String userCode;
@@ -18,24 +25,5 @@ public class UserResponseDTO {
 	private Integer maxDeviceAllow;
 	private List<String> roles;
 
-	public UserResponseDTO(Long id, String userCode, String userName, String email, String firstName, String middleName,
-			String lastName, String address, String city, String state, Long mobileNumber, Boolean isBlocked,
-			Integer maxDeviceAllow, List<String> roles) {
-		this.id = id;
-		this.userCode = userCode;
-		this.userName = userName;
-		this.email = email;
-		this.firstName = firstName;
-		this.middleName = middleName;
-		this.lastName = lastName;
-		this.address = address;
-		this.city = city;
-		this.state = state;
-		this.mobileNumber = mobileNumber;
-		this.isBlocked = isBlocked;
-		this.maxDeviceAllow = maxDeviceAllow;
-		this.roles = roles;
-	}
 
-	// Getters and Setters
 }

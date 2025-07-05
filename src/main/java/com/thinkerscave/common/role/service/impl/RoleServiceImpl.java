@@ -1,9 +1,10 @@
-package com.thinkerscave.common.role.service;
+package com.thinkerscave.common.role.service.impl;
 
 
-import com.thinkerscave.common.role.DTO.RoleDTO;
+import com.thinkerscave.common.role.dto.RoleDTO;
 import com.thinkerscave.common.role.domain.Role;
 import com.thinkerscave.common.role.repository.RoleRepository;
+import com.thinkerscave.common.role.service.RoleService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;

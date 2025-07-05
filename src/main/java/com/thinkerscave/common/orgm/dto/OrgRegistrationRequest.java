@@ -1,4 +1,4 @@
-package com.thinkerscave.common.orgm.requestDto;
+package com.thinkerscave.common.orgm.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

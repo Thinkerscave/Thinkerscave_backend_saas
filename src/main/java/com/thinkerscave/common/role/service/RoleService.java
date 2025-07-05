@@ -1,7 +1,7 @@
 package com.thinkerscave.common.role.service;
 
 
-import com.thinkerscave.common.role.DTO.RoleDTO;
+import com.thinkerscave.common.role.dto.RoleDTO;
 import com.thinkerscave.common.role.domain.Role;
 
 import java.util.List;

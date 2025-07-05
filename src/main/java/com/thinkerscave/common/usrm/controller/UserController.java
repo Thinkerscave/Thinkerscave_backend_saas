@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Slf4j
+@CrossOrigin("*")
 @RestController
 @RequestMapping("/api/v1/users")
 public class UserController {

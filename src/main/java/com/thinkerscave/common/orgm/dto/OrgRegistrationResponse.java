@@ -1,4 +1,4 @@
-package com.thinkerscave.common.orgm.responseDto;
+package com.thinkerscave.common.orgm.dto;
 
 
 import lombok.AllArgsConstructor;
