@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class RoleServiceImpl implements RoleService {
@@ -18,25 +19,22 @@ public class RoleServiceImpl implements RoleService {
 
 	@Override
 	public Role saveData(RoleDTO dto) {
-		
-		/*
-		 * instituteType institute=new instituteType();
-		 * institute.setInstituteTypeName(dto.getInstituteType());
-		 */
-		
-		//instituteRepo.save(institute);
-
-		
-		Role role=new Role();
-
-		
+		Role role = new Role();
 		BeanUtils.copyProperties(dto, role);
-		
-		return repository.save(role);
 
+		// Generate Role Code if not already provided
+		if (dto.getRoleCode() == null || dto.getRoleCode().isBlank()) {
+			// For example, create code like "ROLE_ADMIN_001"
+			String baseCode = "ROLE_" + dto.getRoleName().toUpperCase().replaceAll("\\s+", "_");
+			String uniqueSuffix = UUID.randomUUID().toString().substring(0, 5).toUpperCase();  // or use a custom ID generator
+			role.setRoleCode(baseCode + "_" + uniqueSuffix);
+		}
+
+		return repository.save(role);
 	}
 
-	
+
+
 	@Override
 	public List<Role> allRecords() {
 

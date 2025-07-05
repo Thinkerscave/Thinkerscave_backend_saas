@@ -14,7 +14,7 @@ import java.util.List;
 
 @RestController
 @CrossOrigin("*")
-@RequestMapping("/roles")
+@RequestMapping("/api/roles")
 public class RoleController {
 
 	@Autowired
@@ -50,12 +50,6 @@ public class RoleController {
 		return ResponseEntity.ok("Deleted successfully");
 	}
 
-	@Operation(summary = "Get a role by ID for editing")
-	@GetMapping("/edit/{id}")
-	public ResponseEntity<Role> editRole(@PathVariable("id") Long id) {
-		Role role = roleService.editRoleData(id);
-		return ResponseEntity.ok(role);
-	}
 
 	@Operation(summary = "Get a role by ID (view only)")
 	@GetMapping("/view/{id}")
