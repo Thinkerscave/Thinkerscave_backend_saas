@@ -1,15 +1,11 @@
 package com.thinkerscave.common.student.domain;
 
+import com.thinkerscave.common.usrm.domain.User;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
-import com.thinkerscave.common.Address;
+import com.thinkerscave.common.commonModel.Address;
 import com.thinkerscave.common.usrm.domain.Auditable;
 
 @Entity
@@ -40,17 +36,14 @@ public class Student extends Auditable{
     private String gender;
 
 
-    @Embedded
+    // One-to-one relation for current address
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "current_address_id", referencedColumnName = "id")
     private Address currentAddress;
 
-    @Embedded
-    @AttributeOverrides({
-        @AttributeOverride(name = "country", column = @Column(name = "permanent_country")),
-        @AttributeOverride(name = "state", column = @Column(name = "permanent_state")),
-        @AttributeOverride(name = "city", column = @Column(name = "permanent_city")),
-        @AttributeOverride(name = "zipCode", column = @Column(name = "permanent_zip_code")),
-        @AttributeOverride(name = "addressLine", column = @Column(name = "permanent_address_line", columnDefinition = "TEXT"))
-    })
+    // One-to-one relation for permanent address
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "permanent_address_id", referencedColumnName = "id")
     private Address permanentAddress;
 
     private boolean isSameAddress;
@@ -71,20 +64,24 @@ public class Student extends Auditable{
     private String photoUrl;
 
     @ManyToOne
+    @JoinColumn(name = "class_id")
     private ClassEntity classEntity;
 
-    @ManyToOne
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "section_id")
     private Section section;
 
-    @OneToOne
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
+
 
     @ManyToOne
     @JoinColumn(name = "guardian_id", nullable = false)
     private Guardian parent;
 
     private boolean isActive;
-
 
 
 
