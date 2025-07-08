@@ -14,11 +14,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -46,8 +50,8 @@ public class SchemaController {
                     mediaType = "application/json",
                     array = @ArraySchema(schema = @Schema(implementation = String.class)),
                     examples = @ExampleObject(value = """
-                ["demo_org", "tenant1", "tenant2"]
-            """)
+                                ["demo_org", "tenant1", "tenant2"]
+                            """)
             )
     )
     @GetMapping
@@ -132,5 +136,61 @@ public class SchemaController {
         }
         return ResponseEntity.ok("Current connected schema: " + currentSchema);
     }
+
+
+    @GetMapping("/check")
+    public ResponseEntity<?> checkSchemaTables() {
+        String schemaName = TenantContext.getTenant();
+        try {
+            List<String> missingTables = schemaService.getMissingTables(schemaName);
+            if (missingTables.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "schema", schemaName,
+                        "allTablesExist", true,
+                        "message", "All required tables exist."
+                ));
+            } else {
+                return ResponseEntity.ok(Map.of(
+                        "schema", schemaName,
+                        "allTablesExist", false,
+                        "missingTables", missingTables,
+                        "message", "Some tables are missing."
+                ));
+            }
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                    "schema", schemaName,
+                    "error", e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "schema", schemaName,
+                    "error", "An error occurred: " + e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/validate-tables")
+    public ResponseEntity<?> validateAndCreateTables(@RequestBody List<String> tableNames) {
+        String schemaName = TenantContext.getTenant();  // Set by your TenantFilter
+
+        List<String> missingTables = schemaService.getMissingTables(schemaName);
+
+        if (!missingTables.isEmpty()) {
+            schemaInitializer.createMissingTablesInSchema(schemaName, tableNames);
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Created missing tables in schema: " + schemaName);
+            response.put("createdTables", missingTables);
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        }
+
+        return ResponseEntity.ok(Collections.singletonMap(
+                "message", "All requested tables already exist in schema: " + schemaName
+        ));
+    }
+
+
+
+
 }
 
