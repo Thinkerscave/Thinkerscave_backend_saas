@@ -31,7 +31,8 @@ public class SchemaInitializer {
             "role", com.thinkerscave.common.role.domain.Role.class,
             "organisation", com.thinkerscave.common.orgm.domain.Organisation.class,
             "ownerdetails", com.thinkerscave.common.orgm.domain.OwnerDetails.class,
-            "menu", com.thinkerscave.common.menum.domain.Menu.class
+            "menu", com.thinkerscave.common.menum.domain.Menu.class,
+            "submenu_master",com.thinkerscave.common.menum.domain.Submenu.class
     );
 
     public SchemaInitializer(DataSource dataSource) {
@@ -63,6 +64,7 @@ public class SchemaInitializer {
                     .addAnnotatedClass(com.thinkerscave.common.orgm.domain.Organisation.class)
                     .addAnnotatedClass(com.thinkerscave.common.orgm.domain.OwnerDetails.class)
                     .addAnnotatedClass(com.thinkerscave.common.menum.domain.Menu.class)
+                    .addAnnotatedClass(com.thinkerscave.common.menum.domain.Submenu.class)
 
 
                     // Add more .addAnnotatedClass(...) as needed

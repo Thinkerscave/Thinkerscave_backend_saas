@@ -31,14 +31,18 @@ public class LoggingAspect {
      * - com.thinkerscave.common.orgm.controller..*
      * - com.thinkerscave.common.orgm.service..*
      */
-    @Around("execution(* com.thinkerscave.common.orgm.controller..*(..)) || " +
-            "execution(* com.thinkerscave.common.orgm.service..*(..)) || " +
-            "execution(* com.thinkerscave.common.usrm.controller..*(..)) || " +
-            "execution(* com.thinkerscave.common.usrm.service..*(..)) || " +
-            "execution(* com.thinkerscave.common.role.controller..*(..)) || " +
-            "execution(* com.thinkerscave.common.role.service..*(..)) || " +
-            "execution(* com.thinkerscave.common.menum.controller..*(..)) || " +
-            "execution(* com.thinkerscave.common.menum.service..*(..))")
+    @Around(
+            "execution(* com.thinkerscave.common.orgm.controller..*(..)) || " +
+                    "execution(* com.thinkerscave.common.orgm.service..*(..)) || " +
+                    "execution(* com.thinkerscave.common.usrm.controller..*(..)) || " +
+                    "execution(* com.thinkerscave.common.usrm.service..*(..)) || " +
+                    "execution(* com.thinkerscave.common.role.controller..*(..)) || " +
+                    "execution(* com.thinkerscave.common.role.service..*(..)) || " +
+                    "execution(* com.thinkerscave.common.menum.controller..*(..)) || " +
+                    "execution(* com.thinkerscave.common.menum.service..*(..)) || " +
+                    "execution(* com.thinkerscave.common.menum.controller..*(..)) || " +
+                    "execution(* com.thinkerscave.common.menum.service..*(..))"
+    )
     public Object logAllMethodCalls(ProceedingJoinPoint joinPoint) throws Throwable {
         // Record the start time of the method
         long startTime = System.currentTimeMillis();
