@@ -36,7 +36,9 @@ public class LoggingAspect {
             "execution(* com.thinkerscave.common.usrm.controller..*(..)) || " +
             "execution(* com.thinkerscave.common.usrm.service..*(..)) || " +
             "execution(* com.thinkerscave.common.role.controller..*(..)) || " +
-            "execution(* com.thinkerscave.common.role.service..*(..))")
+            "execution(* com.thinkerscave.common.role.service..*(..)) || " +
+            "execution(* com.thinkerscave.common.menum.controller..*(..)) || " +
+            "execution(* com.thinkerscave.common.menum.service..*(..))")
     public Object logAllMethodCalls(ProceedingJoinPoint joinPoint) throws Throwable {
         // Record the start time of the method
         long startTime = System.currentTimeMillis();

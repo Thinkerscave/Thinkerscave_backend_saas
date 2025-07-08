@@ -45,7 +45,7 @@ public class SwaggerConfig {
                         """)
                         .contact(new Contact()
                                 .name("ThinkersCave Dev Team")
-                                .email("support@thinkerscave.com")
+                                .email("info@thinkerscave.com")
                                 .url("https://www.thinkerscave.com"))
                         .license(new License()
                                 .name("Apache 2.0 License")
