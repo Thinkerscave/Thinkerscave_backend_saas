@@ -1,5 +1,6 @@
 package com.thinkerscave.common.usrm.domain;
 
+import com.thinkerscave.common.auditing.Auditable;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -24,7 +25,7 @@ import com.thinkerscave.common.role.domain.Role;
 @Getter
 @Setter
 @Table(name = "users")
-public class User extends Auditable{
+public class User extends Auditable {
 	
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)

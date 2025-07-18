@@ -1,6 +1,6 @@
 package com.thinkerscave.common.orgm.domain;
 
-import com.thinkerscave.common.usrm.domain.Auditable;
+import com.thinkerscave.common.auditing.Auditable;
 import com.thinkerscave.common.usrm.domain.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -47,11 +47,11 @@ public class Organisation extends Auditable {
     @Column(name = "state", length = 255)
     private String state;
 
-    @Column(name = "created_at", columnDefinition = "TIMESTAMPTZ")
-    private OffsetDateTime createdAt;
-
-    @Column(name = "updated_at", columnDefinition = "TIMESTAMPTZ")
-    private OffsetDateTime updatedAt;
+//    @Column(name = "created_at", columnDefinition = "TIMESTAMPTZ")
+//    private OffsetDateTime createdAt;
+//
+//    @Column(name = "updated_at", columnDefinition = "TIMESTAMPTZ")
+//    private OffsetDateTime updatedAt;
 
     @Column(name = "created_by", length = 255)
     private String createdBy;

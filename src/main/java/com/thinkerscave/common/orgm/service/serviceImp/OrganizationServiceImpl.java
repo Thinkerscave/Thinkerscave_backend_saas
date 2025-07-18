@@ -1,7 +1,7 @@
 package com.thinkerscave.common.orgm.service.serviceImp;
 
 
-import com.thinkerscave.common.orgm.config.TenantContext;
+import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.orgm.domain.Organisation;
 import com.thinkerscave.common.orgm.domain.OwnerDetails;
 import com.thinkerscave.common.orgm.repository.OrganizationRepository;
@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -91,6 +93,12 @@ public class OrganizationServiceImpl implements OrganizationService {
                 savedOrg.getOrgCode(),
                 savedUser.getUserCode()
         );
+    }
+
+    @Override
+    public List<Organisation> getAllOrgs() {
+        List<Organisation> all = organizationRepository.findAll();
+        return all;
     }
 
 

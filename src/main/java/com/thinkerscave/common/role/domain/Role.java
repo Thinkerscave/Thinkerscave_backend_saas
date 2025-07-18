@@ -1,5 +1,6 @@
 package com.thinkerscave.common.role.domain;
 
+import com.thinkerscave.common.auditing.Auditable;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;

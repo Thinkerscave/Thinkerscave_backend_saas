@@ -1,4 +1,4 @@
-package com.thinkerscave.common.orgm.config;
+package com.thinkerscave.common.config;
 
 /**
  * TenantContext stores and manages the current tenant identifier at the thread level.

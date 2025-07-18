@@ -1,4 +1,4 @@
-package com.thinkerscave.common.usrm.config;
+package com.thinkerscave.common.auditing;
 
 import org.springframework.data.domain.AuditorAware;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;

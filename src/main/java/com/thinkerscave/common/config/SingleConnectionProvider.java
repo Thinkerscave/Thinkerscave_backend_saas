@@ -1,4 +1,4 @@
-package com.thinkerscave.common.orgm.config;
+package com.thinkerscave.common.config;
 
 import org.hibernate.engine.jdbc.connections.spi.ConnectionProvider;
 import org.hibernate.service.UnknownUnwrapTypeException;

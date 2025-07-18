@@ -1,7 +1,7 @@
 package com.thinkerscave.common.orgm.service;
 
 
-import com.thinkerscave.common.orgm.config.SingleConnectionProvider;
+import com.thinkerscave.common.config.SingleConnectionProvider;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;

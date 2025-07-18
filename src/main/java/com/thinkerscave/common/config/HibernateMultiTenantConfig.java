@@ -1,4 +1,4 @@
-package com.thinkerscave.common.orgm.config;
+package com.thinkerscave.common.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

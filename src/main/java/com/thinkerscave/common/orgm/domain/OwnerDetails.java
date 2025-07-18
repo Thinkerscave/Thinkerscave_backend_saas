@@ -1,6 +1,6 @@
 package com.thinkerscave.common.orgm.domain;
 
-import com.thinkerscave.common.usrm.domain.Auditable;
+import com.thinkerscave.common.auditing.Auditable;
 import com.thinkerscave.common.usrm.domain.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

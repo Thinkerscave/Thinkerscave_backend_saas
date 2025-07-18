@@ -1,4 +1,4 @@
-package com.thinkerscave.common.orgm.config;
+package com.thinkerscave.common.config;
 
 import org.hibernate.engine.jdbc.connections.spi.MultiTenantConnectionProvider;
 import org.springframework.beans.factory.annotation.Autowired;

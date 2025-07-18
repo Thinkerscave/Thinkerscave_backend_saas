@@ -1,4 +1,4 @@
-package com.thinkerscave.common.orgm.config;
+package com.thinkerscave.common.config;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;

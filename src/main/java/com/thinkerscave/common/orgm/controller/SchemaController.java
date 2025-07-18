@@ -1,7 +1,7 @@
 package com.thinkerscave.common.orgm.controller;
 
 
-import com.thinkerscave.common.orgm.config.TenantContext;
+import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.orgm.service.SchemaInitializer;
 import com.thinkerscave.common.orgm.service.SchemaService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -94,14 +94,26 @@ public class SchemaController {
             }
     )
     @PostMapping("/create-and-init")
-    public ResponseEntity<String> createAndInit(@RequestParam String name) {
-        if (schemaService.schemaExists(name)) {
+    public ResponseEntity<String> createAndInit(@RequestParam(required = false) String name) {
+        // Default to 'public' if name is null or blank
+        String schemaName = (name == null || name.isBlank()) ? "public" : name;
+
+        if (schemaService.schemaExists(schemaName)) {
             return ResponseEntity.badRequest().body("Schema already exists");
         }
 
-        schemaService.createSchema(name);
-        schemaInitializer.createTablesForSchema(name);
-        return ResponseEntity.ok("Schema and tables created for: " + name);
+        schemaService.createSchema(schemaName);
+        schemaInitializer.createTablesForSchema(schemaName);
+        return ResponseEntity.ok("Schema and tables created for: " + schemaName);
+    }
+
+
+    @PostMapping("/init")
+    public ResponseEntity<String> init(@RequestParam(required = false) String name) {
+        // Default to 'public' if name is null or blank
+        String schemaName = (name == null || name.isBlank()) ? "public" : name;
+        schemaInitializer.createTablesForSchema(schemaName);
+        return ResponseEntity.ok("Tables created for: " + schemaName);
     }
 
     @Operation(
@@ -140,9 +152,15 @@ public class SchemaController {
 
     @GetMapping("/check")
     public ResponseEntity<?> checkSchemaTables() {
+        // Get tenant (schema) name from context
         String schemaName = TenantContext.getTenant();
+
+        // Default to "public" if null or blank
+        schemaName = (schemaName == null || schemaName.isBlank()) ? "public" : schemaName;
+
         try {
             List<String> missingTables = schemaService.getMissingTables(schemaName);
+
             if (missingTables.isEmpty()) {
                 return ResponseEntity.ok(Map.of(
                         "schema", schemaName,
@@ -157,11 +175,13 @@ public class SchemaController {
                         "message", "Some tables are missing."
                 ));
             }
+
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
                     "schema", schemaName,
                     "error", e.getMessage()
             ));
+
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                     "schema", schemaName,
@@ -170,9 +190,14 @@ public class SchemaController {
         }
     }
 
+
     @PostMapping("/validate-tables")
     public ResponseEntity<?> validateAndCreateTables(@RequestBody List<String> tableNames) {
-        String schemaName = TenantContext.getTenant();  // Set by your TenantFilter
+        // Get tenant (schema) name from context
+        String schemaName = TenantContext.getTenant();
+
+        // Default to "public" if null or blank
+        schemaName = (schemaName == null || schemaName.isBlank()) ? "public" : schemaName;
 
         List<String> missingTables = schemaService.getMissingTables(schemaName);
 

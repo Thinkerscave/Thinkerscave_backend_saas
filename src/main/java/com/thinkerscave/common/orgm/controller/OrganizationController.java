@@ -1,7 +1,8 @@
 package com.thinkerscave.common.orgm.controller;
 
 import com.thinkerscave.common.exception.SchemaCreationException;
-import com.thinkerscave.common.orgm.config.TenantContext;
+import com.thinkerscave.common.config.TenantContext;
+import com.thinkerscave.common.orgm.domain.Organisation;
 import com.thinkerscave.common.orgm.dto.OrgRegistrationRequest;
 import com.thinkerscave.common.orgm.dto.OrgRegistrationResponse;
 import com.thinkerscave.common.orgm.service.OrganizationService;
@@ -18,6 +19,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Collections;
+import java.util.List;
 
 @CrossOrigin("*")
 @RestController
@@ -87,4 +91,25 @@ public class OrganizationController {
                     .body("Unexpected error: " + e.getMessage());
         }
     }
+
+    @GetMapping("/all")
+    @Operation(
+            summary = "Get all organizations",
+            parameters = {
+                    @Parameter(name = "X-Tenant-ID", description = "Schema Name", required = true,
+                            example = "master", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+            }
+    )
+    public ResponseEntity<List<Organisation>> getAllOrganizations() {
+        try {
+            List<Organisation> organizations = organizationService.getAllOrgs();
+            return ResponseEntity.ok(organizations);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.emptyList());
+        }
+    }
+
+
+
 }

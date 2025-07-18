@@ -1,4 +1,4 @@
-package com.thinkerscave.common.usrm.config;
+package com.thinkerscave.common.auditing;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;

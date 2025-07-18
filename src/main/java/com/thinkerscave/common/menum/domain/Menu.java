@@ -1,18 +1,14 @@
 package com.thinkerscave.common.menum.domain;
 
-import com.thinkerscave.common.menum.domain.Auditable;
+import com.thinkerscave.common.auditing.Auditable;
 import jakarta.persistence.*;
 import lombok.Data;
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-import java.time.LocalDateTime;
 
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @Data
-@Table(name = "menu")
+@Table(name = "menu_master")
 public class Menu extends Auditable {
 
     @Id
