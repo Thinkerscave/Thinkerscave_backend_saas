@@ -2,7 +2,7 @@ package com.thinkerscave.common.usrm.service.impl;
 
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.repository.UserRepository;
-import com.thinkerscave.common.usrm.security.UserInfoUserDetails;
+import com.thinkerscave.common.security.UserInfoUserDetails;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetailsService;

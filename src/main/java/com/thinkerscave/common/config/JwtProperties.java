@@ -1,4 +1,4 @@
-package com.thinkerscave.common.usrm.config;
+package com.thinkerscave.common.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;

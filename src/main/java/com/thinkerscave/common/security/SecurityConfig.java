@@ -1,6 +1,6 @@
-package com.thinkerscave.common.usrm.security;
+package com.thinkerscave.common.security;
 
-import com.thinkerscave.common.usrm.filter.JwtAuthFilter;
+import com.thinkerscave.common.filter.JwtAuthFilter;
 import com.thinkerscave.common.usrm.service.impl.UserUserInfoDetailsService;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +59,7 @@ public class SecurityConfig {
                                 "/api/organizations/**",
                                 "/api/roles/**",
                                 "/api/menu/**",
+                                "/api/submenu/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html"

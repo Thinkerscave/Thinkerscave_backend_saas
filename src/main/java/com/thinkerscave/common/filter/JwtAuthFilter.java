@@ -1,4 +1,4 @@
-package com.thinkerscave.common.usrm.filter;
+package com.thinkerscave.common.filter;
 
 import com.thinkerscave.common.usrm.service.JwtService;
 import com.thinkerscave.common.usrm.service.impl.UserUserInfoDetailsService;
