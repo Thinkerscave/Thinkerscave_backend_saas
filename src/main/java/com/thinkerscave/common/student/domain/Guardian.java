@@ -1,5 +1,7 @@
 package com.thinkerscave.common.student.domain;
 
+
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.thinkerscave.common.usrm.domain.User;
 import jakarta.persistence.*;
@@ -57,3 +59,4 @@ public class Guardian {
     @JsonIgnore
     private List<Student> students = new ArrayList<>();
 }
+

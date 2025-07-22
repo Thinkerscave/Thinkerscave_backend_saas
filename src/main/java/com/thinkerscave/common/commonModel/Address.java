@@ -1,8 +1,6 @@
 package com.thinkerscave.common.commonModel;
 
 import jakarta.persistence.Column;
-
-
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -23,6 +21,6 @@ public class Address {
     @Column(columnDefinition = "TEXT")
     private String addressLine;
 
-    // Getters and Setters
+
 }
 

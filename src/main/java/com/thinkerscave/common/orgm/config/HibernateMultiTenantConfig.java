@@ -69,7 +69,8 @@ public class HibernateMultiTenantConfig {
         emf.setPackagesToScan(
                 "com.thinkerscave.common.usrm.domain",
                 "com.thinkerscave.common.role.domain",
-                "com.thinkerscave.common.orgm.domain"
+                "com.thinkerscave.common.orgm.domain",
+                "com.thinkerscave.common.student.domain"
         );
         emf.setJpaVendorAdapter(jpaVendorAdapter);
         emf.setJpaPropertyMap(properties);

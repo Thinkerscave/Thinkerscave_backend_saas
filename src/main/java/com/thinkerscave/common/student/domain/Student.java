@@ -35,6 +35,8 @@ public class Student extends Auditable{
     @Column(length = 10)
     private String gender;
 
+    private Long age;
+
 
     // One-to-one relation for current address
     @OneToOne(cascade = CascadeType.ALL)

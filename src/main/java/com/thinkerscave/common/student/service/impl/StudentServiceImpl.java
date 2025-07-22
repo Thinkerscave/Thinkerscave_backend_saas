@@ -12,6 +12,7 @@ import com.thinkerscave.common.student.repository.SectionRepository;
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.repository.UserRepository;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
+@Slf4j
 public class StudentServiceImpl implements StudentService{
 
 	private static final Logger logger = LoggerFactory.getLogger(StudentServiceImpl.class);
@@ -40,13 +42,13 @@ public class StudentServiceImpl implements StudentService{
 
 	private final Path rootLocation = Paths.get("uploads");
 
-	private final UserRepository userRepository;
+	private  UserRepository userRepository;
 
-	private final RoleRepository roleRepository;
-	private final GuardianRepository guardianRepository;
-	private final StudentRepository studentRepository;
-	private final ClassRepository classRepository;
-	private final SectionRepository sectionRepository;
+	private  RoleRepository roleRepository;
+	private GuardianRepository guardianRepository;
+	private  StudentRepository studentRepository;
+	private  ClassRepository classRepository;
+	private  SectionRepository sectionRepository;
 
 	@Autowired
 	private PasswordEncoder passwordEncoder;
@@ -172,6 +174,8 @@ public class StudentServiceImpl implements StudentService{
 				student.setEnrollmentDate(dto.getEnrollmentDate());
 				student.setRollNumber(dto.getRollNumber());
 				student.setRemarks(dto.getRemarks());
+			//	student.setAge(Long.parseLong(dto.getAge()));
+				student.setAge(10L);
 
 				Address current = new Address();
 				current.setCountry(dto.getCurrentCountry());
@@ -179,16 +183,18 @@ public class StudentServiceImpl implements StudentService{
 				current.setCity(dto.getCurrentCity());
 				current.setZipCode(dto.getCurrentZipCode());
 				current.setAddressLine(dto.getCurrentAddressLine());
+				System.out.println("IN dto same adress"+dto.getIsSameAddress());
 
-				Address permanent = dto.isSameAddress() ? current : new Address();
-				if (!dto.isSameAddress()) {
+				Address permanent = dto.getIsSameAddress() ? current : new Address();
+				if (!dto.getIsSameAddress()) {
+
 					permanent.setCountry(dto.getPermanentCountry());
 					permanent.setState(dto.getPermanentState());
 					permanent.setCity(dto.getPermanentCity());
 					permanent.setZipCode(dto.getPermanentZipCode());
 					permanent.setAddressLine(dto.getPermanentAddressLine());
 				}
-
+				student.setSameAddress(dto.getIsSameAddress());
 				student.setCurrentAddress(current);
 				student.setPermanentAddress(permanent);
 				student.setUser(studentUser);
@@ -229,17 +235,20 @@ public class StudentServiceImpl implements StudentService{
 
 
 	private String saveFile(MultipartFile file, String prefix) throws IOException {
+		System.out.println("In save FIle");
 		if (file == null || file.isEmpty()) return "File is null";
 
-
+		log.info("In save Document");
 		Path destination = rootLocation.resolve(prefix).normalize().toAbsolutePath();
 
 		// Security check
 		if (!destination.getParent().equals(rootLocation.toAbsolutePath())) {
+			log.info("In save Document 1");
 			throw new IOException("Cannot store file outside current directory.");
 		}
 
 		try (var inputStream = file.getInputStream()) {
+
 			Files.copy(inputStream, destination, StandardCopyOption.REPLACE_EXISTING);
 			return destination.toString();
 		}
