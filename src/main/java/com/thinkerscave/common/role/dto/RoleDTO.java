@@ -12,5 +12,7 @@ public class RoleDTO {
 	private String roleName;
 	private String roleCode;
 	private String description;
+	private Boolean isActive;
+
 
 }

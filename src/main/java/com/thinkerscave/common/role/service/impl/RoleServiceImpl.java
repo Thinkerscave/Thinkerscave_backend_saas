@@ -19,82 +19,66 @@ public class RoleServiceImpl implements RoleService {
 	private RoleRepository repository;
 
 	@Override
-	public Role saveData(RoleDTO dto) {
-		Role role = new Role();
-		BeanUtils.copyProperties(dto, role);
+	public String saveOrUpdateRole(String code, RoleDTO dto) {
+		Role role;
 
-		// Generate Role Code if not already provided
-		if (dto.getRoleCode() == null || dto.getRoleCode().isBlank()) {
-			// For example, create code like "ROLE_ADMIN_001"
-			String baseCode = "ROLE_" + dto.getRoleName().toUpperCase().replaceAll("\\s+", "_");
-			String uniqueSuffix = UUID.randomUUID().toString().substring(0, 5).toUpperCase();  // or use a custom ID generator
-			role.setRoleCode(baseCode + "_" + uniqueSuffix);
+		if (code == null || code.isBlank()) {
+			// New Role Creation
+			role = new Role();
+			BeanUtils.copyProperties(dto, role);
+
+			// Generate Role Code if not provided
+			if (dto.getRoleCode() == null || dto.getRoleCode().isBlank()) {
+				String baseCode = "ROLE_" + dto.getRoleName().toUpperCase().replaceAll("\\s+", "_");
+				String uniqueSuffix = UUID.randomUUID().toString().substring(0, 5).toUpperCase();
+				role.setRoleCode(baseCode + "_" + uniqueSuffix);
+			} else {
+				role.setRoleCode(dto.getRoleCode());
+			}
+
+		} else {
+			// Update existing Role using roleCode
+			role = repository.findByRoleCode(code)
+					.orElseThrow(() -> new RuntimeException("Role not found with code: " + code));
+
+			// Update fields
+			role.setRoleName(dto.getRoleName());
+			role.setDescription(dto.getDescription());
+			role.setIsActive(dto.getIsActive());
 		}
 
-		return repository.save(role);
-	}
+		repository.save(role);
 
+		return (code == null || code.isBlank()) ? "Role created successfully" : "Role updated successfully";
+	}
 
 
 	@Override
 	public List<Role> allRecords() {
-
 		return repository.findAllRoles();
 	}
 
-	
-	//Soft Deletion
 	@Override
-	public void delete(Long id) {
-
-		if(id!=null)
-		{
-			Role role = repository.findById(id).get();
-			
-			if(role.getIsActive())
-			{
-				role.setIsActive(false);
-				repository.save(role);
-			}
+	public void delete(String code) {
+		if (code == null || code.isBlank()) {
+			throw new IllegalArgumentException("Role code must not be null or blank for deletion");
 		}
-		else {
-			System.out.println("Id is null");
+
+		Role role = repository.findByRoleCode(code)
+				.orElseThrow(() -> new RuntimeException("Role not found with code: " + code));
+
+		if (Boolean.TRUE.equals(role.getIsActive())) {
+			role.setIsActive(false);
+			repository.save(role);
 		}
-		
-		
 	}
-
-
 
 	@Override
-	public Role editRoleData(Long id) {
-
-		return repository.findById(id).get(); 
+	public Role editRoleData(String code) {
+		return repository.findByRoleCode(code)
+				.orElseThrow(() -> new RuntimeException("Role not found with code: " + code));
 	}
 
 
-	@Override
-	public String updateRole(Long id, RoleDTO dto) {
-		//Fetch role by id
-	   // System.out.println("Institute In Service"+instituteRepo.findById(dto.getInstitute()).get());
 
-		Role existingRole = repository.findById(id)
-	            .orElseThrow(() -> new RuntimeException("Role not found"));
-
-	    System.out.println(existingRole);
-
-	    // Update fields
-	    existingRole.setRoleName(dto.getRoleName());
-	    existingRole.setDescription(dto.getDescription());
-
-	    System.out.println(existingRole);
-	    
-	    // Save updated role
-	    repository.save(existingRole);		
-	    
-	    return "Role updated successfully";
-	}
-
-	
-	
 }

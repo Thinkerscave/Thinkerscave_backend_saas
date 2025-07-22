@@ -8,9 +8,9 @@ import java.util.List;
 
 public interface RoleService {
 
-	public Role saveData(RoleDTO dto);
-	public List<Role> allRecords();
-	public void delete(Long id);
-	public Role editRoleData(Long id);
-	public String updateRole( Long id, RoleDTO dto);
+	String saveOrUpdateRole(String code, RoleDTO dto);
+	List<Role> allRecords();
+	void delete(String code);
+	Role editRoleData(String code);
+
 }

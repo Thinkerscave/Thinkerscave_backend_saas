@@ -12,7 +12,7 @@ import java.util.Optional;
 @Repository
 public interface RoleRepository extends JpaRepository<Role, Long> {
 	
-	@Query("SELECT r FROM Role r WHERE r.isActive = true")
+	@Query("SELECT r FROM role_master r WHERE r.isActive = true")
 	List<Role> findAllRoles();
 
 	Optional<Role> findByRoleName(String roleName);

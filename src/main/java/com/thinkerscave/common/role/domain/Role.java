@@ -9,7 +9,7 @@ import java.util.UUID;
 
 @Data
 @EntityListeners(AuditingEntityListener.class)
-@Entity
+@Entity(name = "role_master")
 public class Role extends Auditable {
 
 	@Id

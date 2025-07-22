@@ -26,14 +26,26 @@ public class RoleController {
 		return ResponseEntity.ok("Welcome Page");
 	}
 
-	@Operation(summary = "Save a new role")
+	@Operation(summary = "Create a new role")
 	@ApiResponses(value = {
-			@ApiResponse(responseCode = "200", description = "Role saved successfully")
+			@ApiResponse(responseCode = "200", description = "Role created successfully")
 	})
 	@PostMapping("/save")
-	public ResponseEntity<Role> saveData(@RequestBody RoleDTO roleDto) {
-		Role savedRole = roleService.saveData(roleDto);
-		return ResponseEntity.ok(savedRole);
+	public ResponseEntity<String> saveRole(@RequestBody RoleDTO roleDto) {
+		String message = roleService.saveOrUpdateRole(null, roleDto); // Pass null for creation
+		return ResponseEntity.ok(message);
+	}
+
+	@Operation(summary = "Update an existing role by ID")
+	@ApiResponses(value = {
+			@ApiResponse(responseCode = "200", description = "Role updated successfully"),
+			@ApiResponse(responseCode = "404", description = "Role not found")
+	})
+
+	@PutMapping("/update/{code}")
+	public ResponseEntity<String> updateRole(@PathVariable String code, @RequestBody RoleDTO roleDto) {
+		String message = roleService.saveOrUpdateRole(code, roleDto);
+		return ResponseEntity.ok(message);
 	}
 
 	@Operation(summary = "Get all roles")
@@ -43,25 +55,17 @@ public class RoleController {
 		return ResponseEntity.ok(roles);
 	}
 
-	@Operation(summary = "Delete a role by ID")
+	@Operation(summary = "Delete a role by ID (soft delete)")
 	@DeleteMapping("/delete/{id}")
-	public ResponseEntity<String> delete(@PathVariable("id") Long id) {
+	public ResponseEntity<String> delete(@PathVariable("id") String id) {
 		roleService.delete(id);
 		return ResponseEntity.ok("Deleted successfully");
 	}
 
-
 	@Operation(summary = "Get a role by ID (view only)")
 	@GetMapping("/view/{id}")
-	public ResponseEntity<Role> viewOne(@PathVariable("id") Long id) {
-		Role role = roleService.editRoleData(id); // Same as edit
+	public ResponseEntity<Role> viewOne(@PathVariable("id") String id) {
+		Role role = roleService.editRoleData(id); // Same as view
 		return ResponseEntity.ok(role);
-	}
-
-	@Operation(summary = "Update an existing role by ID")
-	@PutMapping("/update/{id}")
-	public ResponseEntity<String> updateRole(@PathVariable Long id, @RequestBody RoleDTO dto) {
-		String message = roleService.updateRole(id, dto);
-		return ResponseEntity.ok(message);
 	}
 }
