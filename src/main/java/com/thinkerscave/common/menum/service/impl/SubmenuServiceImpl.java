@@ -1,72 +1,101 @@
 package com.thinkerscave.common.menum.service.impl;
 
 import com.thinkerscave.common.menum.domain.Submenu;
-import com.thinkerscave.common.menum.repository.SubmenuRepository;
+import com.thinkerscave.common.menum.dto.SubmenuDTO;
+import com.thinkerscave.common.menum.repository.SubmenuRepo;
 import com.thinkerscave.common.menum.service.SubmenuService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.Optional;
-
+import java.util.*;
+/**
+ * Service implementation for managing Submenu entities.
+ * Handles create, update, retrieve, sequencing, and soft deletion operations.
+ *
+ * @author Sandeep
+ */
 @Service
 public class SubmenuServiceImpl implements SubmenuService {
 
     @Autowired
-    private SubmenuRepository submenuRepo;
+    private SubmenuRepo submenuRepo;
 
+    /** Saves a new submenu or updates an existing one by code. */
     @Override
-    public Submenu createSubmenu(Submenu submenu) {
+    public Submenu saveOrUpdateSubmenu(String code, Submenu updatedData) {
+        Submenu submenu;
+
+        if (code == null || code.isBlank()) {
+            // Create new submenu
+            submenu = new Submenu();
+            submenu.setSubmenuCode(generateSubmenuCode(updatedData.getSubmenuName()));
+
+            // Auto-assign sequence if not provided
+            if (updatedData.getSequence() == null) {
+                Integer maxSeq = submenuRepo.findMaxSequence();
+                submenu.setSequence((maxSeq == null) ? 1 : maxSeq + 1);
+            } else {
+                submenu.setSequence(updatedData.getSequence());
+            }
+
+        } else {
+            // Update existing submenu
+            submenu = submenuRepo.findBySubmenuCode(code)
+                    .orElseThrow(() -> new RuntimeException("Submenu not found with code: " + code));
+        }
+
+        submenu.setSubmenuName(updatedData.getSubmenuName());
+        submenu.setUrl(updatedData.getUrl());
+        submenu.setIcon(updatedData.getIcon());
+        submenu.setSequence(updatedData.getSequence());
+        submenu.setIsActive(updatedData.getIsActive() != null ? updatedData.getIsActive() : true);
+        submenu.setMenu(updatedData.getMenu());
+
         return submenuRepo.save(submenu);
     }
 
+    /** Returns a submenu by its code. */
     @Override
-    public Submenu updateSubmenu(Long id, Submenu updatedData) {
-        Submenu existing = submenuRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("Submenu not found with id: " + id));
-
-        existing.setSubmenuName(updatedData.getSubmenuName());
-        existing.setSubmenuCode(updatedData.getSubmenuCode());
-        existing.setUrl(updatedData.getUrl());
-        existing.setIcon(updatedData.getIcon());
-        existing.setSequence(updatedData.getSequence());
-        existing.setIsActive(updatedData.getIsActive());
-        existing.setTooltip(updatedData.getTooltip());
-        existing.setComponentName(updatedData.getComponentName());
-        existing.setPermissionKey(updatedData.getPermissionKey());
-        existing.setIsVisible(updatedData.getIsVisible());
-        existing.setDeleted(updatedData.getDeleted());
-        existing.setMenu(updatedData.getMenu());
-
-        return submenuRepo.save(existing);
+    public Optional<Submenu> getSubmenu(String code) {
+        return submenuRepo.findBySubmenuCode(code);
     }
 
-    @Override
-    public Optional<Submenu> getSubmenuById(Long id) {
-        return submenuRepo.findById(id);
-    }
-
+    /** Returns all submenus sorted by sequence. */
     @Override
     public List<Submenu> getAllSubmenus() {
-        return submenuRepo.findAll();
+        return submenuRepo.findAllByOrderBySequenceAsc();
     }
 
+    /** Returns all active submenus sorted by sequence. */
     @Override
     public List<Submenu> getAllActiveSubmenus() {
-        return submenuRepo.findByIsActiveTrue();
+        return submenuRepo.findByIsActiveTrueOrderBySequenceAsc();
     }
 
+    /** Marks a submenu as inactive (soft delete) by code. */
     @Override
-    public String softDeleteSubmenu(Long id) {
-        Optional<Submenu> submenuOptional = submenuRepo.findById(id);
-        if (submenuOptional.isPresent()) {
-            Submenu submenu = submenuOptional.get();
-            submenu.setIsActive(false);
-            submenu.setDeleted(true);
+    public String softDeleteSubmenu(String code) {
+        Submenu submenu = submenuRepo.findBySubmenuCode(code)
+                .orElseThrow(() -> new RuntimeException("Submenu not found with code: " + code));
+
+        submenu.setIsActive(false);
+        submenuRepo.save(submenu);
+        return "Submenu soft-deleted successfully.";
+    }
+
+    /** Updates the sequence numbers of multiple submenus. */
+    @Override
+    public void updateSequences(List<SubmenuDTO> sequenceList) {
+        for (SubmenuDTO dto : sequenceList) {
+            Submenu submenu = submenuRepo.findBySubmenuCode(dto.getSubmenuCode())
+                    .orElseThrow(() -> new RuntimeException("Submenu not found: " + dto.getSubmenuCode()));
+            submenu.setSequence(dto.getSequence());
             submenuRepo.save(submenu);
-            return "Submenu soft deleted successfully.";
-        } else {
-            throw new RuntimeException("Submenu not found with id: " + id);
         }
+    }
+
+    /** Generates a unique submenu code from the submenu name. */
+    private String generateSubmenuCode(String name) {
+        String base = (name != null) ? name.toUpperCase().replaceAll("\\s+", "_") : "SUBMENU";
+        return "SUB_" + base + "_" + UUID.randomUUID().toString().substring(0, 5).toUpperCase();
     }
 }

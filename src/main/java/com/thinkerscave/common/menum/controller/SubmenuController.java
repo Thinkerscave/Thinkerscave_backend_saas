@@ -1,6 +1,7 @@
 package com.thinkerscave.common.menum.controller;
 
 import com.thinkerscave.common.menum.domain.Submenu;
+import com.thinkerscave.common.menum.dto.SubmenuDTO;
 import com.thinkerscave.common.menum.service.SubmenuService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
@@ -8,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
+@CrossOrigin("*")
 @RestController
 @RequestMapping("/api/submenu")
 public class SubmenuController {
@@ -18,29 +20,29 @@ public class SubmenuController {
     // ✅ Create Submenu
     @PostMapping
     public ResponseEntity<Object> createSubmenu(@RequestBody Submenu submenu) {
-        Submenu created = submenuService.createSubmenu(submenu);
+        Submenu created = submenuService.saveOrUpdateSubmenu(null, submenu); // null means create
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    // ✅ Update Submenu
-    @PutMapping("/{id}")
-    public ResponseEntity<Object> updateSubmenu(@PathVariable Long id, @RequestBody Submenu submenu) {
+    // ✅ Update Submenu by Code
+    @PutMapping("/{code}")
+    public ResponseEntity<Object> updateSubmenu(@PathVariable String code, @RequestBody Submenu submenu) {
         try {
-            Submenu updated = submenuService.updateSubmenu(id, submenu);
+            Submenu updated = submenuService.saveOrUpdateSubmenu(code, submenu);
             return ResponseEntity.ok(updated);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Collections.singletonMap("error", e.getMessage()));
         }
     }
 
-    // ✅ Get Submenu by ID
-    @GetMapping("/{id}")
-    public ResponseEntity<Object> getSubmenuById(@PathVariable Long id) {
-        Optional<Submenu> submenu = submenuService.getSubmenuById(id);
+    // ✅ Get Submenu by Code
+    @GetMapping("/{code}")
+    public ResponseEntity<Object> getSubmenuByCode(@PathVariable String code) {
+        Optional<Submenu> submenu = submenuService.getSubmenu(code);
         if (submenu.isPresent()) {
             return ResponseEntity.ok(submenu.get());
         } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Submenu not found with ID: " + id);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Submenu not found with code: " + code);
         }
     }
 
@@ -65,13 +67,23 @@ public class SubmenuController {
     }
 
     // ✅ Soft Delete Submenu
-    @PutMapping("/delete/{id}")
-    public ResponseEntity<Object> softDeleteSubmenu(@PathVariable Long id) {
+    @PutMapping("/delete/{code}")
+    public ResponseEntity<Object> softDeleteSubmenu(@PathVariable String code) {
         try {
-            String message = submenuService.softDeleteSubmenu(id);
+            String message = submenuService.softDeleteSubmenu(code);
             return ResponseEntity.ok(message);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/sequence-update")
+    public ResponseEntity<Object> updateSubmenuSequences(@RequestBody List<SubmenuDTO> sequenceList) {
+        try {
+            submenuService.updateSequences(sequenceList);
+            return ResponseEntity.ok("Submenu sequences updated successfully");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
 }

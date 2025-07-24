@@ -16,6 +16,9 @@ public class Menu extends Auditable {
     @Column(name = "menu_id")
     private Long menuId;
 
+    @Column(name="menu_code")
+    private String menuCode;
+
     @Column(nullable = false, length = 50)
     private String name;
 

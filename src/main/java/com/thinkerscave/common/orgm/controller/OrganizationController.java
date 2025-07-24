@@ -3,8 +3,10 @@ package com.thinkerscave.common.orgm.controller;
 import com.thinkerscave.common.exception.SchemaCreationException;
 import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.orgm.domain.Organisation;
-import com.thinkerscave.common.orgm.dto.OrgRegistrationRequest;
-import com.thinkerscave.common.orgm.dto.OrgRegistrationResponse;
+
+import com.thinkerscave.common.orgm.dto.OrgRequestDTO;
+import com.thinkerscave.common.orgm.dto.OrgResponseDTO;
+import com.thinkerscave.common.orgm.dto.OwnerDTO;
 import com.thinkerscave.common.orgm.service.OrganizationService;
 import com.thinkerscave.common.orgm.service.SchemaInitializer;
 import com.thinkerscave.common.orgm.service.SchemaService;
@@ -52,7 +54,7 @@ public class OrganizationController {
                             description = "Successfully registered organization",
                             content = @Content(
                                     mediaType = "application/json",
-                                    schema = @Schema(implementation = OrgRegistrationResponse.class),
+                                    schema = @Schema(implementation = OrgResponseDTO.class),
                                     examples = @ExampleObject(value = """
                         {
                           "message": "Organization registered successfully",
@@ -66,20 +68,20 @@ public class OrganizationController {
                     @ApiResponse(responseCode = "500", description = "Internal server error")
             }
     )
-    public ResponseEntity<?> registerOrganization(@RequestBody OrgRegistrationRequest request) {
+    public ResponseEntity<?> registerOrganization(@RequestBody OrgRequestDTO request) {
         String schema = TenantContext.getTenant();  // This will be tenant/schema name
 
         try {
-            if (schemaService.schemaExists(schema)) {
-                return ResponseEntity.badRequest().body("Schema already exists");
-            }
-
-            // Create Schema and Tables
-            schemaService.createSchema(schema);
-            schemaInitializer.createTablesForSchema(schema);
+//            if (schemaService.schemaExists(schema)) {
+//                return ResponseEntity.badRequest().body("Schema already exists");
+//            }
+//
+//            // Create Schema and Tables
+//            schemaService.createSchema(schema);
+//            schemaInitializer.createTablesForSchema(schema);
 
             // Register Organization
-            OrgRegistrationResponse response = organizationService.registerOrg(request);
+            OrgResponseDTO response = organizationService.saveOrganization(request);
             return ResponseEntity.ok(response);
 
         } catch (SchemaCreationException e) {
@@ -109,6 +111,22 @@ public class OrganizationController {
                     .body(Collections.emptyList());
         }
     }
+
+    @DeleteMapping("/{orgCode}")
+    public ResponseEntity<String> softDeleteOrg(@PathVariable String orgCode) {
+        String result = organizationService.softDeleteOrg(orgCode);
+        return ResponseEntity.ok(result);
+    }
+
+
+    @PutMapping("/owner/update")
+    public ResponseEntity<String> updateOwnerDetails(@RequestBody OwnerDTO dto) {
+        organizationService.updateOwnerDetailsWithUser(dto);
+        return ResponseEntity.ok("Owner and user details updated successfully.");
+    }
+
+
+
 
 
 

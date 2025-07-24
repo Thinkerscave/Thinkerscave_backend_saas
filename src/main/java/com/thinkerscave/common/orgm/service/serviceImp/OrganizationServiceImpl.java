@@ -1,52 +1,56 @@
 package com.thinkerscave.common.orgm.service.serviceImp;
-
-
 import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.orgm.domain.Organisation;
 import com.thinkerscave.common.orgm.domain.OwnerDetails;
+import com.thinkerscave.common.orgm.dto.OrgRequestDTO;
+import com.thinkerscave.common.orgm.dto.OrgResponseDTO;
+import com.thinkerscave.common.orgm.dto.OwnerDTO;
 import com.thinkerscave.common.orgm.repository.OrganizationRepository;
 import com.thinkerscave.common.orgm.repository.OwnerDetailsRepository;
-import com.thinkerscave.common.orgm.dto.OrgRegistrationRequest;
-import com.thinkerscave.common.orgm.dto.OrgRegistrationResponse;
 import com.thinkerscave.common.orgm.service.OrganizationService;
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Implementation of OrganizationService to manage organization creation, updates, and soft deletions.
+ * Handles user and owner detail linkage during organization registration.
+ *
+ * @author Sandeep
+ */
 @Service
 @RequiredArgsConstructor
 public class OrganizationServiceImpl implements OrganizationService {
+
+    private static final Logger logger = LoggerFactory.getLogger(OrganizationServiceImpl.class);
 
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
     private final OwnerDetailsRepository ownerDetailsRepository;
 
+    /** Saves organization along with user and owner details. */
     @Override
     @Transactional
-    public OrgRegistrationResponse registerOrg(OrgRegistrationRequest request) {
-
-        // ✅ Step 0: Get Tenant (schema) from context
+    public OrgResponseDTO saveOrganization(OrgRequestDTO request) {
         String schema = TenantContext.getTenant();
         if (schema == null) {
             throw new IllegalStateException("Tenant (schema) not set. Please provide 'X-Tenant-ID' in the header.");
         }
-        System.out.println("📦 [TenantContext] Active schema: " + schema);
 
-        // ✅ Step 1: Create User
-        System.out.println("👤 [User] Creating user with name: " + request.getName());
-        User user = new User();
+        // Step 1: Handle User
+        logger.info("👤 [User] Preparing user data for: {}", request.getName());
         String[] names = request.getName().split(" ", 3);
+        User user = new User();
         user.setFirstName(names[0]);
         user.setMiddleName(names.length == 3 ? names[1] : null);
         user.setLastName(names.length >= 2 ? names[names.length - 1] : "");
-
         user.setEmail(request.getMailId());
         user.setMobileNumber(request.getPhoneNumber());
         user.setUserName(generateUniqueUserName(request.getName()));
@@ -57,55 +61,97 @@ public class OrganizationServiceImpl implements OrganizationService {
         user.setUserCode("USER" + UUID.randomUUID().toString().substring(0, 8));
 
         User savedUser = userRepository.save(user);
-        System.out.println("✅ [User] Saved user: " + savedUser.getUserCode());
 
-        // ✅ Step 2: Create Organization
-        System.out.println("🏢 [Organization] Creating organization: " + request.getOrganizationName());
+        // Step 2: Create New Organization
         Organisation organisation = new Organisation();
+        organisation.setOrgCode("ORG" + UUID.randomUUID().toString().substring(0, 8));
         organisation.setOrgName(request.getOrganizationName());
         organisation.setBrandName(request.getBrandName());
         organisation.setType(request.getOrgType());
         organisation.setCity(request.getCity());
         organisation.setState(request.getState());
-        organisation.setCreatedAt(OffsetDateTime.now());
-        organisation.setCreatedBy(user.getUserName());
+        organisation.setCreatedBy(savedUser.getUserName());
         organisation.setUser(savedUser);
-        organisation.setOrgCode("ORG" + UUID.randomUUID().toString().substring(0, 8));
 
         Organisation savedOrg = organizationRepository.save(organisation);
-        System.out.println("✅ [Organization] Saved org: " + savedOrg.getOrgCode());
 
-        // ✅ Step 3: Create OwnerDetails
-        System.out.println("👑 [Owner] Creating owner details...");
+        /// Step 3: Save Owner Details
+        logger.info("👑 [Owner] Creating owner details...");
         OwnerDetails owner = new OwnerDetails();
+        owner.setOwnerCode("OWNR" + UUID.randomUUID().toString().substring(0, 8)); // 👈 generate owner code
         owner.setGender(request.getGender());
         owner.setMailId(request.getMailId());
         owner.setUser(savedUser);
         owner.setOrganization(savedOrg);
-
         ownerDetailsRepository.save(owner);
-        System.out.println("✅ [Owner] Saved owner for user: " + savedUser.getUserName());
 
-        // ✅ Step 4: Return response
-        System.out.println("🚀 [Registration] Completed for tenant: " + schema);
-        return new OrgRegistrationResponse(
+        return new OrgResponseDTO(
                 "Organization successfully registered under tenant: " + schema,
                 savedOrg.getOrgCode(),
                 savedUser.getUserCode()
         );
     }
 
+
+    /** Returns all organizations. */
     @Override
     public List<Organisation> getAllOrgs() {
-        List<Organisation> all = organizationRepository.findAll();
-        return all;
+        return organizationRepository.findAll();
+    }
+
+    /** Soft-deletes an organization by marking it inactive. */
+    @Override
+    @Transactional
+    public String softDeleteOrg(String orgCode) {
+        Optional<Organisation> optionalOrg = organizationRepository.findByOrgCode(orgCode);
+
+        if (optionalOrg.isEmpty()) {
+            return "Organization not found.";
+        }
+
+        Organisation org = optionalOrg.get();
+
+        if (Boolean.FALSE.equals(org.getIsActive())) {
+            return "Organization already inactive.";
+        }
+
+        org.setIsActive(false);
+        organizationRepository.save(org);
+        return "Organization soft-deleted (marked inactive) successfully.";
+    }
+
+    public void updateOwnerDetailsWithUser(OwnerDTO request) {
+        OwnerDetails owner = ownerDetailsRepository.findByOwnerCode(request.getOwnerCode())
+                .orElseThrow(() -> new RuntimeException("Owner not found with code: " + request.getOwnerCode()));
+
+        // Update OwnerDetails
+        owner.setOwnerName(request.getOwnerName());
+        owner.setGender(request.getGender());
+        owner.setMailId(request.getMailId());
+
+        // Update linked User entity
+        User user = owner.getUser();
+        user.setUserName(request.getUserName() != null ? request.getUserName() : user.getUserName());
+        user.setAddress(request.getAddress() != null ? request.getAddress() : user.getAddress());
+        user.setMobileNumber(request.getPhoneNumber() != null ? request.getPhoneNumber() : user.getMobileNumber());
+        user.setCity(request.getCity() != null ? request.getCity() : user.getCity());
+        user.setState(request.getState() != null ? request.getState() : user.getState());
+
+
+        // Save updates
+        userRepository.save(user);
+        ownerDetailsRepository.save(owner);
     }
 
 
+
+
+    /** Generates a unique username using name and timestamp. */
     private String generateUniqueUserName(String fullName) {
         return fullName.toLowerCase().replace(" ", "_") + "_" + System.currentTimeMillis() % 10000;
     }
 
+    /** Generates a random 10-character password. */
     private String generateRandomPassword() {
         return UUID.randomUUID().toString().substring(0, 10);
     }

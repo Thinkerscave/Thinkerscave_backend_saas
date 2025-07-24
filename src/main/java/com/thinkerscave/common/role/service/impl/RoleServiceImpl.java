@@ -12,12 +12,18 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Implementation of RoleService for managing roles.
+ *
+ * @author Sandeep
+ */
 @Service
 public class RoleServiceImpl implements RoleService {
 
 	@Autowired
 	private RoleRepository repository;
 
+	/** Saves or updates a role based on the given code and data. */
 	@Override
 	public String saveOrUpdateRole(String code, RoleDTO dto) {
 		Role role;
@@ -52,12 +58,13 @@ public class RoleServiceImpl implements RoleService {
 		return (code == null || code.isBlank()) ? "Role created successfully" : "Role updated successfully";
 	}
 
-
+	/** Returns all role records. */
 	@Override
 	public List<Role> allRecords() {
 		return repository.findAllRoles();
 	}
 
+	/** Deletes a role by its code. */
 	@Override
 	public void delete(String code) {
 		if (code == null || code.isBlank()) {
@@ -73,12 +80,11 @@ public class RoleServiceImpl implements RoleService {
 		}
 	}
 
+	/** Returns role data by code for editing. */
 	@Override
 	public Role editRoleData(String code) {
 		return repository.findByRoleCode(code)
 				.orElseThrow(() -> new RuntimeException("Role not found with code: " + code));
 	}
-
-
-
 }
+

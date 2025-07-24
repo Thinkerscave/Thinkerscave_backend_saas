@@ -15,10 +15,10 @@ public class Submenu extends Auditable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(name = "submenu_name", nullable = false)
     private String submenuName;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "submenu_code", nullable = false, unique = true)
     private String submenuCode;
 
     private String url;
@@ -31,11 +31,11 @@ public class Submenu extends Auditable {
     private Menu menu;
 
     // Optional Fields
-    private String tooltip;
-    private String componentName;
-    private String permissionKey;
-    private Boolean isVisible = true;
-    private Boolean deleted = false;
+//    private String tooltip;
+//    private String componentName;
+//    private String permissionKey;
+//    private Boolean isVisible = true;
+//    private Boolean deleted = false;
 
     // Getters and Setters
 }

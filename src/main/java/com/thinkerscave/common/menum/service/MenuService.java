@@ -8,11 +8,10 @@ import java.util.List;
 import java.util.Optional;
 
 public interface MenuService {
-	Menu InsertMenu(MenuDTO menu);
+	Menu saveOrUpdateMenu(String code, MenuDTO dto);
 	List<Menu> displayMenudata();
-	Menu updateMenudata(Long id, MenuDTO updateMenuData);
-	Optional<Menu> displaySingleMenudata(Long id);
-	String softDeleteMenu(Long id);
+	Optional<Menu> displaySingleMenudata(String code);
+	String softDeleteMenu(String code);
 
 
 

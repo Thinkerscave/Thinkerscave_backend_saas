@@ -1,6 +1,5 @@
 package com.thinkerscave.common.menum.controller;
 
-
 import com.thinkerscave.common.menum.domain.Menu;
 import com.thinkerscave.common.menum.dto.MenuDTO;
 import com.thinkerscave.common.menum.repository.MenuRepo;
@@ -15,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+@CrossOrigin("*")
 @RestController
 @RequestMapping("/api/menu")
 public class MenuController {
@@ -28,14 +28,14 @@ public class MenuController {
 	// ✅ Insert Menu Data
 	@PostMapping
 	public ResponseEntity<Menu> createMenuData(@RequestBody MenuDTO menu) {
-		Menu insertMenu = menuService.InsertMenu(menu);
-		return ResponseEntity.status(HttpStatus.CREATED).body(insertMenu);
+		Menu createdMenu = menuService.saveOrUpdateMenu(null, menu);  // code = null for insert
+		return ResponseEntity.status(HttpStatus.CREATED).body(createdMenu);
 	}
 
-	// ✅ Update Menu Data
-	@PutMapping("/{id}")
-	public ResponseEntity<Menu> updateMenuData(@PathVariable Long id, @RequestBody MenuDTO menu) {
-		Menu updatedMenu = menuService.updateMenudata(id, menu);
+	// ✅ Update Menu Data by Code
+	@PutMapping("/{code}")
+	public ResponseEntity<Menu> updateMenuData(@PathVariable String code, @RequestBody MenuDTO menu) {
+		Menu updatedMenu = menuService.saveOrUpdateMenu(code, menu);  // code for update
 		return ResponseEntity.ok(updatedMenu);
 	}
 
@@ -48,22 +48,18 @@ public class MenuController {
 				: ResponseEntity.ok(list);
 	}
 
-	// ✅ Get Menu by ID
-	@GetMapping("/{id}")
-	public ResponseEntity<?> getMenuById(@PathVariable Long id) {
-		Optional<Menu> menu = menuService.displaySingleMenudata(id);
-		if (menu.isPresent()) {
-			return ResponseEntity.ok(menu.get());
-		}else {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-		}
-
+	// ✅ Get Menu by Code
+	@GetMapping("/{code}")
+	public ResponseEntity<?> getMenuByCode(@PathVariable String code) {
+		Optional<Menu> menu = menuService.displaySingleMenudata(code);
+		return menu.map(ResponseEntity::ok)
+				.orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
 	}
 
-	// ✅ Soft Delete Menu
-	@PutMapping("/delete/{id}")
-	public ResponseEntity<Map<String, String>> softDeleteMenu(@PathVariable Long id) {
-		String result = menuService.softDeleteMenu(id);
+	// ✅ Soft Delete Menu by Code
+	@PutMapping("/delete/{code}")
+	public ResponseEntity<Map<String, String>> softDeleteMenu(@PathVariable String code) {
+		String result = menuService.softDeleteMenu(code);
 		return ResponseEntity.ok(Collections.singletonMap("message", result));
 	}
 

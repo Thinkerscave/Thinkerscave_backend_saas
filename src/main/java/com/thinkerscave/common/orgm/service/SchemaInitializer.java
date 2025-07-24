@@ -19,6 +19,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Service for initializing and managing schema-specific tables dynamically using Hibernate.
+ * Used for schema-per-tenant architecture in multi-tenant setups.
+ *
+ * @author Sandeep
+ */
 @Service
 public class SchemaInitializer {
 
@@ -32,20 +38,18 @@ public class SchemaInitializer {
             "organisation", com.thinkerscave.common.orgm.domain.Organisation.class,
             "ownerdetails", com.thinkerscave.common.orgm.domain.OwnerDetails.class,
             "menu", com.thinkerscave.common.menum.domain.Menu.class,
-            "submenu_master",com.thinkerscave.common.menum.domain.Submenu.class
+            "submenu_master", com.thinkerscave.common.menum.domain.Submenu.class
     );
 
     public SchemaInitializer(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 
+    /** Creates all required tables for a given schema. */
     public void createTablesForSchema(String schemaName) {
         try (Connection connection = dataSource.getConnection()) {
-
-            // Set the current schema for the connection
             connection.createStatement().execute("SET search_path TO " + schemaName);
 
-            // Build Hibernate ServiceRegistry with connection
             Map<String, Object> settings = new HashMap<>();
             settings.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
             settings.put("hibernate.hbm2ddl.auto", "none");
@@ -55,7 +59,6 @@ public class SchemaInitializer {
                     .addService(ConnectionProvider.class, new SingleConnectionProvider(connection))
                     .build();
 
-            // Load only the required entities dynamically
             Metadata metadata = new MetadataSources(registry)
                     .addAnnotatedClass(com.thinkerscave.common.usrm.domain.User.class)
                     .addAnnotatedClass(com.thinkerscave.common.usrm.domain.PasswordResetToken.class)
@@ -65,12 +68,8 @@ public class SchemaInitializer {
                     .addAnnotatedClass(com.thinkerscave.common.orgm.domain.OwnerDetails.class)
                     .addAnnotatedClass(com.thinkerscave.common.menum.domain.Menu.class)
                     .addAnnotatedClass(com.thinkerscave.common.menum.domain.Submenu.class)
-
-
-                    // Add more .addAnnotatedClass(...) as needed
                     .buildMetadata();
 
-            // Use SchemaExport to create tables in the DB for the schema
             SchemaExport export = new SchemaExport();
             export.setDelimiter(";");
             export.setFormat(true);
@@ -81,10 +80,9 @@ public class SchemaInitializer {
         }
     }
 
+    /** Creates only the missing tables in a given schema. */
     public void createMissingTablesInSchema(String schemaName, List<String> missingTables) {
         try (Connection connection = dataSource.getConnection()) {
-
-            // Set schema
             connection.createStatement().execute("SET search_path TO " + schemaName);
 
             Map<String, Object> settings = new HashMap<>();
@@ -116,5 +114,4 @@ public class SchemaInitializer {
             throw new RuntimeException("Error creating tables in schema: " + schemaName, e);
         }
     }
-
 }

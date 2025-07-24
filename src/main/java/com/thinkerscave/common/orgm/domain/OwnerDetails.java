@@ -22,6 +22,12 @@ public class OwnerDetails extends Auditable {
     @Column(name = "owner_id")
     private Long ownerId;
 
+    @Column(name = "owner_code", nullable = false, unique = true, length = 50)
+    private String ownerCode;
+
+    @Column(name = "owner_name", nullable = false, length = 100)
+    private String ownerName;
+
     @Column(name = "gender", nullable = false, length = 10)
     private String gender;
 
@@ -35,6 +41,4 @@ public class OwnerDetails extends Auditable {
     @OneToOne
     @JoinColumn(name = "org_id", nullable = false)
     private Organisation organization;
-
-
 }
