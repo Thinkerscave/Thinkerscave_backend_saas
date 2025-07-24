@@ -1,6 +1,9 @@
 package com.thinkerscave.common.role.service.impl;
 
 
+import com.thinkerscave.common.menum.domain.Menu;
+import com.thinkerscave.common.menum.dto.MenuDTO;
+import com.thinkerscave.common.menum.repository.MenuRepo;
 import com.thinkerscave.common.role.dto.RoleDTO;
 import com.thinkerscave.common.role.domain.Role;
 import com.thinkerscave.common.role.repository.RoleRepository;
@@ -9,7 +12,9 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -22,6 +27,11 @@ public class RoleServiceImpl implements RoleService {
 
 	@Autowired
 	private RoleRepository repository;
+
+	@Autowired
+	private MenuRepo menuRepo;
+    @Autowired
+    private RoleRepository roleRepository;
 
 	/** Saves or updates a role based on the given code and data. */
 	@Override
@@ -86,5 +96,21 @@ public class RoleServiceImpl implements RoleService {
 		return repository.findByRoleCode(code)
 				.orElseThrow(() -> new RuntimeException("Role not found with code: " + code));
 	}
+
+	@Override
+	public String assignMenu(String roleCode, List<String> menuCodes) {
+		Role role = roleRepository.findByRoleCode(roleCode)
+				.orElseThrow(() -> new RuntimeException("Role not found"));
+
+		List<Menu> menuList = new ArrayList<>();
+		for (String menuCode : menuCodes) {
+			Menu byMenuCode = menuRepo.findByMenuCode(menuCode).get();
+			menuList.add(byMenuCode);
+		}
+		role.setMenus(menuList);
+		roleRepository.save(role);
+
+        return "Menu assigned successfully";
+    }
 }
 

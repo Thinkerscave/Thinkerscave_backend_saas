@@ -1,6 +1,7 @@
 package com.thinkerscave.common.role.service;
 
 
+import com.thinkerscave.common.menum.dto.MenuDTO;
 import com.thinkerscave.common.role.dto.RoleDTO;
 import com.thinkerscave.common.role.domain.Role;
 
@@ -19,4 +20,7 @@ public interface RoleService {
 
 	/** Returns role data by code for editing. */
 	Role editRoleData(String code);
+
+
+	String assignMenu(String roleCode, List<String> menuCode);
 }

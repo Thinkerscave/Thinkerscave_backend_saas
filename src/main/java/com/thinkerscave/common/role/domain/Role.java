@@ -1,11 +1,12 @@
 package com.thinkerscave.common.role.domain;
 
 import com.thinkerscave.common.auditing.Auditable;
+import com.thinkerscave.common.menum.domain.Menu;
 import jakarta.persistence.*;
 import lombok.Data;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-import java.util.UUID;
+import java.util.*;
 
 @Data
 @EntityListeners(AuditingEntityListener.class)
@@ -28,6 +29,12 @@ public class Role extends Auditable {
 
     @Column(name = "is_active")
     private Boolean isActive=true;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "role_menu",
+            joinColumns = @JoinColumn(name = "role_id"),
+            inverseJoinColumns = @JoinColumn(name = "menu_id"))
+    private List<Menu> menus = new ArrayList<>();
 
 
     @PrePersist

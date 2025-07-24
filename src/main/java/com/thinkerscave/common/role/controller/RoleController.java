@@ -1,5 +1,6 @@
 package com.thinkerscave.common.role.controller;
 
+import com.thinkerscave.common.role.dto.AssignMenuDTO;
 import com.thinkerscave.common.role.dto.RoleDTO;
 import com.thinkerscave.common.role.service.RoleService;
 import com.thinkerscave.common.role.domain.Role;
@@ -67,5 +68,19 @@ public class RoleController {
 	public ResponseEntity<Role> viewOne(@PathVariable("id") String id) {
 		Role role = roleService.editRoleData(id); // Same as view
 		return ResponseEntity.ok(role);
+	}
+
+	@Operation(
+			summary = "Assign menus to a role",
+			description = "Assigns a list of menu codes to a specified role based on roleCode.",
+			responses = {
+					@ApiResponse(responseCode = "200", description = "Menus assigned successfully"),
+					@ApiResponse(responseCode = "404", description = "Role not found")
+			}
+	)
+	@PostMapping("/assign-menus")
+	public ResponseEntity<String> assignMenusToRole(@RequestBody AssignMenuDTO request) {
+		String result = roleService.assignMenu(request.getRoleCode(), request.getMenuCodes());
+		return ResponseEntity.ok(result);
 	}
 }
