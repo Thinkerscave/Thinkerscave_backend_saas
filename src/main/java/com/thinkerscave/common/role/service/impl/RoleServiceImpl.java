@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -97,6 +96,7 @@ public class RoleServiceImpl implements RoleService {
 				.orElseThrow(() -> new RuntimeException("Role not found with code: " + code));
 	}
 
+	/** Assigns a list of menus to a specific role. */
 	@Override
 	public String assignMenu(String roleCode, List<String> menuCodes) {
 		Role role = roleRepository.findByRoleCode(roleCode)
