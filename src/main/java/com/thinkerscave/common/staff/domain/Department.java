@@ -25,6 +25,9 @@ public class Department extends Auditable {
     @Column(name = "description", length = 500)
     private String description;
 
+    @Column(name = "department_code", unique = true, nullable = false)
+    private String departmentCode;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

@@ -21,7 +21,7 @@ public class Staff extends Auditable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "staff_id")
-    private Long staffId;
+    private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -34,6 +34,9 @@ public class Staff extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id", nullable = false)
     private Department department;
+
+    @Column(name = "staff_code", unique = true, nullable = false)
+    private String staffCode;
 
     @Column(name = "first_name", length = 255)
     private String firstName;
@@ -64,6 +67,15 @@ public class Staff extends Auditable {
 
     @Column(name = "address", length = 500)
     private String address;
+
+    @Column(name = "city", length = 255)
+    private String city;
+
+    @Column(name = "state", length = 255)
+    private String state;
+
+    @Column(columnDefinition = "TEXT")
+    private String remarks;
 
     @Column(name = "is_active")
     private Boolean isActive = true;

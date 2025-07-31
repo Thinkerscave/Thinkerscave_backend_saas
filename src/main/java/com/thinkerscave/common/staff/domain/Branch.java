@@ -26,6 +26,9 @@ public class Branch  extends Auditable {
     @Column(name = "location", length = 255)
     private String location;
 
+    @Column(name = "branch_code", unique = true, nullable = false)
+    private String branchCode;
+
     @Column(name = "is_active")
     private Boolean isActive = true;
 }

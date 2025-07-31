@@ -9,11 +9,11 @@ import java.time.LocalDate;
 @NoArgsConstructor
 public class StaffRequestDTO {
 
-    private Long staffId;
-    private Long userId;
-    private Long branchId;
-    private Long departmentId;
+    private String staffCode;
+    private String branchCode;
+    private String departmentCode;
 
+    private String userName;
     private String firstName;
     private String middleName;
     private String lastName;
@@ -22,8 +22,9 @@ public class StaffRequestDTO {
     private String gender;
     private LocalDate dateOfBirth;
     private LocalDate hireDate;
-    private String photoUrl;
     private String address;
-    private Boolean isActive;
+    private String city;
+    private String state;
+    private String remarks;
 }
 
