@@ -30,16 +30,21 @@ public class SchemaInitializer {
 
     private final DataSource dataSource;
 
-    private static final Map<String, Class<?>> TABLE_ENTITY_MAP = Map.of(
-            "user", com.thinkerscave.common.usrm.domain.User.class,
-            "passwordresettoken", com.thinkerscave.common.usrm.domain.PasswordResetToken.class,
-            "refreshtoken", com.thinkerscave.common.usrm.domain.RefreshToken.class,
-            "role", com.thinkerscave.common.role.domain.Role.class,
-            "organisation", com.thinkerscave.common.orgm.domain.Organisation.class,
-            "ownerdetails", com.thinkerscave.common.orgm.domain.OwnerDetails.class,
-            "menu", com.thinkerscave.common.menum.domain.Menu.class,
-            "submenu_master", com.thinkerscave.common.menum.domain.Submenu.class
+    private static final Map<String, Class<?>> TABLE_ENTITY_MAP = Map.ofEntries(
+            Map.entry("user", com.thinkerscave.common.usrm.domain.User.class),
+            Map.entry("passwordresettoken", com.thinkerscave.common.usrm.domain.PasswordResetToken.class),
+            Map.entry("refreshtoken", com.thinkerscave.common.usrm.domain.RefreshToken.class),
+            Map.entry("role", com.thinkerscave.common.role.domain.Role.class),
+            Map.entry("organisation", com.thinkerscave.common.orgm.domain.Organisation.class),
+            Map.entry("ownerdetails", com.thinkerscave.common.orgm.domain.OwnerDetails.class),
+            Map.entry("menu", com.thinkerscave.common.menum.domain.Menu.class),
+            Map.entry("submenu_master", com.thinkerscave.common.menum.domain.Submenu.class),
+            Map.entry("branch", com.thinkerscave.common.staff.domain.Branch.class),
+            Map.entry("department", com.thinkerscave.common.staff.domain.Department.class),
+            Map.entry("staff", com.thinkerscave.common.staff.domain.Staff.class)
     );
+
+
 
     public SchemaInitializer(DataSource dataSource) {
         this.dataSource = dataSource;
@@ -68,6 +73,9 @@ public class SchemaInitializer {
                     .addAnnotatedClass(com.thinkerscave.common.orgm.domain.OwnerDetails.class)
                     .addAnnotatedClass(com.thinkerscave.common.menum.domain.Menu.class)
                     .addAnnotatedClass(com.thinkerscave.common.menum.domain.Submenu.class)
+                    .addAnnotatedClass(com.thinkerscave.common.staff.domain.Branch.class)
+                    .addAnnotatedClass(com.thinkerscave.common.staff.domain.Department.class)
+                    .addAnnotatedClass(com.thinkerscave.common.staff.domain.Staff.class)
                     .buildMetadata();
 
             SchemaExport export = new SchemaExport();

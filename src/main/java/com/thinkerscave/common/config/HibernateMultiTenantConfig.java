@@ -70,7 +70,8 @@ public class HibernateMultiTenantConfig {
                 "com.thinkerscave.common.usrm.domain",
                 "com.thinkerscave.common.role.domain",
                 "com.thinkerscave.common.orgm.domain",
-                "com.thinkerscave.common.menum.domain"
+                "com.thinkerscave.common.menum.domain",
+                "com.thinkerscave.common.staff.domain"
         );
         emf.setJpaVendorAdapter(jpaVendorAdapter);
         emf.setJpaPropertyMap(properties);
