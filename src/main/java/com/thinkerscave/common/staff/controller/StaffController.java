@@ -1,8 +1,8 @@
 package com.thinkerscave.common.staff.controller;
 
-import com.thinkerscave.common.staff.domain.Staff;
 import com.thinkerscave.common.staff.dto.StaffRequestDTO;
 import com.thinkerscave.common.staff.service.StaffService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +13,7 @@ import java.util.Map;
 @CrossOrigin("*")
 @RestController
 @RequestMapping("/api/staff")
+@Tag(name = "Staff Management", description = "Operations related to staff management")
 public class StaffController {
 
     @Autowired

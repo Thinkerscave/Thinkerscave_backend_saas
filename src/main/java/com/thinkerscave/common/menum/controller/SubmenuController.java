@@ -3,6 +3,7 @@ package com.thinkerscave.common.menum.controller;
 import com.thinkerscave.common.menum.domain.Submenu;
 import com.thinkerscave.common.menum.dto.SubmenuDTO;
 import com.thinkerscave.common.menum.service.SubmenuService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
@@ -12,6 +13,7 @@ import java.util.*;
 @CrossOrigin("*")
 @RestController
 @RequestMapping("/api/submenu")
+@Tag(name = "Submenu Management", description = "APIs for managing Submenu")
 public class SubmenuController {
 
     @Autowired

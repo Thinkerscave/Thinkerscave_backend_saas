@@ -6,7 +6,9 @@ import com.thinkerscave.common.usrm.service.PasswordResetTokenService;
 import com.thinkerscave.common.usrm.service.UserService;
 import com.thinkerscave.common.usrm.service.impl.EmailService;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,6 +17,7 @@ import java.util.Optional;
 @CrossOrigin("*")
 @RestController
 @RequestMapping("/api/password")
+@Tag(name = "Password", description = "Endpoints related to password management (reset, update)")
 public class PasswordController {
     @Autowired
     private UserService userService;
@@ -25,6 +28,10 @@ public class PasswordController {
     @Autowired
     private EmailService emailService;
 
+    @Value("${server.port}")
+    private String serverPort;
+
+
     @PostMapping("/forgot")
     public ResponseEntity<String> forgotPassword(@RequestParam("email") String email) {
         Optional<User> userOptional = userService.findByEmail(email);
@@ -34,12 +41,17 @@ public class PasswordController {
 
         User user = userOptional.get();
         String token = passwordResetTokenService.createToken(user).getToken();
-        String resetUrl = "http://localhost:8080/api/password/reset?token=" + token;
 
-        emailService.sendSimpleMessage(user.getEmail(), "Password Reset Request",
-                "Click the link to reset your password: " + resetUrl);
+        String resetUrl = "http://localhost:" + serverPort + "/api/password/reset?token=" + token;
+
+        emailService.sendSimpleMessage(
+                user.getEmail(),
+                "Password Reset Request",
+                "Click the link to reset your password: " + resetUrl
+        );
 
         return ResponseEntity.ok("Password reset link sent to your email.");
+
     }
 
     @PostMapping("/reset")

@@ -4,6 +4,7 @@ import com.thinkerscave.common.menum.domain.Menu;
 import com.thinkerscave.common.menum.dto.MenuDTO;
 import com.thinkerscave.common.menum.repository.MenuRepo;
 import com.thinkerscave.common.menum.service.MenuService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import java.util.Optional;
 @CrossOrigin("*")
 @RestController
 @RequestMapping("/api/menu")
+@Tag(name = "Menu Management", description = "APIs for managing Menus")
 public class MenuController {
 
 	@Autowired
