@@ -76,6 +76,7 @@ public class SchemaInitializer {
                     .addAnnotatedClass(com.thinkerscave.common.staff.domain.Branch.class)
                     .addAnnotatedClass(com.thinkerscave.common.staff.domain.Department.class)
                     .addAnnotatedClass(com.thinkerscave.common.staff.domain.Staff.class)
+                    .addAnnotatedClass(com.thinkerscave.common.admission.domain.ApplicationAdmission.class)
                     .buildMetadata();
 
             SchemaExport export = new SchemaExport();
