@@ -27,12 +27,25 @@ public class ApplicationAdmissionEditRequest {
     private String guardianName;
     private String contactNumber;
     private String email;
-    private String address;
-    private String city;
-    private String state;
-    private String pinCode;
-    private String emergencyContact;
+
+    // --- MODIFICATION START ---
+
+    // Remove the old flat fields
+    // private String address;
+    // private String city;
+    // private String state;
+    // private String pinCode;
+    // private String emergencyContact;
+
+    // Add nested DTOs
+    private AddressDto address;
+    private EmergencyContactDto emergencyContact;
+
+    // --- MODIFICATION END ---
+
     private List<String> uploadedDocuments;
     private ApplicationStatus status;
     private String internalComments;
+
+
 }

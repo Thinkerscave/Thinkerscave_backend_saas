@@ -7,18 +7,10 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * Entity representing an admission application and its persistent state.
- * <p>
- * This entity contains all fields mapped to the database for storing application details,
- * including applicant information, contact details, status, and audit information.
- *
- * @author Bibekananda Pradhan
- * @since 2023-06-06
- */
 @Entity
 @Table(name = "application_admission")
-@Data
+@Setter
+@Getter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -35,6 +27,7 @@ public class ApplicationAdmission extends Auditable {
     @Column(name = "applicant_name", nullable = false)
     private String applicantName;
 
+    // ... other fields like dateOfBirth, gender, etc. remain the same ...
     @Column(name = "date_of_birth", nullable = false)
     private LocalDateTime dateOfBirth;
 
@@ -56,23 +49,29 @@ public class ApplicationAdmission extends Auditable {
     @Column(name = "email", nullable = false)
     private String email;
 
-    @Column(name = "address", nullable = false)
-    private String address;
+    // --- MODIFICATION START ---
 
-    @Column(name = "city", nullable = false)
-    private String city;
+    // Remove the old flat address fields:
+    // private String address;
+    // private String city;
+    // private String state;
+    // private String pincode;
 
-    @Column(name = "state", nullable = false)
-    private String state;
+    // Replace them with an @Embedded Address object
+    @Embedded
+    private Address address;
 
-    @Column(name = "pincode", nullable = false)
-    private String pincode;
+    // Remove the old emergency_contact string
+    // private String emergencyContact;
 
-    @Column(name = "emergency_contact", nullable = false)
-    private String emergencyContact;
+    // Replace it with an @Embedded EmergencyContact object
+    @Embedded
+    private EmergencyContact emergencyContact;
+
+    // --- MODIFICATION END ---
 
     @ElementCollection
-    @CollectionTable(name = "uploaded_documents", joinColumns = @JoinColumn(name = "application_id"))
+    @CollectionTable(name = "application_documents", joinColumns = @JoinColumn(name = "application_admission_id"))
     @Column(name = "document_url")
     private List<String> uploadedDocuments;
 

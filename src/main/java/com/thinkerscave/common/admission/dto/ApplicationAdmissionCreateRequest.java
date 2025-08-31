@@ -28,11 +28,8 @@ public class ApplicationAdmissionCreateRequest {
     private String guardianName;
     private String contactNumber;
     private String email;
-    private String address;
-    private String city;
-    private String state;
-    private String pinCode;
-    private String emergencyContact;
+    private AddressDto address; // Use a nested object
+    private EmergencyContactDto emergencyContact; // Use a nested object
     private List<String> uploadedDocuments;
     private ApplicationStatus status;
     private String internalComments;

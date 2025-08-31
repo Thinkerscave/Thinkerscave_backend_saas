@@ -7,10 +7,10 @@ import java.util.List;
 
 /**
  * Data Transfer Object representing the complete response details of an admission application.
- * 
+ *
  * @apiNote This DTO encapsulates all relevant information about an application, including applicant details,
- *          contact information, status, and internal comments, for use in API responses.
- * 
+ * contact information, status, and internal comments, for use in API responses.
+ *
  * @author Bibekananda Pradhan
  * @since 2023-06-06
  */
@@ -29,12 +29,25 @@ public class ApplicationAdmissionResponse {
     private String guardianName;
     private String contactNumber;
     private String email;
-    private String address;
-    private String city;
-    private String state;
-    private String pinCode;
-    private String emergencyContact;
+
+    // --- MODIFICATION START ---
+
+    // Remove the old flat fields
+    // private String address;
+    // private String city;
+    // private String state;
+    // private String pinCode;
+    // private String emergencyContact;
+
+    // Add nested DTOs
+    private AddressDto address;
+    private EmergencyContactDto emergencyContact;
+
+    // --- MODIFICATION END ---
+
     private List<String> uploadedDocuments;
     private ApplicationStatus status;
     private String internalComments;
+
+
 }
