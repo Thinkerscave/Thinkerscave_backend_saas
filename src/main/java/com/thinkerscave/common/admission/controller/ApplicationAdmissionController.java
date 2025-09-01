@@ -1,12 +1,14 @@
 package com.thinkerscave.common.admission.controller;
 
 import com.thinkerscave.common.admission.dto.ApplicationAdmissionCreateRequest;
+import com.thinkerscave.common.admission.dto.ApplicationAdmissionDraftRequest;
 import com.thinkerscave.common.admission.dto.ApplicationAdmissionEditRequest;
 import com.thinkerscave.common.admission.dto.ApplicationAdmissionResponse;
 import com.thinkerscave.common.admission.service.ApplicationAdmissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,10 +22,21 @@ import java.util.Optional;
 @RequestMapping("/api/admissions")
 @RequiredArgsConstructor
 @Tag(name = "Application Admission", description = "APIs for managing application admissions")
+@CrossOrigin("*")
 public class ApplicationAdmissionController {
 
     private final ApplicationAdmissionService service;
-
+    /**
+     * Saves an application form as a draft.
+     * @param request DTO with partial or complete application data.
+     * @return The created or updated draft.
+     */
+    @Operation(summary = "Save Application as Draft", description = "Saves the current application progress as a draft. Can be used to create a new draft or update an existing one.")
+    @PostMapping("/draft")
+    public ResponseEntity<ApplicationAdmissionResponse> saveDraft(@RequestBody ApplicationAdmissionDraftRequest request) {
+        ApplicationAdmissionResponse draftResponse = service.saveDraft(request);
+        return new ResponseEntity<>(draftResponse, HttpStatus.CREATED);
+    }
     /**
      * Create a new ApplicationAdmission.
      * @param request DTO with application data

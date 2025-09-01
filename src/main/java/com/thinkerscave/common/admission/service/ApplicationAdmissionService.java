@@ -1,6 +1,7 @@
 package com.thinkerscave.common.admission.service;
 
 import com.thinkerscave.common.admission.domain.Address;
+import com.thinkerscave.common.admission.domain.ApplicationStatus;
 import com.thinkerscave.common.admission.domain.EmergencyContact;
 import com.thinkerscave.common.admission.dto.*;
 import com.thinkerscave.common.admission.domain.ApplicationAdmission;
@@ -9,7 +10,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Service class providing business logic for admission application operations.
@@ -172,5 +175,65 @@ public class ApplicationAdmissionService {
                 .internalComments(entity.getInternalComments())
                 .build();
         // --- MODIFICATION END ---
+    }
+    @Transactional
+    public ApplicationAdmissionResponse saveDraft(ApplicationAdmissionDraftRequest request) {
+        // Find existing draft or create a new entity
+        ApplicationAdmission entity = repository.findById(request.getId())
+                .orElse(new ApplicationAdmission());
+
+        // --- Map DTO data to the Entity ---
+        // Basic Info
+        if (request.getBasicInfo() != null) {
+            String fullName = (request.getBasicInfo().getFirstName() + " " + request.getBasicInfo().getLastName()).trim();
+            entity.setApplicantName(fullName);
+            entity.setDateOfBirth(request.getBasicInfo().getDateOfBirth());
+            entity.setGender(request.getBasicInfo().getGender());
+            entity.setApplyingForSchoolOrCollege(request.getBasicInfo().getApplyingForSchool());
+        }
+
+        // Parent Details
+        if (request.getParentDetails() != null) {
+            entity.setParentName(request.getParentDetails().getParentName());
+            entity.setGuardianName(request.getParentDetails().getGuardianName());
+            entity.setEmail(request.getParentDetails().getEmail());
+            entity.setContactNumber(request.getParentDetails().getContactNumber());
+        }
+
+        // Address (Embedded)
+        if (request.getAddress() != null) {
+            Address address = new Address();
+            address.setStreet(request.getAddress().getStreet());
+            address.setCity(request.getAddress().getCity());
+            address.setState(request.getAddress().getState());
+            address.setPincode(request.getAddress().getPincode());
+            entity.setAddress(address);
+        }
+
+        // Emergency Contact (Embedded)
+        if (request.getEmergencyContact() != null) {
+            EmergencyContact contact = new EmergencyContact();
+            contact.setName(request.getEmergencyContact().getName());
+            contact.setNumber(request.getEmergencyContact().getNumber());
+            entity.setEmergencyContact(contact);
+        }
+
+        // Set the status to DRAFT
+        entity.setStatus(ApplicationStatus.DRAFT);
+
+        // Save the entity (JPA handles create vs. update)
+        ApplicationAdmission savedEntity = repository.save(entity);
+
+        // Map the saved entity to a response DTO
+        return toResponse(savedEntity);
+    }
+    /**
+     * Generates a unique application ID.
+     * Example: "APP-20250901-A3CDE"
+     */
+    private String generateUniqueApplicationId() {
+        String timestampPart = String.valueOf(Instant.now().toEpochMilli()); // Milliseconds for uniqueness
+        String randomPart = UUID.randomUUID().toString().substring(0, 5).toUpperCase();
+        return "APP-" + timestampPart + "-" + randomPart;
     }
 }

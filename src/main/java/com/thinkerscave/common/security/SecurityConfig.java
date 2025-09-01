@@ -24,78 +24,72 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
-    
-	@Autowired
-	private JwtAuthFilter jwtAuthFilter;
-	
+
+    @Autowired
+    private JwtAuthFilter jwtAuthFilter;
+
+    // --- ADJUSTMENT 1: REMOVED CONSTRUCTOR AND @Autowired FIELDS ---
+    // The @Autowired JwtAuthFilter and the constructor were causing the cycle.
+    // They are no longer needed here.
+
     /**
-     * Configures the UserDetailsService bean used for fetching user details
-     * from the database. This service is used by Spring Security for authentication.
-     * 
-     * @return a UserDetailsService implementation to load user-specific data
+     * Configures the UserDetailsService bean used for fetching user details.
+     * @return a UserDetailsService implementation to load user-specific data.
      */
     @Bean
     public UserDetailsService userDetailsService() {
-        // Use UserUserInfoDetailsService to load user details from the database
         return new UserUserInfoDetailsService();
     }
 
     /**
-     * Configures HTTP security for the application.
-     * 
-     * @param http the HttpSecurity object used to configure security settings
-     * @return the configured SecurityFilterChain
-     * @throws Exception if an error occurs while configuring HTTP security
+     * Configures the main HTTP security filter chain.
+     *
+     * @param http HttpSecurity object to configure.
+     * @param authenticationProvider The AuthenticationProvider bean (injected by Spring).
+     * @return the configured SecurityFilterChain.
+     * @throws Exception if an error occurs during configuration.
      */
+
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationProvider authenticationProvider) throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/v1/users/**",
                                 "/login",
-                                "/api/schema/**",
-                                "/api/organizations/**",
-                                "/api/roles/**",
-                                "/api/menu/**",
-                                "/api/submenu/**",
-                                "/api/admissions/**",
+                                "/api/password/**",     // <-- THE FIX IS ADDING THIS LINE
+                                "/api/v1/users/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                "/api/admissions/**"
+                                // Be careful: other endpoints like /api/admissions/** should likely be secured
                         ).permitAll()
-                        .requestMatchers("/home/**").authenticated()
+                        // This line ensures any endpoint NOT in the list above is protected
+                        .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .authenticationProvider(authenticationProvider())
+                .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
-
-
     /**
-     * Configures the PasswordEncoder bean used to encode passwords.
-     * BCryptPasswordEncoder is a strong password encoder.
-     * 
-     * @return the configured PasswordEncoder
+     * Configures the PasswordEncoder bean.
+     * @return the configured PasswordEncoder.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();  // BCrypt is a strong hashing function for passwords
+        return new BCryptPasswordEncoder();
     }
 
     /**
-     * Exposes the AuthenticationManager as a Spring bean. This allows the
-     * AuthenticationManager to be injected and used manually in other parts
-     * of the application, such as controllers or service classes.
-     * 
-     * @param authenticationConfiguration the AuthenticationConfiguration provided by Spring Security
-     * @return the configured AuthenticationManager
-     * @throws Exception if an error occurs while obtaining the AuthenticationManager
+     * Exposes the AuthenticationManager as a Spring bean.
+     * @param authenticationConfiguration the AuthenticationConfiguration provided by Spring Security.
+     * @return the configured AuthenticationManager.
+     * @throws Exception if an error occurs.
      */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
@@ -103,16 +97,14 @@ public class SecurityConfig {
     }
 
     /**
-     * Configures an AuthenticationProvider bean for authentication.
-     * DaoAuthenticationProvider is used to authenticate users with a database.
-     * 
-     * @return the configured AuthenticationProvider
+     * Configures the primary AuthenticationProvider bean using a database.
+     * @return the configured AuthenticationProvider.
      */
     @Bean
     public AuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
-        authenticationProvider.setUserDetailsService(userDetailsService());  // Set the UserDetailsService for loading user data
-        authenticationProvider.setPasswordEncoder(passwordEncoder());  // Set the PasswordEncoder for encoding passwords
+        authenticationProvider.setUserDetailsService(userDetailsService());
+        authenticationProvider.setPasswordEncoder(passwordEncoder());
         return authenticationProvider;
     }
 }

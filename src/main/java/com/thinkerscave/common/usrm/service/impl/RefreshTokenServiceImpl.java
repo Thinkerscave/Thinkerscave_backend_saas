@@ -21,32 +21,33 @@ public class RefreshTokenServiceImpl implements RefreshTokenService{
 	private RefreshTokenRepository refreshTokenRepository; 
 	@Autowired
 	private UserRepository userRepository;
-	
+
 	@Transactional
 	public RefreshToken createRefreshToken(String username) {
-	    // Find the user by username
-	    Optional<User> optionalUser = userRepository.findByUserName(username);
+		User user = userRepository.findByUserName(username)
+				.orElseThrow(() -> new RuntimeException("User not found with username: " + username));
 
-	    // If user not found, throw an exception
-	    if (!optionalUser.isPresent()) {
-	        throw new RuntimeException("User not found with username: " + username);
-	    }
+		// Check if a token already exists for this user
+		Optional<RefreshToken> existingTokenOpt = refreshTokenRepository.findByUser((user));
 
-	    // Extract the User object from the Optional
-	    User user = optionalUser.get();
+		RefreshToken refreshToken;
+		if (existingTokenOpt.isPresent()) {
+			// If it exists, UPDATE the existing token
+			refreshToken = existingTokenOpt.get();
+			refreshToken.setToken(UUID.randomUUID().toString());
+			refreshToken.setExpiryDate(Instant.now().plusMillis(600000)); // Update expiry
+		} else {
+			// If it doesn't exist, CREATE a new one
+			refreshToken = RefreshToken.builder()
+					.user(user)
+					.token(UUID.randomUUID().toString())
+					.expiryDate(Instant.now().plusMillis(600000))
+					.build();
+		}
 
-	     // Remove existing refresh tokens for the user
-	      //refreshTokenRepository.deleteByUser(user);
-
-	        // Generate a new refresh token
-	        RefreshToken refreshToken = RefreshToken.builder()
-	                .user(user)
-	                .token(UUID.randomUUID().toString())
-	                .expiryDate(Instant.now().plusMillis(600000))
-	                .build();
-
-	        return refreshTokenRepository.save(refreshToken);
-	 }
+		// Save the (either updated or new) token
+		return refreshTokenRepository.save(refreshToken);
+	}
 	/**
      * Find a refresh token by its token value.
      *

@@ -10,6 +10,7 @@ package com.thinkerscave.common.admission.domain;
  * @since 2023-06-06
  */
 public enum ApplicationStatus {
+    DRAFT,
     PENDING,
     APPROVED,
     REJECTED,

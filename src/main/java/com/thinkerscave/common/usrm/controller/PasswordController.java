@@ -42,8 +42,8 @@ public class PasswordController {
         User user = userOptional.get();
         String token = passwordResetTokenService.createToken(user).getToken();
 
-        String resetUrl = "http://localhost:" + serverPort + "/api/password/reset?token=" + token;
-
+//        String resetUrl = "http://localhost:" + serverPort + "/api/password/reset?token=" + token;
+        String resetUrl = "http://localhost:4200/reset-password?token=" + token;
         emailService.sendSimpleMessage(
                 user.getEmail(),
                 "Password Reset Request",
