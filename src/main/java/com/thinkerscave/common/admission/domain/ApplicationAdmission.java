@@ -19,34 +19,32 @@ public class ApplicationAdmission extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "application_id", nullable = false, unique = true)
+    @Column(name = "application_id", unique = true)
     private String applicationId;
 
-    @Column(name = "applicant_name", nullable = false)
+    @Column(name = "applicant_name")
     private String applicantName;
 
     // ... other fields like dateOfBirth, gender, etc. remain the same ...
-    @Column(name = "date_of_birth", nullable = false)
+    @Column(name = "date_of_birth")
     private LocalDateTime dateOfBirth;
 
-    @Column(name = "gender", nullable = false)
+    @Column(name = "gender")
     private String gender;
 
-    @Column(name = "applying_for_school_or_college", nullable = false)
+    @Column(name = "applying_for_school_or_college")
     private String applyingForSchoolOrCollege;
 
-    @Column(name = "parent_name", nullable = false)
+    @Column(name = "parent_name")
     private String parentName;
 
     @Column(name = "guardian_name")
     private String guardianName;
 
-    @Column(name = "contact_number", nullable = false)
+    @Column(name = "contact_number")
     private String contactNumber;
 
-    @Column(name = "email", nullable = false)
+    @Column(name = "email")
     private String email;
 
     // --- MODIFICATION START ---
@@ -76,7 +74,7 @@ public class ApplicationAdmission extends Auditable {
     private List<String> uploadedDocuments;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
+    @Column(name = "status")
     private ApplicationStatus status;
 
     @Column(name = "internal_comments", length = 2000)

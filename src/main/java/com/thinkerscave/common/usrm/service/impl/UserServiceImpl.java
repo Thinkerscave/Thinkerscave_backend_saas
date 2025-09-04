@@ -4,12 +4,14 @@ import com.thinkerscave.common.role.domain.Role;
 import com.thinkerscave.common.role.repository.RoleRepository;
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.dto.UserResponseDTO;
+import com.thinkerscave.common.usrm.repository.PasswordResetTokenRepository;
 import com.thinkerscave.common.usrm.repository.UserRepository;
 import com.thinkerscave.common.usrm.service.UserService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +28,10 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private RoleRepository roleRepository;
+
+    @Autowired
+    private PasswordResetTokenRepository passwordResetTokenRepository;
+
     /**
      * Registers a new user with encrypted password.
      *
@@ -97,9 +103,20 @@ public class UserServiceImpl implements UserService {
      * @param user        the user
      * @param newPassword the new raw password
      */
+    @Transactional
     public void updatePassword(User user, String newPassword) {
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
+    }
+    @Transactional // This is the crucial annotation
+    public void updatePasswordAndInvalidateToken(User user, String newPassword) {
+        // 1. Update the user's password with the encoded version
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // 2. Delete the user's password reset token
+        // This now works because it's inside a transaction
+        passwordResetTokenRepository.deleteByUser(user);
     }
 
     /**

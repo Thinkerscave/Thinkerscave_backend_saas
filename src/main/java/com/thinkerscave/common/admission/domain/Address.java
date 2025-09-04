@@ -13,15 +13,15 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class Address {
 
-    @Column(name = "street_address", nullable = false) // Renamed from "address" for clarity
+    @Column(name = "street_address") // Renamed from "address" for clarity
     private String street;
 
-    @Column(name = "city", nullable = false)
+    @Column(name = "city")
     private String city;
 
-    @Column(name = "state", nullable = false)
+    @Column(name = "state")
     private String state;
 
-    @Column(name = "pincode", nullable = false)
+    @Column(name = "pincode")
     private String pincode;
 }

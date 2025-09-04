@@ -54,7 +54,7 @@ public class ApplicationAdmissionService {
         );
 
         ApplicationAdmission entity = ApplicationAdmission.builder()
-                .applicationId(request.getApplicationId())
+                .applicationId(generateUniqueApplicationId())
                 .applicantName(request.getApplicantName())
                 .dateOfBirth(request.getDateOfBirth())
                 .gender(request.getGender())
@@ -85,7 +85,7 @@ public class ApplicationAdmissionService {
      * @since 2025-08-05
      */
     @Transactional
-    public Optional<ApplicationAdmissionResponse> edit(Long id, ApplicationAdmissionEditRequest request) {
+    public Optional<ApplicationAdmissionResponse> edit(String id, ApplicationAdmissionEditRequest request) {
         return repository.findById(id).map(entity -> {
             // --- MODIFICATION START ---
             // Update Address and EmergencyContact objects
@@ -130,7 +130,7 @@ public class ApplicationAdmissionService {
      * @since 2025-08-05
      */
     @Transactional(readOnly = true)
-    public Optional<ApplicationAdmissionResponse> getById(Long id) {
+    public Optional<ApplicationAdmissionResponse> getById(String id) {
         return repository.findById(id).map(this::toResponse);
     }
 
@@ -158,7 +158,6 @@ public class ApplicationAdmissionService {
         );
 
         return ApplicationAdmissionResponse.builder()
-                .id(entity.getId())
                 .applicationId(entity.getApplicationId())
                 .applicantName(entity.getApplicantName())
                 .dateOfBirth(entity.getDateOfBirth())
@@ -178,50 +177,51 @@ public class ApplicationAdmissionService {
     }
     @Transactional
     public ApplicationAdmissionResponse saveDraft(ApplicationAdmissionDraftRequest request) {
-        // Find existing draft or create a new entity
-        ApplicationAdmission entity = repository.findById(request.getId())
+        // Find an existing draft by its database 'id' or create a new entity if no id is provided.
+        ApplicationAdmission entity = Optional.ofNullable(request.getApplicationId())
+                .flatMap(repository::findById)
                 .orElse(new ApplicationAdmission());
 
-        // --- Map DTO data to the Entity ---
-        // Basic Info
-        if (request.getBasicInfo() != null) {
-            String fullName = (request.getBasicInfo().getFirstName() + " " + request.getBasicInfo().getLastName()).trim();
-            entity.setApplicantName(fullName);
-            entity.setDateOfBirth(request.getBasicInfo().getDateOfBirth());
-            entity.setGender(request.getBasicInfo().getGender());
-            entity.setApplyingForSchoolOrCollege(request.getBasicInfo().getApplyingForSchool());
-        }
+        // --- Map DTO data directly from the flattened request ---
+        // This removes the need for checking nested objects like 'basicInfo'
+        entity.setApplicantName(request.getApplicantName()) ;
+        entity.setDateOfBirth(request.getDateOfBirth());
+        entity.setGender(request.getGender());
+        entity.setApplyingForSchoolOrCollege(request.getApplyingForSchoolOrCollege());
+        entity.setParentName(request.getParentName());
+        entity.setGuardianName(request.getGuardianName());
+        entity.setEmail(request.getEmail());
+        entity.setContactNumber(request.getContactNumber());
 
-        // Parent Details
-        if (request.getParentDetails() != null) {
-            entity.setParentName(request.getParentDetails().getParentName());
-            entity.setGuardianName(request.getParentDetails().getGuardianName());
-            entity.setEmail(request.getParentDetails().getEmail());
-            entity.setContactNumber(request.getParentDetails().getContactNumber());
-        }
-
-        // Address (Embedded)
+        // Address (Embedded) - This mapping remains the same as it's still a nested object
         if (request.getAddress() != null) {
-            Address address = new Address();
-            address.setStreet(request.getAddress().getStreet());
-            address.setCity(request.getAddress().getCity());
-            address.setState(request.getAddress().getState());
-            address.setPincode(request.getAddress().getPincode());
+            Address address = new Address(
+                    request.getAddress().getStreet(),
+                    request.getAddress().getCity(),
+                    request.getAddress().getState(),
+                    request.getAddress().getPincode()
+            );
             entity.setAddress(address);
         }
 
-        // Emergency Contact (Embedded)
+        // Emergency Contact (Embedded) - This mapping also remains the same
         if (request.getEmergencyContact() != null) {
-            EmergencyContact contact = new EmergencyContact();
-            contact.setName(request.getEmergencyContact().getName());
-            contact.setNumber(request.getEmergencyContact().getNumber());
+            EmergencyContact contact = new EmergencyContact(
+                    request.getEmergencyContact().getName(),
+                    request.getEmergencyContact().getNumber()
+            );
             entity.setEmergencyContact(contact);
+        }
+
+        // Map the list of document file names
+        if (request.getUploadedDocuments() != null) {
+            entity.setUploadedDocuments(request.getUploadedDocuments());
         }
 
         // Set the status to DRAFT
         entity.setStatus(ApplicationStatus.DRAFT);
 
-        // Save the entity (JPA handles create vs. update)
+        // Save the entity (JPA handles create vs. update based on the presence of the 'id')
         ApplicationAdmission savedEntity = repository.save(entity);
 
         // Map the saved entity to a response DTO
@@ -231,7 +231,7 @@ public class ApplicationAdmissionService {
      * Generates a unique application ID.
      * Example: "APP-20250901-A3CDE"
      */
-    private String generateUniqueApplicationId() {
+    private static String generateUniqueApplicationId() {
         String timestampPart = String.valueOf(Instant.now().toEpochMilli()); // Milliseconds for uniqueness
         String randomPart = UUID.randomUUID().toString().substring(0, 5).toUpperCase();
         return "APP-" + timestampPart + "-" + randomPart;

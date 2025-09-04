@@ -19,6 +19,8 @@ public interface UserService {
 	Optional<User> findByEmail(String email);
 
 	void updatePassword(User user, String password);
+
+	void updatePasswordAndInvalidateToken(User user,String newPassword);
 	
 
 }

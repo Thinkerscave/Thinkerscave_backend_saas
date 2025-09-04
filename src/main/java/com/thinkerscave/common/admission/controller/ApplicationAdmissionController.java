@@ -22,7 +22,7 @@ import java.util.Optional;
 @RequestMapping("/api/admissions")
 @RequiredArgsConstructor
 @Tag(name = "Application Admission", description = "APIs for managing application admissions")
-@CrossOrigin("*")
+@CrossOrigin(origins = "http://localhost:4200")
 public class ApplicationAdmissionController {
 
     private final ApplicationAdmissionService service;
@@ -56,7 +56,7 @@ public class ApplicationAdmissionController {
      */
     @Operation(summary = "Edit Application Admission", description = "Edits an existing application admission by its ID.")
     @PutMapping("/{id}")
-    public ResponseEntity<ApplicationAdmissionResponse> edit(@PathVariable Long id, @RequestBody ApplicationAdmissionEditRequest request) {
+    public ResponseEntity<ApplicationAdmissionResponse> edit(@PathVariable String id, @RequestBody ApplicationAdmissionEditRequest request) {
         Optional<ApplicationAdmissionResponse> response = service.edit(id, request);
         return response.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
@@ -68,7 +68,7 @@ public class ApplicationAdmissionController {
      */
     @Operation(summary = "Get Application Admission by ID", description = "Retrieves an application admission by its ID.")
     @GetMapping("/{id}")
-    public ResponseEntity<ApplicationAdmissionResponse> getById(@PathVariable Long id) {
+    public ResponseEntity<ApplicationAdmissionResponse> getById(@PathVariable String id) {
         Optional<ApplicationAdmissionResponse> response = service.getById(id);
         return response.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }

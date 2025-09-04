@@ -12,9 +12,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class EmergencyContact {
 
-    @Column(name = "emergency_contact_name", nullable = false)
+    @Column(name = "emergency_contact_name")
     private String name;
 
-    @Column(name = "emergency_contact_number", nullable = false)
+    @Column(name = "emergency_contact_number")
     private String number;
 }

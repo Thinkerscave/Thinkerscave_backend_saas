@@ -4,6 +4,8 @@ import com.thinkerscave.common.admission.domain.ApplicationAdmission;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 /**
  * Repository interface for managing ApplicationAdmission entities in the database.
  * <p>
@@ -13,5 +15,6 @@ import org.springframework.stereotype.Repository;
  * @since 2025-08-05
  */
 @Repository
-public interface ApplicationAdmissionRepository extends JpaRepository<ApplicationAdmission, Long> {
+public interface ApplicationAdmissionRepository extends JpaRepository<ApplicationAdmission, String> {
+    Optional<ApplicationAdmission> findByApplicationId(String applicationId);
 }
