@@ -1,7 +1,7 @@
 package com.thinkerscave.common.student.domain;
 
+import com.thinkerscave.common.auditing.Auditable;
 import com.thinkerscave.common.commonModel.Address;
-import com.thinkerscave.common.usrm.domain.Auditable;
 import com.thinkerscave.common.usrm.domain.User;
 import jakarta.persistence.*;
 import lombok.Data;

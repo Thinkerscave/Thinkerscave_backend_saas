@@ -15,34 +15,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-@CrossOrigin("*")
+@CrossOrigin("http://localhost:4200/")
 @RestController
 @RequestMapping("/api/menu")
 @Tag(name = "Menu Management", description = "APIs for managing Menus")
 public class MenuController {
-
-	@Autowired
-	private MenuRepo menuRepo;
-
+	
 	@Autowired
 	private MenuService menuService;
 
 	// ✅ Insert Menu Data
-	@PostMapping
+	@PostMapping("/saveMenu")
 	public ResponseEntity<Menu> createMenuData(@RequestBody MenuDTO menu) {
-		Menu createdMenu = menuService.saveOrUpdateMenu(null, menu);  // code = null for insert
+		Menu createdMenu = menuService.saveOrUpdateMenu(menu);  // code = null for insert
 		return ResponseEntity.status(HttpStatus.CREATED).body(createdMenu);
 	}
 
-	// ✅ Update Menu Data by Code
-	@PutMapping("/{code}")
-	public ResponseEntity<Menu> updateMenuData(@PathVariable String code, @RequestBody MenuDTO menu) {
-		Menu updatedMenu = menuService.saveOrUpdateMenu(code, menu);  // code for update
-		return ResponseEntity.ok(updatedMenu);
-	}
-
 	// ✅ Display All Menu Data
-	@GetMapping
+	@GetMapping("/getAllMenus")
 	public ResponseEntity<List<Menu>> displayMenuData() {
 		List<Menu> list = menuService.displayMenudata();
 		return list.isEmpty()
@@ -58,19 +48,12 @@ public class MenuController {
 				.orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
 	}
 
-	// ✅ Soft Delete Menu by Code
-	@PutMapping("/delete/{code}")
-	public ResponseEntity<Map<String, String>> softDeleteMenu(@PathVariable String code) {
-		String result = menuService.softDeleteMenu(code);
-		return ResponseEntity.ok(Collections.singletonMap("message", result));
-	}
-
-	// ✅ Get All Active Menus
-	@GetMapping("/active")
-	public ResponseEntity<List<Menu>> getActiveMenus() {
-		List<Menu> allActiveMenus = menuRepo.findByIsActiveTrue();
-		return allActiveMenus.isEmpty()
-				? ResponseEntity.status(HttpStatus.NO_CONTENT).build()
-				: ResponseEntity.ok(allActiveMenus);
+	// ✅ Toggle Active/Inactive status
+	@PutMapping("/toggle/{code}")
+	public ResponseEntity<Map<String, String>> toggleMenuStatus(
+	        @PathVariable String code,
+	        @RequestParam boolean status) {
+	    String result = menuService.toggleMenuStatus(code, status);
+	    return ResponseEntity.ok(Collections.singletonMap("message", result));
 	}
 }

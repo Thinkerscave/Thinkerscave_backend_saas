@@ -25,17 +25,17 @@ public class MenuServiceImpl implements MenuService {
 
 	/** Saves a new menu or updates an existing one based on the code. */
 	@Override
-	public Menu saveOrUpdateMenu(String code, MenuDTO dto) {
+	public Menu saveOrUpdateMenu(MenuDTO dto) {
 		Menu menu = null;
 		try {
-			if (code == null || code.isBlank()) {
+			if (dto.getMenuCode() == null || dto.getMenuCode().isBlank()) {
 				// Create new menu
 				menu = new Menu();
 				menu.setMenuCode(generateMenuCode(dto.getName()));
 			} else {
 				// Update existing menu
-				menu = menuRepo.findByMenuCode(code)
-						.orElseThrow(() -> new RuntimeException("Menu not found with code: " + code));
+				menu = menuRepo.findByMenuCode(dto.getMenuCode())
+						.orElseThrow(() -> new RuntimeException("Menu not found with code: " + dto.getMenuCode()));
 			}
 
 			// Set fields for both create & update
@@ -62,7 +62,30 @@ public class MenuServiceImpl implements MenuService {
 			throw new RuntimeException("Failed to fetch menu data: " + e.getMessage());
 		}
 	}
+	
+	@Override
+	public String toggleMenuStatus(String code, boolean status) {
+	    try {
+	        Optional<Menu> menuOptional = menuRepo.findByMenuCode(code);
+	        if (menuOptional.isPresent()) {
+	            Menu menu = menuOptional.get();
+	            menu.setIsActive(status);
+	            menuRepo.save(menu);
+	            return "Menu status updated to " + (status ? "Active" : "Inactive");
+	        } else {
+	            return "Menu not found";
+	        }
+	    } catch (Exception e) {
+	        throw new RuntimeException("Failed to update menu status: " + e.getMessage());
+	    }
+	}
 
+	/** Generates a unique menu code from the menu name. */
+	private String generateMenuCode(String name) {
+		String base = name != null ? name.toUpperCase().replaceAll("\\s+", "_") : "MENU";
+		return "MENU_" + base + "_" + UUID.randomUUID().toString().substring(0, 5).toUpperCase();
+	}
+	
 	/** Returns a single menu by its code. */
 	@Override
 	public Optional<Menu> displaySingleMenudata(String code) {
@@ -71,30 +94,5 @@ public class MenuServiceImpl implements MenuService {
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to fetch menu with code " + code + ": " + e.getMessage());
 		}
-	}
-
-	/** Marks a menu as inactive (soft delete) by code. */
-	@Override
-	public String softDeleteMenu(String code) {
-		try {
-			Optional<Menu> menuOptional = menuRepo.findByMenuCode(code);
-
-			if (menuOptional.isPresent()) {
-				Menu menu = menuOptional.get();
-				menu.setIsActive(false);
-				menuRepo.save(menu);
-				return "Menu soft-deleted successfully";
-			} else {
-				return "Menu not found";
-			}
-		} catch (Exception e) {
-			throw new RuntimeException("Failed to soft delete menu: " + e.getMessage());
-		}
-	}
-
-	/** Generates a unique menu code from the menu name. */
-	private String generateMenuCode(String name) {
-		String base = name != null ? name.toUpperCase().replaceAll("\\s+", "_") : "MENU";
-		return "MENU_" + base + "_" + UUID.randomUUID().toString().substring(0, 5).toUpperCase();
 	}
 }
