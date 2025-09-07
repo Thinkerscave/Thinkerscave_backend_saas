@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Address {
+public class AddressEmbedded {
 
     @Column(name = "street_address") // Renamed from "address" for clarity
     private String street;

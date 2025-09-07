@@ -57,7 +57,7 @@ public class ApplicationAdmission extends Auditable {
 
     // Replace them with an @Embedded Address object
     @Embedded
-    private Address address;
+    private AddressEmbedded address;
 
     // Remove the old emergency_contact string
     // private String emergencyContact;

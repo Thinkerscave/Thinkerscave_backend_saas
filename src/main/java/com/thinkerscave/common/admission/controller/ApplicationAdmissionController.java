@@ -1,16 +1,16 @@
 package com.thinkerscave.common.admission.controller;
 
-import com.thinkerscave.common.admission.dto.ApplicationAdmissionCreateRequest;
-import com.thinkerscave.common.admission.dto.ApplicationAdmissionDraftRequest;
-import com.thinkerscave.common.admission.dto.ApplicationAdmissionEditRequest;
-import com.thinkerscave.common.admission.dto.ApplicationAdmissionResponse;
+import com.thinkerscave.common.admission.domain.ApplicationStatus;
+import com.thinkerscave.common.admission.dto.*;
 import com.thinkerscave.common.admission.service.ApplicationAdmissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
@@ -71,5 +71,27 @@ public class ApplicationAdmissionController {
     public ResponseEntity<ApplicationAdmissionResponse> getById(@PathVariable String id) {
         Optional<ApplicationAdmissionResponse> response = service.getById(id);
         return response.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Update the status of multiple applications (APPROVED/REJECTED).
+     * @param request Contains the status and list of application IDs to update
+     * @return Response with update statistics and any errors
+     */
+    @Operation(summary = "Update Application Status", 
+              description = "Updates the status of multiple applications to either APPROVED or REJECTED. " +
+                          "Approved applications will create corresponding student records.")
+    @PostMapping("/status")
+    public ResponseEntity<ApplicationStatusUpdateResponse> updateApplicationStatus(
+            @Valid @RequestBody ApplicationStatusUpdateRequest request) {
+        // Validate status is either APPROVED or REJECTED
+        if (request.getStatus() != ApplicationStatus.APPROVED &&
+            request.getStatus() != ApplicationStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                "Status must be either APPROVED or REJECTED");
+        }
+        
+        ApplicationStatusUpdateResponse response = service.updateApplicationStatus(request);
+        return ResponseEntity.ok(response);
     }
 }

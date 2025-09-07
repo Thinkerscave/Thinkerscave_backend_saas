@@ -4,6 +4,7 @@ import com.thinkerscave.common.admission.domain.ApplicationAdmission;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -17,4 +18,12 @@ import java.util.Optional;
 @Repository
 public interface ApplicationAdmissionRepository extends JpaRepository<ApplicationAdmission, String> {
     Optional<ApplicationAdmission> findByApplicationId(String applicationId);
+
+    /**
+     * Finds all applications with the given application IDs.
+     *
+     * @param applicationIds List of application IDs to search for
+     * @return List of found applications
+     */
+    List<ApplicationAdmission> findByApplicationIdIn(List<String> applicationIds);
 }
