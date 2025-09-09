@@ -1,31 +1,32 @@
 package com.thinkerscave.common.orgm.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
+
+import java.time.LocalDate;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@Getter
+@Setter
 public class OrgRequestDTO {
 
-    // Optional for updates
-    private String orgCode;
+    // General Info
+    private Boolean isAGroup;
+    private Long parentOrgId; // We only need the ID of the parent
 
-    // Owner/User details
-    private String name;           // Full name (split inside service)
-    private String gender;
-    private Long phoneNumber;
-    private String address;
-    private String mailId;
-
-    // Organization details
-    private String organizationName;
+    // Organisation Details
+    private String orgName;
     private String brandName;
+    private String orgUrl;
     private String orgType;
     private String city;
     private String state;
+    private LocalDate establishDate;
+    private String subscriptionType;
 
-    // Optional flags
-    private Boolean isActive;
-    private Boolean isGroup;
+    // Owner Details
+    private String ownerName;
+    private String ownerEmail;
+    private String ownerMobile;
 }

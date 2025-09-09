@@ -8,7 +8,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-
 @Data
 @Entity
 @EntityListeners(AuditingEntityListener.class)
@@ -22,23 +21,28 @@ public class OwnerDetails extends Auditable {
     @Column(name = "owner_id")
     private Long ownerId;
 
-    @Column(name = "owner_code", nullable = false, unique = true, length = 50)
+    @Column(name = "owner_code",   unique = true, length = 50)
     private String ownerCode;
 
-    @Column(name = "owner_name", nullable = false, length = 100)
+    @Column(name = "owner_name",   length = 100)
     private String ownerName;
 
-    @Column(name = "gender", nullable = false, length = 10)
+    @Column(name = "gender",   length = 10)
     private String gender;
 
-    @Column(name = "mail_id", nullable = false, length = 255)
-    private String mailId;
+    // --- ADJUSTED: Renamed for consistency ---
+    @Column(name = "owner_email",   length = 255)
+    private String ownerEmail;
 
-    @OneToOne
+    // --- NEW FIELD ---
+    @Column(name = "owner_mobile", length = 20)
+    private String ownerMobile;
+
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "org_id", nullable = false)
     private Organisation organization;
 }

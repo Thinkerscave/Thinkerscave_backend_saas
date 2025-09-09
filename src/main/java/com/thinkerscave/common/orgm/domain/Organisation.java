@@ -7,6 +7,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import java.time.LocalDate; // Use LocalDate for dates without time
 
 @Data
 @Entity
@@ -32,7 +33,7 @@ public class Organisation extends Auditable {
     @Column(name = "org_url", length = 255)
     private String orgUrl;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY) // Link to the owner
     @JoinColumn(name = "user_id")
     private User user;
 
@@ -44,6 +45,20 @@ public class Organisation extends Auditable {
 
     @Column(name = "state", length = 255)
     private String state;
+
+    // --- NEW FIELDS START ---
+
+    @Column(name = "establishment_date")
+    private LocalDate establishmentDate;
+
+    @Column(name = "subscription_type", length = 50)
+    private String subscriptionType;
+
+    @ManyToOne(fetch = FetchType.LAZY) // This creates the parent-child relationship
+    @JoinColumn(name = "parent_org_id")
+    private Organisation parentOrganisation;
+
+    // --- NEW FIELDS END ---
 
     @Column(name = "is_active")
     private Boolean isActive = true;

@@ -117,18 +117,13 @@ public class PasswordController {
         if (userOptional.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Invalid request."));
         }
-
         User user = userOptional.get();
-
         // Re-validate the OTP one last time
         if (passwordResetTokenService.validateOtp(user, request.getOtp()).isPresent()) {
-
             // --- FIX IS HERE: Call the single transactional service method ---
             userService.updatePasswordAndInvalidateToken(user, request.getNewPassword());
-
             return ResponseEntity.ok(Map.of("message", "Password reset successful."));
         }
-
         return ResponseEntity.badRequest().body(Map.of("message", "Invalid or expired OTP."));
     }
 }

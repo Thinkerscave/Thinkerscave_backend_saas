@@ -63,7 +63,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
                                 "/api/admissions/**"
-                                ,"/api/schema/init"
+                                ,"/api/schema/init",
+                                "/api/organizations/**"
                                 // Be careful: other endpoints like /api/admissions/** should likely be secured
                         ).permitAll()
                         // This line ensures any endpoint NOT in the list above is protected
