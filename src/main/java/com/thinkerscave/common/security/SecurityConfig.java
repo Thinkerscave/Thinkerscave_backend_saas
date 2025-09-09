@@ -56,9 +56,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/login",
-                                "/api/password/**",     // <-- THE FIX IS ADDING THIS LINE
                                 "/api/v1/users/**",
+                                "/api/password/**",     // <-- THE FIX IS ADDING THIS LI
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
