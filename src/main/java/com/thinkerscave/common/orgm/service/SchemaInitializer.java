@@ -38,7 +38,7 @@ public class SchemaInitializer {
             Map.entry("organisation", com.thinkerscave.common.orgm.domain.Organisation.class),
             Map.entry("ownerdetails", com.thinkerscave.common.orgm.domain.OwnerDetails.class),
             Map.entry("menu", com.thinkerscave.common.menum.domain.Menu.class),
-            Map.entry("submenu_master", com.thinkerscave.common.menum.domain.Submenu.class),
+            Map.entry("submenu_master", com.thinkerscave.common.menum.domain.SubMenu.class),
             Map.entry("branch", com.thinkerscave.common.staff.domain.Branch.class),
             Map.entry("department", com.thinkerscave.common.staff.domain.Department.class),
             Map.entry("staff", com.thinkerscave.common.staff.domain.Staff.class)
@@ -72,7 +72,7 @@ public class SchemaInitializer {
                     .addAnnotatedClass(com.thinkerscave.common.orgm.domain.Organisation.class)
                     .addAnnotatedClass(com.thinkerscave.common.orgm.domain.OwnerDetails.class)
                     .addAnnotatedClass(com.thinkerscave.common.menum.domain.Menu.class)
-                    .addAnnotatedClass(com.thinkerscave.common.menum.domain.Submenu.class)
+                    .addAnnotatedClass(com.thinkerscave.common.menum.domain.SubMenu.class)
                     .addAnnotatedClass(com.thinkerscave.common.staff.domain.Branch.class)
                     .addAnnotatedClass(com.thinkerscave.common.staff.domain.Department.class)
                     .addAnnotatedClass(com.thinkerscave.common.staff.domain.Staff.class)

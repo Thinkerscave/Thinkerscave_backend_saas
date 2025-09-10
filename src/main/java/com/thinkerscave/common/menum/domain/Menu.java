@@ -31,8 +31,8 @@ public class Menu extends Auditable {
     @Column(length = 55)
     private String icon;
 
-    @Column(name = "\"order\"")
-    private Integer order;
+    @Column(name = "menu_order")
+    private Integer menuOrder;
 
     @Column(name = "is_active")
     private Boolean isActive;

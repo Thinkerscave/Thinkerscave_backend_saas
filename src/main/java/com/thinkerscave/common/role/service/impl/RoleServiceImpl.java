@@ -3,7 +3,7 @@ package com.thinkerscave.common.role.service.impl;
 
 import com.thinkerscave.common.menum.domain.Menu;
 import com.thinkerscave.common.menum.dto.MenuDTO;
-import com.thinkerscave.common.menum.repository.MenuRepo;
+import com.thinkerscave.common.menum.repository.MenuRepository;
 import com.thinkerscave.common.role.dto.RoleDTO;
 import com.thinkerscave.common.role.domain.Role;
 import com.thinkerscave.common.role.repository.RoleRepository;
@@ -28,7 +28,7 @@ public class RoleServiceImpl implements RoleService {
 	private RoleRepository repository;
 
 	@Autowired
-	private MenuRepo menuRepo;
+	private MenuRepository menuRepo;
     @Autowired
     private RoleRepository roleRepository;
 

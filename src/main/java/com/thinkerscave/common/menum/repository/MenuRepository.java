@@ -14,11 +14,16 @@ import java.util.Optional;
  * @author Sandeep
  */
 @Repository
-public interface MenuRepo extends JpaRepository<Menu, Long> {
+public interface MenuRepository extends JpaRepository<Menu, Long> {
 
     /** Returns all menus where isActive is true. */
     List<Menu> findByIsActiveTrue();
 
     /** Finds a menu by its unique menu code. */
     Optional<Menu> findByMenuCode(String menuCode);
+    
+    List<Menu> findByIsActiveTrueOrderByMenuOrderAsc();
+
+	List<Menu> findAllByOrderByMenuOrderAsc();
+
 }

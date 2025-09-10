@@ -2,7 +2,6 @@ package com.thinkerscave.common.menum.controller;
 
 import com.thinkerscave.common.menum.domain.Menu;
 import com.thinkerscave.common.menum.dto.MenuDTO;
-import com.thinkerscave.common.menum.repository.MenuRepo;
 import com.thinkerscave.common.menum.service.MenuService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +38,16 @@ public class MenuController {
 				? ResponseEntity.status(HttpStatus.NO_CONTENT).build()
 				: ResponseEntity.ok(list);
 	}
+	
+	// ✅ Get All Active Menus
+	@GetMapping("/activeMenus")
+	public ResponseEntity<List<Map<String, Object>>> getAllActiveMenus() {
+		List<Map<String, Object>> activeMenus = menuService.getAllActiveMenus();
+	    return activeMenus.isEmpty()
+	            ? ResponseEntity.status(HttpStatus.NO_CONTENT).build()
+	            : ResponseEntity.ok(activeMenus);
+	}
+
 
 	// ✅ Get Menu by Code
 	@GetMapping("/{code}")
@@ -49,7 +58,7 @@ public class MenuController {
 	}
 
 	// ✅ Toggle Active/Inactive status
-	@PutMapping("/toggle/{code}")
+	@PutMapping("/updateStatus/{code}")
 	public ResponseEntity<Map<String, String>> toggleMenuStatus(
 	        @PathVariable String code,
 	        @RequestParam boolean status) {
