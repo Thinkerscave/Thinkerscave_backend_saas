@@ -4,6 +4,7 @@ package com.thinkerscave.common.orgm.service;
 import com.thinkerscave.common.orgm.domain.Organisation;
 import com.thinkerscave.common.orgm.dto.OrgRequestDTO;
 import com.thinkerscave.common.orgm.dto.OrgResponseDTO;
+import com.thinkerscave.common.orgm.dto.OrganisationListDTO;
 import com.thinkerscave.common.orgm.dto.OwnerDTO;
 
 import java.util.List;
@@ -20,8 +21,8 @@ public interface OrganizationService {
     OrgResponseDTO saveOrganization(OrgRequestDTO request);
 
     /** Returns a list of all organizations. */
-    List<Organisation> getAllOrgs();
-
+//    List<Organisation> getAllOrgs();
+     List<OrganisationListDTO> getAllOrgsAsDTO() ;
     /** Performs a soft delete on an organization by org code. */
     String softDeleteOrg(String orgCode);
 
