@@ -1,6 +1,8 @@
 package com.thinkerscave.common.usrm.domain;
 
 import com.thinkerscave.common.auditing.Auditable;
+import com.thinkerscave.common.menum.domain.Role;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -13,8 +15,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-
-import com.thinkerscave.common.role.domain.Role;
 
 
 @Data

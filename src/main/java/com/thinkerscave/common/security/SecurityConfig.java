@@ -67,7 +67,8 @@ public class SecurityConfig {
                                 "/api/menu/**",
                                 "/api/sub-menus/**",
                                 "/api/menu-sequence/**",
-                                "/api/menu-mapping/**"
+                                "/api/menu-mapping/**",
+                                "/api/roles/**"
                                 // Be careful: other endpoints like /api/admissions/** should likely be secured
                         ).permitAll()
                         // This line ensures any endpoint NOT in the list above is protected

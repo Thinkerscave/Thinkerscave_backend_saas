@@ -1,7 +1,7 @@
 package com.thinkerscave.common.usrm.service.impl;
 
-import com.thinkerscave.common.role.domain.Role;
-import com.thinkerscave.common.role.repository.RoleRepository;
+import com.thinkerscave.common.menum.domain.Role;
+import com.thinkerscave.common.menum.repository.RoleRepository;
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.dto.UserResponseDTO;
 import com.thinkerscave.common.usrm.repository.PasswordResetTokenRepository;

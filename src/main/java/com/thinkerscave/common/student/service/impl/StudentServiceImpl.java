@@ -1,8 +1,8 @@
 package com.thinkerscave.common.student.service.impl;
 
 import com.thinkerscave.common.commonModel.Address;
-import com.thinkerscave.common.role.domain.Role;
-import com.thinkerscave.common.role.repository.RoleRepository;
+import com.thinkerscave.common.menum.domain.Role;
+import com.thinkerscave.common.menum.repository.RoleRepository;
 import com.thinkerscave.common.student.domain.Guardian;
 import com.thinkerscave.common.student.domain.Student;
 import com.thinkerscave.common.student.dto.StudentRequestDTO;

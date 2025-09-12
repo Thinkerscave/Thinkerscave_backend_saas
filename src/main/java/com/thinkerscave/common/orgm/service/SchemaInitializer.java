@@ -34,7 +34,7 @@ public class SchemaInitializer {
             Map.entry("user", com.thinkerscave.common.usrm.domain.User.class),
             Map.entry("passwordresettoken", com.thinkerscave.common.usrm.domain.PasswordResetToken.class),
             Map.entry("refreshtoken", com.thinkerscave.common.usrm.domain.RefreshToken.class),
-            Map.entry("role", com.thinkerscave.common.role.domain.Role.class),
+            Map.entry("role", com.thinkerscave.common.menum.domain.Role.class),
             Map.entry("organisation", com.thinkerscave.common.orgm.domain.Organisation.class),
             Map.entry("ownerdetails", com.thinkerscave.common.orgm.domain.OwnerDetails.class),
             Map.entry("menu", com.thinkerscave.common.menum.domain.Menu.class),
@@ -68,7 +68,7 @@ public class SchemaInitializer {
                     .addAnnotatedClass(com.thinkerscave.common.usrm.domain.User.class)
                     .addAnnotatedClass(com.thinkerscave.common.usrm.domain.PasswordResetToken.class)
                     .addAnnotatedClass(com.thinkerscave.common.usrm.domain.RefreshToken.class)
-                    .addAnnotatedClass(com.thinkerscave.common.role.domain.Role.class)
+                    .addAnnotatedClass(com.thinkerscave.common.menum.domain.Role.class)
                     .addAnnotatedClass(com.thinkerscave.common.orgm.domain.Organisation.class)
                     .addAnnotatedClass(com.thinkerscave.common.orgm.domain.OwnerDetails.class)
                     .addAnnotatedClass(com.thinkerscave.common.menum.domain.Menu.class)

@@ -1,6 +1,5 @@
 package com.thinkerscave.common.staff.repository;
 
-import com.thinkerscave.common.role.domain.Role;
 import com.thinkerscave.common.staff.domain.Branch;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

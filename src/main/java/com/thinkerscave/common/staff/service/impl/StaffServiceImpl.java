@@ -1,7 +1,7 @@
 package com.thinkerscave.common.staff.service.impl;
 
-import com.thinkerscave.common.role.domain.Role;
-import com.thinkerscave.common.role.repository.RoleRepository;
+import com.thinkerscave.common.menum.domain.Role;
+import com.thinkerscave.common.menum.repository.RoleRepository;
 import com.thinkerscave.common.staff.domain.Branch;
 import com.thinkerscave.common.staff.domain.Department;
 import com.thinkerscave.common.staff.domain.Staff;
