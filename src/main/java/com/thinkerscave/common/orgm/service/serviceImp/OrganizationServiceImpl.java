@@ -4,6 +4,7 @@ import com.thinkerscave.common.orgm.domain.Organisation;
 import com.thinkerscave.common.orgm.domain.OwnerDetails;
 import com.thinkerscave.common.orgm.dto.OrgRequestDTO;
 import com.thinkerscave.common.orgm.dto.OrgResponseDTO;
+import com.thinkerscave.common.orgm.dto.OrganisationListDTO;
 import com.thinkerscave.common.orgm.dto.OwnerDTO;
 import com.thinkerscave.common.orgm.repository.OrganizationRepository;
 import com.thinkerscave.common.orgm.repository.OwnerDetailsRepository;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Implementation of OrganizationService to manage organization creation, updates, and soft deletions.
@@ -121,10 +123,48 @@ public class OrganizationServiceImpl implements OrganizationService {
         );
     }
 
-    /** Returns all organizations. */
-    @Override
-    public List<Organisation> getAllOrgs() {
-        return organizationRepository.findAll();
+    /**
+     * Fetches all organizations and converts them to a safe DTO format for the API.
+     * This is the method your controller should now call.
+     */
+    @Transactional(readOnly = true) // Use a read-only transaction for performance
+    public List<OrganisationListDTO> getAllOrgsAsDTO() {
+        return organizationRepository.findAll()
+                .stream()
+                .map(this::toOrganisationListDTO) // Use a helper to map each entity
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * A private helper method to safely map an Organisation entity to its DTO representation.
+     * This explicitly calls the getters, which resolves the lazy-loaded proxies.
+     */
+    private OrganisationListDTO toOrganisationListDTO(Organisation org) {
+        OrganisationListDTO dto = new OrganisationListDTO();
+
+        dto.setOrgId(org.getOrgId());
+        dto.setOrgName(org.getOrgName());
+        dto.setBrandName(org.getBrandName());
+        dto.setOrgUrl(org.getOrgUrl());
+        dto.setOrgType(org.getType());
+        dto.setCity(org.getCity());
+        dto.setState(org.getState());
+        dto.setEstablishDate(org.getEstablishmentDate());
+        dto.setGroup(org.getIsGroup());
+
+        // --- THIS IS THE FIX ---
+        // Safely access lazy-loaded fields to get the real data.
+        if (org.getParentOrganisation() != null) {
+            dto.setParentOrgId(org.getParentOrganisation().getOrgId());
+        }
+
+        if (org.getUser() != null) {
+            dto.setOwnerName(org.getUser().getFirstName()); // Or getFullName() if you have it
+            dto.setOwnerEmail(org.getUser().getEmail());
+            dto.setOwnerMobile(String.valueOf(org.getUser().getMobileNumber()));
+        }
+
+        return dto;
     }
 
     /** Soft-deletes an organization by marking it inactive. */

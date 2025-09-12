@@ -6,6 +6,7 @@ import com.thinkerscave.common.orgm.domain.Organisation;
 
 import com.thinkerscave.common.orgm.dto.OrgRequestDTO;
 import com.thinkerscave.common.orgm.dto.OrgResponseDTO;
+import com.thinkerscave.common.orgm.dto.OrganisationListDTO;
 import com.thinkerscave.common.orgm.dto.OwnerDTO;
 import com.thinkerscave.common.orgm.service.OrganizationService;
 import com.thinkerscave.common.orgm.service.SchemaInitializer;
@@ -102,9 +103,9 @@ public class OrganizationController {
                             example = "master", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
             }
     )
-    public ResponseEntity<List<Organisation>> getAllOrganizations() {
+    public ResponseEntity<List<OrganisationListDTO>> getAllOrganizations() {
         try {
-            List<Organisation> organizations = organizationService.getAllOrgs();
+            List<OrganisationListDTO> organizations = organizationService.getAllOrgsAsDTO();
             return ResponseEntity.ok(organizations);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
