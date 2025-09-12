@@ -1,5 +1,7 @@
 package com.thinkerscave.common.menum.dto;
 
+import java.util.List;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,4 +19,5 @@ public class SubMenuRequestDTO {
     private Boolean subMenuIsActive;
     private String subMenuDescription;
     private Long menuId;
+    private List<Long> privilegeIds;
 }

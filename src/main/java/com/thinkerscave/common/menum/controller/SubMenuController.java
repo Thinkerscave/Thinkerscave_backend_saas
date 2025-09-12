@@ -1,11 +1,14 @@
 package com.thinkerscave.common.menum.controller;
 
+import com.thinkerscave.common.menum.domain.Privilege;
 import com.thinkerscave.common.menum.dto.SubMenuRequestDTO;
 import com.thinkerscave.common.menum.dto.SubMenuResponseDTO;
 import com.thinkerscave.common.menum.service.SubMenuService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +23,7 @@ import java.util.Optional;
 @RequestMapping("/api/sub-menus")
 @Tag(name = "Submenu Management", description = "APIs for managing Submenus")
 @RequiredArgsConstructor
+@Slf4j
 public class SubMenuController {
 
     private final SubMenuService subMenuService;
@@ -84,5 +88,11 @@ public class SubMenuController {
 	    String result = subMenuService.updateSubMenuStatus(code, status);
 	    return ResponseEntity.ok(Collections.singletonMap("message", result));
 	}
+    
+    @GetMapping("/getPrivileges")
+    public ResponseEntity<List<Privilege>> getAllPrivileges() {
+        log.info("API called: Get All Privileges");
+        return ResponseEntity.ok(subMenuService.getAllPrivileges());
+    }
 
 }

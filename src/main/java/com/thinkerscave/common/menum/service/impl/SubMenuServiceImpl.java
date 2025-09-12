@@ -1,12 +1,19 @@
 package com.thinkerscave.common.menum.service.impl;
 
 import com.thinkerscave.common.menum.domain.Menu;
+import com.thinkerscave.common.menum.domain.Privilege;
 import com.thinkerscave.common.menum.domain.SubMenu;
+import com.thinkerscave.common.menum.domain.SubMenuPrivilegeMapping;
 import com.thinkerscave.common.menum.dto.SubMenuRequestDTO;
 import com.thinkerscave.common.menum.dto.SubMenuResponseDTO;
 import com.thinkerscave.common.menum.repository.MenuRepository;
+import com.thinkerscave.common.menum.repository.PrivilegeRepository;
+import com.thinkerscave.common.menum.repository.SubMenuPrivilegeMappingRepository;
 import com.thinkerscave.common.menum.repository.SubMenuRepository;
 import com.thinkerscave.common.menum.service.SubMenuService;
+
+import jakarta.transaction.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.*;
@@ -25,11 +32,18 @@ public class SubMenuServiceImpl implements SubMenuService {
 	@Autowired
 	private MenuRepository menuRepository;
 
+	@Autowired
+	private PrivilegeRepository privilegeRepository;
+
+	@Autowired
+	private SubMenuPrivilegeMappingRepository subMenuPrivilegeMappingRepository;
+
 	/**
 	 * Saves a new submenu or updates an existing one. - Uses submenuId for updates
 	 * (DB identity). - Generates submenuCode only for new records.
 	 */
 	@Override
+	@Transactional
 	public SubMenuResponseDTO saveOrUpdateSubMenu(SubMenuRequestDTO dto) {
 		SubMenu subMenu;
 
@@ -65,6 +79,22 @@ public class SubMenuServiceImpl implements SubMenuService {
 		subMenu.setMenu(menu);
 
 		subMenu = subMenuRepository.save(subMenu);
+
+		// ✅ Clear old privilege mappings first
+		subMenuPrivilegeMappingRepository.deleteBySubMenu(subMenu);
+		subMenuPrivilegeMappingRepository.flush();
+		// ✅ Save privilege mappings
+		if (dto.getPrivilegeIds() != null && !dto.getPrivilegeIds().isEmpty()) {
+			for (Long privilegeId : dto.getPrivilegeIds()) {
+				Privilege privilege = privilegeRepository.findById(privilegeId)
+						.orElseThrow(() -> new RuntimeException("Privilege not found with id: " + privilegeId));
+
+				SubMenuPrivilegeMapping mapping = new SubMenuPrivilegeMapping();
+				mapping.setSubMenu(subMenu);
+				mapping.setPrivilege(privilege);
+				subMenuPrivilegeMappingRepository.save(mapping);
+			}
+		}
 
 		return mapToResponseDTO(subMenu);
 	}
@@ -121,23 +151,36 @@ public class SubMenuServiceImpl implements SubMenuService {
 		dto.setMenuCode(subMenu.getMenu().getMenuCode());
 		dto.setCreatedBy(subMenu.getCreatedBy());
 		dto.setLastUpdatedOn(subMenu.getLastModifiedDate());
+
+		// ✅ Add privileges
+		List<Privilege> privileges = subMenu.getPrivilegeMappings().stream()
+				.map(mapping -> new Privilege(mapping.getPrivilege().getPrivilegeId(),
+						mapping.getPrivilege().getPrivilegeName()))
+				.collect(Collectors.toList());
+		dto.setPrivileges(privileges);
+
 		return dto;
 	}
 
 	@Override
 	public String updateSubMenuStatus(String code, boolean status) {
 		try {
-	        Optional<SubMenu> subMenuOptional = subMenuRepository.findBySubMenuCode(code);
-	        if (subMenuOptional.isPresent()) {
-	            SubMenu subMenu = subMenuOptional.get();
-	            subMenu.setIsActive(status);
-	            subMenuRepository.save(subMenu);
-	            return "Sub-menu status updated to " + (status ? "Active" : "Inactive");
-	        } else {
-	            return "Sub-Menu not found";
-	        }
-	    } catch (Exception e) {
-	        throw new RuntimeException("Failed to update sub-menu status: " + e.getMessage());
-	    }
+			Optional<SubMenu> subMenuOptional = subMenuRepository.findBySubMenuCode(code);
+			if (subMenuOptional.isPresent()) {
+				SubMenu subMenu = subMenuOptional.get();
+				subMenu.setIsActive(status);
+				subMenuRepository.save(subMenu);
+				return "Sub-menu status updated to " + (status ? "Active" : "Inactive");
+			} else {
+				return "Sub-Menu not found";
+			}
+		} catch (Exception e) {
+			throw new RuntimeException("Failed to update sub-menu status: " + e.getMessage());
+		}
+	}
+
+	@Override
+	public List<Privilege> getAllPrivileges() {
+		return privilegeRepository.findAll();
 	}
 }
