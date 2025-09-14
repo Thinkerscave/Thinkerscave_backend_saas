@@ -29,15 +29,11 @@ public class RoleServiceImpl implements RoleService {
             role = roleRepository.findById(dto.getRoleId())
                     .orElseThrow(() -> new RuntimeException("Role not found with id: " + dto.getRoleId()));
         } else {
-            // create
-            if (roleRepository.existsByRoleCode(dto.getRoleCode())) {
-                throw new RuntimeException("Role already exists with code: " + dto.getRoleCode());
-            }
             role = new Role();
         }
 
         role.setRoleName(dto.getRoleName());
-        role.setRoleCode(dto.getRoleCode());
+        role.setRoleCode(dto.getRoleName());
         role.setDescription(dto.getDescription());
         role.setIsActive(dto.getIsActive() != null ? dto.getIsActive() : true);
         role.setRoleType(dto.getRoleType());
