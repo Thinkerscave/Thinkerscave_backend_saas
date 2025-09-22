@@ -26,17 +26,17 @@ import java.util.Map;
 public class HibernateMultiTenantConfig {
 
     // Custom implementation to provide database connections for different tenants (schemas)
-    private final SchemaMultiTenantConnectionProvider connectionProvider;
+//    private final SchemaMultiTenantConnectionProvider connectionProvider;
 
     // Custom implementation that determines the current tenant identifier (i.e., schema name)
-    private final SchemaTenantResolver schemaTenantResolver;
+//    private final SchemaTenantResolver schemaTenantResolver;
 
     // Constructor-based dependency injection for the custom connection provider and tenant resolver
-    public HibernateMultiTenantConfig(SchemaMultiTenantConnectionProvider connectionProvider,
-                                      SchemaTenantResolver schemaTenantResolver) {
-        this.connectionProvider = connectionProvider;
-        this.schemaTenantResolver = schemaTenantResolver;
-    }
+//    public HibernateMultiTenantConfig(SchemaMultiTenantConnectionProvider connectionProvider,
+//                                      SchemaTenantResolver schemaTenantResolver) {
+//        this.connectionProvider = connectionProvider;
+//        this.schemaTenantResolver = schemaTenantResolver;
+//    }
 
     /**
      * Defines the EntityManagerFactory bean with multi-tenancy enabled via SCHEMA strategy.
@@ -52,11 +52,11 @@ public class HibernateMultiTenantConfig {
         Map<String, Object> properties = new HashMap<>();
 
         // Use schema-based multi-tenancy strategy
-        properties.put("hibernate.multiTenancy", "SCHEMA");
+//        properties.put("hibernate.multiTenancy", "SCHEMA");
 
         // Plug in custom multi-tenant connection provider and tenant identifier resolver
-        properties.put("hibernate.multi_tenant_connection_provider", connectionProvider);
-        properties.put("hibernate.tenant_identifier_resolver", schemaTenantResolver);
+//        properties.put("hibernate.multi_tenant_connection_provider", connectionProvider);
+//        properties.put("hibernate.tenant_identifier_resolver", schemaTenantResolver);
 
         // Hibernate-specific settings
         properties.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");

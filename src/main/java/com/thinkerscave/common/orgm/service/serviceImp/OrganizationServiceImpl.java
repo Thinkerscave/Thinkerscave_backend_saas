@@ -1,5 +1,5 @@
 package com.thinkerscave.common.orgm.service.serviceImp;
-import com.thinkerscave.common.config.TenantContext;
+//import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.orgm.domain.Organisation;
 import com.thinkerscave.common.orgm.domain.OwnerDetails;
 import com.thinkerscave.common.orgm.dto.OrgRequestDTO;
@@ -99,10 +99,10 @@ public class OrganizationServiceImpl implements OrganizationService {
     @Override
     @Transactional // Ensures the entire operation succeeds or fails together
     public OrgResponseDTO saveOrganization(OrgRequestDTO request) {
-        String schema = TenantContext.getTenant();
-        if (schema == null) {
-            throw new IllegalStateException("Tenant (schema) not set. Please provide 'X-Tenant-ID' in the header.");
-        }
+//        String schema = TenantContext.getTenant();
+//        if (schema == null) {
+//            throw new IllegalStateException("Tenant (schema) not set. Please provide 'X-Tenant-ID' in the header.");
+//        }
 
         // Step 1: Find an existing user or create a new one.
         User savedUser = findOrCreateUser(request);
@@ -117,7 +117,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         // and instructions to use the "Forgot Password" feature to set their password.
 
         return new OrgResponseDTO(
-                "Organization successfully registered under tenant: " + schema,
+                "Organization successfully registered under tenant: ",
                 savedOrg.getOrgCode(),
                 savedUser.getUserCode()
         );

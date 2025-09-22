@@ -1,7 +1,7 @@
 package com.thinkerscave.common.orgm.controller;
 
 
-import com.thinkerscave.common.config.TenantContext;
+//import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.orgm.service.SchemaInitializer;
 import com.thinkerscave.common.orgm.service.SchemaService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -116,103 +116,103 @@ public class SchemaController {
         return ResponseEntity.ok("Tables created for: " + schemaName);
     }
 
-    @Operation(
-            summary = "Get current tenant/schema",
-            description = "Returns the schema (tenant) set for the current request based on the tenant context.",
-            parameters = {
-                    @Parameter(
-                            name = "X-Tenant-ID",
-                            description = "Tenant ID or schema name passed via request header",
-                            in = ParameterIn.HEADER,
-                            required = false,
-                            example = "demo_org"
-                    )
-            },
-            responses = {
-                    @ApiResponse(responseCode = "200", description = "Tenant context response",
-                            content = @Content(
-                                    mediaType = "text/plain",
-                                    examples = {
-                                            @ExampleObject(name = "With schema", value = "Current connected schema: demo_org"),
-                                            @ExampleObject(name = "Without schema", value = "No schema (tenant) set for this request.")
-                                    }
-                            )
-                    )
-            }
-    )
-    @GetMapping("/current")
-    public ResponseEntity<String> getCurrentTenant() {
-        String currentSchema = TenantContext.getTenant();
-        if (currentSchema == null) {
-            return ResponseEntity.ok("No schema (tenant) set for this request.");
-        }
-        return ResponseEntity.ok("Current connected schema: " + currentSchema);
-    }
+//    @Operation(
+//            summary = "Get current tenant/schema",
+//            description = "Returns the schema (tenant) set for the current request based on the tenant context.",
+//            parameters = {
+//                    @Parameter(
+//                            name = "X-Tenant-ID",
+//                            description = "Tenant ID or schema name passed via request header",
+//                            in = ParameterIn.HEADER,
+//                            required = false,
+//                            example = "demo_org"
+//                    )
+//            },
+//            responses = {
+//                    @ApiResponse(responseCode = "200", description = "Tenant context response",
+//                            content = @Content(
+//                                    mediaType = "text/plain",
+//                                    examples = {
+//                                            @ExampleObject(name = "With schema", value = "Current connected schema: demo_org"),
+//                                            @ExampleObject(name = "Without schema", value = "No schema (tenant) set for this request.")
+//                                    }
+//                            )
+//                    )
+//            }
+//    )
+//    @GetMapping("/current")
+//    public ResponseEntity<String> getCurrentTenant() {
+//        String currentSchema = TenantContext.getTenant();
+//        if (currentSchema == null) {
+//            return ResponseEntity.ok("No schema (tenant) set for this request.");
+//        }
+//        return ResponseEntity.ok("Current connected schema: " + currentSchema);
+//    }
 
 
-    @GetMapping("/check")
-    public ResponseEntity<?> checkSchemaTables() {
-        // Get tenant (schema) name from context
-        String schemaName = TenantContext.getTenant();
+//    @GetMapping("/check")
+//    public ResponseEntity<?> checkSchemaTables() {
+//        // Get tenant (schema) name from context
+//        String schemaName = TenantContext.getTenant();
+//
+//        // Default to "public" if null or blank
+//        schemaName = (schemaName == null || schemaName.isBlank()) ? "public" : schemaName;
+//
+//        try {
+//            List<String> missingTables = schemaService.getMissingTables(schemaName);
+//
+//            if (missingTables.isEmpty()) {
+//                return ResponseEntity.ok(Map.of(
+//                        "schema", schemaName,
+//                        "allTablesExist", true,
+//                        "message", "All required tables exist."
+//                ));
+//            } else {
+//                return ResponseEntity.ok(Map.of(
+//                        "schema", schemaName,
+//                        "allTablesExist", false,
+//                        "missingTables", missingTables,
+//                        "message", "Some tables are missing."
+//                ));
+//            }
+//
+//        } catch (IllegalArgumentException e) {
+//            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+//                    "schema", schemaName,
+//                    "error", e.getMessage()
+//            ));
+//
+//        } catch (Exception e) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+//                    "schema", schemaName,
+//                    "error", "An error occurred: " + e.getMessage()
+//            ));
+//        }
+//    }
 
-        // Default to "public" if null or blank
-        schemaName = (schemaName == null || schemaName.isBlank()) ? "public" : schemaName;
 
-        try {
-            List<String> missingTables = schemaService.getMissingTables(schemaName);
-
-            if (missingTables.isEmpty()) {
-                return ResponseEntity.ok(Map.of(
-                        "schema", schemaName,
-                        "allTablesExist", true,
-                        "message", "All required tables exist."
-                ));
-            } else {
-                return ResponseEntity.ok(Map.of(
-                        "schema", schemaName,
-                        "allTablesExist", false,
-                        "missingTables", missingTables,
-                        "message", "Some tables are missing."
-                ));
-            }
-
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-                    "schema", schemaName,
-                    "error", e.getMessage()
-            ));
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
-                    "schema", schemaName,
-                    "error", "An error occurred: " + e.getMessage()
-            ));
-        }
-    }
-
-
-    @PostMapping("/validate-tables")
-    public ResponseEntity<?> validateAndCreateTables(@RequestBody List<String> tableNames) {
-        // Get tenant (schema) name from context
-        String schemaName = TenantContext.getTenant();
-
-        // Default to "public" if null or blank
-        schemaName = (schemaName == null || schemaName.isBlank()) ? "public" : schemaName;
-
-        List<String> missingTables = schemaService.getMissingTables(schemaName);
-
-        if (!missingTables.isEmpty()) {
-            schemaInitializer.createMissingTablesInSchema(schemaName, tableNames);
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "Created missing tables in schema: " + schemaName);
-            response.put("createdTables", missingTables);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        }
-
-        return ResponseEntity.ok(Collections.singletonMap(
-                "message", "All requested tables already exist in schema: " + schemaName
-        ));
-    }
+//    @PostMapping("/validate-tables")
+//    public ResponseEntity<?> validateAndCreateTables(@RequestBody List<String> tableNames) {
+//        // Get tenant (schema) name from context
+//        String schemaName = TenantContext.getTenant();
+//
+//        // Default to "public" if null or blank
+//        schemaName = (schemaName == null || schemaName.isBlank()) ? "public" : schemaName;
+//
+//        List<String> missingTables = schemaService.getMissingTables(schemaName);
+//
+//        if (!missingTables.isEmpty()) {
+//            schemaInitializer.createMissingTablesInSchema(schemaName, tableNames);
+//            Map<String, Object> response = new HashMap<>();
+//            response.put("message", "Created missing tables in schema: " + schemaName);
+//            response.put("createdTables", missingTables);
+//            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+//        }
+//
+//        return ResponseEntity.ok(Collections.singletonMap(
+//                "message", "All requested tables already exist in schema: " + schemaName
+//        ));
+//    }
 
 
 

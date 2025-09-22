@@ -1,7 +1,7 @@
 package com.thinkerscave.common.orgm.controller;
 
 import com.thinkerscave.common.exception.SchemaCreationException;
-import com.thinkerscave.common.config.TenantContext;
+//import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.orgm.domain.Organisation;
 
 import com.thinkerscave.common.orgm.dto.OrgRequestDTO;
@@ -70,7 +70,7 @@ public class OrganizationController {
             }
     )
     public ResponseEntity<?> registerOrganization(@RequestBody OrgRequestDTO request) {
-        String schema = TenantContext.getTenant();  // This will be tenant/schema name
+//        String schema = TenantContext.getTenant();  // This will be tenant/schema name
 
         try {
 //            if (schemaService.schemaExists(schema)) {
