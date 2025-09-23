@@ -9,7 +9,7 @@ import com.thinkerscave.common.orgm.dto.OrgResponseDTO;
 import com.thinkerscave.common.orgm.dto.OrganisationListDTO;
 import com.thinkerscave.common.orgm.dto.OwnerDTO;
 import com.thinkerscave.common.orgm.service.OrganizationService;
-import com.thinkerscave.common.orgm.service.SchemaInitializer;
+//import com.thinkerscave.common.orgm.service.SchemaInitializer;
 import com.thinkerscave.common.orgm.service.SchemaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,8 +38,8 @@ public class OrganizationController {
     @Autowired
     private SchemaService schemaService;
 
-    @Autowired
-    private SchemaInitializer schemaInitializer;
+//    @Autowired
+//    private SchemaInitializer schemaInitializer;
 
     @PostMapping("/register")
     @Operation(
@@ -97,11 +97,7 @@ public class OrganizationController {
 
     @GetMapping("/all")
     @Operation(
-            summary = "Get all organizations",
-            parameters = {
-                    @Parameter(name = "X-Tenant-ID", description = "Schema Name", required = true,
-                            example = "master", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-            }
+            summary = "Get all organizations"
     )
     public ResponseEntity<List<OrganisationListDTO>> getAllOrganizations() {
         try {
