@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-@CrossOrigin("http://localhost:4200/")
 @RestController
 @RequestMapping("/api/menu")
 @Tag(name = "Menu Management", description = "APIs for managing Menus")

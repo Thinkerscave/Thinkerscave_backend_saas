@@ -88,6 +88,9 @@ public class User extends Auditable {
     @Column(name = "remarks", length = 255)
     private String remarks;
     
+    @Column(name = "is_first_time_login", nullable = false)
+    private Boolean isFirstTimeLogin = true;
+    
     @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinTable(
         name = "user_roles",

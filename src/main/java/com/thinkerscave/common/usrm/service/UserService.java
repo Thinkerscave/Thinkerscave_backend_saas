@@ -21,6 +21,8 @@ public interface UserService {
 	void updatePassword(User user, String password);
 
 	void updatePasswordAndInvalidateToken(User user,String newPassword);
+
+	Optional<UserResponseDTO> findByUsername(String username);
 	
 
 }

@@ -64,10 +64,6 @@ public class SecurityConfig {
                                 "/api/admissions/**"
                                 ,"/api/schema/init",
                                 "/api/organizations/**",
-                                "/api/menu/**",
-                                "/api/sub-menus/**",
-                                "/api/menu-sequence/**",
-                                "/api/menu-mapping/**",
                                 "/api/roles/**"
                                 // Be careful: other endpoints like /api/admissions/** should likely be secured
                         ).permitAll()

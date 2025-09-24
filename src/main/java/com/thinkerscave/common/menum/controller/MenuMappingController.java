@@ -19,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/menu-mapping")
-@CrossOrigin("http://localhost:4200/")
 @RequiredArgsConstructor
 public class MenuMappingController {
 

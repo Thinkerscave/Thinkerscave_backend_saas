@@ -15,7 +15,6 @@ import java.util.Map;
 
 @Slf4j
 @RestController
-@CrossOrigin("http://localhost:4200/")
 @RequestMapping("/api/roles")
 @RequiredArgsConstructor
 public class RoleController {

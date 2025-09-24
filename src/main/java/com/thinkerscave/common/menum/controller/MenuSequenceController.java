@@ -15,7 +15,6 @@ import com.thinkerscave.common.menum.service.MenuService;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import lombok.RequiredArgsConstructor;
 
-@CrossOrigin(origins = "http://localhost:4200")
 @RestController
 @RequestMapping("/api/menu-sequence")
 @RequiredArgsConstructor

@@ -144,8 +144,36 @@ public class UserServiceImpl implements UserService {
         	    user.getMobileNumber(),
         	    user.getIsBlocked(),
         	    user.getMaxDeviceAllow(),
+        	    user.getIsFirstTimeLogin(),
         	    roleNames
         	);
 
     }
+
+    @Override
+    public Optional<UserResponseDTO> findByUsername(String username) {
+        return userRepository.findByUserName(username)
+                .map(user -> UserResponseDTO.builder()
+                        .id(user.getId())
+                        .userCode(user.getUserCode())
+                        .userName(user.getUserName())
+                        .email(user.getEmail())
+                        .firstName(user.getFirstName())
+                        .middleName(user.getMiddleName())
+                        .lastName(user.getLastName())
+                        .address(user.getAddress())
+                        .city(user.getCity())
+                        .state(user.getState())
+                        .mobileNumber(user.getMobileNumber())
+                        .isBlocked(user.getIsBlocked())
+                        .maxDeviceAllow(user.getMaxDeviceAllow())
+                        .firstTimeLogin(user.getIsFirstTimeLogin())
+                        .roles(user.getRoles()
+                                .stream()
+                                .map(Role::getRoleName)   // assuming Role has getName()
+                                .toList())
+                        .build()
+                );
+    }
+
 }

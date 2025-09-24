@@ -223,5 +223,23 @@ public class UserController {
 				}).orElseThrow(() -> new RuntimeException(
 						"Refresh token is not in database!"));
 	}
+	
+	
+	@Operation(summary = "Get current logged-in user details")
+	@GetMapping("/currentUserInfo")
+	public ResponseEntity<UserResponseDTO> getCurrentUser(Authentication authentication) {
+	    if (authentication == null || !authentication.isAuthenticated()) {
+	        return ResponseEntity.status(401).build();
+	    }
+
+	    String username = authentication.getName();
+
+	    UserResponseDTO dto = userService.findByUsername(username)
+	            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+
+	    return ResponseEntity.ok(dto);
+	}
+
+
 
 }
