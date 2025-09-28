@@ -3,7 +3,7 @@ package com.thinkerscave.common.menum.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -14,6 +14,7 @@ import com.thinkerscave.common.menum.dto.MenuMappingDTO;
 import com.thinkerscave.common.menum.dto.RoleMenuMappingRequest;
 import com.thinkerscave.common.menum.dto.SideMenuDTO;
 import com.thinkerscave.common.menum.service.MenuMappingService;
+import com.thinkerscave.common.security.UserInfoUserDetails;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,14 +26,12 @@ public class MenuMappingController {
     private final MenuMappingService menuMappingService;
 
     @GetMapping
-    public List<SideMenuDTO> getSideMenu() {
-        List<SideMenuDTO> menus = menuMappingService.getSideMenu();
-
-        // Add static Dashboard menu at the top
-        SideMenuDTO dashboard = new SideMenuDTO("Dashboard", "pi pi-home", "/app", null);
-        menus.add(0, dashboard);
-
-        return menus;
+    public ResponseEntity<List<SideMenuDTO>> getRoleBasedSideMenu(@AuthenticationPrincipal UserInfoUserDetails userInfoUserDetails) {
+    	Long roleId = userInfoUserDetails.getRoleId();
+        List<SideMenuDTO> sideMenuList= menuMappingService.getRoleBasedSideMenu(roleId);
+        return sideMenuList.isEmpty()
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.ok(sideMenuList);
     }
     
     @GetMapping("/getActiveMenuTree")

@@ -2,6 +2,7 @@ package com.thinkerscave.common.usrm.service.impl;
 
 import com.thinkerscave.common.menum.domain.Role;
 import com.thinkerscave.common.menum.repository.RoleRepository;
+import com.thinkerscave.common.security.UserInfoUserDetails;
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.dto.UserResponseDTO;
 import com.thinkerscave.common.usrm.repository.PasswordResetTokenRepository;
@@ -9,6 +10,7 @@ import com.thinkerscave.common.usrm.repository.UserRepository;
 import com.thinkerscave.common.usrm.service.UserService;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -174,6 +176,15 @@ public class UserServiceImpl implements UserService {
                                 .toList())
                         .build()
                 );
+    }
+    
+    public Long getCurrentUserRoleId(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new IllegalStateException("No authenticated user found");
+        }
+
+        UserInfoUserDetails userDetails = (UserInfoUserDetails) authentication.getPrincipal();
+        return userDetails.getRoleId(); // now works ✅
     }
 
 }

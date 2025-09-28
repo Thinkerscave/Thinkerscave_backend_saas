@@ -12,5 +12,6 @@ public class SideMenuDTO {
     private String label;
     private String icon;
     private String routerLink;
-    private List<SideMenuDTO> items; // nested submenus
+    private List<SideMenuDTO> items; 
+    private List<String> privileges;
 }

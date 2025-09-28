@@ -11,4 +11,6 @@ public interface RefreshTokenService {
 	public Optional<RefreshToken> findByToken(String token);
 
 	public RefreshToken verifyExpiration(RefreshToken token);
+
+	public void deleteByToken(String refreshToken);
 }

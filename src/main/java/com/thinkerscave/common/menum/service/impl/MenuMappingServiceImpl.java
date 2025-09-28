@@ -1,7 +1,10 @@
 package com.thinkerscave.common.menum.service.impl;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -18,7 +21,6 @@ import com.thinkerscave.common.menum.repository.MenuRepository;
 import com.thinkerscave.common.menum.repository.PrivilegeRepository;
 import com.thinkerscave.common.menum.repository.RoleMenuPrivilegeMappingRepository;
 import com.thinkerscave.common.menum.repository.RoleRepository;
-import com.thinkerscave.common.menum.repository.SubMenuPrivilegeMappingRepository;
 import com.thinkerscave.common.menum.repository.SubMenuRepository;
 import com.thinkerscave.common.menum.service.MenuMappingService;
 
@@ -35,29 +37,56 @@ public class MenuMappingServiceImpl implements MenuMappingService {
 	private final PrivilegeRepository privilegeRepository;
 
 	@Override
-	public List<SideMenuDTO> getSideMenu() {
-		// Fetch active menus
-		List<Menu> menus = menuRepository.findByIsActiveTrueOrderByMenuOrderAsc();
+	public List<SideMenuDTO> getRoleBasedSideMenu(Long roleId) {
+		List<RoleMenuPrivilegeMapping> mappings = roleMenuPrivilegeMappingRepository.findByRoleId(roleId);
 
-		List<SideMenuDTO> menuList = new ArrayList<>();
+        // Group by Menu → SubMenu
+        Map<Menu, Map<SubMenu, List<Privilege>>> grouped = mappings.stream()
+                .collect(Collectors.groupingBy(
+                        m -> m.getSubMenu().getMenu(),
+                        Collectors.groupingBy(
+                                RoleMenuPrivilegeMapping::getSubMenu,
+                                Collectors.mapping(RoleMenuPrivilegeMapping::getPrivilege, Collectors.toList())
+                        )
+                ));
 
-		for (Menu menu : menus) {
-			// Fetch active submenus for each menu
-			List<SubMenu> subMenus = subMenuRepository.findByMenuAndIsActiveTrueOrderBySubMenuOrderAsc(menu);
+        List<SideMenuDTO> menuList = new ArrayList<>();
 
-			// Map submenus to DTO
-			List<SideMenuDTO> subMenuDTOs = subMenus.stream()
-					.map(sub -> new SideMenuDTO(sub.getSubMenuName(), sub.getSubMenuIcon(), sub.getSubMenuUrl(), null))
-					.toList();
+        for (Map.Entry<Menu, Map<SubMenu, List<Privilege>>> menuEntry : grouped.entrySet()) {
+            Menu menu = menuEntry.getKey();
 
-			// Map menu
-			SideMenuDTO menuDTO = new SideMenuDTO(menu.getName(), menu.getIcon(), menu.getUrl(),
-					subMenuDTOs.isEmpty() ? null : subMenuDTOs);
+            List<SideMenuDTO> subMenuDTOs = menuEntry.getValue().entrySet().stream()
+                    .map(subEntry -> {
+                        SubMenu subMenu = subEntry.getKey();
+                        List<String> privileges = subEntry.getValue().stream()
+                                .map(Privilege::getPrivilegeName) // assuming privilege has name
+                                .toList();
 
-			menuList.add(menuDTO);
-		}
+                        return new SideMenuDTO(
+                                subMenu.getSubMenuName(),
+                                subMenu.getSubMenuIcon(),
+                                subMenu.getSubMenuUrl(),
+                                null,
+                                privileges
+                        );
+                    })
+                    .toList();
 
-		return menuList;
+            SideMenuDTO menuDTO = new SideMenuDTO(
+                    menu.getName(),
+                    menu.getIcon(),
+                    menu.getUrl(),
+                    subMenuDTOs,
+                    Collections.emptyList() // top-level menus don’t have privileges
+            );
+
+            menuList.add(menuDTO);
+        }
+        // Add static Dashboard at the top
+        SideMenuDTO dashboard = new SideMenuDTO("Dashboard", "pi pi-home", "/app", null, Collections.emptyList());
+        menuList.add(0, dashboard);
+        
+        return menuList;
 	}
 
 	@Override

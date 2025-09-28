@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Optional;
 
 @Slf4j
-@CrossOrigin("*")
 @RestController
 @RequestMapping("/api/v1/users")
 @Tag(name = "User Management", description = "APIs for managing Users")
@@ -222,6 +221,14 @@ public class UserController {
 					// Throw an exception if the refresh token is not found in the database
 				}).orElseThrow(() -> new RuntimeException(
 						"Refresh token is not in database!"));
+	}
+	
+	@Operation(summary = "Logout user and invalidate refresh token")
+	@PostMapping("/logout")
+	public ResponseEntity<String> logoutUser(@RequestBody RefreshTokenRequest refreshTokenRequest) {
+	    // Invalidate refresh token in DB
+	    refreshTokenService.deleteByToken(refreshTokenRequest.getToken());
+	    return ResponseEntity.ok("Logged out successfully");
 	}
 	
 	

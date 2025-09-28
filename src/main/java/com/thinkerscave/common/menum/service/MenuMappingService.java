@@ -8,7 +8,7 @@ import com.thinkerscave.common.menum.dto.SideMenuDTO;
 
 public interface MenuMappingService {
 
-	List<SideMenuDTO> getSideMenu();
+	List<SideMenuDTO> getRoleBasedSideMenu(Long roleId);
 
 	List<MenuMappingDTO> getActiveMenuTree();
 
