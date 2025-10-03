@@ -88,7 +88,7 @@ public class User extends Auditable {
     @Column(name = "remarks", length = 255)
     private String remarks;
     
-    @Column(name = "is_first_time_login", nullable = false)
+    @Column(name = "is_first_time_login")
     private Boolean isFirstTimeLogin = true;
     
     @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)

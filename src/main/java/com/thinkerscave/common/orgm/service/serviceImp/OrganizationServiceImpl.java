@@ -1,11 +1,9 @@
 package com.thinkerscave.common.orgm.service.serviceImp;
 //import com.thinkerscave.common.config.TenantContext;
+import com.thinkerscave.common.exception.ResourceNotFoundException;
 import com.thinkerscave.common.orgm.domain.Organisation;
 import com.thinkerscave.common.orgm.domain.OwnerDetails;
-import com.thinkerscave.common.orgm.dto.OrgRequestDTO;
-import com.thinkerscave.common.orgm.dto.OrgResponseDTO;
-import com.thinkerscave.common.orgm.dto.OrganisationListDTO;
-import com.thinkerscave.common.orgm.dto.OwnerDTO;
+import com.thinkerscave.common.orgm.dto.*;
 import com.thinkerscave.common.orgm.repository.OrganizationRepository;
 import com.thinkerscave.common.orgm.repository.OwnerDetailsRepository;
 import com.thinkerscave.common.orgm.service.OrganizationService;
@@ -38,6 +36,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     private final OrganizationRepository organizationRepository;
     private final OwnerDetailsRepository ownerDetailsRepository;
     private final PasswordEncoder passwordEncoder;
+
 
     /** Saves organization along with user and owner details. */
 //    @Override
@@ -166,6 +165,93 @@ public class OrganizationServiceImpl implements OrganizationService {
 
         return dto;
     }
+    /**
+     * Updates an existing organization and its associated owner details.
+     * This operation is transactional, ensuring data consistency across related tables.
+     *
+     * @param orgId The ID of the organisation to update.
+     * @param dto The data transfer object containing the updated information.
+     * @return A DTO confirming the successful update.
+     */
+    @Transactional
+    public OrgResponseDTO updateOrganization(Long orgId, OrgUpdateDTO dto) {
+        // --- Step 1: Fetch the core Organisation entity ---
+        Organisation org = organizationRepository.findById(orgId)
+                .orElseThrow(() -> new ResourceNotFoundException("Organisation not found with ID: " + orgId));
+
+        // --- Step 2: Map and update the Organisation entity's fields ---
+        org.setOrgName(dto.orgName());
+        org.setBrandName(dto.brandName());
+        org.setOrgUrl(dto.orgUrl());
+        org.setCity(dto.city());
+        org.setState(dto.state());
+        org.setEstablishmentDate(dto.establishmentDate());
+        org.setIsGroup(dto.isGroup());
+        org.setType(dto.orgType());
+        // Note: JPA Auditing should handle 'last_modified_by' and 'last_modified_date' automatically.
+
+        // --- Step 3: Fetch and update the related OwnerDetails and User entities ---
+        // Find the owner details linked to this organization.
+        OwnerDetails owner = ownerDetailsRepository.findByOrganization(org)
+                .orElseThrow(() -> new ResourceNotFoundException("OwnerDetails not found for Organisation ID: " + orgId));
+
+        // Update the denormalized fields on OwnerDetails as per the ERD.
+        owner.setOwnerName(dto.ownerName());
+        owner.setOwnerEmail(dto.ownerEmail());
+        owner.setOwnerMobile(dto.ownerMobile());
+
+        // Now, update the single source of truth: the User entity.
+        User user = owner.getUser();
+        if (user == null) {
+            throw new IllegalStateException("Data integrity issue: OwnerDetails with ID " + owner.getOwnerId() + " has no associated User.");
+        }
+
+        // Update the master user record.
+        // A simple utility can be used to split the full name into first and last names.
+        updateUserFullName(user, dto.ownerName());
+        user.setEmail(dto.ownerEmail());
+        user.setMobileNumber(Long.parseLong(dto.ownerMobile())); // Assuming mobile is stored as a long
+
+        // --- Step 4: Save all changes ---
+        // Within a @Transactional method, JPA's dirty checking often makes explicit save calls redundant
+        // for managed entities. However, calling save() is explicit and clear.
+        organizationRepository.save(org);
+        ownerDetailsRepository.save(owner);
+        userRepository.save(user);
+
+        // --- Step 5: Return a success response ---
+        return new OrgResponseDTO(
+                "Organization successfully updated.",
+                org.getOrgCode(),
+                user.getUserCode()
+        );
+    }
+
+    /**
+     * A helper utility to split a full name and update the user object.
+     */
+    private void updateUserFullName(User user, String fullName) {
+        if (fullName == null || fullName.trim().isEmpty()) {
+            return;
+        }
+        String[] names = fullName.trim().split("\\s+", 2);
+        user.setFirstName(names[0]);
+        user.setLastName(names.length > 1 ? names[1] : ""); // Handle cases with no last name
+    }
+    /**
+     * Retrieves a list of all active organizations that are marked as groups.
+     *
+     * @return A list of ParentOrgDTOs suitable for a dropdown.
+     */
+    public List<ParentOrgDTO> getParentOrganizations() {
+        // 1. Fetch all parent-eligible organizations from the database.
+        List<Organisation> groupOrganisations = organizationRepository.findByIsGroupTrueAndIsActiveTrue();
+
+        // 2. Map the full Organisation entities to the lightweight ParentOrgDTO.
+        return groupOrganisations.stream()
+                .map(org -> new ParentOrgDTO(org.getOrgId(), org.getOrgName())) // Assuming getId() and getName() methods
+                .collect(Collectors.toList());
+    }
 
     /** Soft-deletes an organization by marking it inactive. */
     @Override
@@ -239,33 +325,6 @@ public class OrganizationServiceImpl implements OrganizationService {
                 });
     }
 
-    /**
-     * Creates and saves a new Organisation entity from the request DTO.
-     */
-    private Organisation createOrganisation(OrgRequestDTO request, User ownerUser) {
-        logger.info("🏢 [Organisation] Creating new organisation: {}", request.getOrgName());
-        Organisation organisation = new Organisation();
-        organisation.setOrgCode("ORG-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-        organisation.setOrgName(request.getOrgName());
-        organisation.setBrandName(request.getBrandName());
-        organisation.setType(request.getOrgType());
-        organisation.setCity(request.getCity());
-        organisation.setState(request.getState());
-        organisation.setEstablishmentDate(request.getEstablishDate());
-        organisation.setSubscriptionType(request.getSubscriptionType());
-
-        // --- HIERARCHY LOGIC ---
-        organisation.setIsGroup(request.getIsAGroup());
-        if (!request.getIsAGroup() && request.getParentOrgId() != null) {
-            Organisation parent = organizationRepository.findById(request.getParentOrgId())
-                    .orElseThrow(() -> new RuntimeException("Parent organization with ID " + request.getParentOrgId() + " not found."));
-            organisation.setParentOrganisation(parent);
-        }
-
-        organisation.setUser(ownerUser); // Link the owner (as a user)
-
-        return organizationRepository.save(organisation);
-    }
 
     /**
      * Creates and saves the OwnerDetails entity to link the User and Organisation.
@@ -292,5 +351,42 @@ public class OrganizationServiceImpl implements OrganizationService {
     private String generateRandomPassword() {
         return UUID.randomUUID().toString().substring(0, 10);
     }
+    /**
+     * Helper method to create and save a new Organisation.
+     * It now includes the logic to link to a parent organization.
+     */
+    private Organisation createOrganisation(OrgRequestDTO request, User ownerUser) {
+        logger.info("🏢 [Organisation] Creating new organisation: {}", request.getOrgName());
+        Organisation newOrg = new Organisation();
+
+        // --- NEW LOGIC for Parent Organization Mapping ---
+        if (!request.getIsAGroup() && request.getParentOrgId() != null) {
+            // If the new org is not a group and a parent ID is provided, find the parent.
+            Organisation parentOrg = organizationRepository.findById(request.getParentOrgId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent Organization not found with ID: " + request.getParentOrgId()));
+
+            // Set the parent organization on the new (child) organization.
+            newOrg.setParentOrganisation(parentOrg);
+        }
+        // ---------------------------------------------------
+        newOrg.setOrgCode("ORG-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+
+        newOrg.setOrgName(request.getOrgName());
+        newOrg.setBrandName(request.getBrandName());
+        newOrg.setOrgUrl(request.getOrgUrl());
+        newOrg.setCity(request.getCity());
+        newOrg.setState(request.getState());
+        newOrg.setEstablishmentDate(request.getEstablishDate());
+        newOrg.setIsGroup(request.getIsAGroup());
+        newOrg.setType(request.getOrgType());
+        newOrg.setSubscriptionType(request.getSubscriptionType());
+        newOrg.setIsActive(true); // Default to active on creation
+
+        // Associate the owner User with this Organisation (as per your ER diagram)
+        newOrg.setUser(ownerUser);
+
+        return organizationRepository.save(newOrg);
+    }
+
 }
 

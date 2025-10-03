@@ -24,7 +24,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(buildError("Invalid Credentials", ex.getMessage(), HttpStatus.UNAUTHORIZED));
     }
+    // This logic now applies to ALL controllers
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<?> handleResourceNotFound(ResourceNotFoundException ex) {
 
+        return new ResponseEntity<>("Resource was not found: " + ex.getMessage(), HttpStatus.NOT_FOUND);
+    }
     // Handle wrong password or login issues
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<?> handleBadCredentials(BadCredentialsException ex) {

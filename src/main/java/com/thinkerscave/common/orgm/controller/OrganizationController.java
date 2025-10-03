@@ -4,10 +4,7 @@ import com.thinkerscave.common.exception.SchemaCreationException;
 //import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.orgm.domain.Organisation;
 
-import com.thinkerscave.common.orgm.dto.OrgRequestDTO;
-import com.thinkerscave.common.orgm.dto.OrgResponseDTO;
-import com.thinkerscave.common.orgm.dto.OrganisationListDTO;
-import com.thinkerscave.common.orgm.dto.OwnerDTO;
+import com.thinkerscave.common.orgm.dto.*;
 import com.thinkerscave.common.orgm.service.OrganizationService;
 //import com.thinkerscave.common.orgm.service.SchemaInitializer;
 import com.thinkerscave.common.orgm.service.SchemaService;
@@ -94,6 +91,32 @@ public class OrganizationController {
                     .body("Unexpected error: " + e.getMessage());
         }
     }
+
+
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateOrganization(
+            @PathVariable Long id,
+             @RequestBody OrgUpdateDTO organizationUpdateDto) {
+      System.out.println(id + " " + organizationUpdateDto);
+        OrgResponseDTO response = organizationService.updateOrganization(id, organizationUpdateDto);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * GET /api/organizations/groups
+     * * Retrieves a list of organizations that are marked as groups, to be used
+     * as potential parent organizations in a dropdown.
+     *
+     * @return A ResponseEntity containing the list of parent organizations.
+     */
+    @GetMapping("/groups")
+    public ResponseEntity<List<ParentOrgDTO>> getParentOrganizations() {
+        List<ParentOrgDTO> parentOrgs = organizationService.getParentOrganizations();
+        return ResponseEntity.ok(parentOrgs);
+    }
+
+
 
     @GetMapping("/all")
     @Operation(

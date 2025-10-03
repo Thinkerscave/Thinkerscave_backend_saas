@@ -2,10 +2,7 @@ package com.thinkerscave.common.orgm.service;
 
 
 import com.thinkerscave.common.orgm.domain.Organisation;
-import com.thinkerscave.common.orgm.dto.OrgRequestDTO;
-import com.thinkerscave.common.orgm.dto.OrgResponseDTO;
-import com.thinkerscave.common.orgm.dto.OrganisationListDTO;
-import com.thinkerscave.common.orgm.dto.OwnerDTO;
+import com.thinkerscave.common.orgm.dto.*;
 
 import java.util.List;
 
@@ -28,4 +25,10 @@ public interface OrganizationService {
 
     /** Updates owner details using owner code. */
     void updateOwnerDetailsWithUser(OwnerDTO dto);
+
+     /** update organization details **/
+     OrgResponseDTO updateOrganization(Long orgId, OrgUpdateDTO dto);
+
+     /** get only parent organization list**/
+     List<ParentOrgDTO> getParentOrganizations();
 }
