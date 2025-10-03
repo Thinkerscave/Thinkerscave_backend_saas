@@ -142,6 +142,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         OrganisationListDTO dto = new OrganisationListDTO();
 
         dto.setOrgId(org.getOrgId());
+        dto.setOrgCode(org.getOrgCode());
         dto.setOrgName(org.getOrgName());
         dto.setBrandName(org.getBrandName());
         dto.setOrgUrl(org.getOrgUrl());
@@ -150,6 +151,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         dto.setState(org.getState());
         dto.setEstablishDate(org.getEstablishmentDate());
         dto.setGroup(org.getIsGroup());
+        dto.setIsActive(org.getIsActive());
 
         // --- THIS IS THE FIX ---
         // Safely access lazy-loaded fields to get the real data.

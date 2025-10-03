@@ -8,6 +8,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 public class OrganisationListDTO {
     private Long orgId;
+    private String orgCode;
     private String orgName;
     private String brandName;
     private String orgUrl;
@@ -23,5 +24,6 @@ public class OrganisationListDTO {
 
     // Additional fields for UI logic
     private boolean isGroup;
-    private Long parentOrgId; // Sending the ID can be useful for the UI
+    private Long parentOrgId;
+    private Boolean isActive;// Sending the ID can be useful for the UI
 }

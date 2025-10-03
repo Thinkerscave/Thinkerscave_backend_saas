@@ -132,10 +132,10 @@ public class OrganizationController {
         }
     }
 
-    @DeleteMapping("/{orgCode}")
-    public ResponseEntity<String> softDeleteOrg(@PathVariable String orgCode) {
-        String result = organizationService.softDeleteOrg(orgCode);
-        return ResponseEntity.ok(result);
+    @PatchMapping("/{orgCode}")
+    public ResponseEntity<String> toggleOrganizationStatus(@PathVariable String orgCode) {
+        String resultMessage = organizationService.softDeleteOrg(orgCode);
+        return ResponseEntity.ok(resultMessage);
     }
 
 
