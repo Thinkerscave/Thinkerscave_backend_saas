@@ -35,13 +35,13 @@ public class RefreshTokenServiceImpl implements RefreshTokenService{
 			// If it exists, UPDATE the existing token
 			refreshToken = existingTokenOpt.get();
 			refreshToken.setToken(UUID.randomUUID().toString());
-			refreshToken.setExpiryDate(Instant.now().plusMillis(600000)); // Update expiry
+			refreshToken.setExpiryDate(Instant.now().plusMillis(86400000)); // Update expiry
 		} else {
 			// If it doesn't exist, CREATE a new one
 			refreshToken = RefreshToken.builder()
 					.user(user)
 					.token(UUID.randomUUID().toString())
-					.expiryDate(Instant.now().plusMillis(600000))
+					.expiryDate(Instant.now().plusMillis(86400000))
 					.build();
 		}
 
