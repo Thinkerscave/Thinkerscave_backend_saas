@@ -1,126 +1,642 @@
-//package com.thinkerscave.common.orgm.service;
-//
-//
-//import com.thinkerscave.common.config.SingleConnectionProvider;
-//import org.hibernate.boot.Metadata;
-//import org.hibernate.boot.MetadataSources;
-//import org.hibernate.boot.registry.StandardServiceRegistry;
-//import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
-//import org.hibernate.engine.jdbc.connections.spi.ConnectionProvider;
-////import org.hibernate.tool.hbm2ddl.SchemaExport;
-//import org.hibernate.tool.schema.TargetType;
-//import org.springframework.stereotype.Service;
-//
-//import javax.sql.DataSource;
-//import java.sql.Connection;
-//import java.sql.SQLException;
-//import java.util.EnumSet;
-//import java.util.HashMap;
-//import java.util.List;
-//import java.util.Map;
-//
-///**
-// * Service for initializing and managing schema-specific tables dynamically using Hibernate.
-// * Used for schema-per-tenant architecture in multi-tenant setups.
-// *
-// * @author Sandeep
-// */
-////@Service
-////public class SchemaInitializer {
-////
-////    private final DataSource dataSource;
-////
-////    private static final Map<String, Class<?>> TABLE_ENTITY_MAP = Map.ofEntries(
-////            Map.entry("user", com.thinkerscave.common.usrm.domain.User.class),
-////            Map.entry("passwordresettoken", com.thinkerscave.common.usrm.domain.PasswordResetToken.class),
-////            Map.entry("refreshtoken", com.thinkerscave.common.usrm.domain.RefreshToken.class),
-////            Map.entry("role", com.thinkerscave.common.menum.domain.Role.class),
-////            Map.entry("organisation", com.thinkerscave.common.orgm.domain.Organisation.class),
-////            Map.entry("ownerdetails", com.thinkerscave.common.orgm.domain.OwnerDetails.class),
-////            Map.entry("menu", com.thinkerscave.common.menum.domain.Menu.class),
-////            Map.entry("submenu_master", com.thinkerscave.common.menum.domain.SubMenu.class),
-////            Map.entry("branch", com.thinkerscave.common.staff.domain.Branch.class),
-////            Map.entry("department", com.thinkerscave.common.staff.domain.Department.class),
-////            Map.entry("staff", com.thinkerscave.common.staff.domain.Staff.class)
-////    );
-////
-////
-////
-////    public SchemaInitializer(DataSource dataSource) {
-////        this.dataSource = dataSource;
-////    }
-////
-////    /** Creates all required tables for a given schema. */
-////    public void createTablesForSchema(String schemaName) {
-////        try (Connection connection = dataSource.getConnection()) {
-////            connection.createStatement().execute("SET search_path TO " + schemaName);
-////
-////            Map<String, Object> settings = new HashMap<>();
-////            settings.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
-////            settings.put("hibernate.hbm2ddl.auto", "none");
-////
-////            StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
-////                    .applySettings(settings)
-////                    .addService(ConnectionProvider.class, new SingleConnectionProvider(connection))
-////                    .build();
-////
-////            Metadata metadata = new MetadataSources(registry)
-////                    .addAnnotatedClass(com.thinkerscave.common.usrm.domain.User.class)
-////                    .addAnnotatedClass(com.thinkerscave.common.usrm.domain.PasswordResetToken.class)
-////                    .addAnnotatedClass(com.thinkerscave.common.usrm.domain.RefreshToken.class)
-////                    .addAnnotatedClass(com.thinkerscave.common.menum.domain.Role.class)
-////                    .addAnnotatedClass(com.thinkerscave.common.orgm.domain.Organisation.class)
-////                    .addAnnotatedClass(com.thinkerscave.common.orgm.domain.OwnerDetails.class)
-////                    .addAnnotatedClass(com.thinkerscave.common.menum.domain.Menu.class)
-////                    .addAnnotatedClass(com.thinkerscave.common.menum.domain.SubMenu.class)
-////                    .addAnnotatedClass(com.thinkerscave.common.staff.domain.Branch.class)
-////                    .addAnnotatedClass(com.thinkerscave.common.staff.domain.Department.class)
-////                    .addAnnotatedClass(com.thinkerscave.common.staff.domain.Staff.class)
-////                    .addAnnotatedClass(com.thinkerscave.common.admission.domain.ApplicationAdmission.class)
-////                    .buildMetadata();
-////
-////            SchemaExport export = new SchemaExport();
-////            export.setDelimiter(";");
-////            export.setFormat(true);
-////            export.create(EnumSet.of(TargetType.DATABASE), metadata);
-////
-////        } catch (SQLException e) {
-////            throw new RuntimeException("Error creating tables in schema: " + schemaName, e);
-////        }
-////    }
-////
-////    /** Creates only the missing tables in a given schema. */
-////    public void createMissingTablesInSchema(String schemaName, List<String> missingTables) {
-////        try (Connection connection = dataSource.getConnection()) {
-////            connection.createStatement().execute("SET search_path TO " + schemaName);
-////
-////            Map<String, Object> settings = new HashMap<>();
-////            settings.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
-////            settings.put("hibernate.hbm2ddl.auto", "none");
-////
-////            StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
-////                    .applySettings(settings)
-////                    .addService(ConnectionProvider.class, new SingleConnectionProvider(connection))
-////                    .build();
-////
-////            MetadataSources sources = new MetadataSources(registry);
-////
-////            for (String tableName : missingTables) {
-////                Class<?> entityClass = TABLE_ENTITY_MAP.get(tableName.toLowerCase());
-////                if (entityClass != null) {
-////                    sources.addAnnotatedClass(entityClass);
-////                }
-////            }
-////
-////            Metadata metadata = sources.buildMetadata();
-////
-////            SchemaExport export = new SchemaExport();
-////            export.setDelimiter(";");
-////            export.setFormat(true);
-////            export.create(EnumSet.of(TargetType.DATABASE), metadata);
-////
-////        } catch (SQLException e) {
-////            throw new RuntimeException("Error creating tables in schema: " + schemaName, e);
-////        }
-////    }
-////}
+package com.thinkerscave.common.orgm.service;
+
+
+import com.thinkerscave.common.multitenancy.ApplicationContextService;
+import com.thinkerscave.common.multitenancy.DataSourceConfig;
+import com.thinkerscave.common.multitenancy.TenantContext;
+import com.zaxxer.hikari.HikariDataSource;
+import io.hypersistence.tsid.TSID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
+import javax.sql.DataSource;
+import javax.xml.bind.ValidationException;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Objects;
+
+/**
+ * Service for initializing and managing schema-specific tables dynamically using Hibernate.
+ * Used for schema-per-tenant architecture in multi-tenant setups.
+ *
+ * @author Sandeep
+ */
+@Service
+@RequiredArgsConstructor
+@Log4j2
+public class SchemaInitializer {
+
+    private String sqlScript = "-- public.address definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.address;\n" +
+            "\n" +
+            "CREATE TABLE public.address (\n" +
+            "\tid int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\taddress_line text NULL,\n" +
+            "\tcity varchar(255) NULL,\n" +
+            "\tcountry varchar(255) NULL,\n" +
+            "\tstate varchar(255) NULL,\n" +
+            "\tzip_code varchar(255) NULL,\n" +
+            "\tCONSTRAINT address_pkey PRIMARY KEY (id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.branch definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.branch;\n" +
+            "\n" +
+            "CREATE TABLE public.branch (\n" +
+            "\tbranch_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\tbranch_code varchar(255) NOT NULL,\n" +
+            "\tbranch_name varchar(255) NOT NULL,\n" +
+            "\tis_active bool NULL,\n" +
+            "\t\"location\" varchar(255) NULL,\n" +
+            "\tCONSTRAINT branch_pkey PRIMARY KEY (branch_id),\n" +
+            "\tCONSTRAINT ukisfsopa9nxf3amcuj963nb41g UNIQUE (branch_name),\n" +
+            "\tCONSTRAINT ukspmmcodjifhtymlws7w5fttgl UNIQUE (branch_code)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.\"class\" definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.\"class\";\n" +
+            "\n" +
+            "CREATE TABLE public.\"class\" (\n" +
+            "\tclass_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tclass_name varchar(255) NOT NULL,\n" +
+            "\tCONSTRAINT class_pkey PRIMARY KEY (class_id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.department definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.department;\n" +
+            "\n" +
+            "CREATE TABLE public.department (\n" +
+            "\tdepartment_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\tdepartment_code varchar(255) NOT NULL,\n" +
+            "\tdepartment_name varchar(255) NOT NULL,\n" +
+            "\tdescription varchar(500) NULL,\n" +
+            "\tis_active bool NULL,\n" +
+            "\tCONSTRAINT department_pkey PRIMARY KEY (department_id),\n" +
+            "\tCONSTRAINT ukf5np34wnxt905fwmrs6133l28 UNIQUE (department_name),\n" +
+            "\tCONSTRAINT uktc0vggvvuqc22trtdy0dmrahh UNIQUE (department_code)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.menu_master definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.menu_master;\n" +
+            "\n" +
+            "CREATE TABLE public.menu_master (\n" +
+            "\tmenu_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\tdescription text NULL,\n" +
+            "\ticon varchar(55) NULL,\n" +
+            "\tis_active bool NULL,\n" +
+            "\tmenu_code varchar(255) NULL,\n" +
+            "\tmenu_order int4 NULL,\n" +
+            "\t\"name\" varchar(50) NOT NULL,\n" +
+            "\turl varchar(55) NULL,\n" +
+            "\tCONSTRAINT menu_master_pkey PRIMARY KEY (menu_id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.privilege_master definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.privilege_master;\n" +
+            "\n" +
+            "CREATE TABLE public.privilege_master (\n" +
+            "\tprivilege_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tprivilege_name varchar(50) NOT NULL,\n" +
+            "\tCONSTRAINT privilege_master_pkey PRIMARY KEY (privilege_id),\n" +
+            "\tCONSTRAINT uko82uvx84yphm3y1r3rf9a6ab7 UNIQUE (privilege_name)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.role_master definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.role_master;\n" +
+            "\n" +
+            "CREATE TABLE public.role_master (\n" +
+            "\trole_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\tdescription text NULL,\n" +
+            "\tis_active bool NULL,\n" +
+            "\torganization_id int8 NULL,\n" +
+            "\trole_code varchar(50) NULL,\n" +
+            "\trole_name varchar(50) NOT NULL,\n" +
+            "\trole_type varchar(30) NULL,\n" +
+            "\tCONSTRAINT role_master_pkey PRIMARY KEY (role_id),\n" +
+            "\tCONSTRAINT role_master_role_type_check CHECK (((role_type)::text = ANY ((ARRAY['SCHOOL'::character varying, 'COLLEGE'::character varying, 'UNIVERSITY'::character varying, 'ADMIN'::character varying])::text[]))),\n" +
+            "\tCONSTRAINT ukermkbsp5njhawu0uk2bmj8lks UNIQUE (role_code)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.schema_meta_data definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.schema_meta_data;\n" +
+            "\n" +
+            "CREATE TABLE public.schema_meta_data (\n" +
+            "\tid varchar(50) NOT NULL,\n" +
+            "\t\"password\" varchar(255) NULL,\n" +
+            "\tschema_name varchar(255) NULL,\n" +
+            "\turl varchar(255) NULL,\n" +
+            "\tusername varchar(255) NULL,\n" +
+            "\tCONSTRAINT schema_meta_data_pkey PRIMARY KEY (id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.users definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.users;\n" +
+            "\n" +
+            "CREATE TABLE public.users (\n" +
+            "\tid int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\taddress varchar(255) NULL,\n" +
+            "\tattempts int4 NULL,\n" +
+            "\tcity varchar(255) NULL,\n" +
+            "\temail varchar(255) NOT NULL,\n" +
+            "\tfirst_name varchar(255) NOT NULL,\n" +
+            "\tis_2fa_enabled bool NULL,\n" +
+            "\tis_blocked bool NULL,\n" +
+            "\tis_first_time_login bool NULL,\n" +
+            "\tlast_name varchar(255) NOT NULL,\n" +
+            "\tlock_date_time timestamp(6) NULL,\n" +
+            "\tmax_device_allow int4 NULL,\n" +
+            "\tmiddle_name varchar(255) NULL,\n" +
+            "\tmobile_number int8 NOT NULL,\n" +
+            "\t\"password\" varchar(60) NOT NULL,\n" +
+            "\tremarks varchar(255) NULL,\n" +
+            "\tsecret_operation varchar(255) NULL,\n" +
+            "\tstate varchar(255) NULL,\n" +
+            "\tuser_code varchar(255) NOT NULL,\n" +
+            "\tuser_name varchar(255) NOT NULL,\n" +
+            "\tCONSTRAINT ukk8d0f2n7n88w1a16yhua64onx UNIQUE (user_name),\n" +
+            "\tCONSTRAINT ukt4oh2dnaf9b4jc7qj8rxswgyh UNIQUE (user_code),\n" +
+            "\tCONSTRAINT users_pkey PRIMARY KEY (id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.guardian definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.guardian;\n" +
+            "\n" +
+            "CREATE TABLE public.guardian (\n" +
+            "\tguardian_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\taddress text NULL,\n" +
+            "\tcreated_at timestamp(6) NULL,\n" +
+            "\temail varchar(50) NULL,\n" +
+            "\tfirst_name varchar(50) NULL,\n" +
+            "\tlast_name varchar(50) NULL,\n" +
+            "\tmiddle_name varchar(50) NULL,\n" +
+            "\tmobile_number int8 NOT NULL,\n" +
+            "\trelation varchar(10) NULL,\n" +
+            "\tupdated_at timestamp(6) NULL,\n" +
+            "\tuser_id int8 NULL,\n" +
+            "\tCONSTRAINT guardian_pkey PRIMARY KEY (guardian_id),\n" +
+            "\tCONSTRAINT ukdic46x6kqr2cqqhrps9a4b65e UNIQUE (user_id),\n" +
+            "\tCONSTRAINT fk78238bh00pipro62xntxayb9x FOREIGN KEY (user_id) REFERENCES public.users(id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.organisation definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.organisation;\n" +
+            "\n" +
+            "CREATE TABLE public.organisation (\n" +
+            "\torg_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\tbrand_name varchar(255) NULL,\n" +
+            "\tcity varchar(255) NULL,\n" +
+            "\testablishment_date date NULL,\n" +
+            "\tis_active bool NULL,\n" +
+            "\tis_group bool NULL,\n" +
+            "\torg_code varchar(50) NOT NULL,\n" +
+            "\torg_name varchar(255) NOT NULL,\n" +
+            "\torg_url varchar(255) NULL,\n" +
+            "\tstate varchar(255) NULL,\n" +
+            "\tsubscription_type varchar(50) NULL,\n" +
+            "\t\"type\" varchar(50) NULL,\n" +
+            "\tparent_org_id int8 NULL,\n" +
+            "\tuser_id int8 NULL,\n" +
+            "\tCONSTRAINT organisation_pkey PRIMARY KEY (org_id),\n" +
+            "\tCONSTRAINT ukchd15mrfx7slue9vae2rvjs0i UNIQUE (org_code),\n" +
+            "\tCONSTRAINT fk7fe1cxfbwcb8f0ns4xvaniyao FOREIGN KEY (parent_org_id) REFERENCES public.organisation(org_id),\n" +
+            "\tCONSTRAINT fkdiyk5ra1jiihwhyoev7u9etp9 FOREIGN KEY (user_id) REFERENCES public.users(id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.owner_details definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.owner_details;\n" +
+            "\n" +
+            "CREATE TABLE public.owner_details (\n" +
+            "\towner_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\tgender varchar(10) NULL,\n" +
+            "\towner_code varchar(50) NULL,\n" +
+            "\towner_email varchar(255) NULL,\n" +
+            "\towner_mobile varchar(20) NULL,\n" +
+            "\towner_name varchar(100) NULL,\n" +
+            "\torg_id int8 NOT NULL,\n" +
+            "\tuser_id int8 NOT NULL,\n" +
+            "\tCONSTRAINT owner_details_pkey PRIMARY KEY (owner_id),\n" +
+            "\tCONSTRAINT uk4p1dvwn9adevvem5yfoh9clk6 UNIQUE (org_id),\n" +
+            "\tCONSTRAINT uk5vyl8wqq92b1khqo1s6chny27 UNIQUE (user_id),\n" +
+            "\tCONSTRAINT ukbbo3oa2cibch9s9t607tjtj73 UNIQUE (owner_code),\n" +
+            "\tCONSTRAINT fk5638gjc6jkwq0gj6adp1bak4i FOREIGN KEY (org_id) REFERENCES public.organisation(org_id),\n" +
+            "\tCONSTRAINT fkiuk30qky3ejwp35qeq3hbr4d8 FOREIGN KEY (user_id) REFERENCES public.users(id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.password_reset_token definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.password_reset_token;\n" +
+            "\n" +
+            "CREATE TABLE public.password_reset_token (\n" +
+            "\tid int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\texpiration_date timestamp(6) NOT NULL,\n" +
+            "\t\"token\" varchar(255) NOT NULL,\n" +
+            "\tuser_id int8 NOT NULL,\n" +
+            "\tCONSTRAINT password_reset_token_pkey PRIMARY KEY (id),\n" +
+            "\tCONSTRAINT ukg0guo4k8krgpwuagos61oc06j UNIQUE (token),\n" +
+            "\tCONSTRAINT fk83nsrttkwkb6ym0anu051mtxn FOREIGN KEY (user_id) REFERENCES public.users(id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.refresh_token definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.refresh_token;\n" +
+            "\n" +
+            "CREATE TABLE public.refresh_token (\n" +
+            "\tid int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\texpiry_date timestamptz(6) NOT NULL,\n" +
+            "\t\"token\" varchar(512) NOT NULL,\n" +
+            "\tuser_id int8 NOT NULL,\n" +
+            "\tCONSTRAINT refresh_token_pkey PRIMARY KEY (id),\n" +
+            "\tCONSTRAINT ukf95ixxe7pa48ryn1awmh2evt7 UNIQUE (user_id),\n" +
+            "\tCONSTRAINT ukr4k4edos30bx9neoq81mdvwph UNIQUE (token),\n" +
+            "\tCONSTRAINT fkjtx87i0jvq2svedphegvdwcuy FOREIGN KEY (user_id) REFERENCES public.users(id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.\"section\" definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.\"section\";\n" +
+            "\n" +
+            "CREATE TABLE public.\"section\" (\n" +
+            "\tsection_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tsection_name varchar(255) NOT NULL,\n" +
+            "\tclass_entity_class_id int8 NULL,\n" +
+            "\tCONSTRAINT section_pkey PRIMARY KEY (section_id),\n" +
+            "\tCONSTRAINT fkmp0d1954x86u7s6939a7iqk5d FOREIGN KEY (class_entity_class_id) REFERENCES public.\"class\"(class_id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.staff definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.staff;\n" +
+            "\n" +
+            "CREATE TABLE public.staff (\n" +
+            "\tstaff_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\taddress varchar(500) NULL,\n" +
+            "\tcity varchar(255) NULL,\n" +
+            "\tdate_of_birth date NULL,\n" +
+            "\temail varchar(255) NOT NULL,\n" +
+            "\tfirst_name varchar(255) NULL,\n" +
+            "\tgender varchar(20) NULL,\n" +
+            "\thire_date date NULL,\n" +
+            "\tis_active bool NULL,\n" +
+            "\tlast_name varchar(255) NULL,\n" +
+            "\tmiddle_name varchar(255) NULL,\n" +
+            "\tmobile_number int8 NOT NULL,\n" +
+            "\tphoto_url varchar(500) NULL,\n" +
+            "\tremarks text NULL,\n" +
+            "\tstaff_code varchar(255) NOT NULL,\n" +
+            "\tstate varchar(255) NULL,\n" +
+            "\tbranch_id int8 NOT NULL,\n" +
+            "\tdepartment_id int8 NOT NULL,\n" +
+            "\tuser_id int8 NOT NULL,\n" +
+            "\tCONSTRAINT staff_pkey PRIMARY KEY (staff_id),\n" +
+            "\tCONSTRAINT uk9ovwaulv155suydr9xljxsgnj UNIQUE (mobile_number),\n" +
+            "\tCONSTRAINT ukpvctx4dbua9qh4p4s3gm3scrh UNIQUE (email),\n" +
+            "\tCONSTRAINT uktkv6oqgei31ht6h0jsoj61008 UNIQUE (staff_code),\n" +
+            "\tCONSTRAINT fk686rqn8cpu4ncey4odd8cw3hm FOREIGN KEY (department_id) REFERENCES public.department(department_id),\n" +
+            "\tCONSTRAINT fkc9xh37lh8sjk8m5hhp5bnq1ca FOREIGN KEY (branch_id) REFERENCES public.branch(branch_id),\n" +
+            "\tCONSTRAINT fkdlvw23ak3u9v9bomm8g12rtc0 FOREIGN KEY (user_id) REFERENCES public.users(id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.student definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.student;\n" +
+            "\n" +
+            "CREATE TABLE public.student (\n" +
+            "\tstudent_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\tage int8 NULL,\n" +
+            "\tdate_of_birth date NULL,\n" +
+            "\temail varchar(50) NOT NULL,\n" +
+            "\tenrollment_date date NULL,\n" +
+            "\tfirst_name varchar(50) NULL,\n" +
+            "\tgender varchar(10) NULL,\n" +
+            "\tis_active bool NULL,\n" +
+            "\tis_same_address bool NULL,\n" +
+            "\tlast_name varchar(50) NULL,\n" +
+            "\tmiddle_name varchar(50) NULL,\n" +
+            "\tmobile_number int8 NOT NULL,\n" +
+            "\tphoto_url varchar(255) NULL,\n" +
+            "\tremarks text NULL,\n" +
+            "\troll_number varchar(50) NULL,\n" +
+            "\tclass_id int8 NULL,\n" +
+            "\tcurrent_address_id int8 NULL,\n" +
+            "\tguardian_id int8 NOT NULL,\n" +
+            "\tpermanent_address_id int8 NULL,\n" +
+            "\tsection_id int8 NULL,\n" +
+            "\tuser_id int8 NULL,\n" +
+            "\tCONSTRAINT student_pkey PRIMARY KEY (student_id),\n" +
+            "\tCONSTRAINT uk3ocykn0brvo25ctocwjnc6v5n UNIQUE (date_of_birth),\n" +
+            "\tCONSTRAINT ukbkix9btnoi1n917ll7bplkvg5 UNIQUE (user_id),\n" +
+            "\tCONSTRAINT ukfe0i52si7ybu0wjedj6motiim UNIQUE (email),\n" +
+            "\tCONSTRAINT uklveppkmt4yf9yyqby9xd4d8s9 UNIQUE (enrollment_date),\n" +
+            "\tCONSTRAINT ukng18h3c3bgj5caqbi2opf6uyp UNIQUE (is_same_address),\n" +
+            "\tCONSTRAINT uko1g1spw0ecyidv94ka2dk88wf UNIQUE (roll_number),\n" +
+            "\tCONSTRAINT ukrguwj66alc6nvyjtwdl6xcoq7 UNIQUE (permanent_address_id),\n" +
+            "\tCONSTRAINT ukt4917jp0sx54fbj9vh1b3susi UNIQUE (current_address_id),\n" +
+            "\tCONSTRAINT fkdwhkib64u47wc4yo4hk0cub90 FOREIGN KEY (class_id) REFERENCES public.\"class\"(class_id),\n" +
+            "\tCONSTRAINT fke0jaefltp39n72oaynbquavtu FOREIGN KEY (permanent_address_id) REFERENCES public.address(id),\n" +
+            "\tCONSTRAINT fkhbvsrbyf0pkgo53royos2qk4k FOREIGN KEY (current_address_id) REFERENCES public.address(id),\n" +
+            "\tCONSTRAINT fkj1c0de75pterue04btw6w5mh8 FOREIGN KEY (section_id) REFERENCES public.\"section\"(section_id),\n" +
+            "\tCONSTRAINT fkk0thg920a3xk3v59yjbsatw1l FOREIGN KEY (user_id) REFERENCES public.users(id),\n" +
+            "\tCONSTRAINT fkkktpamdaydbva4kxjcn17sbvk FOREIGN KEY (guardian_id) REFERENCES public.guardian(guardian_id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.sub_menu_master definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.sub_menu_master;\n" +
+            "\n" +
+            "CREATE TABLE public.sub_menu_master (\n" +
+            "\tsub_menu_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\tis_active bool NOT NULL,\n" +
+            "\tsub_menu_code varchar(50) NOT NULL,\n" +
+            "\tsub_menu_description text NULL,\n" +
+            "\tsub_menu_icon varchar(100) NULL,\n" +
+            "\tsub_menu_name varchar(100) NOT NULL,\n" +
+            "\tsub_menu_order int4 NULL,\n" +
+            "\tsub_menu_url varchar(200) NULL,\n" +
+            "\tmenu_id int8 NOT NULL,\n" +
+            "\tCONSTRAINT sub_menu_master_pkey PRIMARY KEY (sub_menu_id),\n" +
+            "\tCONSTRAINT uk709rtwhykwrsyf2gft2au05w UNIQUE (sub_menu_code),\n" +
+            "\tCONSTRAINT fkb85x2ldxes2aawp2tm6l22agr FOREIGN KEY (menu_id) REFERENCES public.menu_master(menu_id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.submenu_privilege_mapping definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.submenu_privilege_mapping;\n" +
+            "\n" +
+            "CREATE TABLE public.submenu_privilege_mapping (\n" +
+            "\tmapping_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tprivilege_id int8 NOT NULL,\n" +
+            "\tsub_menu_id int8 NOT NULL,\n" +
+            "\tCONSTRAINT submenu_privilege_mapping_pkey PRIMARY KEY (mapping_id),\n" +
+            "\tCONSTRAINT fk7svjf9w09egt2fhat8cr7w4ix FOREIGN KEY (privilege_id) REFERENCES public.privilege_master(privilege_id),\n" +
+            "\tCONSTRAINT fkgw4uli0ql5yynwwdqtoercoel FOREIGN KEY (sub_menu_id) REFERENCES public.sub_menu_master(sub_menu_id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.user_roles definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.user_roles;\n" +
+            "\n" +
+            "CREATE TABLE public.user_roles (\n" +
+            "\tuser_id int8 NOT NULL,\n" +
+            "\trole_id int8 NOT NULL,\n" +
+            "\tCONSTRAINT fk2ptgru2sianmji5yk32p4kdfj FOREIGN KEY (role_id) REFERENCES public.role_master(role_id),\n" +
+            "\tCONSTRAINT fkhfh9dx7w3ubf1co1vdev94g3f FOREIGN KEY (user_id) REFERENCES public.users(id)\n" +
+            ");\n" +
+            "\n" +
+            "\n" +
+            "-- public.role_submenu_privilege_mapping definition\n" +
+            "\n" +
+            "-- Drop table\n" +
+            "\n" +
+            "-- DROP TABLE public.role_submenu_privilege_mapping;\n" +
+            "\n" +
+            "CREATE TABLE public.role_submenu_privilege_mapping (\n" +
+            "\tmapping_id int8 GENERATED BY DEFAULT AS IDENTITY( INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START 1 CACHE 1 NO CYCLE) NOT NULL,\n" +
+            "\tcreated_by varchar(255) NULL,\n" +
+            "\tcreated_date timestamp(6) NULL,\n" +
+            "\tlast_modified_by varchar(255) NULL,\n" +
+            "\tlast_modified_date timestamp(6) NULL,\n" +
+            "\tprivilege_id int8 NOT NULL,\n" +
+            "\trole_id int8 NOT NULL,\n" +
+            "\tsub_menu_id int8 NOT NULL,\n" +
+            "\tCONSTRAINT role_submenu_privilege_mapping_pkey PRIMARY KEY (mapping_id),\n" +
+            "\tCONSTRAINT fk7jqt3j378sy52a8geufpb8hpw FOREIGN KEY (role_id) REFERENCES public.role_master(role_id),\n" +
+            "\tCONSTRAINT fkb6vl70k1ulwfka5h5fejkv5u5 FOREIGN KEY (sub_menu_id) REFERENCES public.sub_menu_master(sub_menu_id),\n" +
+            "\tCONSTRAINT fkhj9xptnt4ge1mhhj5codj6cui FOREIGN KEY (privilege_id) REFERENCES public.privilege_master(privilege_id)\n" +
+            ");";
+
+    @Value("${spring.datasource.url}")
+    private String dataSourceUrl;
+
+    @Value("${spring.datasource.username}")
+    private String dataSourceUsername;
+
+    @Value("${spring.datasource.password}")
+    private String dataSourcePassword;
+
+    @Value("${spring.datasource.driver-class-name}")
+    private String dataSourceDriver;
+
+    private final DataSource dataSource;
+    private final DataSourceConfig dataSourceConfig;
+    private final ApplicationContextService applicationContextService;
+
+    public void createAndInitializeSchema(String schemaName) throws ValidationException, IOException {
+        if (!schemaExists(schemaName)) {
+            createSchema(schemaName);
+            DataSource newDatasource = createDataSource(dataSourceUrl + "?currentSchema=" + schemaName, dataSourceUsername, dataSourcePassword, dataSourceDriver);
+            configureDataSource(schemaName,newDatasource);
+            try {
+                generateTablesFromSchemaSql(schemaName, newDatasource);
+            } catch (Exception e) {
+                log.error(e.getMessage());
+            }
+            //cleanUpSignUpThreadLocal();
+        }
+    }
+
+    private void createSchema(String schemaName) throws ValidationException {
+        String sb = "CREATE SCHEMA " + schemaName;
+        try (final Connection connection = dataSource.getConnection(); final PreparedStatement preparedStatement = connection.prepareStatement(sb)) {
+            preparedStatement.execute();
+        } catch (Exception e) {
+            throw new ValidationException("Unable to create Schema", "ErrorCode.ERR_PROCESSING");
+        }
+    }
+
+    public boolean schemaExists(String schemaName) {
+        String sql = "SELECT 1 FROM pg_namespace WHERE nspname ='" + schemaName + "'";
+        try (final Connection connection = dataSource.getConnection(); final PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+            final ResultSet resultSet = preparedStatement.executeQuery();
+            if (resultSet.next()) {
+                final int result = resultSet.getInt(1);
+                return result == 1;
+            }
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public void configureDataSource(String schemaName, DataSource dataSource) {
+        if (Objects.isNull(dataSource)) {
+            dataSource = createDataSource("%s?currentSchema=%s".formatted(dataSourceUrl, schemaName), dataSourceUsername, dataSourcePassword, dataSourceDriver);
+        }
+        if (saveSchemaMetaData(schemaName)) {
+            applicationContextService.setNewDataSourceInAbstractRoutingDatasource(schemaName, dataSource);
+        }
+    }
+
+    private boolean saveSchemaMetaData(String schemaName) {
+        try (Connection connection = dataSource.getConnection(); PreparedStatement checkStatement = connection.prepareStatement("SELECT TRUE FROM schema_meta_data WHERE schema_name = ?"); PreparedStatement insertStatement = connection.prepareStatement("INSERT INTO schema_meta_data (id, schema_name, url, username, password) VALUES (?, ?, ?, ?, ?)")) {
+            checkStatement.setString(1, schemaName);
+            try (ResultSet resultSet = checkStatement.executeQuery()) {
+                // Insert only if no record exists for that schema
+                if (!resultSet.next()) {
+                    insertStatement.setString(1, TSID.Factory.getTsid().toString());
+                    insertStatement.setString(2, schemaName);
+                    insertStatement.setString(3, dataSourceUrl);
+                    insertStatement.setString(4, dataSourceUsername);
+                    insertStatement.setString(5, dataSourcePassword);
+                    return insertStatement.executeUpdate() > 0;
+                }
+            }
+        } catch (SQLException e) {
+            log.error(e.getMessage());
+        }
+        return false;
+    }
+
+    public void generateTablesFromSchemaSql(String newSchema, DataSource dataSource) {
+        try {
+            // Set tenant context (useful if Hibernate is involved)
+            TenantContext.setCurrentTenant(newSchema);
+
+            try (Connection connection = dataSource.getConnection()) {
+
+                // 1 Execute schema SQL (tables, constraints, etc.)
+                try (PreparedStatement createTablesStmt =
+                             connection.prepareStatement(sqlScript)) {
+                    createTablesStmt.execute();
+                }
+            }
+        } catch (Exception e) {
+            log.error("Error creating tables for schema {}: {}", newSchema, e.getMessage(), e);
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
+    private DataSource createDataSource(String url, String username, String password, String driver) {
+        HikariDataSource hikariDataSource = new HikariDataSource();
+        hikariDataSource.setJdbcUrl(url);
+        hikariDataSource.setUsername(username);
+        hikariDataSource.setPassword(password);
+        hikariDataSource.setDriverClassName(driver);
+        hikariDataSource.setMetricRegistry(dataSourceConfig.metricRegistry());
+        return hikariDataSource;
+    }
+
+    private void cleanUpSignUpThreadLocal() {
+
+    }
+}

@@ -154,9 +154,17 @@
             <optional>true</optional>
         </dependency>
 
+        <dependency>
+            <groupId>io.dropwizard.metrics</groupId>
+            <artifactId>metrics-core</artifactId>
+            <version>4.2.23</version>
+        </dependency>
 
-
-
+        <dependency>
+            <groupId>io.hypersistence</groupId>
+            <artifactId>hypersistence-utils-hibernate-62</artifactId>
+            <version>3.7.3</version>
+        </dependency>
 
     </dependencies>
 

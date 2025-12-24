@@ -1,12 +1,10 @@
 package com.thinkerscave.common.orgm.controller;
 
 import com.thinkerscave.common.exception.SchemaCreationException;
-//import com.thinkerscave.common.config.TenantContext;
-import com.thinkerscave.common.orgm.domain.Organisation;
-
+import com.thinkerscave.common.multitenancy.TenantContext;
 import com.thinkerscave.common.orgm.dto.*;
 import com.thinkerscave.common.orgm.service.OrganizationService;
-//import com.thinkerscave.common.orgm.service.SchemaInitializer;
+import com.thinkerscave.common.orgm.service.SchemaInitializer;
 import com.thinkerscave.common.orgm.service.SchemaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -35,8 +33,8 @@ public class OrganizationController {
     @Autowired
     private SchemaService schemaService;
 
-//    @Autowired
-//    private SchemaInitializer schemaInitializer;
+    @Autowired
+    private SchemaInitializer schemaInitializer;
 
     @PostMapping("/register")
     @Operation(
@@ -68,6 +66,7 @@ public class OrganizationController {
     )
     public ResponseEntity<?> registerOrganization(@RequestBody OrgRequestDTO request) {
 //        String schema = TenantContext.getTenant();  // This will be tenant/schema name
+        String schema = request.getSchemaName();
 
         try {
 //            if (schemaService.schemaExists(schema)) {
@@ -75,10 +74,11 @@ public class OrganizationController {
 //            }
 //
 //            // Create Schema and Tables
-//            schemaService.createSchema(schema);
-//            schemaInitializer.createTablesForSchema(schema);
+            //schemaService.createSchema(schema);
+            schemaInitializer.createAndInitializeSchema(schema);
 
             // Register Organization
+            TenantContext.setCurrentTenant("default");
             OrgResponseDTO response = organizationService.saveOrganization(request);
             return ResponseEntity.ok(response);
 

@@ -24,6 +24,7 @@ public class OrgRequestDTO {
     private String state;
     private LocalDate establishDate;
     private String subscriptionType;
+    private String schemaName;
 
     // Owner Details
     private String ownerName;
