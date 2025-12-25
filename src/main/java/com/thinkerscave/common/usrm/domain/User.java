@@ -26,10 +26,10 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Setter
 @Table(name = "users")
 public class User extends Auditable {
-	
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @Column(name = "user_code", unique = true, nullable = false)
     private String userCode;
@@ -87,42 +87,45 @@ public class User extends Auditable {
 
     @Column(name = "remarks", length = 255)
     private String remarks;
-    
+
     @Column(name = "is_first_time_login")
     private Boolean isFirstTimeLogin = true;
-    
+
     @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinTable(
-        name = "user_roles",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "role_id")
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
     )
     private List<Role> roles = new ArrayList<>();
 
-    
+    @Column(name = "schema_name", nullable = false)
+    private String schemaName;
+
+
     // other Optional fields:
 
     public User(String userName, String email, String password, String firstName, String middleName, String lastName,
-            String address, String city, String state, Long mobileNumber,
-            Boolean isBlocked, Boolean is2faEnabled, Integer maxDeviceAllow, Integer attempts,
-            LocalDateTime lockDateTime, String secretOperation, String remarks) {
+                String address, String city, String state, Long mobileNumber,
+                Boolean isBlocked, Boolean is2faEnabled, Integer maxDeviceAllow, Integer attempts,
+                LocalDateTime lockDateTime, String secretOperation, String remarks) {
 
-    this.userName = userName;
-    this.email = email;
-    this.password = password;
-    this.firstName = firstName;
-    this.middleName = middleName;
-    this.lastName = lastName;
-    this.address = address;
-    this.city = city;
-    this.state = state;
-    this.mobileNumber = mobileNumber;
-    this.isBlocked = isBlocked;
-    this.is2faEnabled = is2faEnabled;
-    this.maxDeviceAllow = maxDeviceAllow;
-    this.attempts = attempts;
-    this.lockDateTime = lockDateTime;
-    this.secretOperation = secretOperation;
-    this.remarks = remarks;
-}
+        this.userName = userName;
+        this.email = email;
+        this.password = password;
+        this.firstName = firstName;
+        this.middleName = middleName;
+        this.lastName = lastName;
+        this.address = address;
+        this.city = city;
+        this.state = state;
+        this.mobileNumber = mobileNumber;
+        this.isBlocked = isBlocked;
+        this.is2faEnabled = is2faEnabled;
+        this.maxDeviceAllow = maxDeviceAllow;
+        this.attempts = attempts;
+        this.lockDateTime = lockDateTime;
+        this.secretOperation = secretOperation;
+        this.remarks = remarks;
+    }
 }

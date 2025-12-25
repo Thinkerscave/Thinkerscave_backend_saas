@@ -1,7 +1,6 @@
 package com.thinkerscave.common.orgm.controller;
 
 import com.thinkerscave.common.exception.SchemaCreationException;
-import com.thinkerscave.common.multitenancy.TenantContext;
 import com.thinkerscave.common.orgm.dto.*;
 import com.thinkerscave.common.orgm.service.OrganizationService;
 import com.thinkerscave.common.orgm.service.SchemaInitializer;
@@ -78,8 +77,7 @@ public class OrganizationController {
             schemaInitializer.createAndInitializeSchema(schema);
 
             // Register Organization
-            TenantContext.setCurrentTenant("default");
-            OrgResponseDTO response = organizationService.saveOrganization(request);
+            OrgResponseDTO response = organizationService.saveOrganization(request, schema);
             return ResponseEntity.ok(response);
 
         } catch (SchemaCreationException e) {

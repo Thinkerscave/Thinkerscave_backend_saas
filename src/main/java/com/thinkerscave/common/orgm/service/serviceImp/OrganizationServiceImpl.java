@@ -1,6 +1,7 @@
 package com.thinkerscave.common.orgm.service.serviceImp;
-//import com.thinkerscave.common.config.TenantContext;
+
 import com.thinkerscave.common.exception.ResourceNotFoundException;
+import com.thinkerscave.common.multitenancy.TenantContext;
 import com.thinkerscave.common.orgm.domain.Organisation;
 import com.thinkerscave.common.orgm.domain.OwnerDetails;
 import com.thinkerscave.common.orgm.dto.*;
@@ -8,6 +9,7 @@ import com.thinkerscave.common.orgm.repository.OrganizationRepository;
 import com.thinkerscave.common.orgm.repository.OwnerDetailsRepository;
 import com.thinkerscave.common.orgm.service.OrganizationService;
 import com.thinkerscave.common.usrm.domain.User;
+import com.thinkerscave.common.usrm.mapper.UserMapper;
 import com.thinkerscave.common.usrm.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -15,9 +17,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /**
@@ -36,9 +42,12 @@ public class OrganizationServiceImpl implements OrganizationService {
     private final OrganizationRepository organizationRepository;
     private final OwnerDetailsRepository ownerDetailsRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
 
-    /** Saves organization along with user and owner details. */
+    /**
+     * Saves organization along with user and owner details.
+     */
 //    @Override
 //    @Transactional
 //    public OrgResponseDTO saveOrganization(OrgRequestDTO request) {
@@ -94,17 +103,16 @@ public class OrganizationServiceImpl implements OrganizationService {
 //                savedUser.getUserCode()
 //        );
 //    }
-
     @Override
     @Transactional // Ensures the entire operation succeeds or fails together
-    public OrgResponseDTO saveOrganization(OrgRequestDTO request) {
+    public OrgResponseDTO saveOrganization(OrgRequestDTO request, String schema) {
 //        String schema = TenantContext.getTenant();
 //        if (schema == null) {
 //            throw new IllegalStateException("Tenant (schema) not set. Please provide 'X-Tenant-ID' in the header.");
 //        }
 
         // Step 1: Find an existing user or create a new one.
-        User savedUser = findOrCreateUser(request);
+        User savedUser = findOrCreateUser(request, schema);
 
         // Step 2: Create the new Organisation, handling the parent relationship.
         Organisation savedOrg = createOrganisation(request, savedUser);
@@ -167,12 +175,13 @@ public class OrganizationServiceImpl implements OrganizationService {
 
         return dto;
     }
+
     /**
      * Updates an existing organization and its associated owner details.
      * This operation is transactional, ensuring data consistency across related tables.
      *
      * @param orgId The ID of the organisation to update.
-     * @param dto The data transfer object containing the updated information.
+     * @param dto   The data transfer object containing the updated information.
      * @return A DTO confirming the successful update.
      */
     @Transactional
@@ -240,6 +249,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         user.setFirstName(names[0]);
         user.setLastName(names.length > 1 ? names[1] : ""); // Handle cases with no last name
     }
+
     /**
      * Retrieves a list of all active organizations that are marked as groups.
      *
@@ -255,7 +265,9 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .collect(Collectors.toList());
     }
 
-    /** Soft-deletes an organization by marking it inactive. */
+    /**
+     * Soft-deletes an organization by marking it inactive.
+     */
     @Override
     @Transactional
     public String softDeleteOrg(String orgCode) {
@@ -302,8 +314,8 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     /**
      * Finds a user by email. If the user doesn't exist, creates a new one.
-     */
-    private User findOrCreateUser(OrgRequestDTO request) {
+     *//*
+    private User findOrCreateUser(OrgRequestDTO request, String schema) {
         logger.info("👤 [User] Checking for existing user with email: {}", request.getOwnerEmail());
 
         return userRepository.findByEmail(request.getOwnerEmail())
@@ -317,13 +329,154 @@ public class OrganizationServiceImpl implements OrganizationService {
                     newUser.setUserName(generateUniqueUserName(request.getOwnerName()));
 
                     // --- SECURITY FIX: Hash the password before saving ---
-                    String rawPassword = generateRandomPassword();
+                    //String rawPassword = generateRandomPassword();
+                    String rawPassword = "password";
                     newUser.setPassword(passwordEncoder.encode(rawPassword));
 
                     newUser.setUserCode("USER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
                     // Set default roles, active status, etc. here if needed
 
+                    // Save in TENANT schema asynchronously
+                    CompletableFuture
+                            .supplyAsync(() -> {
+                                try {
+                                    TenantContext.setCurrentTenant(schema);
+                                    User user = new User();
+                                    user.setFirstName(request.getOwnerName()); // Assume ownerName is the full name for simplicity
+                                    user.setLastName(""); // Can be enhanced to split name
+                                    user.setEmail(request.getOwnerEmail());
+                                    user.setMobileNumber(Long.valueOf(request.getOwnerMobile()));
+                                    user.setUserName(generateUniqueUserName(request.getOwnerName()));
+
+                                    // --- SECURITY FIX: Hash the password before saving ---
+                                    //String rawPassword = generateRandomPassword();
+                                    String defaultRawPassword = "password";
+                                    user.setPassword(passwordEncoder.encode(defaultRawPassword));
+
+                                    user.setSchemaName(schema);
+                                    user.setUserCode("USER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+                                    return userRepository.save(user);
+                                } finally {
+                                    TenantContext.clear();
+                                }
+                            }, executorService)
+                            .exceptionally(ex -> {
+                                logger.error(
+                                        "❌ Failed to save user in tenant schema [{}]",
+                                        ex);
+                                return null;
+                            });
+                    // schema information only save in Public schema for each user
+                    newUser.setSchemaName(schema);
                     return userRepository.save(newUser);
+                });
+    }*/
+
+    /**
+     * Finds an existing user by email or creates a new user
+     * in both PUBLIC and TENANT schemas.
+     */
+    private User findOrCreateUser(OrgRequestDTO request, String schema) {
+
+        logger.info("🔍 [User-Service] Start findOrCreateUser | email={} | schema={}",
+                request.getOwnerEmail(), schema);
+
+        // Step 1: Validate request data
+        if (request.getOwnerEmail() == null || request.getOwnerEmail().isEmpty()) {
+            logger.error("❌ [Validation] Owner email is missing");
+            throw new IllegalArgumentException("Owner email must not be null or empty");
+        }
+
+        // Step 2: Try to find user in PUBLIC schema
+        return userRepository.findByEmail(request.getOwnerEmail())
+                .map(existingUser -> {
+                    logger.info("✅ [User-Service] User already exists | userId={}",
+                            existingUser.getId());
+                    return existingUser;
+                })
+                .orElseGet(() -> {
+                    logger.warn("⚠️ [User-Service] User not found. Creating new user | email={}",
+                            request.getOwnerEmail());
+                    return createUserForPublicAndTenant(request, schema);
+                });
+    }
+
+    /**
+     * Creates a user in PUBLIC schema synchronously
+     * and TENANT schema asynchronously.
+     */
+    private User createUserForPublicAndTenant(OrgRequestDTO request, String schema) {
+
+        logger.info("🚀 [User-Service] User creation started | schema={}", schema);
+
+        // Step 3: Generate shared credentials
+        String username = generateUniqueUserName(request.getOwnerName());
+        String rawPassword = generateRandomPassword(); // Recommended
+        String encodedPassword = passwordEncoder.encode(rawPassword);
+
+        logger.info("🔐 [User-Service] Credentials generated | username={}", username);
+
+        // Step 4: Build user object for PUBLIC schema
+        User publicUser = UserMapper.buildUser(request, username, encodedPassword, schema);
+
+        // Step 5: Save user in PUBLIC schema
+        User savedPublicUser;
+        try {
+            savedPublicUser = userRepository.save(publicUser);
+            logger.info("✅ [PUBLIC-SCHEMA] User saved successfully | userId={}",
+                    savedPublicUser.getId());
+        } catch (Exception ex) {
+            logger.error("❌ [PUBLIC-SCHEMA] Failed to save user", ex);
+            throw ex; // Critical failure → stop flow
+        }
+
+        // Step 6: Save user in TENANT schema asynchronously
+        saveUserInTenantSchemaAsync(request, username, encodedPassword, schema);
+
+        logger.info("🏁 [User-Service] User creation flow completed (tenant async started)");
+
+        return savedPublicUser;
+    }
+
+    /**
+     * Saves user in tenant schema asynchronously.
+     * Failure here should NOT affect PUBLIC schema save.
+     */
+    private void saveUserInTenantSchemaAsync(
+            OrgRequestDTO request,
+            String username,
+            String encodedPassword,
+            String schema) {
+
+        logger.info("⏳ [TENANT-SCHEMA] Async user save initiated | schema={}", schema);
+
+        CompletableFuture.runAsync(() -> {
+                    try {
+                        // Step 7: Set tenant context
+                        TenantContext.setCurrentTenant(schema);
+                        logger.info("🔁 [TENANT-CONTEXT] Tenant context set | schema={}", schema);
+
+                        // Step 8: Build tenant user
+                        User tenantUser = UserMapper.buildUser(request, username, encodedPassword, schema);
+
+                        // Step 9: Save user in tenant schema
+                        userRepository.save(tenantUser);
+                        logger.info("✅ [TENANT-SCHEMA] User saved successfully | email={}",
+                                tenantUser.getEmail());
+
+                    } catch (Exception ex) {
+                        // Tenant failure should be logged but not crash system
+                        logger.error("❌ [TENANT-SCHEMA] Failed to save user | schema={}", schema, ex);
+
+                    } finally {
+                        // Step 10: Clear tenant context
+                        TenantContext.clear();
+                        logger.info("🧹 [TENANT-CONTEXT] Tenant context cleared | schema={}", schema);
+                    }
+                }, executorService)
+                .exceptionally(ex -> {
+                    logger.error("❌ [ASYNC-EXECUTOR] Unexpected async failure | schema={}", schema, ex);
+                    return null;
                 });
     }
 
@@ -344,15 +497,20 @@ public class OrganizationServiceImpl implements OrganizationService {
         ownerDetailsRepository.save(owner);
     }
 
-    /** Generates a unique username using name and timestamp. */
+    /**
+     * Generates a unique username using name and timestamp.
+     */
     private String generateUniqueUserName(String fullName) {
         return fullName.toLowerCase().replace(" ", "_") + "_" + System.currentTimeMillis() % 10000;
     }
 
-    /** Generates a random 10-character password. */
+    /**
+     * Generates a random 10-character password.
+     */
     private String generateRandomPassword() {
         return UUID.randomUUID().toString().substring(0, 10);
     }
+
     /**
      * Helper method to create and save a new Organisation.
      * It now includes the logic to link to a parent organization.
