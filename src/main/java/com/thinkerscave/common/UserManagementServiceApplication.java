@@ -5,6 +5,8 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
+@EnableJpaRepositories(basePackages = "com.thinkerscave.common")
+@EntityScan(basePackages = "com.thinkerscave.common")
 @SpringBootApplication
 public class UserManagementServiceApplication {
 

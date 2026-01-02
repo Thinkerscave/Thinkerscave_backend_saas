@@ -6,10 +6,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
 
-
-
-
 @Data
+@EqualsAndHashCode(callSuper = false)
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
@@ -82,8 +80,8 @@ public class Staff extends Auditable {
 
     // Optional convenience constructor
     public Staff(User user, Branch branch, Department department, String firstName, String lastName,
-                 String email, Long mobileNumber, String gender, LocalDate dateOfBirth,
-                 LocalDate hireDate, String photoUrl, String address, Boolean isActive) {
+            String email, Long mobileNumber, String gender, LocalDate dateOfBirth,
+            LocalDate hireDate, String photoUrl, String address, Boolean isActive) {
         this.user = user;
         this.branch = branch;
         this.department = department;

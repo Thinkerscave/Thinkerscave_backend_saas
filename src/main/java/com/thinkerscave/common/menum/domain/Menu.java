@@ -3,11 +3,13 @@ package com.thinkerscave.common.menum.domain;
 import com.thinkerscave.common.auditing.Auditable;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @Data
+@EqualsAndHashCode(callSuper = false)
 @Table(name = "menu_master")
 public class Menu extends Auditable {
 
@@ -16,7 +18,7 @@ public class Menu extends Auditable {
     @Column(name = "menu_id")
     private Long menuId;
 
-    @Column(name="menu_code")
+    @Column(name = "menu_code")
     private String menuCode;
 
     @Column(nullable = false, length = 50)
@@ -37,5 +39,4 @@ public class Menu extends Auditable {
     @Column(name = "is_active")
     private Boolean isActive;
 
-
-   }
+}

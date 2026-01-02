@@ -1,7 +1,7 @@
 package com.thinkerscave.common.security;
 
 import com.thinkerscave.common.filter.JwtAuthFilter;
-import com.thinkerscave.common.usrm.service.impl.UserUserInfoDetailsService;
+import com.thinkerscave.common.usrm.service.JwtService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -33,45 +33,35 @@ public class SecurityConfig {
     // They are no longer needed here.
 
     /**
-     * Configures the UserDetailsService bean used for fetching user details.
-     * @return a UserDetailsService implementation to load user-specific data.
-     */
-    @Bean
-    public UserDetailsService userDetailsService() {
-        return new UserUserInfoDetailsService();
-    }
-
-    /**
      * Configures the main HTTP security filter chain.
      *
-     * @param http HttpSecurity object to configure.
-     * @param authenticationProvider The AuthenticationProvider bean (injected by Spring).
+     * @param http                   HttpSecurity object to configure.
+     * @param authenticationProvider The AuthenticationProvider bean (injected by
+     *                               Spring).
      * @return the configured SecurityFilterChain.
      * @throws Exception if an error occurs during configuration.
      */
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationProvider authenticationProvider) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationProvider authenticationProvider)
+            throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/v1/users/**",
-                                "/api/password/**",     // <-- THE FIX IS ADDING THIS LI
+                                "/api/password/**", // <-- THE FIX IS ADDING THIS LI
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
-                                "/api/admissions/**"
-                                ,"/api/schema/init",
+                                "/api/admissions/**", "/api/schema/init",
                                 "/api/organizations/**"
-                                // Be careful: other endpoints like /api/admissions/** should likely be secured
+                        // Be careful: other endpoints like /api/admissions/** should likely be secured
                         ).permitAll()
                         // This line ensures any endpoint NOT in the list above is protected
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated())
                 .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider)
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
@@ -79,6 +69,7 @@ public class SecurityConfig {
 
     /**
      * Configures the PasswordEncoder bean.
+     * 
      * @return the configured PasswordEncoder.
      */
     @Bean
@@ -88,23 +79,27 @@ public class SecurityConfig {
 
     /**
      * Exposes the AuthenticationManager as a Spring bean.
-     * @param authenticationConfiguration the AuthenticationConfiguration provided by Spring Security.
+     * 
+     * @param authenticationConfiguration the AuthenticationConfiguration provided
+     *                                    by Spring Security.
      * @return the configured AuthenticationManager.
      * @throws Exception if an error occurs.
      */
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
+            throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
     /**
      * Configures the primary AuthenticationProvider bean using a database.
+     * 
      * @return the configured AuthenticationProvider.
      */
     @Bean
-    public AuthenticationProvider authenticationProvider() {
+    public AuthenticationProvider authenticationProvider(UserDetailsService userDetailsService) {
         DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();
-        authenticationProvider.setUserDetailsService(userDetailsService());
+        authenticationProvider.setUserDetailsService(userDetailsService);
         authenticationProvider.setPasswordEncoder(passwordEncoder());
         return authenticationProvider;
     }

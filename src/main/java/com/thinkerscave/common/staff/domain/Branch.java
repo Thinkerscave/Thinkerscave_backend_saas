@@ -1,10 +1,13 @@
 package com.thinkerscave.common.staff.domain;
 
-
-
 import com.thinkerscave.common.auditing.Auditable;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Data
 @Entity
@@ -12,8 +15,9 @@ import lombok.*;
 @NoArgsConstructor
 @Getter
 @Setter
+@EqualsAndHashCode(callSuper = false)
 @Table(name = "branch")
-public class Branch  extends Auditable {
+public class Branch extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,4 +36,3 @@ public class Branch  extends Auditable {
     @Column(name = "is_active")
     private Boolean isActive = true;
 }
-

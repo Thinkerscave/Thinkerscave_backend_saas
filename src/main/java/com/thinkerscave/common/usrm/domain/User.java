@@ -68,6 +68,7 @@ public class User extends Auditable {
     @Column(name = "state", length = 255)
     private String state;
 
+    @Builder.Default
     @Column(name = "country", length = 100)
     private String country = "India";
 
@@ -86,15 +87,18 @@ public class User extends Auditable {
     // @Column(name = "parent_user_name", length = 255)
     // private String parentUserName;
 
+    @Builder.Default
     @Column(name = "is_blocked")
     private Boolean isBlocked = false;
 
+    @Builder.Default
     @Column(name = "is_2fa_enabled")
     private Boolean is2faEnabled = false;
 
     @Column(name = "max_device_allow")
     private Integer maxDeviceAllow;
 
+    @Builder.Default
     @Column(name = "attempts")
     private Integer attempts = 0;
 
@@ -107,18 +111,22 @@ public class User extends Auditable {
     @Column(name = "remarks", length = 255)
     private String remarks;
 
+    @Builder.Default
     @Column(name = "is_first_time_login")
     private Boolean isFirstTimeLogin = true;
 
+    @Builder.Default
     @Column(name = "is_email_verified")
     private Boolean isEmailVerified = false;
 
+    @Builder.Default
     @Column(name = "is_mobile_verified")
     private Boolean isMobileVerified = false;
 
     @Column(name = "last_login_date")
     private LocalDate lastLoginDate;
 
+    @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private List<Role> roles = new ArrayList<>();

@@ -1,7 +1,5 @@
 package com.thinkerscave.common.menum.domain;
 
-import java.util.List;
-
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import com.thinkerscave.common.auditing.Auditable;
@@ -16,13 +14,15 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Data
+@EqualsAndHashCode(callSuper = false)
 @EntityListeners(AuditingEntityListener.class)
 @Entity(name = "role_master")
 public class Role extends Auditable {
 
-	@Id
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "role_id")
     private Long roleId;
@@ -37,15 +37,14 @@ public class Role extends Auditable {
     private String description;
 
     @Column(name = "is_active")
-    private Boolean isActive=true;
-    
+    private Boolean isActive = true;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "role_type", length = 30)
-    private RoleType roleType=RoleType.SCHOOL;
+    private RoleType roleType = RoleType.SCHOOL;
     // Example values: "SCHOOL", "COLLEGE", "UNIVERSITY", "ADMIN"
 
     // (Optional) to support multi-tenancy in future:
     @Column(name = "organization_id")
     private Long organizationId;
 }
-

@@ -22,27 +22,21 @@
         <java.version>21</java.version>
     </properties>
 
-    <!-- GLOBAL EXCLUSION OF spring-boot-starter-logging -->
+    <!-- ARCHITECTURAL FIX: Global Logging Exclusion -->
+    <!-- This replaces individual exclusions and ensures Log4j2 is the sole provider -->
     <dependencyManagement>
         <dependencies>
             <dependency>
                 <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-dependencies</artifactId>
-                <version>3.3.4</version>
-                <type>pom</type>
-                <scope>import</scope>
-                <exclusions>
-                    <exclusion>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-logging</artifactId>
-                    </exclusion>
-                </exclusions>
+                <artifactId>spring-boot-starter-logging</artifactId>
+                <version>${project.parent.version}</version>
+                <scope>provided</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
 
     <dependencies>
-        <!-- Spring Boot Starters (Logging via Log4j2 instead of Logback) -->
+        <!-- Spring Boot Starters -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
@@ -62,20 +56,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-log4j2</artifactId>
         </dependency>
-
-        <!-- Hibernate Core (6.x required for MultiTenancy SCHEMA support) -->
-<!--        <dependency>-->
-<!--            <groupId>org.hibernate.orm</groupId>-->
-<!--            <artifactId>hibernate-core</artifactId>-->
-<!--            <version>6.6.15.Final</version>-->
-<!--        </dependency>-->
-
-        <!-- Optional Hibernate tools -->
-<!--        <dependency>-->
-<!--            <groupId>org.hibernate.tool</groupId>-->
-<!--            <artifactId>hibernate-tools-orm</artifactId>-->
-<!--            <version>6.4.4.Final</version>-->
-<!--        </dependency>-->
 
         <!-- JWT -->
         <dependency>
@@ -136,12 +116,6 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- AOP -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
-        </dependency>
-
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
@@ -153,11 +127,6 @@
             <artifactId>spring-boot-devtools</artifactId>
             <optional>true</optional>
         </dependency>
-
-
-
-
-
     </dependencies>
 
     <build>
