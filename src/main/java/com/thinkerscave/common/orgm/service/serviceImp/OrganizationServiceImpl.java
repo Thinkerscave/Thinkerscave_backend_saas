@@ -1,7 +1,9 @@
 package com.thinkerscave.common.orgm.service.serviceImp;
+
 //import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.exception.ResourceNotFoundException;
 import com.thinkerscave.common.orgm.domain.Organisation;
+import com.thinkerscave.common.shared.enums.OrganizationType;
 import com.thinkerscave.common.orgm.domain.OwnerDetails;
 import com.thinkerscave.common.orgm.dto.*;
 import com.thinkerscave.common.orgm.repository.OrganizationRepository;
@@ -21,7 +23,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Implementation of OrganizationService to manage organization creation, updates, and soft deletions.
+ * Implementation of OrganizationService to manage organization creation,
+ * updates, and soft deletions.
  * Handles user and owner detail linkage during organization registration.
  *
  * @author Sandeep
@@ -37,71 +40,74 @@ public class OrganizationServiceImpl implements OrganizationService {
     private final OwnerDetailsRepository ownerDetailsRepository;
     private final PasswordEncoder passwordEncoder;
 
-
     /** Saves organization along with user and owner details. */
-//    @Override
-//    @Transactional
-//    public OrgResponseDTO saveOrganization(OrgRequestDTO request) {
-//        String schema = TenantContext.getTenant();
-//        if (schema == null) {
-//            throw new IllegalStateException("Tenant (schema) not set. Please provide 'X-Tenant-ID' in the header.");
-//        }
-//
-//        // Step 1: Handle User
-//        logger.info("👤 [User] Preparing user data for: {}", request.getName());
-//        String[] names = request.getName().split(" ", 3);
-//        User user = new User();
-//        user.setFirstName(names[0]);
-//        user.setMiddleName(names.length == 3 ? names[1] : null);
-//        user.setLastName(names.length >= 2 ? names[names.length - 1] : "");
-//        user.setEmail(request.getMailId());
-//        user.setMobileNumber(request.getPhoneNumber());
-//        user.setUserName(generateUniqueUserName(request.getName()));
-//        user.setPassword(generateRandomPassword());
-//        user.setAddress(request.getAddress());
-//        user.setCity(request.getCity());
-//        user.setState(request.getState());
-//        user.setUserCode("USER" + UUID.randomUUID().toString().substring(0, 8));
-//
-//        User savedUser = userRepository.save(user);
-//
-//        // Step 2: Create New Organization
-//        Organisation organisation = new Organisation();
-//        organisation.setOrgCode("ORG" + UUID.randomUUID().toString().substring(0, 8));
-//        organisation.setOrgName(request.getOrganizationName());
-//        organisation.setBrandName(request.getBrandName());
-//        organisation.setType(request.getOrgType());
-//        organisation.setCity(request.getCity());
-//        organisation.setState(request.getState());
-//        organisation.setCreatedBy(savedUser.getUserName());
-//        organisation.setUser(savedUser);
-//
-//        Organisation savedOrg = organizationRepository.save(organisation);
-//
-//        /// Step 3: Save Owner Details
-//        logger.info("👑 [Owner] Creating owner details...");
-//        OwnerDetails owner = new OwnerDetails();
-//        owner.setOwnerCode("OWNR" + UUID.randomUUID().toString().substring(0, 8)); // 👈 generate owner code
-//        owner.setGender(request.getGender());
-//        owner.setMailId(request.getMailId());
-//        owner.setUser(savedUser);
-//        owner.setOrganization(savedOrg);
-//        ownerDetailsRepository.save(owner);
-//
-//        return new OrgResponseDTO(
-//                "Organization successfully registered under tenant: " + schema,
-//                savedOrg.getOrgCode(),
-//                savedUser.getUserCode()
-//        );
-//    }
+    // @Override
+    // @Transactional
+    // public OrgResponseDTO saveOrganization(OrgRequestDTO request) {
+    // String schema = TenantContext.getTenant();
+    // if (schema == null) {
+    // throw new IllegalStateException("Tenant (schema) not set. Please provide
+    // 'X-Tenant-ID' in the header.");
+    // }
+    //
+    // // Step 1: Handle User
+    // logger.info("👤 [User] Preparing user data for: {}", request.getName());
+    // String[] names = request.getName().split(" ", 3);
+    // User user = new User();
+    // user.setFirstName(names[0]);
+    // user.setMiddleName(names.length == 3 ? names[1] : null);
+    // user.setLastName(names.length >= 2 ? names[names.length - 1] : "");
+    // user.setEmail(request.getMailId());
+    // user.setMobileNumber(request.getPhoneNumber());
+    // user.setUserName(generateUniqueUserName(request.getName()));
+    // user.setPassword(generateRandomPassword());
+    // user.setAddress(request.getAddress());
+    // user.setCity(request.getCity());
+    // user.setState(request.getState());
+    // user.setUserCode("USER" + UUID.randomUUID().toString().substring(0, 8));
+    //
+    // User savedUser = userRepository.save(user);
+    //
+    // // Step 2: Create New Organization
+    // Organisation organisation = new Organisation();
+    // organisation.setOrgCode("ORG" + UUID.randomUUID().toString().substring(0,
+    // 8));
+    // organisation.setOrgName(request.getOrganizationName());
+    // organisation.setBrandName(request.getBrandName());
+    // organisation.setType(request.getOrgType());
+    // organisation.setCity(request.getCity());
+    // organisation.setState(request.getState());
+    // organisation.setCreatedBy(savedUser.getUserName());
+    // organisation.setUser(savedUser);
+    //
+    // Organisation savedOrg = organizationRepository.save(organisation);
+    //
+    // /// Step 3: Save Owner Details
+    // logger.info("👑 [Owner] Creating owner details...");
+    // OwnerDetails owner = new OwnerDetails();
+    // owner.setOwnerCode("OWNR" + UUID.randomUUID().toString().substring(0, 8)); //
+    // 👈 generate owner code
+    // owner.setGender(request.getGender());
+    // owner.setMailId(request.getMailId());
+    // owner.setUser(savedUser);
+    // owner.setOrganization(savedOrg);
+    // ownerDetailsRepository.save(owner);
+    //
+    // return new OrgResponseDTO(
+    // "Organization successfully registered under tenant: " + schema,
+    // savedOrg.getOrgCode(),
+    // savedUser.getUserCode()
+    // );
+    // }
 
     @Override
     @Transactional // Ensures the entire operation succeeds or fails together
     public OrgResponseDTO saveOrganization(OrgRequestDTO request) {
-//        String schema = TenantContext.getTenant();
-//        if (schema == null) {
-//            throw new IllegalStateException("Tenant (schema) not set. Please provide 'X-Tenant-ID' in the header.");
-//        }
+        // String schema = TenantContext.getTenant();
+        // if (schema == null) {
+        // throw new IllegalStateException("Tenant (schema) not set. Please provide
+        // 'X-Tenant-ID' in the header.");
+        // }
 
         // Step 1: Find an existing user or create a new one.
         User savedUser = findOrCreateUser(request);
@@ -112,14 +118,14 @@ public class OrganizationServiceImpl implements OrganizationService {
         // Step 3: Create the OwnerDetails to link the User and Organisation.
         createOwnerDetails(request, savedUser, savedOrg);
 
-        // TODO: Consider sending a welcome email to the user with their generated username
+        // TODO: Consider sending a welcome email to the user with their generated
+        // username
         // and instructions to use the "Forgot Password" feature to set their password.
 
         return new OrgResponseDTO(
                 "Organization successfully registered under tenant: ",
                 savedOrg.getOrgCode(),
-                savedUser.getUserCode()
-        );
+                savedUser.getUserCode());
     }
 
     /**
@@ -135,7 +141,8 @@ public class OrganizationServiceImpl implements OrganizationService {
     }
 
     /**
-     * A private helper method to safely map an Organisation entity to its DTO representation.
+     * A private helper method to safely map an Organisation entity to its DTO
+     * representation.
      * This explicitly calls the getters, which resolves the lazy-loaded proxies.
      */
     private OrganisationListDTO toOrganisationListDTO(Organisation org) {
@@ -146,7 +153,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         dto.setOrgName(org.getOrgName());
         dto.setBrandName(org.getBrandName());
         dto.setOrgUrl(org.getOrgUrl());
-        dto.setOrgType(org.getType());
+        dto.setOrgType(org.getType() != null ? org.getType().name() : null);
         dto.setCity(org.getCity());
         dto.setState(org.getState());
         dto.setEstablishDate(org.getEstablishmentDate());
@@ -167,12 +174,14 @@ public class OrganizationServiceImpl implements OrganizationService {
 
         return dto;
     }
+
     /**
      * Updates an existing organization and its associated owner details.
-     * This operation is transactional, ensuring data consistency across related tables.
+     * This operation is transactional, ensuring data consistency across related
+     * tables.
      *
      * @param orgId The ID of the organisation to update.
-     * @param dto The data transfer object containing the updated information.
+     * @param dto   The data transfer object containing the updated information.
      * @return A DTO confirming the successful update.
      */
     @Transactional
@@ -189,13 +198,15 @@ public class OrganizationServiceImpl implements OrganizationService {
         org.setState(dto.state());
         org.setEstablishmentDate(dto.establishmentDate());
         org.setIsGroup(dto.isGroup());
-        org.setType(dto.orgType());
-        // Note: JPA Auditing should handle 'last_modified_by' and 'last_modified_date' automatically.
+        org.setType(dto.orgType() != null ? OrganizationType.valueOf(dto.orgType()) : null);
+        // Note: JPA Auditing should handle 'last_modified_by' and 'last_modified_date'
+        // automatically.
 
         // --- Step 3: Fetch and update the related OwnerDetails and User entities ---
         // Find the owner details linked to this organization.
         OwnerDetails owner = ownerDetailsRepository.findByOrganization(org)
-                .orElseThrow(() -> new ResourceNotFoundException("OwnerDetails not found for Organisation ID: " + orgId));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("OwnerDetails not found for Organisation ID: " + orgId));
 
         // Update the denormalized fields on OwnerDetails as per the ERD.
         owner.setOwnerName(dto.ownerName());
@@ -205,17 +216,20 @@ public class OrganizationServiceImpl implements OrganizationService {
         // Now, update the single source of truth: the User entity.
         User user = owner.getUser();
         if (user == null) {
-            throw new IllegalStateException("Data integrity issue: OwnerDetails with ID " + owner.getOwnerId() + " has no associated User.");
+            throw new IllegalStateException(
+                    "Data integrity issue: OwnerDetails with ID " + owner.getOwnerId() + " has no associated User.");
         }
 
         // Update the master user record.
-        // A simple utility can be used to split the full name into first and last names.
+        // A simple utility can be used to split the full name into first and last
+        // names.
         updateUserFullName(user, dto.ownerName());
         user.setEmail(dto.ownerEmail());
         user.setMobileNumber(Long.parseLong(dto.ownerMobile())); // Assuming mobile is stored as a long
 
         // --- Step 4: Save all changes ---
-        // Within a @Transactional method, JPA's dirty checking often makes explicit save calls redundant
+        // Within a @Transactional method, JPA's dirty checking often makes explicit
+        // save calls redundant
         // for managed entities. However, calling save() is explicit and clear.
         organizationRepository.save(org);
         ownerDetailsRepository.save(owner);
@@ -225,8 +239,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         return new OrgResponseDTO(
                 "Organization successfully updated.",
                 org.getOrgCode(),
-                user.getUserCode()
-        );
+                user.getUserCode());
     }
 
     /**
@@ -240,6 +253,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         user.setFirstName(names[0]);
         user.setLastName(names.length > 1 ? names[1] : ""); // Handle cases with no last name
     }
+
     /**
      * Retrieves a list of all active organizations that are marked as groups.
      *
@@ -251,7 +265,8 @@ public class OrganizationServiceImpl implements OrganizationService {
 
         // 2. Map the full Organisation entities to the lightweight ParentOrgDTO.
         return groupOrganisations.stream()
-                .map(org -> new ParentOrgDTO(org.getOrgId(), org.getOrgName())) // Assuming getId() and getName() methods
+                .map(org -> new ParentOrgDTO(org.getOrgId(), org.getOrgName())) // Assuming getId() and getName()
+                                                                                // methods
                 .collect(Collectors.toList());
     }
 
@@ -293,12 +308,10 @@ public class OrganizationServiceImpl implements OrganizationService {
         user.setCity(request.getCity() != null ? request.getCity() : user.getCity());
         user.setState(request.getState() != null ? request.getState() : user.getState());
 
-
         // Save updates
         userRepository.save(user);
         ownerDetailsRepository.save(owner);
     }
-
 
     /**
      * Finds a user by email. If the user doesn't exist, creates a new one.
@@ -327,7 +340,6 @@ public class OrganizationServiceImpl implements OrganizationService {
                 });
     }
 
-
     /**
      * Creates and saves the OwnerDetails entity to link the User and Organisation.
      */
@@ -338,7 +350,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         owner.setOwnerName(request.getOwnerName());
         owner.setOwnerEmail(request.getOwnerEmail());
         owner.setOwnerMobile(request.getOwnerMobile());
-//        owner.setGender(request.getGender());
+        // owner.setGender(request.getGender());
         owner.setUser(user);
         owner.setOrganization(org);
         ownerDetailsRepository.save(owner);
@@ -353,6 +365,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     private String generateRandomPassword() {
         return UUID.randomUUID().toString().substring(0, 10);
     }
+
     /**
      * Helper method to create and save a new Organisation.
      * It now includes the logic to link to a parent organization.
@@ -365,7 +378,8 @@ public class OrganizationServiceImpl implements OrganizationService {
         if (!request.getIsAGroup() && request.getParentOrgId() != null) {
             // If the new org is not a group and a parent ID is provided, find the parent.
             Organisation parentOrg = organizationRepository.findById(request.getParentOrgId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Parent Organization not found with ID: " + request.getParentOrgId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Parent Organization not found with ID: " + request.getParentOrgId()));
 
             // Set the parent organization on the new (child) organization.
             newOrg.setParentOrganisation(parentOrg);
@@ -380,7 +394,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         newOrg.setState(request.getState());
         newOrg.setEstablishmentDate(request.getEstablishDate());
         newOrg.setIsGroup(request.getIsAGroup());
-        newOrg.setType(request.getOrgType());
+        newOrg.setType(request.getOrgType() != null ? OrganizationType.valueOf(request.getOrgType()) : null);
         newOrg.setSubscriptionType(request.getSubscriptionType());
         newOrg.setIsActive(true); // Default to active on creation
 
@@ -391,4 +405,3 @@ public class OrganizationServiceImpl implements OrganizationService {
     }
 
 }
-

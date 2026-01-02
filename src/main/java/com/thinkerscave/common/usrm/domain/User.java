@@ -5,31 +5,35 @@ import com.thinkerscave.common.menum.domain.Role;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-
 @Data
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 @Getter
 @Setter
+@EqualsAndHashCode(callSuper = false)
 @Table(name = "users")
 public class User extends Auditable {
-	
-	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	private Long id;
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @Column(name = "user_code", unique = true, nullable = false)
     private String userCode;
@@ -64,8 +68,23 @@ public class User extends Auditable {
     @Column(name = "state", length = 255)
     private String state;
 
-//    @Column(name = "parent_user_name", length = 255)
-//    private String parentUserName;
+    @Column(name = "country", length = 100)
+    private String country = "India";
+
+    @Column(name = "zip_code", length = 10)
+    private String zipCode;
+
+    @Column(name = "photo_url", length = 500)
+    private String photoUrl;
+
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    @Column(name = "gender", length = 20)
+    private String gender;
+
+    // @Column(name = "parent_user_name", length = 255)
+    // private String parentUserName;
 
     @Column(name = "is_blocked")
     private Boolean isBlocked = false;
@@ -87,19 +106,23 @@ public class User extends Auditable {
 
     @Column(name = "remarks", length = 255)
     private String remarks;
-    
+
     @Column(name = "is_first_time_login")
     private Boolean isFirstTimeLogin = true;
-    
+
+    @Column(name = "is_email_verified")
+    private Boolean isEmailVerified = false;
+
+    @Column(name = "is_mobile_verified")
+    private Boolean isMobileVerified = false;
+
+    @Column(name = "last_login_date")
+    private LocalDate lastLoginDate;
+
     @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
-    @JoinTable(
-        name = "user_roles",
-        joinColumns = @JoinColumn(name = "user_id"),
-        inverseJoinColumns = @JoinColumn(name = "role_id")
-    )
+    @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private List<Role> roles = new ArrayList<>();
 
-    
     // other Optional fields:
 
     public User(String userName, String email, String password, String firstName, String middleName, String lastName,
@@ -107,22 +130,22 @@ public class User extends Auditable {
             Boolean isBlocked, Boolean is2faEnabled, Integer maxDeviceAllow, Integer attempts,
             LocalDateTime lockDateTime, String secretOperation, String remarks) {
 
-    this.userName = userName;
-    this.email = email;
-    this.password = password;
-    this.firstName = firstName;
-    this.middleName = middleName;
-    this.lastName = lastName;
-    this.address = address;
-    this.city = city;
-    this.state = state;
-    this.mobileNumber = mobileNumber;
-    this.isBlocked = isBlocked;
-    this.is2faEnabled = is2faEnabled;
-    this.maxDeviceAllow = maxDeviceAllow;
-    this.attempts = attempts;
-    this.lockDateTime = lockDateTime;
-    this.secretOperation = secretOperation;
-    this.remarks = remarks;
-}
+        this.userName = userName;
+        this.email = email;
+        this.password = password;
+        this.firstName = firstName;
+        this.middleName = middleName;
+        this.lastName = lastName;
+        this.address = address;
+        this.city = city;
+        this.state = state;
+        this.mobileNumber = mobileNumber;
+        this.isBlocked = isBlocked;
+        this.is2faEnabled = is2faEnabled;
+        this.maxDeviceAllow = maxDeviceAllow;
+        this.attempts = attempts;
+        this.lockDateTime = lockDateTime;
+        this.secretOperation = secretOperation;
+        this.remarks = remarks;
+    }
 }
