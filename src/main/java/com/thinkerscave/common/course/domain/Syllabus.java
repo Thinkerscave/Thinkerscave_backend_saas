@@ -1,17 +1,20 @@
 package com.thinkerscave.common.course.domain;
 
 import com.thinkerscave.common.auditing.Auditable;
+import com.thinkerscave.common.course.enums.SyllabusStatus;
+import com.thinkerscave.common.usrm.domain.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Syllabus entity - curriculum for a subject
+ * Syllabus entity - curriculum for a subject with versioning support
  */
 @Entity
 @Table(name = "syllabus")
@@ -52,6 +55,32 @@ public class Syllabus extends Auditable {
     @OneToMany(mappedBy = "syllabus", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Chapter> chapters = new ArrayList<>();
 
+    // Versioning fields
     @Column(name = "version", length = 20)
-    private String version; // e.g., "2024-v1"
+    private String version; // e.g., "1.0", "2.0"
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", length = 50)
+    private SyllabusStatus status = SyllabusStatus.DRAFT;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "previous_version_id")
+    private Syllabus previousVersion; // Link to previous version
+
+    // Approval workflow
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "approved_by")
+    private User approvedBy;
+
+    @Column(name = "approved_date")
+    private LocalDate approvedDate;
+
+    @Column(name = "published_date")
+    private LocalDate publishedDate;
+
+    @Column(name = "archived_date")
+    private LocalDate archivedDate;
+
+    @Column(columnDefinition = "TEXT")
+    private String approval_remarks;
 }
