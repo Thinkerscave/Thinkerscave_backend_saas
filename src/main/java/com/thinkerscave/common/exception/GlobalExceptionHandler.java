@@ -10,6 +10,8 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 
+import com.thinkerscave.common.dto.ApiResponse;
+
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -24,12 +26,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(buildError("Invalid Credentials", ex.getMessage(), HttpStatus.UNAUTHORIZED));
     }
-    // This logic now applies to ALL controllers
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<?> handleResourceNotFound(ResourceNotFoundException ex) {
-
-        return new ResponseEntity<>("Resource was not found: " + ex.getMessage(), HttpStatus.NOT_FOUND);
-    }
+    
     // Handle wrong password or login issues
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<?> handleBadCredentials(BadCredentialsException ex) {
@@ -44,13 +41,6 @@ public class GlobalExceptionHandler {
                 .body(buildError("Token Expired", ex.getMessage(), HttpStatus.UNAUTHORIZED));
     }
 
-    // Handle refresh token errors and others
-    @ExceptionHandler(RuntimeException.class)
-    public ResponseEntity<?> handleRuntimeException(RuntimeException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(buildError("Error Occurred", ex.getMessage(), HttpStatus.BAD_REQUEST));
-    }
-
     // Handle validation errors (e.g., @Valid failure)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<?> handleValidationErrors(MethodArgumentNotValidException ex) {
@@ -62,12 +52,17 @@ public class GlobalExceptionHandler {
                 .body(buildError("Validation Failed", "Input validation error", HttpStatus.BAD_REQUEST, fieldErrors));
     }
 
-    // Fallback
+    // 🔥 Handles ALL unhandled exceptions
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<?> handleGenericException(Exception ex) {
-    	log.error("Unexpected Error: ", ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(buildError("Internal Server Error", ex.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR));
+    public ResponseEntity<ApiResponse<Object>> handleException(Exception ex) {
+
+        ApiResponse<Object> response = ApiResponse.builder()
+                .success(false)
+                .message(ex.getMessage())
+                .data(null)
+                .build();
+
+        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     // Response structure
