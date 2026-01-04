@@ -1,6 +1,7 @@
 package com.thinkerscave.common.admission.service.impl;
 
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -13,8 +14,9 @@ import com.thinkerscave.common.admission.repository.InquiryRepository;
 import com.thinkerscave.common.admission.service.InquiryService;
 import com.thinkerscave.common.exception.BadRequestException;
 import com.thinkerscave.common.exception.ResourceNotFoundException;
+import com.thinkerscave.common.security.SecurityUtil;
 
-import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -32,7 +34,7 @@ public class InquiryServiceImpl implements InquiryService {
 
 		Inquiry enquiry = Inquiry.builder().name(request.getName()).mobileNumber(request.getMobileNumber())
 				.email(request.getEmail()).classInterestedIn(request.getClassInterestedIn())
-				.address(request.getAddress()).inquirySource("WEBSITE").createdBy("PUBLIC").status("NEW").build();
+				.address(request.getAddress()).inquirySource("WEBSITE").status("NEW").build();
 
 		inquiryRepository.save(enquiry);
 
@@ -45,6 +47,7 @@ public class InquiryServiceImpl implements InquiryService {
         validateRequest(request);
 
         Inquiry inquiry;
+        String userName=SecurityUtil.getCurrentUsername();
 
         // ---------- UPDATE ----------
         if (request.getInquiryId() != null) {
@@ -58,11 +61,13 @@ public class InquiryServiceImpl implements InquiryService {
             inquiry = new Inquiry();
             inquiry.setStatus("NEW");
             inquiry.setIsDeleted(false);
-            inquiry.setCreatedAt(LocalDateTime.now());
+            inquiry.setCreatedDate(new Date());
+            inquiry.setCreatedBy(userName);
         }
 
         mapRequestToEntity(request, inquiry);
-        inquiry.setUpdatedAt(LocalDateTime.now());
+        inquiry.setLastModifiedDate(new Date());
+        inquiry.setLastModifiedBy(userName);
 
         Inquiry saved = inquiryRepository.save(inquiry);
         return mapToResponse(saved);
@@ -74,7 +79,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Transactional(readOnly = true)
     public List<InquiryResponse> getAll() {
 
-        return inquiryRepository.findAllByIsDeletedFalseOrderByCreatedAtDesc()
+        return inquiryRepository.findAllByIsDeletedFalseOrderByCreatedDateDesc()
                 .stream()
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
@@ -91,7 +96,8 @@ public class InquiryServiceImpl implements InquiryService {
                 );
 
         inquiry.setIsDeleted(true);
-        inquiry.setUpdatedAt(LocalDateTime.now());
+        inquiry.setLastModifiedDate(new Date());
+        inquiry.setLastModifiedBy(SecurityUtil.getCurrentUsername());
         inquiryRepository.save(inquiry);
     }
 

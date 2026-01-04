@@ -12,7 +12,7 @@ public interface InquiryRepository extends JpaRepository<Inquiry,Long> {
 	
 	Optional<Inquiry> findByInquiryIdAndIsDeletedFalse(Long inquiryId);
 
-    List<Inquiry> findAllByIsDeletedFalseOrderByCreatedAtDesc();
+    List<Inquiry> findAllByIsDeletedFalseOrderByCreatedDateDesc();
 
     boolean existsByMobileNumberAndIsDeletedFalse(String mobileNumber);
 

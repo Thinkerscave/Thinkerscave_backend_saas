@@ -18,6 +18,8 @@ import lombok.Builder;
 
 import java.time.LocalDateTime;
 
+import com.thinkerscave.common.auditing.Auditable;
+
 @Entity
 @Table(
     name = "inquiry",
@@ -34,7 +36,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Inquiry {
+public class Inquiry extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -84,19 +86,6 @@ public class Inquiry {
     private String status; // NEW, FOLLOW_UP, ADMITTED, LOST
 
     // --------------------
-    // Audit Fields
-    // --------------------
-
-    @Column(name = "created_by", nullable = false, length = 30)
-    private String createdBy; // SYSTEM / STAFF
-
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
-
-    // --------------------
     // Soft Delete
     // --------------------
 
@@ -109,19 +98,12 @@ public class Inquiry {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
         if (this.status == null) {
             this.status = "NEW";
         }
         if (this.isDeleted == null) {
             this.isDeleted = false;
         }
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
     }
 }
 
