@@ -1,5 +1,6 @@
 package com.thinkerscave.common.security;
 
+import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -11,6 +12,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@Getter
 public class UserInfoUserDetails implements UserDetails {
 
 	
@@ -20,6 +22,7 @@ public class UserInfoUserDetails implements UserDetails {
 	private String password;
 	private List<GrantedAuthority> 	authorities;
 	private Long roleId;
+	private String schemaName;
 		
 	public UserInfoUserDetails(User user) {
 		this.userId=user.getId();
@@ -30,17 +33,8 @@ public class UserInfoUserDetails implements UserDetails {
                 .collect(Collectors.toList());
         Role role = user.getRoles().iterator().next();
         this.roleId = role.getRoleId();
+		this.schemaName=user.getSchemaName();
 	}
-	
-	
-	
-	public Long getUserId() {
-		return userId;
-	}
-
-	public Long getRoleId() {
-        return roleId;
-    }
 	
 	@Override
 	public Collection<? extends GrantedAuthority> getAuthorities() {

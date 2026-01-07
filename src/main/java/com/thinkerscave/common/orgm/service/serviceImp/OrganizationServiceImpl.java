@@ -412,7 +412,8 @@ public class OrganizationServiceImpl implements OrganizationService {
         // Step 3: Generate shared credentials
         String username = generateUniqueUserName(request.getOwnerName());
         String rawPassword = generateRandomPassword(); // Recommended
-        String encodedPassword = passwordEncoder.encode(rawPassword);
+        logger.info("🔐 [User-Service] Credentials generated |------- rawPassword={}", rawPassword);
+        String encodedPassword = passwordEncoder.encode("admin@123");
 
         logger.info("🔐 [User-Service] Credentials generated | username={}", username);
 

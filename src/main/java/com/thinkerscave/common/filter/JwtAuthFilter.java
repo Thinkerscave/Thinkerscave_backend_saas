@@ -1,5 +1,7 @@
 package com.thinkerscave.common.filter;
 
+import com.thinkerscave.common.multitenancy.TenantContext;
+import com.thinkerscave.common.security.UserInfoUserDetails;
 import com.thinkerscave.common.usrm.service.JwtService;
 import com.thinkerscave.common.usrm.service.impl.UserUserInfoDetailsService;
 
@@ -16,6 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Objects;
 
 /**
  * Filter to handle JWT authentication.
@@ -58,8 +61,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         // If a username is found in the token and no authentication is currently set in the security context
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
             // Load user details from the username
-            UserDetails userDetails = userInfoDetailsService.loadUserByUsername(username);
+            UserInfoUserDetails userDetails = userInfoDetailsService.loadUserByUsername(username);
 
+            if(Objects.nonNull(userDetails) && Objects.nonNull(userDetails.getSchemaName())){
+                TenantContext.setCurrentTenant(userDetails.getSchemaName());
+            }
             // Validate the token and check if it is associated with the user details
             if (jwtService.validateToken(token, userDetails)) {
                 // Create an authentication token for the user with their authorities
