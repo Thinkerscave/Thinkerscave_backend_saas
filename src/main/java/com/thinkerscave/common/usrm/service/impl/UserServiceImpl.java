@@ -1,7 +1,9 @@
 package com.thinkerscave.common.usrm.service.impl;
 
+import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.menum.domain.Role;
 import com.thinkerscave.common.menum.repository.RoleRepository;
+import com.thinkerscave.common.orgm.service.serviceImp.OrganizationServiceImpl;
 import com.thinkerscave.common.security.UserInfoUserDetails;
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.dto.UserResponseDTO;
@@ -9,18 +11,29 @@ import com.thinkerscave.common.usrm.repository.PasswordResetTokenRepository;
 import com.thinkerscave.common.usrm.repository.UserRepository;
 import com.thinkerscave.common.usrm.service.UserService;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService {
+
+    private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
+
+    private final ExecutorService executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
     @Autowired
     private UserRepository userRepository;
@@ -33,6 +46,61 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    private User cloneUser(User source) {
+
+        User target = new User();
+        target.setUserCode(source.getUserCode());
+        target.setFirstName(source.getFirstName());
+        target.setMiddleName(source.getMiddleName());
+        target.setLastName(source.getLastName());
+        target.setEmail(source.getEmail());
+        target.setMobileNumber(source.getMobileNumber());
+        target.setUserName(source.getUserName());
+        target.setPassword(source.getPassword());
+        target.setAddress(source.getAddress());
+        target.setCity(source.getCity());
+        target.setState(source.getState());
+        target.setIsBlocked(source.getIsBlocked());
+        target.setIs2faEnabled(source.getIs2faEnabled());
+        target.setMaxDeviceAllow(source.getMaxDeviceAllow());
+        target.setAttempts(source.getAttempts());
+        target.setLockDateTime(source.getLockDateTime());
+        target.setSecretOperation(source.getSecretOperation());
+        target.setRemarks(source.getRemarks());
+        target.setSchemaName(source.getSchemaName());
+        target.setIsFirstTimeLogin(source.getIsFirstTimeLogin());
+        // =====================
+        // Roles (IMPORTANT)
+        // =====================
+        // Reuse attached Role entities (roles SHOULD come from public schema)
+        target.setRoles(new ArrayList<>(source.getRoles()));
+
+        return target;
+    }
+
+    public List<Role> attachRolesPublicOnly(List<Role> roles) {
+
+        try {
+            // 🔐 Force PUBLIC schema for roles
+            TenantContext.setTenant("public");
+
+            return roles.stream()
+                    .map(role ->
+                            roleRepository.findByRoleCode(role.getRoleCode())
+                                    .orElseThrow(() ->
+                                            new IllegalStateException(
+                                                    "Role not found in public schema: " + role.getRoleCode()
+                                            )
+                                    )
+                    )
+                    .collect(Collectors.toList());
+
+        } finally {
+            TenantContext.clear();
+        }
+    }
+
 
     /**
      * Registers a new user with encrypted password.
@@ -51,11 +119,54 @@ public class UserServiceImpl implements UserService {
                 return roleRepository.save(role);
             });
         }).collect(Collectors.toList());
-
         user.setRoles(attachedRoles);
+
+        if (!"public".equalsIgnoreCase(user.getSchemaName())) {
+            saveUserInSchemaAsync(user, user.getSchemaName());
+        }
+
+
 
         return userRepository.save(user);
     }
+
+    public void saveUserInSchemaAsync(User user, String schema) {
+
+        logger.info("⏳ [SCHEMA-SAVE] Async user save initiated | schema={}", schema);
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                // 1️⃣ Set tenant context
+                TenantContext.setTenant(schema);
+                logger.info("🔁 [TENANT-CONTEXT] Tenant context set | schema={}", schema);
+
+                // 2️⃣ Clone user (IMPORTANT)
+                User clonedUser = cloneUser(user);
+
+                // 3️⃣ Save user in the given schema
+                userRepository.save(clonedUser);
+
+                logger.info("✅ [SCHEMA-SAVE] User saved successfully | schema={} | username={}",
+                        schema, clonedUser.getUserName());
+
+            } catch (Exception ex) {
+                // Async failure should not crash main flow
+                logger.error("❌ [SCHEMA-SAVE] Failed to save user | schema={}", schema, ex);
+
+            } finally {
+                // 4️⃣ Clear tenant context (MANDATORY)
+                TenantContext.clear();
+                logger.info("🧹 [TENANT-CONTEXT] Tenant context cleared | schema={}", schema);
+            }
+
+        }, executorService).exceptionally(ex -> {
+            logger.error("❌ [ASYNC-EXECUTOR] Unexpected async failure | schema={}", schema, ex);
+            return null;
+        });
+    }
+
+
+
 
     /**
      * Returns all users in the system as full entities (if needed internally).
