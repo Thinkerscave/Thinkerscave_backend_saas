@@ -52,5 +52,5 @@ mvn spring-boot:run
 Once the application is running, go to:
 
 ```
-http://localhost:8080/swagger-ui.html
+http://localhost:8181/swagger-ui.html
 ```
