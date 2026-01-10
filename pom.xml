@@ -63,19 +63,19 @@
             <artifactId>spring-boot-starter-log4j2</artifactId>
         </dependency>
 
-<!--         Hibernate Core (6.x required for MultiTenancy SCHEMA support)-->
-        <dependency>
-            <groupId>org.hibernate.orm</groupId>
-            <artifactId>hibernate-core</artifactId>
-            <version>6.6.15.Final</version>
-        </dependency>
+        <!-- Hibernate Core (6.x required for MultiTenancy SCHEMA support) -->
+<!--        <dependency>-->
+<!--            <groupId>org.hibernate.orm</groupId>-->
+<!--            <artifactId>hibernate-core</artifactId>-->
+<!--            <version>6.6.15.Final</version>-->
+<!--        </dependency>-->
 
-<!--         Optional Hibernate tools-->
-        <dependency>
-            <groupId>org.hibernate.tool</groupId>
-            <artifactId>hibernate-tools-orm</artifactId>
-            <version>6.4.4.Final</version>
-        </dependency>
+        <!-- Optional Hibernate tools -->
+<!--        <dependency>-->
+<!--            <groupId>org.hibernate.tool</groupId>-->
+<!--            <artifactId>hibernate-tools-orm</artifactId>-->
+<!--            <version>6.4.4.Final</version>-->
+<!--        </dependency>-->
 
         <!-- JWT -->
         <dependency>
