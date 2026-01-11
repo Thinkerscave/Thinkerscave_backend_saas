@@ -1,6 +1,5 @@
 package com.thinkerscave.common.multitenancy;
 
-import com.thinkerscave.common.config.TenantContext;
 import lombok.extern.log4j.Log4j2;
 import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
 
@@ -31,7 +30,7 @@ import java.util.Objects;
     }
 
     private String determineCurrentUserOrTenant() {
-        String currentTenant = TenantContext.getTenant();
+        String currentTenant = TenantContext.getCurrentTenant();
         log.info("CurrentTenant#########:-- {}", currentTenant);
         if (Objects.nonNull(currentTenant)){
             return currentTenant;

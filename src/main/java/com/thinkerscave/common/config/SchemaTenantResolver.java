@@ -1,5 +1,6 @@
 package com.thinkerscave.common.config;
 
+import com.thinkerscave.common.multitenancy.TenantContext;
 import org.hibernate.context.spi.CurrentTenantIdentifierResolver;
 import org.springframework.stereotype.Component;
 
@@ -18,7 +19,7 @@ public class SchemaTenantResolver implements CurrentTenantIdentifierResolver {
 
     @Override
     public String resolveCurrentTenantIdentifier() {
-        String tenant = TenantContext.getTenant();
+        String tenant = TenantContext.getCurrentTenant();
         String resolvedTenant = (tenant != null && !tenant.isBlank()) ? tenant : DEFAULT_TENANT;
 //        System.out.println("Resolving tenant (organisation): " + resolvedTenant);
         return resolvedTenant;
