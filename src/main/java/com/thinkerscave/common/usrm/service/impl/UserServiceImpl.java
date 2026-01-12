@@ -1,9 +1,8 @@
 package com.thinkerscave.common.usrm.service.impl;
 
-import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.menum.domain.Role;
 import com.thinkerscave.common.menum.repository.RoleRepository;
-import com.thinkerscave.common.orgm.service.serviceImp.OrganizationServiceImpl;
+import com.thinkerscave.common.multitenancy.TenantContext;
 import com.thinkerscave.common.security.UserInfoUserDetails;
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.dto.UserResponseDTO;
@@ -17,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
@@ -83,7 +81,7 @@ public class UserServiceImpl implements UserService {
 
         try {
             // 🔐 Force PUBLIC schema for roles
-            TenantContext.setTenant("public");
+            TenantContext.setCurrentTenant("public");
 
             return roles.stream()
                     .map(role ->
@@ -137,7 +135,7 @@ public class UserServiceImpl implements UserService {
         CompletableFuture.runAsync(() -> {
             try {
                 // 1️⃣ Set tenant context
-                TenantContext.setTenant(schema);
+                TenantContext.setCurrentTenant(schema);
                 logger.info("🔁 [TENANT-CONTEXT] Tenant context set | schema={}", schema);
 
                 // 2️⃣ Clone user (IMPORTANT)
