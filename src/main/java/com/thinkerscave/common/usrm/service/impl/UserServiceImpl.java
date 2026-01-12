@@ -72,7 +72,7 @@ public class UserServiceImpl implements UserService {
         // Roles (IMPORTANT)
         // =====================
         // Reuse attached Role entities (roles SHOULD come from public schema)
-        target.setRoles(new ArrayList<>(source.getRoles()));
+
 
         return target;
     }
@@ -128,6 +128,7 @@ public class UserServiceImpl implements UserService {
         return userRepository.save(user);
     }
 
+    @Transactional
     public void saveUserInSchemaAsync(User user, String schema) {
 
         logger.info("⏳ [SCHEMA-SAVE] Async user save initiated | schema={}", schema);
@@ -138,8 +139,23 @@ public class UserServiceImpl implements UserService {
                 TenantContext.setCurrentTenant(schema);
                 logger.info("🔁 [TENANT-CONTEXT] Tenant context set | schema={}", schema);
 
+
                 // 2️⃣ Clone user (IMPORTANT)
                 User clonedUser = cloneUser(user);
+
+                List<Role> managedRoles = user.getRoles().stream()
+                        .map(r ->
+                                roleRepository.findByRoleCode(r.getRoleCode())
+                                        .orElseThrow(() ->
+                                                new IllegalStateException(
+                                                        "Role not found in schema " + schema +
+                                                                " role=" + r.getRoleCode()
+                                                )
+                                        )
+                        )
+                        .toList();
+
+                clonedUser.setRoles(managedRoles);
 
                 // 3️⃣ Save user in the given schema
                 userRepository.save(clonedUser);

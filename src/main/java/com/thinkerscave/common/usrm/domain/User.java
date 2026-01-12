@@ -91,13 +91,13 @@ public class User extends Auditable {
     @Column(name = "is_first_time_login")
     private Boolean isFirstTimeLogin = true;
 
-    @ManyToMany(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id")
     )
-    private List<Role> roles = new ArrayList<>();
+    private List<Role> roles;
 
     @Column(name = "schema_name", nullable = false)
     private String schemaName;
