@@ -18,7 +18,7 @@ import java.util.List;
 public class ApplicationAdmission extends Auditable {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+//    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "application_id", unique = true)
     private String applicationId;
 
