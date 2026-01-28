@@ -20,5 +20,8 @@ public class InquiryResponse {
     private String comments;
     private String assignedCounselor;
     private String status;
+    private java.time.LocalDateTime lastFollowUpDate;
+    private String lastFollowUpType;
+    private java.time.LocalDate nextFollowUpDate;
 }
 

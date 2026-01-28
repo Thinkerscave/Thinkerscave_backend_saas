@@ -17,6 +17,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import com.thinkerscave.common.admission.enums.InquiryStatus;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 
 import com.thinkerscave.common.auditing.Auditable;
 
@@ -82,8 +86,9 @@ public class Inquiry extends Auditable {
     @Column(name = "assigned_counselor_id")
     private Long assignedCounselorId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
-    private String status; // NEW, FOLLOW_UP, ADMITTED, LOST
+    private InquiryStatus status; // NEW, CONTACTED, FOLLOW_UP_REQUIRED, READY_FOR_ADMISSION, CONVERTED, LOST, CLOSED
 
     // --------------------
     // Soft Delete
@@ -92,6 +97,16 @@ public class Inquiry extends Auditable {
     @Column(name = "is_deleted")
     private Boolean isDeleted = false;
 
+    @Column(name = "last_follow_up_date")
+    private LocalDateTime lastFollowUpDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "last_follow_up_type")
+    private com.thinkerscave.common.admission.enums.FollowUpType lastFollowUpType;
+
+    @Column(name = "next_follow_up_date")
+    private LocalDate nextFollowUpDate;
+
     // --------------------
     // Lifecycle Hooks
     // --------------------
@@ -99,7 +114,7 @@ public class Inquiry extends Auditable {
     @PrePersist
     protected void onCreate() {
         if (this.status == null) {
-            this.status = "NEW";
+            this.status = InquiryStatus.NEW;
         }
         if (this.isDeleted == null) {
             this.isDeleted = false;
