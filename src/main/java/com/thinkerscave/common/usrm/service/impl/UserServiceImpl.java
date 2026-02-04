@@ -3,6 +3,7 @@ package com.thinkerscave.common.usrm.service.impl;
 import com.thinkerscave.common.menum.domain.Role;
 import com.thinkerscave.common.menum.repository.RoleRepository;
 import com.thinkerscave.common.multitenancy.TenantContext;
+import com.thinkerscave.common.orgm.service.SchemaInitializer;
 import com.thinkerscave.common.security.UserInfoUserDetails;
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.dto.UserResponseDTO;
@@ -44,6 +45,9 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Autowired
+    private SchemaInitializer schemaInitializer;
 
     private User cloneUser(User source) {
 
@@ -107,25 +111,38 @@ public class UserServiceImpl implements UserService {
      * @return the saved user entity
      */
     public User registerUser(User user) {
-    	// Set encoded password
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
+        String schema = user.getSchemaName();
+        if (schema == null || schema.isBlank()) {
+            schema = "public";
+        }
+        user.setSchemaName(schema);
 
-        List<Role> attachedRoles = user.getRoles().stream().map(role -> {
-            // Try to fetch role from DB by roleCode
-            return roleRepository.findByRoleCode(role.getRoleCode()).orElseGet(() -> {
-                // If role doesn't exist, save it
-                return roleRepository.save(role);
-            });
-        }).collect(Collectors.toList());
-        user.setRoles(attachedRoles);
-
-        if (!"public".equalsIgnoreCase(user.getSchemaName())) {
-            saveUserInSchemaAsync(user, user.getSchemaName());
+        if (!"public".equalsIgnoreCase(schema)) {
+            try {
+                schemaInitializer.createAndInitializeSchema(schema);
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to initialize schema: " + schema, e);
+            }
         }
 
+        TenantContext.setCurrentTenant(schema);
+        try {
+            // Set encoded password
+            user.setPassword(passwordEncoder.encode(user.getPassword()));
 
+            List<Role> attachedRoles = user.getRoles().stream().map(role -> {
+                // Try to fetch role from DB by roleCode
+                return roleRepository.findByRoleCode(role.getRoleCode()).orElseGet(() -> {
+                    // If role doesn't exist, save it
+                    return roleRepository.save(role);
+                });
+            }).collect(Collectors.toList());
+            user.setRoles(attachedRoles);
 
-        return userRepository.save(user);
+            return userRepository.save(user);
+        } finally {
+            TenantContext.clear();
+        }
     }
 
     @Transactional
@@ -258,22 +275,22 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toList());
 
         return new UserResponseDTO(
-        	    user.getId(),
-        	    user.getUserCode(),
-        	    user.getUserName(),
-        	    user.getEmail(),
-        	    user.getFirstName(),
-        	    user.getMiddleName(),
-        	    user.getLastName(),
-        	    user.getAddress(),
-        	    user.getCity(),
-        	    user.getState(),
-        	    user.getMobileNumber(),
-        	    user.getIsBlocked(),
-        	    user.getMaxDeviceAllow(),
-        	    user.getIsFirstTimeLogin(),
-        	    roleNames
-        	);
+                user.getId(),
+                user.getUserCode(),
+                user.getUserName(),
+                user.getEmail(),
+                user.getFirstName(),
+                user.getMiddleName(),
+                user.getLastName(),
+                user.getAddress(),
+                user.getCity(),
+                user.getState(),
+                user.getMobileNumber(),
+                user.getIsBlocked(),
+                user.getMaxDeviceAllow(),
+                user.getIsFirstTimeLogin(),
+                roleNames
+        );
 
     }
 
@@ -302,7 +319,7 @@ public class UserServiceImpl implements UserService {
                         .build()
                 );
     }
-    
+
     public Long getCurrentUserRoleId(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new IllegalStateException("No authenticated user found");

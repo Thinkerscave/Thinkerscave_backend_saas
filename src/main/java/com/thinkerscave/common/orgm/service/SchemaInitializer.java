@@ -66,17 +66,24 @@ public class SchemaInitializer {
     }
 
     public void createAndInitializeSchema(String schemaName) throws ValidationException, IOException {
-        if (!schemaExists(schemaName)) {
+        boolean exists = schemaExists(schemaName);
+        if (!exists) {
             createSchema(schemaName);
-            DataSource newDatasource = createDataSource(dataSourceUrl + "?currentSchema=" + schemaName, dataSourceUsername, dataSourcePassword, dataSourceDriver);
-            configureDataSource(schemaName,newDatasource);
-            try {
-                generateTablesFromSchemaSql(schemaName, newDatasource);
-            } catch (Exception e) {
-                log.error(e.getMessage());
-            }
-            //cleanUpSignUpThreadLocal();
         }
+
+        DataSource newDatasource = createDataSource(
+                dataSourceUrl + "?currentSchema=" + schemaName,
+                dataSourceUsername,
+                dataSourcePassword,
+                dataSourceDriver
+        );
+        configureDataSource(schemaName, newDatasource);
+        try {
+            generateTablesFromSchemaSql(schemaName, newDatasource);
+        } catch (Exception e) {
+            log.error(e.getMessage());
+        }
+        //cleanUpSignUpThreadLocal();
     }
 
     private void createSchema(String schemaName) throws ValidationException {
