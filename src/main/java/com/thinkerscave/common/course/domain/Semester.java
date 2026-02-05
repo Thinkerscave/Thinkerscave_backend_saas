@@ -13,7 +13,11 @@ import java.time.LocalDate;
  * Semester entity - semesters within an academic year
  */
 @Entity
-@Table(name = "semesters")
+@Table(name = "semesters", indexes = {
+        @Index(name = "idx_sem_org", columnList = "organization_id")
+})
+@org.hibernate.annotations.Filter(name = "tenantFilter", condition = "organization_id = :tenantId")
+@org.hibernate.annotations.FilterDef(name = "tenantFilter", parameters = @org.hibernate.annotations.ParamDef(name = "tenantId", type = Long.class))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -34,6 +38,10 @@ public class Semester extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "academic_year_id", nullable = false)
     private AcademicYear academicYear;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", nullable = false)
+    private com.thinkerscave.common.orgm.domain.Organisation organization;
 
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;

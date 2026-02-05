@@ -12,6 +12,9 @@ import com.thinkerscave.common.course.service.CourseSubjectService;
 import com.thinkerscave.common.exception.ResourceNotFoundException;
 import com.thinkerscave.common.orgm.domain.Organisation;
 import com.thinkerscave.common.orgm.repository.OrganizationRepository;
+import com.thinkerscave.common.course.domain.CourseSubjectMapping;
+import com.thinkerscave.common.course.dto.CourseSubjectMappingDTO;
+import com.thinkerscave.common.course.repository.CourseSubjectMappingRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -70,282 +73,354 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CourseSubjectServiceImpl implements CourseSubjectService {
 
-    /**
-     * Repository layer for Courses.
-     * Stores high-level certification data, duration, and eligibility.
-     */
-    private final CourseRepository courseRepository;
+        /**
+         * Repository layer for Courses.
+         * Stores high-level certification data, duration, and eligibility.
+         */
+        private final CourseRepository courseRepository;
 
-    /**
-     * Repository layer for Subjects.
-     * Manages modular units of study, including credits and hourly requirements.
-     */
-    private final SubjectRepository subjectRepository;
+        /**
+         * Repository layer for Subjects.
+         * Manages modular units of study, including credits and hourly requirements.
+         */
+        private final SubjectRepository subjectRepository;
 
-    /**
-     * Repository layer for Organisations.
-     * Essential for verifying that every course/subject belongs to a valid tenant.
-     */
-    private final OrganizationRepository organizationRepository;
+        /**
+         * Repository layer for Organisations.
+         * Essential for verifying that every course/subject belongs to a valid tenant.
+         */
+        private final OrganizationRepository organizationRepository;
 
-    /**
-     * 🆕 createCourse
-     * 
-     * 🛠️ Purpose: Registers a new academic course/degree program.
-     * ⏰ When it is called: During the initial onboarding of a school or when
-     * a new department is launched.
-     * 👤 Triggered by: Admin Portal (Course Management).
-     * 
-     * @param dto Object containing course metadata, duration, and fees.
-     * @return CourseResponseDTO The persisted course record with generated IDs.
-     * 
-     *         ⚠️ Side Effects: DB insertion into the 'courses' table.
-     */
-    @Override
-    @Transactional
-    public CourseResponseDTO createCourse(CourseRequestDTO dto) {
-        // Multi-tenant validation: Ensure the hosting organisation exists.
-        Organisation org = organizationRepository.findById(dto.getOrganizationId())
-                .orElseThrow(() -> new ResourceNotFoundException("Organisation not found"));
+        /**
+         * Repository layer for Course-Subject Mappings.
+         * Manages the many-to-many relationship between Courses and Subjects.
+         */
+        private final CourseSubjectMappingRepository courseSubjectMappingRepository;
 
-        Course course = new Course();
+        /**
+         * 🆕 createCourse
+         * 
+         * 🛠️ Purpose: Registers a new academic course/degree program.
+         * ⏰ When it is called: During the initial onboarding of a school or when
+         * a new department is launched.
+         * 👤 Triggered by: Admin Portal (Course Management).
+         * 
+         * @param dto Object containing course metadata, duration, and fees.
+         * @return CourseResponseDTO The persisted course record with generated IDs.
+         * 
+         *         ⚠️ Side Effects: DB insertion into the 'courses' table.
+         */
+        @Override
+        @Transactional
+        public CourseResponseDTO createCourse(CourseRequestDTO dto) {
+                // Multi-tenant validation: Ensure the hosting organisation exists.
+                Organisation org = organizationRepository.findById(dto.getOrganizationId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Organisation not found"));
 
-        // Logical check: Generate a business-friendly code if not provided manually.
-        course.setCourseCode(dto.getCourseCode() != null ? dto.getCourseCode() : generateCode("CRS"));
+                Course course = new Course();
 
-        course.setCourseName(dto.getCourseName());
-        course.setDescription(dto.getDescription());
-        course.setCategory(dto.getCategory());
-        course.setDurationYears(dto.getDurationYears());
-        course.setTotalSemesters(dto.getTotalSemesters());
-        course.setEligibilityCriteria(dto.getEligibilityCriteria());
-        course.setFees(dto.getFees());
-        course.setOrganization(org);
+                // Logical check: Generate a business-friendly code if not provided manually.
+                course.setCourseCode(dto.getCourseCode() != null ? dto.getCourseCode() : generateCode("CRS"));
 
-        // Availability Control: New courses are active by default for immediate
-        // enrollment.
-        course.setIsActive(true);
+                course.setCourseName(dto.getCourseName());
+                course.setDescription(dto.getDescription());
+                course.setCategory(dto.getCategory());
+                course.setDurationYears(dto.getDurationYears());
+                course.setTotalSemesters(dto.getTotalSemesters());
+                course.setEligibilityCriteria(dto.getEligibilityCriteria());
+                course.setFees(dto.getFees());
+                course.setOrganization(org);
 
-        Course saved = courseRepository.save(course);
-        log.info("New Course created: {} (ID: {}) for Org: {}", saved.getCourseName(), saved.getCourseId(),
-                org.getOrgName());
-        return mapToCourseDTO(saved);
-    }
+                // Availability Control: New courses are active by default for immediate
+                // enrollment.
+                course.setIsActive(true);
 
-    /**
-     * 📝 updateCourse
-     * 
-     * 🛠️ Purpose: Updates the details of an existing course (e.g., fee changes or
-     * name updates).
-     * ⏰ When it is called: When curriculum headers or administrative details
-     * change.
-     * 
-     * @param courseId The ID of the course to edit.
-     * @param dto      New metadata.
-     * @return CourseResponseDTO The updated state.
-     */
-    @Override
-    @Transactional
-    public CourseResponseDTO updateCourse(Long courseId, CourseRequestDTO dto) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+                Course saved = courseRepository.save(course);
+                log.info("New Course created: {} (ID: {}) for Org: {}", saved.getCourseName(), saved.getCourseId(),
+                                org.getOrgName());
+                return mapToCourseDTO(saved);
+        }
 
-        // Logic rationale: We update only mutable fields.
-        // Organisation and CourseCode are usually immutable after creation to
-        // maintain audit trails and reference integrity.
-        course.setCourseName(dto.getCourseName());
-        course.setDescription(dto.getDescription());
-        course.setCategory(dto.getCategory());
-        course.setDurationYears(dto.getDurationYears());
-        course.setTotalSemesters(dto.getTotalSemesters());
-        course.setEligibilityCriteria(dto.getEligibilityCriteria());
-        course.setFees(dto.getFees());
+        /**
+         * 📝 updateCourse
+         * 
+         * 🛠️ Purpose: Updates the details of an existing course (e.g., fee changes or
+         * name updates).
+         * ⏰ When it is called: When curriculum headers or administrative details
+         * change.
+         * 
+         * @param courseId The ID of the course to edit.
+         * @param dto      New metadata.
+         * @return CourseResponseDTO The updated state.
+         */
+        @Override
+        @Transactional
+        public CourseResponseDTO updateCourse(Long courseId, CourseRequestDTO dto) {
+                Course course = courseRepository.findById(courseId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
 
-        Course saved = courseRepository.save(course);
-        return mapToCourseDTO(saved);
-    }
+                // Logic rationale: We update only mutable fields.
+                // Organisation and CourseCode are usually immutable after creation to
+                // maintain audit trails and reference integrity.
+                course.setCourseName(dto.getCourseName());
+                course.setDescription(dto.getDescription());
+                course.setCategory(dto.getCategory());
+                course.setDurationYears(dto.getDurationYears());
+                course.setTotalSemesters(dto.getTotalSemesters());
+                course.setEligibilityCriteria(dto.getEligibilityCriteria());
+                course.setFees(dto.getFees());
 
-    /**
-     * 🔍 getCourse
-     * 
-     * 🛠️ Purpose: Fetches header information for a specific course.
-     * 
-     * @param courseId The ID of the course to retrieve.
-     * @return CourseResponseDTO
-     */
-    @Override
-    public CourseResponseDTO getCourse(Long courseId) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
-        return mapToCourseDTO(course);
-    }
+                Course saved = courseRepository.save(course);
+                return mapToCourseDTO(saved);
+        }
 
-    /**
-     * 🏢 getAllCoursesByOrg
-     * 
-     * 🛠️ Purpose: Lists all academic offerings for a specific tenant.
-     * 👤 Who triggers it: Prospective parents/students viewing the school's public
-     * catalogue.
-     * 
-     * @param orgId The tenant's unique ID.
-     * @return List of courses belonging to the organisation.
-     */
-    @Override
-    public List<CourseResponseDTO> getAllCoursesByOrg(Long orgId) {
-        Organisation org = organizationRepository.findById(orgId)
-                .orElseThrow(() -> new ResourceNotFoundException("Organisation not found"));
-        return courseRepository.findByOrganization(org)
-                .stream().map(this::mapToCourseDTO).collect(Collectors.toList());
-    }
+        /**
+         * 🔍 getCourse
+         * 
+         * 🛠️ Purpose: Fetches header information for a specific course.
+         * 
+         * @param courseId The ID of the course to retrieve.
+         * @return CourseResponseDTO
+         */
+        @Override
+        public CourseResponseDTO getCourse(Long courseId) {
+                Course course = courseRepository.findById(courseId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+                return mapToCourseDTO(course);
+        }
 
-    /**
-     * 🗑️ deleteCourse
-     * 
-     * 🛠️ Purpose: Retires a course from active selection.
-     * 
-     * 🔒 Strategy: Soft Delete.
-     * Why: We cannot hard-delete courses once students have been enrolled, as
-     * it would break the historical academic record of the alumni.
-     */
-    @Override
-    @Transactional
-    public void deleteCourse(Long courseId) {
-        Course course = courseRepository.findById(courseId)
-                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+        /**
+         * 🏢 getAllCoursesByOrg
+         * 
+         * 🛠️ Purpose: Lists all academic offerings for a specific tenant.
+         * 👤 Who triggers it: Prospective parents/students viewing the school's public
+         * catalogue.
+         * 
+         * @param orgId The tenant's unique ID.
+         * @return List of courses belonging to the organisation.
+         */
+        @Override
+        public List<CourseResponseDTO> getAllCoursesByOrg(Long orgId) {
+                Organisation org = organizationRepository.findById(orgId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Organisation not found"));
+                return courseRepository.findByOrganization(org)
+                                .stream().map(this::mapToCourseDTO).collect(Collectors.toList());
+        }
 
-        course.setIsActive(false);
-        courseRepository.save(course);
-        log.warn("Course ID: {} has been deactivated (soft-deleted).", courseId);
-    }
+        /**
+         * 🗑️ deleteCourse
+         * 
+         * 🛠️ Purpose: Retires a course from active selection.
+         * 
+         * 🔒 Strategy: Soft Delete.
+         * Why: We cannot hard-delete courses once students have been enrolled, as
+         * it would break the historical academic record of the alumni.
+         */
+        @Override
+        @Transactional
+        public void deleteCourse(Long courseId) {
+                Course course = courseRepository.findById(courseId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
 
-    /**
-     * 🆕 createSubject
-     * 
-     * 🛠️ Purpose: Defines a new subject/module in the system.
-     * ⏰ When it is called: When a new subject is added to the curriculum.
-     * 
-     * @param dto Details about credits, theory vs lab hours, and category.
-     * @return SubjectResponseDTO
-     */
-    @Override
-    @Transactional
-    public SubjectResponseDTO createSubject(SubjectRequestDTO dto) {
-        Organisation org = organizationRepository.findById(dto.getOrganizationId())
-                .orElseThrow(() -> new ResourceNotFoundException("Organisation not found"));
+                course.setIsActive(false);
+                courseRepository.save(course);
+                log.warn("Course ID: {} has been deactivated (soft-deleted).", courseId);
+        }
 
-        Subject subject = new Subject();
+        /**
+         * 🆕 createSubject
+         * 
+         * 🛠️ Purpose: Defines a new subject/module in the system.
+         * ⏰ When it is called: When a new subject is added to the curriculum.
+         * 
+         * @param dto Details about credits, theory vs lab hours, and category.
+         * @return SubjectResponseDTO
+         */
+        @Override
+        @Transactional
+        public SubjectResponseDTO createSubject(SubjectRequestDTO dto) {
+                Organisation org = organizationRepository.findById(dto.getOrganizationId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Organisation not found"));
 
-        // Business Rule: Use standard codes (e.g., CS101) for academic tracking.
-        subject.setSubjectCode(dto.getSubjectCode() != null ? dto.getSubjectCode() : generateCode("SUB"));
+                Subject subject = new Subject();
 
-        subject.setSubjectName(dto.getSubjectName());
-        subject.setDescription(dto.getDescription());
-        subject.setCategory(dto.getCategory());
-        subject.setCredits(dto.getCredits());
-        subject.setTheoryHours(dto.getTheoryHours());
-        subject.setLabHours(dto.getLabHours());
-        subject.setPracticalHours(dto.getPracticalHours());
-        subject.setOrganization(org);
-        subject.setIsActive(true);
+                // Business Rule: Use standard codes (e.g., CS101) for academic tracking.
+                subject.setSubjectCode(dto.getSubjectCode() != null ? dto.getSubjectCode() : generateCode("SUB"));
 
-        Subject saved = subjectRepository.save(subject);
-        return mapToSubjectDTO(saved);
-    }
+                subject.setSubjectName(dto.getSubjectName());
+                subject.setDescription(dto.getDescription());
+                subject.setCategory(dto.getCategory());
+                subject.setCredits(dto.getCredits());
+                subject.setTheoryHours(dto.getTheoryHours());
+                subject.setLabHours(dto.getLabHours());
+                subject.setPracticalHours(dto.getPracticalHours());
+                subject.setOrganization(org);
+                subject.setIsActive(true);
 
-    /**
-     * 📝 updateSubject
-     * 
-     * 🛠️ Purpose: Updates subject parameters like credits or description.
-     */
-    @Override
-    @Transactional
-    public SubjectResponseDTO updateSubject(Long subjectId, SubjectRequestDTO dto) {
-        Subject subject = subjectRepository.findById(subjectId)
-                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
+                Subject saved = subjectRepository.save(subject);
+                return mapToSubjectDTO(saved);
+        }
 
-        subject.setSubjectName(dto.getSubjectName());
-        subject.setDescription(dto.getDescription());
-        subject.setCategory(dto.getCategory());
-        subject.setCredits(dto.getCredits());
-        subject.setTheoryHours(dto.getTheoryHours());
-        subject.setLabHours(dto.getLabHours());
-        subject.setPracticalHours(dto.getPracticalHours());
+        /**
+         * 📝 updateSubject
+         * 
+         * 🛠️ Purpose: Updates subject parameters like credits or description.
+         */
+        @Override
+        @Transactional
+        public SubjectResponseDTO updateSubject(Long subjectId, SubjectRequestDTO dto) {
+                Subject subject = subjectRepository.findById(subjectId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
 
-        Subject saved = subjectRepository.save(subject);
-        return mapToSubjectDTO(saved);
-    }
+                subject.setSubjectName(dto.getSubjectName());
+                subject.setDescription(dto.getDescription());
+                subject.setCategory(dto.getCategory());
+                subject.setCredits(dto.getCredits());
+                subject.setTheoryHours(dto.getTheoryHours());
+                subject.setLabHours(dto.getLabHours());
+                subject.setPracticalHours(dto.getPracticalHours());
 
-    @Override
-    public SubjectResponseDTO getSubject(Long subjectId) {
-        Subject subject = subjectRepository.findById(subjectId)
-                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
-        return mapToSubjectDTO(subject);
-    }
+                Subject saved = subjectRepository.save(subject);
+                return mapToSubjectDTO(saved);
+        }
 
-    @Override
-    public List<SubjectResponseDTO> getAllSubjectsByOrg(Long orgId) {
-        Organisation org = organizationRepository.findById(orgId)
-                .orElseThrow(() -> new ResourceNotFoundException("Organisation not found"));
-        return subjectRepository.findByOrganization(org)
-                .stream().map(this::mapToSubjectDTO).collect(Collectors.toList());
-    }
+        @Override
+        public SubjectResponseDTO getSubject(Long subjectId) {
+                Subject subject = subjectRepository.findById(subjectId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
+                return mapToSubjectDTO(subject);
+        }
 
-    /**
-     * 🗑️ deleteSubject
-     * 
-     * 🔒 Strategy: Soft Delete.
-     * Why: Preserves data integrity for old syllabi that might still refer
-     * to this subject code.
-     */
-    @Override
-    @Transactional
-    public void deleteSubject(Long subjectId) {
-        Subject subject = subjectRepository.findById(subjectId)
-                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
-        subject.setIsActive(false);
-        subjectRepository.save(subject);
-    }
+        @Override
+        public List<SubjectResponseDTO> getAllSubjectsByOrg(Long orgId) {
+                Organisation org = organizationRepository.findById(orgId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Organisation not found"));
+                return subjectRepository.findByOrganization(org)
+                                .stream().map(this::mapToSubjectDTO).collect(Collectors.toList());
+        }
 
-    /**
-     * Helper to convert Course Entity to DTO.
-     */
-    private CourseResponseDTO mapToCourseDTO(Course course) {
-        return CourseResponseDTO.builder()
-                .courseId(course.getCourseId())
-                .courseCode(course.getCourseCode())
-                .courseName(course.getCourseName())
-                .description(course.getDescription())
-                .category(course.getCategory())
-                .durationYears(course.getDurationYears())
-                .totalSemesters(course.getTotalSemesters())
-                .eligibilityCriteria(course.getEligibilityCriteria())
-                .fees(course.getFees())
-                .isActive(course.getIsActive())
-                .build();
-    }
+        /**
+         * 🗑️ deleteSubject
+         * 
+         * 🔒 Strategy: Soft Delete.
+         * Why: Preserves data integrity for old syllabi that might still refer
+         * to this subject code.
+         */
+        @Override
+        @Transactional
+        public void deleteSubject(Long subjectId) {
+                Subject subject = subjectRepository.findById(subjectId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
+                subject.setIsActive(false);
+                subjectRepository.save(subject);
+        }
 
-    /**
-     * Helper to convert Subject Entity to DTO.
-     */
-    private SubjectResponseDTO mapToSubjectDTO(Subject subject) {
-        return SubjectResponseDTO.builder()
-                .subjectId(subject.getSubjectId())
-                .subjectCode(subject.getSubjectCode())
-                .subjectName(subject.getSubjectName())
-                .description(subject.getDescription())
-                .category(subject.getCategory())
-                .credits(subject.getCredits())
-                .theoryHours(subject.getTheoryHours())
-                .labHours(subject.getLabHours())
-                .practicalHours(subject.getPracticalHours())
-                .isActive(subject.getIsActive())
-                .build();
-    }
+        // -------------------------------------------------------------------------
+        // Course-Subject Association Logic
+        // -------------------------------------------------------------------------
 
-    /**
-     * Code Utility: Generates unique internal identifiers.
-     */
-    private String generateCode(String prefix) {
-        return prefix + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-    }
+        @Override
+        @Transactional
+        public void assignSubjectToCourse(CourseSubjectMappingDTO mappingDTO) {
+                Course course = courseRepository.findById(mappingDTO.getCourseId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+
+                Subject subject = subjectRepository.findById(mappingDTO.getSubjectId())
+                                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
+
+                // Check if mapping already exists to prevent duplicates
+                courseSubjectMappingRepository.findByCourseAndSubjectAndIsActiveTrue(course, subject)
+                                .ifPresent(m -> {
+                                        throw new IllegalArgumentException("Subject '" + subject.getSubjectName() +
+                                                        "' is already assigned to course '" + course.getCourseName()
+                                                        + "'");
+                                });
+
+                CourseSubjectMapping mapping = new CourseSubjectMapping();
+                mapping.setCourse(course);
+                mapping.setSubject(subject);
+                mapping.setSemester(mappingDTO.getSemester());
+                mapping.setIsMandatory(mappingDTO.getIsMandatory() != null ? mappingDTO.getIsMandatory() : true);
+                mapping.setDisplayOrder(mappingDTO.getDisplayOrder());
+                mapping.setIsActive(true);
+
+                courseSubjectMappingRepository.save(mapping);
+        }
+
+        @Override
+        @Transactional
+        public void removeSubjectFromCourse(Long courseId, Long subjectId) {
+                Course course = courseRepository.findById(courseId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+                Subject subject = subjectRepository.findById(subjectId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Subject not found"));
+
+                courseSubjectMappingRepository.deleteByCourseAndSubject(course, subject);
+        }
+
+        @Override
+        public List<CourseSubjectMappingDTO> getSubjectsByCourse(Long courseId) {
+                Course course = courseRepository.findById(courseId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Course not found"));
+
+                return courseSubjectMappingRepository.findByCourseAndIsActiveTrue(course).stream()
+                                .map(this::mapToMappingDTO)
+                                .collect(Collectors.toList());
+        }
+
+        private CourseSubjectMappingDTO mapToMappingDTO(CourseSubjectMapping mapping) {
+                return CourseSubjectMappingDTO.builder()
+                                .mappingId(mapping.getMappingId())
+                                .courseId(mapping.getCourse().getCourseId())
+                                .subjectId(mapping.getSubject().getSubjectId())
+                                .subjectName(mapping.getSubject().getSubjectName())
+                                .subjectCode(mapping.getSubject().getSubjectCode())
+                                .semester(mapping.getSemester())
+                                .isMandatory(mapping.getIsMandatory())
+                                .displayOrder(mapping.getDisplayOrder())
+                                .build();
+        }
+
+        /**
+         * Helper to convert Course Entity to DTO.
+         */
+        private CourseResponseDTO mapToCourseDTO(Course course) {
+                return CourseResponseDTO.builder()
+                                .courseId(course.getCourseId())
+                                .courseCode(course.getCourseCode())
+                                .courseName(course.getCourseName())
+                                .description(course.getDescription())
+                                .category(course.getCategory())
+                                .durationYears(course.getDurationYears())
+                                .totalSemesters(course.getTotalSemesters())
+                                .eligibilityCriteria(course.getEligibilityCriteria())
+                                .fees(course.getFees())
+                                .isActive(course.getIsActive())
+                                .build();
+        }
+
+        /**
+         * Helper to convert Subject Entity to DTO.
+         */
+        private SubjectResponseDTO mapToSubjectDTO(Subject subject) {
+                return SubjectResponseDTO.builder()
+                                .subjectId(subject.getSubjectId())
+                                .subjectCode(subject.getSubjectCode())
+                                .subjectName(subject.getSubjectName())
+                                .description(subject.getDescription())
+                                .category(subject.getCategory())
+                                .credits(subject.getCredits())
+                                .theoryHours(subject.getTheoryHours())
+                                .labHours(subject.getLabHours())
+                                .practicalHours(subject.getPracticalHours())
+                                .isActive(subject.getIsActive())
+                                .build();
+        }
+
+        /**
+         * Code Utility: Generates unique internal identifiers.
+         */
+        private String generateCode(String prefix) {
+                return prefix + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        }
 }

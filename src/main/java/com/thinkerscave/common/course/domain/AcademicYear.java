@@ -41,7 +41,10 @@ import java.time.LocalDate;
  * default context for the entire application.
  */
 @Entity
-@Table(name = "academic_years")
+@Table(name = "academic_years", indexes = {
+        @Index(name = "idx_year_org", columnList = "organization_id")
+})
+@org.hibernate.annotations.Filter(name = "tenantFilter", condition = "organization_id = :tenantId")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -2,6 +2,7 @@ package com.thinkerscave.common.course.controller;
 
 import com.thinkerscave.common.course.dto.CourseRequestDTO;
 import com.thinkerscave.common.course.dto.CourseResponseDTO;
+import com.thinkerscave.common.course.dto.CourseSubjectMappingDTO;
 import com.thinkerscave.common.course.service.CourseSubjectService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -121,5 +122,41 @@ public class CourseController {
     public ResponseEntity<Void> deleteCourse(@PathVariable Long courseId) {
         courseService.deleteCourse(courseId);
         return ResponseEntity.ok().build();
+    }
+
+    // -------------------------------------------------------------------------
+    // Course-Subject Association Endpoints
+    // -------------------------------------------------------------------------
+
+    @PostMapping("/{courseId}/subjects")
+    @Operation(summary = "Assign a subject to this course", description = "Links an existing subject to this course for a specific semester.")
+    public ResponseEntity<Void> assignSubject(
+            @PathVariable Long courseId,
+            @RequestBody CourseSubjectMappingDTO mappingDTO) {
+
+        // Ensure path variable integrity
+        if (mappingDTO.getCourseId() == null) {
+            mappingDTO.setCourseId(courseId);
+        } else if (!mappingDTO.getCourseId().equals(courseId)) {
+            throw new IllegalArgumentException("Course ID in path and body must match");
+        }
+
+        courseService.assignSubjectToCourse(mappingDTO);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{courseId}/subjects/{subjectId}")
+    @Operation(summary = "Remove a subject from this course", description = "Unlinks a subject from the course. Does not delete the subject entity.")
+    public ResponseEntity<Void> removeSubject(
+            @PathVariable Long courseId,
+            @PathVariable Long subjectId) {
+        courseService.removeSubjectFromCourse(courseId, subjectId);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{courseId}/subjects")
+    @Operation(summary = "List all subjects in this course", description = "Returns the curriculum structure (subjects) for this course.")
+    public ResponseEntity<List<CourseSubjectMappingDTO>> getSubjects(@PathVariable Long courseId) {
+        return ResponseEntity.ok(courseService.getSubjectsByCourse(courseId));
     }
 }

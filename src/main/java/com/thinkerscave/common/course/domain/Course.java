@@ -43,7 +43,10 @@ import java.util.List;
  * the root for all subject mappings and student enrollments.
  */
 @Entity
-@Table(name = "courses")
+@Table(name = "courses", indexes = {
+        @Index(name = "idx_course_org", columnList = "organization_id")
+})
+@org.hibernate.annotations.Filter(name = "tenantFilter", condition = "organization_id = :tenantId")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

@@ -48,7 +48,10 @@ import java.util.List;
  * - Cross-course subject reusability (Elective subjects).
  */
 @Entity
-@Table(name = "subjects")
+@Table(name = "subjects", indexes = {
+        @Index(name = "idx_subject_org", columnList = "organization_id")
+})
+@org.hibernate.annotations.Filter(name = "tenantFilter", condition = "organization_id = :tenantId")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

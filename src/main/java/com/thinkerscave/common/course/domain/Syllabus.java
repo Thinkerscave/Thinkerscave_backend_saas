@@ -3,6 +3,7 @@ package com.thinkerscave.common.course.domain;
 import com.thinkerscave.common.auditing.Auditable;
 import com.thinkerscave.common.course.enums.SyllabusStatus;
 import com.thinkerscave.common.usrm.domain.User;
+import com.thinkerscave.common.orgm.domain.Organisation;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -54,7 +55,10 @@ import java.util.List;
  * - Multi-lingual support for regional curricula.
  */
 @Entity
-@Table(name = "syllabus")
+@Table(name = "syllabus", indexes = {
+        @Index(name = "idx_syllabus_org", columnList = "organization_id")
+})
+@org.hibernate.annotations.Filter(name = "tenantFilter", condition = "organization_id = :tenantId")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -105,6 +109,10 @@ public class Syllabus extends Auditable {
      */
     @Column(columnDefinition = "TEXT")
     private String description;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id")
+    private Organisation organization;
 
     /**
      * Calculated or estimated total hours required to complete this curriculum.

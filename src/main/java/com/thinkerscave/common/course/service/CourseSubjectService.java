@@ -4,6 +4,7 @@ import com.thinkerscave.common.course.dto.CourseRequestDTO;
 import com.thinkerscave.common.course.dto.CourseResponseDTO;
 import com.thinkerscave.common.course.dto.SubjectRequestDTO;
 import com.thinkerscave.common.course.dto.SubjectResponseDTO;
+import com.thinkerscave.common.course.dto.CourseSubjectMappingDTO;
 
 import java.util.List;
 
@@ -33,4 +34,11 @@ public interface CourseSubjectService {
     List<SubjectResponseDTO> getAllSubjectsByOrg(Long orgId);
 
     void deleteSubject(Long subjectId);
+
+    // Course-Subject Association
+    void assignSubjectToCourse(CourseSubjectMappingDTO mappingDTO);
+
+    void removeSubjectFromCourse(Long courseId, Long subjectId);
+
+    List<CourseSubjectMappingDTO> getSubjectsByCourse(Long courseId);
 }

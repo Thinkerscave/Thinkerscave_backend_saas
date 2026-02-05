@@ -16,7 +16,10 @@ import lombok.NoArgsConstructor;
  * Critical for timetabling and teacher assignments
  */
 @Entity
-@Table(name = "class_subject_teacher")
+@Table(name = "class_subject_teacher", indexes = {
+        @Index(name = "idx_cst_org", columnList = "organization_id")
+})
+@org.hibernate.annotations.Filter(name = "tenantFilter", condition = "organization_id = :tenantId")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -31,6 +34,10 @@ public class ClassSubjectTeacher extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "class_id", nullable = false)
     private ClassEntity classEntity;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", nullable = false)
+    private com.thinkerscave.common.orgm.domain.Organisation organization;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "section_id")

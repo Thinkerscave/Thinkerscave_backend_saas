@@ -12,7 +12,10 @@ import lombok.NoArgsConstructor;
  * Maps which subjects belong to which course and in which semester
  */
 @Entity
-@Table(name = "course_subject_mapping")
+@Table(name = "course_subject_mapping", indexes = {
+        @Index(name = "idx_csm_org", columnList = "organization_id")
+})
+@org.hibernate.annotations.Filter(name = "tenantFilter", condition = "organization_id = :tenantId")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -31,6 +34,10 @@ public class CourseSubjectMapping extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subject_id", nullable = false)
     private Subject subject;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id", nullable = false)
+    private com.thinkerscave.common.orgm.domain.Organisation organization;
 
     @Column(name = "semester")
     private Integer semester; // Which semester this subject is taught
