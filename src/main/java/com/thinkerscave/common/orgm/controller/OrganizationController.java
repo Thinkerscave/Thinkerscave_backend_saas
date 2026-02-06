@@ -15,7 +15,8 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -27,57 +28,30 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/organizations")
 @Tag(name = "Organization Management", description = "APIs related to organization registration and management")
+@RequiredArgsConstructor
+@Slf4j
 public class OrganizationController {
 
-    @Autowired
-    private OrganizationService organizationService;
-
-    @Autowired
-    private SchemaService schemaService;
-
-//    @Autowired
-//    private SchemaInitializer schemaInitializer;
+    private final OrganizationService organizationService;
+    private final SchemaService schemaService;
 
     @PostMapping("/register")
-    @Operation(
-            summary = "Register a new organization",
-            description = "Registers a new organization and creates its corresponding schema.",
-            parameters = {
-                    @Parameter(name = "X-Tenant-ID", description = "Schema Name", required = true,
-                            example = "demo_org", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-            },
-            responses = {
-                    @ApiResponse(
-                            responseCode = "200",
-                            description = "Successfully registered organization",
-                            content = @Content(
-                                    mediaType = "application/json",
-                                    schema = @Schema(implementation = OrgResponseDTO.class),
-                                    examples = @ExampleObject(value = """
+    @Operation(summary = "Register a new organization", description = "Registers a new organization and creates its corresponding schema.", parameters = {
+            @Parameter(name = "X-Tenant-ID", description = "Schema Name", required = true, example = "demo_org", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    }, responses = {
+            @ApiResponse(responseCode = "200", description = "Successfully registered organization", content = @Content(mediaType = "application/json", schema = @Schema(implementation = OrgResponseDTO.class), examples = @ExampleObject(value = """
                         {
                           "message": "Organization registered successfully",
                           "orgCode": "demo_org",
                           "userCode": "admin_user"
                         }
-                    """)
-                            )
-                    ),
-                    @ApiResponse(responseCode = "400", description = "Schema already exists"),
-                    @ApiResponse(responseCode = "500", description = "Internal server error")
-            }
-    )
+                    """))),
+            @ApiResponse(responseCode = "400", description = "Schema already exists"),
+            @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
     public ResponseEntity<?> registerOrganization(@RequestBody OrgRequestDTO request) {
-//        String schema = TenantContext.getTenant();  // This will be tenant/schema name
-
         try {
-//            if (schemaService.schemaExists(schema)) {
-//                return ResponseEntity.badRequest().body("Schema already exists");
-//            }
-//
-//            // Create Schema and Tables
-//            schemaService.createSchema(schema);
-//            schemaInitializer.createTablesForSchema(schema);
-
+            log.info("Registering new organization: {}", request.getOrgName());
             // Register Organization
             OrgResponseDTO response = organizationService.saveOrganization(request);
             return ResponseEntity.ok(response);
@@ -92,13 +66,11 @@ public class OrganizationController {
         }
     }
 
-
-
     @PutMapping("/{id}")
     public ResponseEntity<?> updateOrganization(
             @PathVariable Long id,
-             @RequestBody OrgUpdateDTO organizationUpdateDto) {
-      System.out.println(id + " " + organizationUpdateDto);
+            @RequestBody OrgUpdateDTO organizationUpdateDto) {
+        log.debug("Updating Organization ID: {}, Data: {}", id, organizationUpdateDto);
         OrgResponseDTO response = organizationService.updateOrganization(id, organizationUpdateDto);
         return ResponseEntity.ok(response);
     }
@@ -116,12 +88,8 @@ public class OrganizationController {
         return ResponseEntity.ok(parentOrgs);
     }
 
-
-
     @GetMapping("/all")
-    @Operation(
-            summary = "Get all organizations"
-    )
+    @Operation(summary = "Get all organizations")
     public ResponseEntity<List<OrganisationListDTO>> getAllOrganizations() {
         try {
             List<OrganisationListDTO> organizations = organizationService.getAllOrgsAsDTO();
@@ -138,16 +106,10 @@ public class OrganizationController {
         return ResponseEntity.ok(resultMessage);
     }
 
-
     @PutMapping("/owner/update")
     public ResponseEntity<String> updateOwnerDetails(@RequestBody OwnerDTO dto) {
         organizationService.updateOwnerDetailsWithUser(dto);
         return ResponseEntity.ok("Owner and user details updated successfully.");
     }
-
-
-
-
-
 
 }

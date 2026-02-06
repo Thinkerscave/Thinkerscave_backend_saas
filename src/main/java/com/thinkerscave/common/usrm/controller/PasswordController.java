@@ -9,7 +9,8 @@ import com.thinkerscave.common.usrm.service.UserService;
 import com.thinkerscave.common.usrm.service.impl.EmailService;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,58 +22,61 @@ import java.util.Optional;
 @RestController
 @RequestMapping("/api/password")
 @Tag(name = "Password", description = "Endpoints related to password management (reset, update)")
+@RequiredArgsConstructor
+@Slf4j
 public class PasswordController {
-    @Autowired
-    private UserService userService;
 
-    @Autowired
-    private PasswordResetTokenService passwordResetTokenService;
-
-
-    @Autowired
-    private EmailService emailService;
+    private final UserService userService;
+    private final PasswordResetTokenService passwordResetTokenService;
+    private final EmailService emailService;
 
     @Value("${server.port}")
     private String serverPort;
 
-/*
-    @PostMapping("/forgot")
-    public ResponseEntity<String> forgotPassword(@RequestParam("email") String email) {
-        Optional<User> userOptional = userService.findByEmail(email);
-        if (!userOptional.isPresent()) {
-            return ResponseEntity.badRequest().body("User with this email does not exist.");
-        }
-
-        User user = userOptional.get();
-        String token = passwordResetTokenService.createToken(user).getToken();
-
-//        String resetUrl = "http://localhost:" + serverPort + "/api/password/reset?token=" + token;
-        String resetUrl = "http://localhost:4200/reset-password?token=" + token;
-        emailService.sendSimpleMessage(
-                user.getEmail(),
-                "Password Reset Request",
-                "Click the link to reset your password: " + resetUrl
-        );
-
-        return ResponseEntity.ok("Password reset link sent to your email.");
-
-    }
-
-    @PostMapping("/reset")
-    public ResponseEntity<String> resetPassword(@RequestParam("token") String token,
-                                                @RequestParam("password") String password) {
-        Optional<PasswordResetToken> tokenOptional = passwordResetTokenService.validateToken(token);
-        if (!tokenOptional.isPresent()) {
-            return ResponseEntity.badRequest().body("Invalid or expired token.");
-        }
-
-        User user = tokenOptional.get().getUser();
-        userService.updatePassword(user, password);
-
-        return ResponseEntity.ok("Password reset successful.");
-    }
-
- */
+    /*
+     * @PostMapping("/forgot")
+     * public ResponseEntity<String> forgotPassword(@RequestParam("email") String
+     * email) {
+     * Optional<User> userOptional = userService.findByEmail(email);
+     * if (!userOptional.isPresent()) {
+     * return
+     * ResponseEntity.badRequest().body("User with this email does not exist.");
+     * }
+     * 
+     * User user = userOptional.get();
+     * String token = passwordResetTokenService.createToken(user).getToken();
+     * 
+     * // String resetUrl = "http://localhost:" + serverPort +
+     * "/api/password/reset?token=" + token;
+     * String resetUrl = "http://localhost:4200/reset-password?token=" + token;
+     * emailService.sendSimpleMessage(
+     * user.getEmail(),
+     * "Password Reset Request",
+     * "Click the link to reset your password: " + resetUrl
+     * );
+     * 
+     * return ResponseEntity.ok("Password reset link sent to your email.");
+     * 
+     * }
+     * 
+     * @PostMapping("/reset")
+     * public ResponseEntity<String> resetPassword(@RequestParam("token") String
+     * token,
+     * 
+     * @RequestParam("password") String password) {
+     * Optional<PasswordResetToken> tokenOptional =
+     * passwordResetTokenService.validateToken(token);
+     * if (!tokenOptional.isPresent()) {
+     * return ResponseEntity.badRequest().body("Invalid or expired token.");
+     * }
+     * 
+     * User user = tokenOptional.get().getUser();
+     * userService.updatePassword(user, password);
+     * 
+     * return ResponseEntity.ok("Password reset successful.");
+     * }
+     * 
+     */
     /**
      * Step 1: User provides their email to receive an OTP.
      */
@@ -87,8 +91,6 @@ public class PasswordController {
 
         return ResponseEntity.ok("If an account with that email exists, an OTP has been sent.");
     }
-
-
 
     @PostMapping("/verify-otp")
     public ResponseEntity<?> verifyOtp(@RequestParam("email") String email, @RequestParam("otp") String otp) {

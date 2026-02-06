@@ -1,0 +1,443 @@
+{
+  "info": {
+    "name": "ThinkersCave Multi-Tenant API",
+    "description": "Complete API collection for testing multi-tenant login flow with Mumbai and Delhi schools",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8181",
+      "type": "string"
+    },
+    {
+      "key": "mumbai_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "delhi_token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Tenant Management",
+      "item": [
+        {
+          "name": "Create Mumbai School Schema",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tenant/create/mumbai_school",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tenant", "create", "mumbai_school"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Delhi School Schema",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tenant/create/delhi_school",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tenant", "create", "delhi_school"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Seed Mumbai Admin User",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tenant/seed-user/mumbai_school?username=mumbai_admin&password=Mumbai@123",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tenant", "seed-user", "mumbai_school"],
+              "query": [
+                {
+                  "key": "username",
+                  "value": "mumbai_admin"
+                },
+                {
+                  "key": "password",
+                  "value": "Mumbai@123"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Seed Delhi Admin User",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tenant/seed-user/delhi_school?username=delhi_admin&password=Delhi@123",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tenant", "seed-user", "delhi_school"],
+              "query": [
+                {
+                  "key": "username",
+                  "value": "delhi_admin"
+                },
+                {
+                  "key": "password",
+                  "value": "Delhi@123"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List All Schemas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/tenant/schemas",
+              "host": ["{{base_url}}"],
+              "path": ["api", "tenant", "schemas"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Mumbai School - Authentication",
+      "item": [
+        {
+          "name": "Login Mumbai Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('mumbai_token', jsonData.accessToken);",
+                  "    console.log('Mumbai token saved:', jsonData.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "mumbai_school"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"mumbai_admin\",\n  \"password\": \"Mumbai@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Mumbai Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mumbai_token}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "mumbai_school"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/currentUserInfo",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "currentUserInfo"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register Mumbai Teacher",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mumbai_token}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "mumbai_school"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"teacher_priya\",\n  \"password\": \"Teacher@123\",\n  \"email\": \"priya@mumbai.school.com\",\n  \"firstName\": \"Priya\",\n  \"lastName\": \"Sharma\",\n  \"mobileNumber\": 9876543210,\n  \"userCode\": \"TCH_MUM_001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List Mumbai Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mumbai_token}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "mumbai_school"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/list",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "list"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Delhi School - Authentication",
+      "item": [
+        {
+          "name": "Login Delhi Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('delhi_token', jsonData.accessToken);",
+                  "    console.log('Delhi token saved:', jsonData.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "delhi_school"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"delhi_admin\",\n  \"password\": \"Delhi@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Delhi Current User",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{delhi_token}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "delhi_school"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/currentUserInfo",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "currentUserInfo"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Register Delhi Teacher",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{delhi_token}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "delhi_school"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"teacher_rahul\",\n  \"password\": \"Teacher@123\",\n  \"email\": \"rahul@delhi.school.com\",\n  \"firstName\": \"Rahul\",\n  \"lastName\": \"Verma\",\n  \"mobileNumber\": 9876543211,\n  \"userCode\": \"TCH_DEL_001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "register"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Organization Management",
+      "item": [
+        {
+          "name": "Register Mumbai Organization",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "mumbai_school"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orgName\": \"Mumbai International School\",\n  \"orgCode\": \"MIS2024\",\n  \"address\": \"123 Marine Drive\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\",\n  \"country\": \"India\",\n  \"pincode\": \"400001\",\n  \"contactNumber\": \"022-12345678\",\n  \"email\": \"info@mumbai-school.com\",\n  \"website\": \"https://mumbai-school.com\",\n  \"isGroup\": false,\n  \"parentOrgId\": null,\n  \"ownerFirstName\": \"Rajesh\",\n  \"ownerLastName\": \"Kumar\",\n  \"ownerEmail\": \"rajesh@mumbai-school.com\",\n  \"ownerMobile\": \"9876543210\",\n  \"ownerUsername\": \"rajesh_kumar\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/organizations/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "organizations", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Mumbai Organizations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{mumbai_token}}"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "mumbai_school"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/organizations/all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "organizations", "all"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Data Isolation Tests",
+      "item": [
+        {
+          "name": "❌ Try Mumbai Login with Delhi Tenant (Should Fail)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "delhi_school",
+                "description": "Wrong tenant!"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"mumbai_admin\",\n  \"password\": \"Mumbai@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Try Delhi Token with Mumbai Tenant (Should Fail)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{delhi_token}}",
+                "description": "Delhi token"
+              },
+              {
+                "key": "X-Tenant-ID",
+                "value": "mumbai_school",
+                "description": "Mumbai tenant"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/currentUserInfo",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "currentUserInfo"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Entity
 @Data
-@Table(name = "class" ,schema = "public")
+@Table(name = "class")
 public class ClassEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -14,4 +14,7 @@ public class ClassEntity {
 
     @Column(name = "class_name", nullable = false)
     private String className;
+
+    @Column(name = "organization_id")
+    private Long organizationId;
 }

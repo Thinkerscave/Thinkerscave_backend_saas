@@ -110,7 +110,28 @@ public class OrganizationServiceImpl implements OrganizationService {
         // }
 
         // Step 1: Find an existing user or create a new one.
-        User savedUser = findOrCreateUser(request);
+        // User savedUser = findOrCreateUser(request);
+
+        String initialPassword = null;
+        User savedUser = userRepository.findByEmail(request.getOwnerEmail()).orElse(null);
+
+        if (savedUser == null) {
+            logger.info("👤 [User] No existing user found. Creating a new user.");
+            User newUser = new User();
+            newUser.setFirstName(request.getOwnerName());
+            newUser.setLastName("");
+            newUser.setEmail(request.getOwnerEmail());
+            newUser.setMobileNumber(Long.valueOf(request.getOwnerMobile()));
+            newUser.setUserName(generateUniqueUserName(request.getOwnerName()));
+
+            // --- SECURITY FIX: Hash the password before saving ---
+            String rawPassword = generateRandomPassword();
+            initialPassword = rawPassword; // Capture for response
+            newUser.setPassword(passwordEncoder.encode(rawPassword));
+
+            newUser.setUserCode("USER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+            savedUser = userRepository.save(newUser);
+        }
 
         // Step 2: Create the new Organisation, handling the parent relationship.
         Organisation savedOrg = createOrganisation(request, savedUser);
@@ -118,14 +139,11 @@ public class OrganizationServiceImpl implements OrganizationService {
         // Step 3: Create the OwnerDetails to link the User and Organisation.
         createOwnerDetails(request, savedUser, savedOrg);
 
-        // TODO: Consider sending a welcome email to the user with their generated
-        // username
-        // and instructions to use the "Forgot Password" feature to set their password.
-
         return new OrgResponseDTO(
                 "Organization successfully registered under tenant: ",
                 savedOrg.getOrgCode(),
-                savedUser.getUserCode());
+                savedUser.getUserCode(),
+                initialPassword);
     }
 
     /**
@@ -239,7 +257,8 @@ public class OrganizationServiceImpl implements OrganizationService {
         return new OrgResponseDTO(
                 "Organization successfully updated.",
                 org.getOrgCode(),
-                user.getUserCode());
+                user.getUserCode(),
+                null); // No password change on update
     }
 
     /**
@@ -311,33 +330,6 @@ public class OrganizationServiceImpl implements OrganizationService {
         // Save updates
         userRepository.save(user);
         ownerDetailsRepository.save(owner);
-    }
-
-    /**
-     * Finds a user by email. If the user doesn't exist, creates a new one.
-     */
-    private User findOrCreateUser(OrgRequestDTO request) {
-        logger.info("👤 [User] Checking for existing user with email: {}", request.getOwnerEmail());
-
-        return userRepository.findByEmail(request.getOwnerEmail())
-                .orElseGet(() -> {
-                    logger.info("👤 [User] No existing user found. Creating a new user.");
-                    User newUser = new User();
-                    newUser.setFirstName(request.getOwnerName()); // Assume ownerName is the full name for simplicity
-                    newUser.setLastName(""); // Can be enhanced to split name
-                    newUser.setEmail(request.getOwnerEmail());
-                    newUser.setMobileNumber(Long.valueOf(request.getOwnerMobile()));
-                    newUser.setUserName(generateUniqueUserName(request.getOwnerName()));
-
-                    // --- SECURITY FIX: Hash the password before saving ---
-                    String rawPassword = generateRandomPassword();
-                    newUser.setPassword(passwordEncoder.encode(rawPassword));
-
-                    newUser.setUserCode("USER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-                    // Set default roles, active status, etc. here if needed
-
-                    return userRepository.save(newUser);
-                });
     }
 
     /**

@@ -62,7 +62,9 @@ public class AcademicStructureController {
      * @return ResponseEntity with the created AcademicYear.
      */
     @PostMapping("/years")
-    @Operation(summary = "Initialize a new academic year", description = "Registers a new calendar cycle for the institution. Used during year-end preparation.")
+    @Operation(summary = "Initialize a new academic year", description = "Registers a new calendar cycle for the institution. Used during year-end preparation.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<AcademicYear> createAcademicYear(
             @RequestParam Long orgId,
             @RequestParam String yearCode,
@@ -79,7 +81,9 @@ public class AcademicStructureController {
      * intakes.
      */
     @GetMapping("/years/{orgId}")
-    @Operation(summary = "Fetch institutional calendar history", description = "Lists all registered academic years for a specific organization.")
+    @Operation(summary = "Fetch institutional calendar history", description = "Lists all registered academic years for a specific organization.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<List<AcademicYear>> getAcademicYears(@PathVariable Long orgId) {
         return ResponseEntity.ok(structureService.getAcademicYears(orgId));
     }
@@ -92,7 +96,9 @@ public class AcademicStructureController {
      * user's view to current data (Timetables, Syllabus).
      */
     @GetMapping("/years/{orgId}/current")
-    @Operation(summary = "Identify currently active session", description = "Returns the single academic year marked as 'Current' for the organization.")
+    @Operation(summary = "Identify currently active session", description = "Returns the single academic year marked as 'Current' for the organization.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<AcademicYear> getCurrentYear(@PathVariable Long orgId) {
         return ResponseEntity.ok(structureService.getCurrentAcademicYear(orgId));
     }
@@ -105,7 +111,9 @@ public class AcademicStructureController {
      * the session transition phase.
      */
     @PostMapping("/years/{orgId}/current/{yearId}")
-    @Operation(summary = "Switch the active academic session", description = "Updates the organization's state to treat the specified year as the primary active context.")
+    @Operation(summary = "Switch the active academic session", description = "Updates the organization's state to treat the specified year as the primary active context.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<Void> setCurrentYear(@PathVariable Long orgId, @PathVariable Long yearId) {
         structureService.setCurrentAcademicYear(orgId, yearId);
         return ResponseEntity.ok().build();
@@ -119,7 +127,9 @@ public class AcademicStructureController {
      * single new 'Section C' to 'Grade 10').
      */
     @PostMapping("/containers")
-    @Operation(summary = "Add a new structural node", description = "Creates an Academic Container (Class, Section, Branch, etc.). Supports hierarchy via parentContainerId.")
+    @Operation(summary = "Add a new structural node", description = "Creates an Academic Container (Class, Section, Branch, etc.). Supports hierarchy via parentContainerId.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<AcademicContainerDTO> createContainer(@RequestBody AcademicContainerDTO dto) {
         return ResponseEntity.ok(structureService.createContainer(dto));
     }
@@ -130,7 +140,9 @@ public class AcademicStructureController {
      * 🛠️ Purpose: Updates technical parameters of a container (e.g., capacity).
      */
     @PutMapping("/containers/{containerId}")
-    @Operation(summary = "Update structural node parameters", description = "Allows modification of container name, capacity, and display order.")
+    @Operation(summary = "Update structural node parameters", description = "Allows modification of container name, capacity, and display order.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<AcademicContainerDTO> updateContainer(@PathVariable Long containerId,
             @RequestBody AcademicContainerDTO dto) {
         return ResponseEntity.ok(structureService.updateContainer(containerId, dto));
@@ -142,7 +154,9 @@ public class AcademicStructureController {
      * 🛠️ Purpose: Fetches data for a specific class or section.
      */
     @GetMapping("/containers/{containerId}")
-    @Operation(summary = "Fetch container profile", description = "Returns the full descriptive profile of a specific structural node.")
+    @Operation(summary = "Fetch container profile", description = "Returns the full descriptive profile of a specific structural node.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<AcademicContainerDTO> getContainer(@PathVariable Long containerId) {
         return ResponseEntity.ok(structureService.getContainer(containerId));
     }
@@ -155,7 +169,9 @@ public class AcademicStructureController {
      * list of all 'Grades').
      */
     @GetMapping("/containers/org/{orgId}/year/{yearId}")
-    @Operation(summary = "List root structural nodes", description = "Fetches all top-level containers (where parent is null) for an organization's specific year.")
+    @Operation(summary = "List root structural nodes", description = "Fetches all top-level containers (where parent is null) for an organization's specific year.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<List<AcademicContainerDTO>> getTopLevelContainers(
             @PathVariable Long orgId,
             @PathVariable Long yearId) {
@@ -169,7 +185,9 @@ public class AcademicStructureController {
      * 🏛️ Business Rationale: Used when a user clicks a Grade to see its Sections.
      */
     @GetMapping("/containers/{parentId}/children")
-    @Operation(summary = "Drill-down into sub-containers", description = "Returns all immediate child nodes of the provided parent container.")
+    @Operation(summary = "Drill-down into sub-containers", description = "Returns all immediate child nodes of the provided parent container.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<List<AcademicContainerDTO>> getChildContainers(@PathVariable Long parentId) {
         return ResponseEntity.ok(structureService.getChildContainers(parentId));
     }
@@ -182,7 +200,9 @@ public class AcademicStructureController {
      * sections via a single API call.
      */
     @PostMapping("/generate-school")
-    @Operation(summary = "Batch-generate K-12 school structure", description = "Automates the creation of a standard school hierarchy (Classes 1-10 with Section A).")
+    @Operation(summary = "Batch-generate K-12 school structure", description = "Automates the creation of a standard school hierarchy (Classes 1-10 with Section A).", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<Void> generateSchoolStructure(@RequestParam Long orgId, @RequestParam Long yearId) {
         structureService.generateSchoolStructure(orgId, yearId);
         return ResponseEntity.ok().build();
@@ -196,7 +216,9 @@ public class AcademicStructureController {
      * branch structure.
      */
     @PostMapping("/generate-college")
-    @Operation(summary = "Batch-generate higher-ed branch structure", description = "Automates the creation of a college branch and its duration-based years for a specific course.")
+    @Operation(summary = "Batch-generate higher-ed branch structure", description = "Automates the creation of a college branch and its duration-based years for a specific course.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<Void> generateCollegeStructure(
             @RequestParam Long orgId,
             @RequestParam Long yearId,
@@ -211,7 +233,9 @@ public class AcademicStructureController {
      * 🛠️ Purpose: Decommissions a part of the hierarchy.
      */
     @DeleteMapping("/containers/{containerId}")
-    @Operation(summary = "Retire a structural node", description = "Deletes the container. WARNING: Hard-delete in current implementation. Should only be used if no students are assigned.")
+    @Operation(summary = "Retire a structural node", description = "Deletes the container. WARNING: Hard-delete in current implementation. Should only be used if no students are assigned.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<Void> deleteContainer(@PathVariable Long containerId) {
         structureService.deleteContainer(containerId);
         return ResponseEntity.ok().build();

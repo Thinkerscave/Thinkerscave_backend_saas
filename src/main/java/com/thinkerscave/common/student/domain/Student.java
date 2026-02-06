@@ -87,4 +87,7 @@ public class Student extends Auditable {
     @JoinColumn(name = "guardian_id", nullable = false)
     private Guardian parent;
 
+    @Column(name = "organization_id")
+    private Long organizationId;
+
 }

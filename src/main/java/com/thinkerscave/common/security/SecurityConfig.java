@@ -1,7 +1,7 @@
 package com.thinkerscave.common.security;
 
 import com.thinkerscave.common.filter.JwtAuthFilter;
-import com.thinkerscave.common.usrm.service.JwtService;
+import com.thinkerscave.common.filter.TenantFilter;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -19,6 +19,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 @Configuration
 @EnableWebSecurity
@@ -28,74 +29,85 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthFilter jwtAuthFilter;
 
-    // --- ADJUSTMENT 1: REMOVED CONSTRUCTOR AND @Autowired FIELDS ---
-    // The @Autowired JwtAuthFilter and the constructor were causing the cycle.
-    // They are no longer needed here.
+    @Autowired
+    private TenantFilter tenantFilter;
 
     /**
      * Configures the main HTTP security filter chain.
-     *
-     * @param http                   HttpSecurity object to configure.
-     * @param authenticationProvider The AuthenticationProvider bean (injected by
-     *                               Spring).
-     * @return the configured SecurityFilterChain.
-     * @throws Exception if an error occurs during configuration.
+     * CRITICAL: TenantFilter runs BEFORE JwtAuthFilter to set tenant context for DB
+     * queries.
      */
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationProvider authenticationProvider)
             throws Exception {
         return http
                 .csrf(csrf -> csrf.disable())
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/v1/users/**",
-                                "/api/password/**", // <-- THE FIX IS ADDING THIS LI
+                                "/api/v1/users/register",
+                                "/api/v1/users/login",
+                                "/api/v1/users/refreshToken",
+                                "/api/v1/users/generateKey",
+                                "/api/password/**",
+                                "/api/public/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
                                 "/api/admissions/**", "/api/schema/init",
-                                "/api/organizations/**"
-                        // Be careful: other endpoints like /api/admissions/** should likely be secured
-                        ).permitAll()
-                        // This line ensures any endpoint NOT in the list above is protected
+                                "/api/organizations/**",
+                                "/api/tenant/**")
+                        .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider)
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+                // CRITICAL: TenantFilter MUST run first to set schema context.
+                // Anchoring to SecurityContextHolderFilter ensures it runs very early.
+                .addFilterBefore(tenantFilter, SecurityContextHolderFilter.class)
+                .addFilterAfter(jwtAuthFilter, TenantFilter.class)
                 .build();
     }
 
     /**
-     * Configures the PasswordEncoder bean.
-     * 
-     * @return the configured PasswordEncoder.
+     * CORS configuration - allows specific origins from environment variable
      */
+    @Bean
+    public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
+        org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
+
+        // Get allowed origins from environment variable
+        String allowedOriginsEnv = System.getenv("ALLOWED_ORIGINS");
+        if (allowedOriginsEnv != null && !allowedOriginsEnv.isEmpty()) {
+            configuration.setAllowedOrigins(java.util.Arrays.asList(allowedOriginsEnv.split(",")));
+        } else {
+            // Default for development - CHANGE IN PRODUCTION!
+            configuration.setAllowedOrigins(java.util.Arrays.asList(
+                    "http://localhost:3000",
+                    "http://localhost:4200"));
+        }
+
+        configuration.setAllowedMethods(java.util.Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        configuration.setAllowedHeaders(java.util.Arrays.asList("*"));
+        configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
+
+        org.springframework.web.cors.UrlBasedCorsConfigurationSource source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
+    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-     * Exposes the AuthenticationManager as a Spring bean.
-     * 
-     * @param authenticationConfiguration the AuthenticationConfiguration provided
-     *                                    by Spring Security.
-     * @return the configured AuthenticationManager.
-     * @throws Exception if an error occurs.
-     */
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration)
             throws Exception {
         return authenticationConfiguration.getAuthenticationManager();
     }
 
-    /**
-     * Configures the primary AuthenticationProvider bean using a database.
-     * 
-     * @return the configured AuthenticationProvider.
-     */
     @Bean
     public AuthenticationProvider authenticationProvider(UserDetailsService userDetailsService) {
         DaoAuthenticationProvider authenticationProvider = new DaoAuthenticationProvider();

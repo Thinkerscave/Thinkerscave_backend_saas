@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -22,64 +23,72 @@ public class GlobalExceptionHandler {
 
     // Handle Invalid Login
     @ExceptionHandler(UsernameNotFoundException.class)
-    public ResponseEntity<?> handleUsernameNotFound(UsernameNotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(buildError("Invalid Credentials", ex.getMessage(), HttpStatus.UNAUTHORIZED));
+    public ResponseEntity<ApiResponse<Object>> handleUsernameNotFound(UsernameNotFoundException ex) {
+        return buildResponse(false, "Invalid Credentials: " + ex.getMessage(), null, HttpStatus.UNAUTHORIZED);
     }
-    
+
     // Handle wrong password or login issues
     @ExceptionHandler(BadCredentialsException.class)
-    public ResponseEntity<?> handleBadCredentials(BadCredentialsException ex) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(buildError("Authentication Failed", ex.getMessage(), HttpStatus.UNAUTHORIZED));
+    public ResponseEntity<ApiResponse<Object>> handleBadCredentials(BadCredentialsException ex) {
+        return buildResponse(false, "Authentication Failed: " + ex.getMessage(), null, HttpStatus.UNAUTHORIZED);
     }
 
     // Handle JWT Expired
     @ExceptionHandler(ExpiredJwtException.class)
-    public ResponseEntity<?> handleJwtExpired(ExpiredJwtException ex) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(buildError("Token Expired", ex.getMessage(), HttpStatus.UNAUTHORIZED));
+    public ResponseEntity<ApiResponse<Object>> handleJwtExpired(ExpiredJwtException ex) {
+        return buildResponse(false, "Token Expired: " + ex.getMessage(), null, HttpStatus.UNAUTHORIZED);
+    }
+
+    // Handle Generic Authentication Exceptions (Locked, Disabled, etc.)
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleAuthenticationException(AuthenticationException ex) {
+        return buildResponse(false, "Authentication Failed: " + ex.getMessage(), null, HttpStatus.UNAUTHORIZED);
+    }
+
+    // Handle Resource Not Found
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleResourceNotFound(ResourceNotFoundException ex) {
+        return buildResponse(false, ex.getMessage(), null, HttpStatus.NOT_FOUND);
+    }
+
+    // Handle Bad Request
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiResponse<Object>> handleBadRequest(BadRequestException ex) {
+        return buildResponse(false, ex.getMessage(), null, HttpStatus.BAD_REQUEST);
+    }
+
+    // Handle Schema Creation Error
+    @ExceptionHandler(SchemaCreationException.class)
+    public ResponseEntity<ApiResponse<Object>> handleSchemaCreationException(SchemaCreationException ex) {
+        return buildResponse(false, "Schema Creation Failed: " + ex.getMessage(), null,
+                HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     // Handle validation errors (e.g., @Valid failure)
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<?> handleValidationErrors(MethodArgumentNotValidException ex) {
+    public ResponseEntity<ApiResponse<Object>> handleValidationErrors(MethodArgumentNotValidException ex) {
         Map<String, String> fieldErrors = new HashMap<>();
         ex.getBindingResult().getFieldErrors()
                 .forEach(error -> fieldErrors.put(error.getField(), error.getDefaultMessage()));
 
-        return ResponseEntity.badRequest()
-                .body(buildError("Validation Failed", "Input validation error", HttpStatus.BAD_REQUEST, fieldErrors));
+        return buildResponse(false, "Validation Failed", fieldErrors, HttpStatus.BAD_REQUEST);
     }
 
     // 🔥 Handles ALL unhandled exceptions
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Object>> handleException(Exception ex) {
+        return buildResponse(false, "Internal Server Error: " + ex.getMessage(), null,
+                HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
+    private ResponseEntity<ApiResponse<Object>> buildResponse(boolean success, String message, Object data,
+            HttpStatus status) {
         ApiResponse<Object> response = ApiResponse.builder()
-                .success(false)
-                .message(ex.getMessage())
-                .data(null)
+                .success(success)
+                .message(message)
+                .data(data)
                 .build();
-
-        return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+        return new ResponseEntity<>(response, status);
     }
 
-    // Response structure
-    private Map<String, Object> buildError(String error, String message, HttpStatus status) {
-        return buildError(error, message, status, null);
-    }
-
-    private Map<String, Object> buildError(String error, String message, HttpStatus status, Map<String, String> fieldErrors) {
-        Map<String, Object> errorMap = new HashMap<>();
-        errorMap.put("timestamp", LocalDateTime.now());
-        errorMap.put("status", status.value());
-        errorMap.put("error", error);
-        errorMap.put("message", message);
-        if (fieldErrors != null && !fieldErrors.isEmpty()) {
-            errorMap.put("fieldErrors", fieldErrors);
-        }
-        return errorMap;
-    }
 }
-

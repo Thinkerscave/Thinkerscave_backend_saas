@@ -39,7 +39,9 @@ public class SyllabusController {
      * Starts in DRAFT status for review.
      */
     @PostMapping
-    @Operation(summary = "Create a new syllabus draft", description = "Initializes a subject curriculum blueprint. Content starts as a Draft.")
+    @Operation(summary = "Create a new syllabus draft", description = "Initializes a subject curriculum blueprint. Content starts as a Draft.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<SyllabusResponseDTO> createSyllabus(@RequestBody SyllabusRequestDTO dto) {
         return ResponseEntity.ok(syllabusService.createSyllabus(dto));
     }
@@ -49,7 +51,9 @@ public class SyllabusController {
      * Why: Enforces Draft-only updates to prevent corruption of published history.
      */
     @PutMapping("/{syllabusId}")
-    @Operation(summary = "Update a syllabus draft", description = "Modifies existing draft content. Will fail if status is already Approved or Published.")
+    @Operation(summary = "Update a syllabus draft", description = "Modifies existing draft content. Will fail if status is already Approved or Published.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<SyllabusResponseDTO> updateSyllabus(@PathVariable Long syllabusId,
             @RequestBody SyllabusRequestDTO dto) {
         return ResponseEntity.ok(syllabusService.updateSyllabus(syllabusId, dto));
@@ -59,7 +63,9 @@ public class SyllabusController {
      * Detailed retrieval including deep nesting (Chapters -> Topics).
      */
     @GetMapping("/{syllabusId}")
-    @Operation(summary = "Get syllabus details", description = "Returns the full hierarchy of a specific syllabus version.")
+    @Operation(summary = "Get syllabus details", description = "Returns the full hierarchy of a specific syllabus version.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<SyllabusResponseDTO> getSyllabus(@PathVariable Long syllabusId) {
         return ResponseEntity.ok(syllabusService.getSyllabus(syllabusId));
     }
@@ -68,7 +74,9 @@ public class SyllabusController {
      * Main endpoint for student/teacher dashboards.
      */
     @GetMapping("/subject/{subjectId}/latest")
-    @Operation(summary = "Get latest curriculum for a subject", description = "Fetches the highest version number available for a given subject.")
+    @Operation(summary = "Get latest curriculum for a subject", description = "Fetches the highest version number available for a given subject.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<SyllabusResponseDTO> getLatestSyllabus(@PathVariable Long subjectId) {
         return ResponseEntity.ok(syllabusService.getLatestSyllabusBySubject(subjectId));
     }
@@ -77,7 +85,9 @@ public class SyllabusController {
      * Workflow transition: Draft -> Approved.
      */
     @PostMapping("/{syllabusId}/approve")
-    @Operation(summary = "Approve a syllabus", description = "Officially marks the content as reviewed. Requires a valid User ID for audit logs.")
+    @Operation(summary = "Approve a syllabus", description = "Officially marks the content as reviewed. Requires a valid User ID for audit logs.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<Void> approveSyllabus(@PathVariable Long syllabusId, @RequestParam Long userId) {
         syllabusService.approveSyllabus(syllabusId, userId);
         return ResponseEntity.ok().build();
@@ -89,7 +99,9 @@ public class SyllabusController {
      * releasing.
      */
     @PostMapping("/{syllabusId}/publish")
-    @Operation(summary = "Publish an approved syllabus", description = "Makes the curriculum live for students and teachers.")
+    @Operation(summary = "Publish an approved syllabus", description = "Makes the curriculum live for students and teachers.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<Void> publishSyllabus(@PathVariable Long syllabusId) {
         syllabusService.publishSyllabus(syllabusId);
         return ResponseEntity.ok().build();
@@ -101,7 +113,9 @@ public class SyllabusController {
      * administrative time.
      */
     @PostMapping("/{syllabusId}/version")
-    @Operation(summary = "Create a new curriculum version", description = "Deep-clones an existing syllabus into a new Draft for a new year or semester.")
+    @Operation(summary = "Create a new curriculum version", description = "Deep-clones an existing syllabus into a new Draft for a new year or semester.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<SyllabusResponseDTO> createNewVersion(@PathVariable Long syllabusId,
             @RequestParam String newVersion) {
         return ResponseEntity.ok(syllabusService.createNewVersion(syllabusId, newVersion));
@@ -115,7 +129,9 @@ public class SyllabusController {
      * tracking.
      */
     @PostMapping("/progress/topic/{topicId}")
-    @Operation(summary = "Log topic completion", description = "Tracks how much of the syllabus has been completed by a specific student.")
+    @Operation(summary = "Log topic completion", description = "Tracks how much of the syllabus has been completed by a specific student.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<Void> updateProgress(
             @PathVariable Long topicId,
             @RequestParam Long studentId,
@@ -130,7 +146,9 @@ public class SyllabusController {
      * Analytical view of a student's learning journey.
      */
     @GetMapping("/progress/student/{studentId}/syllabus/{syllabusId}")
-    @Operation(summary = "Fetch student progress report", description = "Calculates percentage of completion and details per topic.")
+    @Operation(summary = "Fetch student progress report", description = "Calculates percentage of completion and details per topic.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<Map<String, Object>> getProgressReport(
             @PathVariable Long studentId,
             @PathVariable Long syllabusId) {
@@ -138,7 +156,9 @@ public class SyllabusController {
     }
 
     @PostMapping("/{syllabusId}/access-log")
-    @Operation(summary = "Log access activity", description = "Security audit for tracking who viewed the syllabus content.")
+    @Operation(summary = "Log access activity", description = "Security audit for tracking who viewed the syllabus content.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<Void> logAccess(
             @PathVariable Long syllabusId,
             @RequestParam Long userId,

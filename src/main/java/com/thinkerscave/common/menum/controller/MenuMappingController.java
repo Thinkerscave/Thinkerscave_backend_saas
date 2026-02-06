@@ -25,15 +25,22 @@ public class MenuMappingController {
 
     private final MenuMappingService menuMappingService;
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get role-based side menu", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @GetMapping
-    public ResponseEntity<List<SideMenuDTO>> getRoleBasedSideMenu(@AuthenticationPrincipal UserInfoUserDetails userInfoUserDetails) {
-    	Long roleId = userInfoUserDetails.getRoleId();
-        List<SideMenuDTO> sideMenuList= menuMappingService.getRoleBasedSideMenu(roleId);
+    public ResponseEntity<List<SideMenuDTO>> getRoleBasedSideMenu(
+            @AuthenticationPrincipal UserInfoUserDetails userInfoUserDetails) {
+        Long roleId = userInfoUserDetails.getRoleId();
+        List<SideMenuDTO> sideMenuList = menuMappingService.getRoleBasedSideMenu(roleId);
         return sideMenuList.isEmpty()
                 ? ResponseEntity.noContent().build()
                 : ResponseEntity.ok(sideMenuList);
     }
-    
+
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get active menu tree", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @GetMapping("/getActiveMenuTree")
     public ResponseEntity<List<MenuMappingDTO>> getActiveMenuTree() {
         List<MenuMappingDTO> result = menuMappingService.getActiveMenuTree();
@@ -41,11 +48,14 @@ public class MenuMappingController {
                 ? ResponseEntity.noContent().build()
                 : ResponseEntity.ok(result);
     }
-    
+
+    @io.swagger.v3.oas.annotations.Operation(summary = "Assign role menu privileges", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @PostMapping("/assign")
     public ResponseEntity<String> assignRoleMenuPrivileges(
             @RequestBody RoleMenuMappingRequest request) {
-    	menuMappingService.assignRoleMenuPrivileges(request);
+        menuMappingService.assignRoleMenuPrivileges(request);
         return ResponseEntity.ok("Role menu privileges assigned successfully!");
     }
 

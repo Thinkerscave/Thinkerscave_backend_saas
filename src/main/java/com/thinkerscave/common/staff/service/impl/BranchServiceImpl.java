@@ -4,7 +4,8 @@ import com.thinkerscave.common.staff.domain.Branch;
 import com.thinkerscave.common.staff.domain.Staff;
 import com.thinkerscave.common.staff.repository.BranchRepository;
 import com.thinkerscave.common.staff.service.BranchService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -15,13 +16,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import lombok.extern.slf4j.Slf4j;
 
-
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class BranchServiceImpl implements BranchService {
-    private static final Logger logger = LoggerFactory.getLogger(BranchServiceImpl.class);
-    @Autowired
-    private BranchRepository branchRepository;
+
+    private final BranchRepository branchRepository;
 
     @Override
     public Map<String, Object> getAllActiveBranch() {
@@ -38,7 +38,7 @@ public class BranchServiceImpl implements BranchService {
             }
 
         } catch (Exception e) {
-            logger.error("Exception occurred while Getting Branch Details", e);
+            log.error("Exception occurred while Getting Branch Details", e);
             data.put("isOutcome", false);
             data.put("message", "Unexpected error occurred: " + e.getMessage());
         }

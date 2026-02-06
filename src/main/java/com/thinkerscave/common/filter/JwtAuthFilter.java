@@ -1,6 +1,7 @@
 package com.thinkerscave.common.filter;
 
-import com.thinkerscave.common.usrm.service.JwtService;
+import com.thinkerscave.common.config.TenantContext;
+import com.thinkerscave.common.usrm.service.impl.JwtServiceImpl;
 import com.thinkerscave.common.usrm.service.impl.UserUserInfoDetailsService;
 
 import jakarta.servlet.FilterChain;
@@ -8,6 +9,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,65 +18,67 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Objects;
 
 /**
- * Filter to handle JWT authentication.
- * Extends OncePerRequestFilter to ensure it is executed once per request.
+ * JwtAuthFilter - Validates JWT tokens and sets Spring Security context.
+ * 
+ * SECURITY: This filter validates that the tenant in the JWT matches
+ * the tenant in the X-Tenant-ID header to prevent cross-tenant attacks.
  */
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Autowired
-    private JwtService jwtService;
-    
+    private JwtServiceImpl jwtService;
+
     @Autowired
     private UserUserInfoDetailsService userInfoDetailsService;
 
-    /**
-     * This method is called once per request to process JWT authentication.
-     * 
-     * @param request the HTTP request
-     * @param response the HTTP response
-     * @param filterChain the filter chain to pass the request and response to the next filter
-     * @throws ServletException if an error occurs during request processing
-     * @throws IOException if an I/O error occurs during request processing
-     */
+    private static final String TENANT_HEADER = "X-Tenant-ID";
+
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
-        // Extract the "Authorization" header from the HTTP request
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain) throws ServletException, IOException {
+
         String authHeader = request.getHeader("Authorization");
         String token = null;
         String username = null;
 
-        // Check if the "Authorization" header is present and starts with "Bearer"
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            // Extract the token by removing the "Bearer " prefix
             token = authHeader.substring(7);
-            // Extract the username from the token
             username = jwtService.extractUsername(token);
+
+            // SECURITY: Validate tenant consistency between token and header
+            String tokenTenant = jwtService.extractTenantId(token);
+            String headerTenant = request.getHeader(TENANT_HEADER);
+
+            // If token has tenant claim, it MUST match the header
+            if (tokenTenant != null && !tokenTenant.isBlank()) {
+                if (!Objects.equals(tokenTenant, headerTenant)) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.getWriter()
+                            .write("{\"error\": \"Tenant mismatch: token tenant does not match request tenant\"}");
+                    return;
+                }
+                // Use tenant from token (more trusted than header)
+                TenantContext.setTenant(tokenTenant);
+            }
         }
 
-        // If a username is found in the token and no authentication is currently set in the security context
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            // Load user details from the username
             UserDetails userDetails = userInfoDetailsService.loadUserByUsername(username);
 
-            // Validate the token and check if it is associated with the user details
             if (jwtService.validateToken(token, userDetails)) {
-                // Create an authentication token for the user with their authorities
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                		userDetails, null, userDetails.getAuthorities());
-
-                // Set additional details for the authentication token, such as the current request details
+                        userDetails, null, userDetails.getAuthorities());
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-
-                // Set the authentication token in the security context
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
 
-        // Pass the request and response to the next filter in the chain
         filterChain.doFilter(request, response);
     }
 }

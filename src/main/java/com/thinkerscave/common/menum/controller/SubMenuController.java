@@ -33,6 +33,9 @@ public class SubMenuController {
      * @param subMenuDTO DTO with submenu details
      * @return Created submenu response
      */
+    @io.swagger.v3.oas.annotations.Operation(summary = "Create or update submenu", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @PostMapping
     public ResponseEntity<SubMenuResponseDTO> saveSubMenu(@RequestBody SubMenuRequestDTO subMenuDTO) {
         SubMenuResponseDTO created = subMenuService.saveOrUpdateSubMenu(subMenuDTO);
@@ -45,6 +48,9 @@ public class SubMenuController {
      * @param code submenu code
      * @return Submenu details if found
      */
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get submenu by code", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @GetMapping("/{code}")
     public ResponseEntity<?> getSubMenuByCode(@PathVariable String code) {
         Optional<SubMenuResponseDTO> subMenu = subMenuService.getSubMenuByCode(code);
@@ -59,6 +65,9 @@ public class SubMenuController {
      *
      * @return List of submenus
      */
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get all submenus", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @GetMapping
     public ResponseEntity<List<SubMenuResponseDTO>> getAllSubMenus() {
         List<SubMenuResponseDTO> list = subMenuService.getAllSubMenus();
@@ -72,6 +81,9 @@ public class SubMenuController {
      *
      * @return List of active submenus
      */
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get active submenus", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @GetMapping("/activeSubMenus")
     public ResponseEntity<List<SubMenuResponseDTO>> getActiveSubMenus() {
         List<SubMenuResponseDTO> list = subMenuService.getAllActiveSubMenus();
@@ -79,15 +91,21 @@ public class SubMenuController {
                 ? ResponseEntity.noContent().build()
                 : ResponseEntity.ok(list);
     }
-    
+
+    @io.swagger.v3.oas.annotations.Operation(summary = "Toggle submenu status", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @PutMapping("/updateStatus/{code}")
-	public ResponseEntity<Map<String, String>> toggleMenuStatus(
-	        @PathVariable String code,
-	        @RequestParam boolean status) {
-	    String result = subMenuService.updateSubMenuStatus(code, status);
-	    return ResponseEntity.ok(Collections.singletonMap("message", result));
-	}
-    
+    public ResponseEntity<Map<String, String>> toggleMenuStatus(
+            @PathVariable String code,
+            @RequestParam boolean status) {
+        String result = subMenuService.updateSubMenuStatus(code, status);
+        return ResponseEntity.ok(Collections.singletonMap("message", result));
+    }
+
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get all privileges", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @GetMapping("/getPrivileges")
     public ResponseEntity<List<Privilege>> getAllPrivileges() {
         log.info("API called: Get All Privileges");

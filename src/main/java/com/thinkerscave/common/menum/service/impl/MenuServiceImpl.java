@@ -8,7 +8,7 @@ import com.thinkerscave.common.menum.dto.SubMenuOrderDTO;
 import com.thinkerscave.common.menum.repository.MenuRepository;
 import com.thinkerscave.common.menum.repository.SubMenuRepository;
 import com.thinkerscave.common.menum.service.MenuService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,13 +26,11 @@ import java.util.stream.Collectors;
  * @author Sandeep
  */
 @Service
+@RequiredArgsConstructor
 public class MenuServiceImpl implements MenuService {
 
-	@Autowired
-	private MenuRepository menuRepository;
-
-	@Autowired
-	private SubMenuRepository subMenuRepository;
+	private final MenuRepository menuRepository;
+	private final SubMenuRepository subMenuRepository;
 
 	/** Saves a new menu or updates an existing one based on the code. */
 	@Override
@@ -76,8 +74,10 @@ public class MenuServiceImpl implements MenuService {
 
 	@Override
 	public List<Map<String, Object>> getAllActiveMenus() {
-		return menuRepository.findByIsActiveTrueOrderByMenuOrderAsc().stream().map(menu -> Map.<String, Object>of("menuId",
-				menu.getMenuId(), "name", menu.getName(), "menuCode", menu.getMenuCode())).toList();
+		return menuRepository.findByIsActiveTrueOrderByMenuOrderAsc().stream()
+				.map(menu -> Map.<String, Object>of("menuId",
+						menu.getMenuId(), "name", menu.getName(), "menuCode", menu.getMenuCode()))
+				.toList();
 	}
 
 	@Override
@@ -128,33 +128,36 @@ public class MenuServiceImpl implements MenuService {
 		// Map menus to DTOs
 		return menus.stream().map(menu -> {
 			List<SubMenuOrderDTO> subMenuDTOs = subMenusByMenu.getOrDefault(menu.getMenuId(), List.of()).stream()
-					.map(sub -> new SubMenuOrderDTO(sub.getSubMenuId(),sub.getSubMenuName(),sub.getSubMenuCode(),sub.getSubMenuOrder())).toList();
+					.map(sub -> new SubMenuOrderDTO(sub.getSubMenuId(), sub.getSubMenuName(), sub.getSubMenuCode(),
+							sub.getSubMenuOrder()))
+					.toList();
 
-			return new MenuOrderDTO(menu.getMenuId(),menu.getName(),menu.getMenuCode(), menu.getMenuOrder(), subMenuDTOs);
+			return new MenuOrderDTO(menu.getMenuId(), menu.getName(), menu.getMenuCode(), menu.getMenuOrder(),
+					subMenuDTOs);
 		}).toList();
 	}
 
 	@Transactional
 	public void saveMenuSequence(List<MenuOrderDTO> menuOrders) {
-	    List<Menu> menus = new ArrayList<>();
-	    List<SubMenu> subMenus = new ArrayList<>();
+		List<Menu> menus = new ArrayList<>();
+		List<SubMenu> subMenus = new ArrayList<>();
 
-	    for (MenuOrderDTO menuOrder : menuOrders) {
-	        Menu menu = new Menu();
-	        menu.setMenuId(menuOrder.getMenuId());
-	        menu.setMenuOrder(menuOrder.getMenuOrder());
-	        menus.add(menu);
+		for (MenuOrderDTO menuOrder : menuOrders) {
+			Menu menu = new Menu();
+			menu.setMenuId(menuOrder.getMenuId());
+			menu.setMenuOrder(menuOrder.getMenuOrder());
+			menus.add(menu);
 
-	        for (SubMenuOrderDTO sub : menuOrder.getSubMenus()) {
-	            SubMenu submenu = new SubMenu();
-	            submenu.setSubMenuId(sub.getSubMenuId());
-	            submenu.setSubMenuOrder(sub.getSubMenuOrder());
-	            subMenus.add(submenu);
-	        }
-	    }
+			for (SubMenuOrderDTO sub : menuOrder.getSubMenus()) {
+				SubMenu submenu = new SubMenu();
+				submenu.setSubMenuId(sub.getSubMenuId());
+				submenu.setSubMenuOrder(sub.getSubMenuOrder());
+				subMenus.add(submenu);
+			}
+		}
 
-	    menuRepository.saveAll(menus);
-	    subMenuRepository.saveAll(subMenus);
+		menuRepository.saveAll(menus);
+		subMenuRepository.saveAll(subMenus);
 	}
 
 }

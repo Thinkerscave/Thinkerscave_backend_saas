@@ -26,23 +26,32 @@ import java.util.Optional;
 public class ApplicationAdmissionController {
 
     private final ApplicationAdmissionService service;
+
     /**
      * Saves an application form as a draft.
+     * 
      * @param request DTO with partial or complete application data.
      * @return The created or updated draft.
      */
-    @Operation(summary = "Save Application as Draft", description = "Saves the current application progress as a draft. Can be used to create a new draft or update an existing one.")
+    @Operation(summary = "Save Application as Draft", description = "Saves the current application progress as a draft. Can be used to create a new draft or update an existing one.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @PostMapping("/draft")
-    public ResponseEntity<ApplicationAdmissionResponse> saveDraft(@RequestBody ApplicationAdmissionDraftRequest request) {
+    public ResponseEntity<ApplicationAdmissionResponse> saveDraft(
+            @RequestBody ApplicationAdmissionDraftRequest request) {
         ApplicationAdmissionResponse draftResponse = service.saveDraft(request);
         return new ResponseEntity<>(draftResponse, HttpStatus.CREATED);
     }
+
     /**
      * Create a new ApplicationAdmission.
+     * 
      * @param request DTO with application data
      * @return Created ApplicationAdmissionResponse
      */
-    @Operation(summary = "Create Application Admission", description = "Creates a new application admission with applicant details.")
+    @Operation(summary = "Create Application Admission", description = "Creates a new application admission with applicant details.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @PostMapping
     public ResponseEntity<ApplicationAdmissionResponse> create(@RequestBody ApplicationAdmissionCreateRequest request) {
         return ResponseEntity.ok(service.create(request));
@@ -50,23 +59,30 @@ public class ApplicationAdmissionController {
 
     /**
      * Edit an existing ApplicationAdmission by id.
-     * @param id ApplicationAdmission id
+     * 
+     * @param id      ApplicationAdmission id
      * @param request DTO with fields to update
      * @return Updated ApplicationAdmissionResponse if found
      */
-    @Operation(summary = "Edit Application Admission", description = "Edits an existing application admission by its ID.")
+    @Operation(summary = "Edit Application Admission", description = "Edits an existing application admission by its ID.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @PutMapping("/{id}")
-    public ResponseEntity<ApplicationAdmissionResponse> edit(@PathVariable String id, @RequestBody ApplicationAdmissionEditRequest request) {
+    public ResponseEntity<ApplicationAdmissionResponse> edit(@PathVariable String id,
+            @RequestBody ApplicationAdmissionEditRequest request) {
         Optional<ApplicationAdmissionResponse> response = service.edit(id, request);
         return response.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     /**
      * Get ApplicationAdmission by id.
+     * 
      * @param id ApplicationAdmission id
      * @return ApplicationAdmissionResponse if found
      */
-    @Operation(summary = "Get Application Admission by ID", description = "Retrieves an application admission by its ID.")
+    @Operation(summary = "Get Application Admission by ID", description = "Retrieves an application admission by its ID.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @GetMapping("/{id}")
     public ResponseEntity<ApplicationAdmissionResponse> getById(@PathVariable String id) {
         Optional<ApplicationAdmissionResponse> response = service.getById(id);
@@ -75,22 +91,25 @@ public class ApplicationAdmissionController {
 
     /**
      * Update the status of multiple applications (APPROVED/REJECTED).
+     * 
      * @param request Contains the status and list of application IDs to update
      * @return Response with update statistics and any errors
      */
-    @Operation(summary = "Update Application Status", 
-              description = "Updates the status of multiple applications to either APPROVED or REJECTED. " +
-                          "Approved applications will create corresponding student records.")
+    @Operation(summary = "Update Application Status", description = "Updates the status of multiple applications to either APPROVED or REJECTED. "
+            +
+            "Approved applications will create corresponding student records.", parameters = {
+                    @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+            })
     @PostMapping("/status")
     public ResponseEntity<ApplicationStatusUpdateResponse> updateApplicationStatus(
             @Valid @RequestBody ApplicationStatusUpdateRequest request) {
         // Validate status is either APPROVED or REJECTED
         if (request.getStatus() != ApplicationStatus.APPROVED &&
-            request.getStatus() != ApplicationStatus.REJECTED) {
+                request.getStatus() != ApplicationStatus.REJECTED) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                "Status must be either APPROVED or REJECTED");
+                    "Status must be either APPROVED or REJECTED");
         }
-        
+
         ApplicationStatusUpdateResponse response = service.updateApplicationStatus(request);
         return ResponseEntity.ok(response);
     }

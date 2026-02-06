@@ -35,4 +35,7 @@ public class Department extends Auditable {
 
     @Column(name = "is_active")
     private Boolean isActive = true;
+
+    @Column(name = "organization_id")
+    private Long organizationId;
 }

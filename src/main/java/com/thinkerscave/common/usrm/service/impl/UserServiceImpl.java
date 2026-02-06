@@ -9,7 +9,8 @@ import com.thinkerscave.common.usrm.repository.PasswordResetTokenRepository;
 import com.thinkerscave.common.usrm.repository.UserRepository;
 import com.thinkerscave.common.usrm.service.UserService;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,19 +21,14 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
+@Slf4j
 public class UserServiceImpl implements UserService {
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
-    private PasswordResetTokenRepository passwordResetTokenRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final RoleRepository roleRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
 
     /**
      * Registers a new user with encrypted password.
@@ -40,8 +36,9 @@ public class UserServiceImpl implements UserService {
      * @param user the user entity
      * @return the saved user entity
      */
+    @Transactional
     public User registerUser(User user) {
-    	// Set encoded password
+        // Set encoded password
         user.setPassword(passwordEncoder.encode(user.getPassword()));
 
         List<Role> attachedRoles = user.getRoles().stream().map(role -> {
@@ -110,6 +107,7 @@ public class UserServiceImpl implements UserService {
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
     }
+
     @Transactional // This is the crucial annotation
     public void updatePasswordAndInvalidateToken(User user, String newPassword) {
         // 1. Update the user's password with the encoded version
@@ -133,22 +131,21 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toList());
 
         return new UserResponseDTO(
-        	    user.getId(),
-        	    user.getUserCode(),
-        	    user.getUserName(),
-        	    user.getEmail(),
-        	    user.getFirstName(),
-        	    user.getMiddleName(),
-        	    user.getLastName(),
-        	    user.getAddress(),
-        	    user.getCity(),
-        	    user.getState(),
-        	    user.getMobileNumber(),
-        	    user.getIsBlocked(),
-        	    user.getMaxDeviceAllow(),
-        	    user.getIsFirstTimeLogin(),
-        	    roleNames
-        	);
+                user.getId(),
+                user.getUserCode(),
+                user.getUserName(),
+                user.getEmail(),
+                user.getFirstName(),
+                user.getMiddleName(),
+                user.getLastName(),
+                user.getAddress(),
+                user.getCity(),
+                user.getState(),
+                user.getMobileNumber(),
+                user.getIsBlocked(),
+                user.getMaxDeviceAllow(),
+                user.getIsFirstTimeLogin(),
+                roleNames);
 
     }
 
@@ -172,12 +169,11 @@ public class UserServiceImpl implements UserService {
                         .firstTimeLogin(user.getIsFirstTimeLogin())
                         .roles(user.getRoles()
                                 .stream()
-                                .map(Role::getRoleName)   // assuming Role has getName()
+                                .map(Role::getRoleName) // assuming Role has getName()
                                 .toList())
-                        .build()
-                );
+                        .build());
     }
-    
+
     public Long getCurrentUserRoleId(Authentication authentication) {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new IllegalStateException("No authenticated user found");
@@ -185,6 +181,50 @@ public class UserServiceImpl implements UserService {
 
         UserInfoUserDetails userDetails = (UserInfoUserDetails) authentication.getPrincipal();
         return userDetails.getRoleId(); // now works ✅
+    }
+
+    @Override
+    @Transactional
+    public User createUser(com.thinkerscave.common.usrm.dto.UserCreationContext context, Role role) {
+        User user = new User();
+        try {
+            user.setFirstName(context.firstName());
+            user.setMiddleName(context.middleName());
+            user.setLastName(context.lastName());
+            user.setEmail(context.email());
+            user.setMobileNumber(Long.parseLong(context.mobileNumber()));
+            user.setAddress(context.address());
+            user.setState(context.state());
+            user.setCity(context.city());
+
+            String safeFirst = context.firstName() != null ? context.firstName().trim().toLowerCase() : "user";
+            String safeLast = context.lastName() != null ? context.lastName().trim().toLowerCase()
+                    : context.defaultLastName();
+            String userName = safeFirst + "_" + safeLast + generateRandomAlphaNumeric(3);
+            String userCode = userName + "_" + generateRandomAlphaNumeric(5);
+            String rawPassword = generateRandomAlphaNumeric(6);
+            String encodedPassword = passwordEncoder.encode(rawPassword);
+
+            user.setUserName(userName);
+            user.setUserCode(userCode);
+            user.setPassword(encodedPassword);
+            user.setRoles(List.of(role));
+
+            return userRepository.save(user);
+        } catch (Exception e) {
+            log.error("Failed to save user ({}): {}", context.email(), e.getMessage(), e);
+            throw new RuntimeException("Failed to create user. Please check the input.");
+        }
+    }
+
+    private String generateRandomAlphaNumeric(int length) {
+        String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        StringBuilder result = new StringBuilder(length);
+        java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+        for (int i = 0; i < length; i++) {
+            result.append(characters.charAt(random.nextInt(characters.length())));
+        }
+        return result.toString();
     }
 
 }

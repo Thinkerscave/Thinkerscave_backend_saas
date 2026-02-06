@@ -21,7 +21,9 @@ public class DepartmentController {
     @Autowired
     private DepartmentService departmentService;
 
-    @Operation(summary = "Get All Departments", description = "Retrieve all active departments.")
+    @Operation(summary = "Get All Departments", description = "Retrieve all active departments.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Departments retrieved successfully"),
             @ApiResponse(responseCode = "400", description = "Failed to retrieve departments")

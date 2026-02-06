@@ -14,7 +14,7 @@ import com.thinkerscave.common.menum.service.SubMenuService;
 
 import jakarta.transaction.Transactional;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -24,19 +24,13 @@ import java.util.stream.Collectors;
  * retrieve, sequencing, and active filtering operations.
  */
 @Service
+@RequiredArgsConstructor
 public class SubMenuServiceImpl implements SubMenuService {
 
-	@Autowired
-	private SubMenuRepository subMenuRepository;
-
-	@Autowired
-	private MenuRepository menuRepository;
-
-	@Autowired
-	private PrivilegeRepository privilegeRepository;
-
-	@Autowired
-	private SubMenuPrivilegeMappingRepository subMenuPrivilegeMappingRepository;
+	private final SubMenuRepository subMenuRepository;
+	private final MenuRepository menuRepository;
+	private final PrivilegeRepository privilegeRepository;
+	private final SubMenuPrivilegeMappingRepository subMenuPrivilegeMappingRepository;
 
 	/**
 	 * Saves a new submenu or updates an existing one. - Uses submenuId for updates

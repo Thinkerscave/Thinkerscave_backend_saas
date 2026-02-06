@@ -13,35 +13,39 @@ import java.util.stream.Collectors;
 
 public class UserInfoUserDetails implements UserDetails {
 
-	
 	private static final long serialVersionUID = 1L;
 	private Long userId;
 	private String name;
 	private String password;
-	private List<GrantedAuthority> 	authorities;
+	private List<GrantedAuthority> authorities;
 	private Long roleId;
-		
+
 	public UserInfoUserDetails(User user) {
-		this.userId=user.getId();
-        this.name = user.getUserName();
-        this.password = user.getPassword();
-        this.authorities = user.getRoles().stream()
-                .map(role -> new SimpleGrantedAuthority(role.getRoleName()))
-                .collect(Collectors.toList());
-        Role role = user.getRoles().iterator().next();
-        this.roleId = role.getRoleId();
+		this.userId = user.getId();
+		this.name = user.getUserName();
+		this.password = user.getPassword();
+		this.authorities = user.getRoles().stream()
+				.map(role -> {
+					String roleName = role.getRoleName();
+					// Ensure role starts with ROLE_ for standard Spring Security checks
+					if (!roleName.startsWith("ROLE_")) {
+						roleName = "ROLE_" + roleName;
+					}
+					return new SimpleGrantedAuthority(roleName);
+				})
+				.collect(Collectors.toList());
+		Role role = user.getRoles().iterator().next();
+		this.roleId = role.getRoleId();
 	}
-	
-	
-	
+
 	public Long getUserId() {
 		return userId;
 	}
 
 	public Long getRoleId() {
-        return roleId;
-    }
-	
+		return roleId;
+	}
+
 	@Override
 	public Collection<? extends GrantedAuthority> getAuthorities() {
 		return authorities;

@@ -27,22 +27,15 @@ public class LoggingAspect {
      * - Execution time
      * - Exceptions (if any)
      *
-     * The pointcut expression targets all methods inside:
-     * - com.thinkerscave.common.orgm.controller..*
-     * - com.thinkerscave.common.orgm.service..*
+     * The pointcut expression targets all methods in:
+     * - All controller packages: com.thinkerscave.common..controller..*
+     * - All service packages: com.thinkerscave.common..service..*
+     * 
+     * This covers ALL modules: orgm, usrm, student, staff, course, admission,
+     * menum, role, etc.
      */
-    @Around(
-            "execution(* com.thinkerscave.common.orgm.controller..*(..)) || " +
-                    "execution(* com.thinkerscave.common.orgm.service..*(..)) || " +
-                    "execution(* com.thinkerscave.common.usrm.controller..*(..)) || " +
-                    "execution(* com.thinkerscave.common.usrm.service..*(..)) || " +
-                    "execution(* com.thinkerscave.common.role.controller..*(..)) || " +
-                    "execution(* com.thinkerscave.common.role.service..*(..)) || " +
-                    "execution(* com.thinkerscave.common.menum.controller..*(..)) || " +
-                    "execution(* com.thinkerscave.common.menum.service..*(..)) || " +
-                    "execution(* com.thinkerscave.common.menum.controller..*(..)) || " +
-                    "execution(* com.thinkerscave.common.menum.service..*(..))"
-    )
+    @Around("execution(* com.thinkerscave.common..controller..*(..)) || " +
+            "execution(* com.thinkerscave.common..service..*(..))")
     public Object logAllMethodCalls(ProceedingJoinPoint joinPoint) throws Throwable {
         // Record the start time of the method
         long startTime = System.currentTimeMillis();

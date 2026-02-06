@@ -25,16 +25,13 @@ import jakarta.persistence.Enumerated;
 import com.thinkerscave.common.auditing.Auditable;
 
 @Entity
-@Table(
-    name = "inquiry",
-    indexes = {
+@Table(name = "inquiry", indexes = {
         @Index(name = "idx_inquiry_mobile", columnList = "mobile_number"),
         @Index(name = "idx_inquiry_class", columnList = "class_interested_in"),
         @Index(name = "idx_inquiry_source", columnList = "inquiry_source"),
         @Index(name = "idx_inquiry_counselor", columnList = "assigned_counselor_id"),
         @Index(name = "idx_inquiry_active", columnList = "is_deleted")
-    }
-)
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -88,7 +85,8 @@ public class Inquiry extends Auditable {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
-    private InquiryStatus status; // NEW, CONTACTED, FOLLOW_UP_REQUIRED, READY_FOR_ADMISSION, CONVERTED, LOST, CLOSED
+    private InquiryStatus status; // NEW, CONTACTED, FOLLOW_UP_REQUIRED, READY_FOR_ADMISSION, CONVERTED, LOST,
+                                  // CLOSED
 
     // --------------------
     // Soft Delete
@@ -120,5 +118,7 @@ public class Inquiry extends Auditable {
             this.isDeleted = false;
         }
     }
-}
 
+    @Column(name = "organization_id")
+    private Long organizationId;
+}

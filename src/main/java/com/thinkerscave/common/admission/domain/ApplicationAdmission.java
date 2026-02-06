@@ -79,4 +79,7 @@ public class ApplicationAdmission extends Auditable {
 
     @Column(name = "internal_comments", length = 2000)
     private String internalComments;
+
+    @Column(name = "organization_id")
+    private Long organizationId;
 }

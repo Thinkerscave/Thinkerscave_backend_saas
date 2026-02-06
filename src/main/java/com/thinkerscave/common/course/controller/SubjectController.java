@@ -57,7 +57,9 @@ public class SubjectController {
      * @return ResponseEntity with the persisted subject.
      */
     @PostMapping
-    @Operation(summary = "Define a new study module", description = "Creates a new Subject entity. Captures pedagogical details like credits, theory hours, and lab hours.")
+    @Operation(summary = "Define a new study module", description = "Creates a new Subject entity. Captures pedagogical details like credits, theory hours, and lab hours.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<SubjectResponseDTO> createSubject(@RequestBody SubjectRequestDTO dto) {
         return ResponseEntity.ok(subjectService.createSubject(dto));
     }
@@ -70,7 +72,9 @@ public class SubjectController {
      * revised in the curriculum.
      */
     @PutMapping("/{subjectId}")
-    @Operation(summary = "Update subject parameters", description = "Allows modification of credits, hour allocations, and descriptive metadata.")
+    @Operation(summary = "Update subject parameters", description = "Allows modification of credits, hour allocations, and descriptive metadata.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<SubjectResponseDTO> updateSubject(@PathVariable Long subjectId,
             @RequestBody SubjectRequestDTO dto) {
         return ResponseEntity.ok(subjectService.updateSubject(subjectId, dto));
@@ -84,7 +88,9 @@ public class SubjectController {
      * portals.
      */
     @GetMapping("/{subjectId}")
-    @Operation(summary = "Fetch subject definition", description = "Returns the full academic and administrative definition of a specific subject.")
+    @Operation(summary = "Fetch subject definition", description = "Returns the full academic and administrative definition of a specific subject.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<SubjectResponseDTO> getSubject(@PathVariable Long subjectId) {
         return ResponseEntity.ok(subjectService.getSubject(subjectId));
     }
@@ -97,7 +103,9 @@ public class SubjectController {
      * association wizards.
      */
     @GetMapping("/org/{orgId}")
-    @Operation(summary = "List all subjects in an organization", description = "Fetches the master subject catalogue for a specific SaaS tenant.")
+    @Operation(summary = "List all subjects in an organization", description = "Fetches the master subject catalogue for a specific SaaS tenant.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<List<SubjectResponseDTO>> getAllSubjectsByOrg(@PathVariable Long orgId) {
         return ResponseEntity.ok(subjectService.getAllSubjectsByOrg(orgId));
     }
@@ -110,7 +118,9 @@ public class SubjectController {
      * refer to this subject.
      */
     @DeleteMapping("/{subjectId}")
-    @Operation(summary = "Deactivate a study module", description = "Performs a soft-delete (isActive=false). History is preserved to maintain references in historical syllabi.")
+    @Operation(summary = "Deactivate a study module", description = "Performs a soft-delete (isActive=false). History is preserved to maintain references in historical syllabi.", parameters = {
+            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
+    })
     public ResponseEntity<Void> deleteSubject(@PathVariable Long subjectId) {
         subjectService.deleteSubject(subjectId);
         return ResponseEntity.ok().build();

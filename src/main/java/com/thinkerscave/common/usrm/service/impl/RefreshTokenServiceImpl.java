@@ -6,7 +6,7 @@ import com.thinkerscave.common.usrm.repository.RefreshTokenRepository;
 import com.thinkerscave.common.usrm.repository.UserRepository;
 import com.thinkerscave.common.usrm.service.RefreshTokenService;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,12 +15,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-public class RefreshTokenServiceImpl implements RefreshTokenService{
-	
-	@Autowired
-	private RefreshTokenRepository refreshTokenRepository; 
-	@Autowired
-	private UserRepository userRepository;
+@RequiredArgsConstructor
+public class RefreshTokenServiceImpl implements RefreshTokenService {
+
+	private static final long REFRESH_TOKEN_DURATION_MS = 86400000L;
+
+	private final RefreshTokenRepository refreshTokenRepository;
+	private final UserRepository userRepository;
 
 	@Transactional
 	public RefreshToken createRefreshToken(String username) {
@@ -35,39 +36,56 @@ public class RefreshTokenServiceImpl implements RefreshTokenService{
 			// If it exists, UPDATE the existing token
 			refreshToken = existingTokenOpt.get();
 			refreshToken.setToken(UUID.randomUUID().toString());
-			refreshToken.setExpiryDate(Instant.now().plusMillis(86400000)); // Update expiry
+			refreshToken.setExpiryDate(Instant.now().plusMillis(REFRESH_TOKEN_DURATION_MS)); // Update expiry
 		} else {
 			// If it doesn't exist, CREATE a new one
 			refreshToken = RefreshToken.builder()
 					.user(user)
 					.token(UUID.randomUUID().toString())
-					.expiryDate(Instant.now().plusMillis(86400000))
+					.expiryDate(Instant.now().plusMillis(REFRESH_TOKEN_DURATION_MS))
 					.build();
 		}
 
 		// Save the (either updated or new) token
 		return refreshTokenRepository.save(refreshToken);
 	}
+
 	/**
-     * Find a refresh token by its token value.
-     *
-     * @param token the token value
-     * @return an Optional containing the refresh token if found, or empty if not found
-     */
-    public Optional<RefreshToken> findByToken(String token) {
-        return refreshTokenRepository.findByToken(token);
-    }
-	
+	 * Find a refresh token by its token value.
+	 *
+	 * @param token the token value
+	 * @return an Optional containing the refresh token if found, or empty if not
+	 *         found
+	 */
+	public Optional<RefreshToken> findByToken(String token) {
+		return refreshTokenRepository.findByToken(token);
+	}
+
+	@Override
+	@Transactional
+	public User validateAndGetUser(String token) {
+		return findByToken(token)
+				.map(this::verifyExpiration)
+				.map(refreshToken -> {
+					User user = refreshToken.getUser();
+					// Trigger initialization of the proxy by accessing a property
+					user.getUserName();
+					return user;
+				})
+				.orElseThrow(() -> new RuntimeException("Refresh token is not in database!"));
+	}
+
 	public RefreshToken verifyExpiration(RefreshToken token) {
-		if(token.getExpiryDate().compareTo(Instant.now()) < 0) {
-			
+		if (token.getExpiryDate().compareTo(Instant.now()) < 0) {
+
 			refreshTokenRepository.delete(token);
-			throw new RuntimeException(token.getToken()+"Refresh token was expired");
+			throw new RuntimeException(token.getToken() + "Refresh token was expired");
 		}
 		return token;
 	}
+
 	@Override
 	public void deleteByToken(String refreshToken) {
-		refreshTokenRepository.findByToken(refreshToken).ifPresent(refreshTokenRepository::delete);	
+		refreshTokenRepository.findByToken(refreshToken).ifPresent(refreshTokenRepository::delete);
 	}
 }
