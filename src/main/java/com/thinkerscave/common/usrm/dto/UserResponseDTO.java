@@ -26,7 +26,9 @@ public class UserResponseDTO {
 	private Boolean isBlocked;
 	private Integer maxDeviceAllow;
 	private Boolean firstTimeLogin;
-	private List<String> roles;
-
+	private List<InternalRoleDTO> roles;
+	private List<String> privileges;
+	private String orgType;
+	private List<UserOrgDTO> organizations;
 
 }

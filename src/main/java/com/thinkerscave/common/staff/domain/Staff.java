@@ -6,13 +6,11 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
 
-@Data
-@EqualsAndHashCode(callSuper = false)
+
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@Getter
-@Setter
+@Data
 @Table(name = "staff")
 public class Staff extends Auditable {
 

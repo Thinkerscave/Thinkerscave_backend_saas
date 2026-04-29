@@ -2,15 +2,15 @@ package com.thinkerscave.common.auditing;
 
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
-import org.springframework.context.annotation.Bean;
-import org.springframework.data.domain.AuditorAware;
 
+/**
+ * Enables Spring Data JPA auditing.
+ * AuditorAwareImpl is a @Component — Spring auto-names it "auditorAwareImpl".
+ * We reference that bean name here so createdBy / lastModifiedBy are populated.
+ */
 @Configuration
-@EnableJpaAuditing(auditorAwareRef = "auditorProvider")
+@EnableJpaAuditing(auditorAwareRef = "auditorAwareImpl")
 public class AuditingConfig {
-
-    @Bean
-    public AuditorAware<String> auditorProvider() {
-        return new AuditorAwareImpl();
-    }
+    // AuditorAwareImpl is registered automatically via @Component — no @Bean needed
+    // here
 }

@@ -1,6 +1,8 @@
 package com.thinkerscave.common.admission.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -8,11 +10,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class ApplicationAdmissionDraftRequest {
 
     private String applicationId;// Used to identify and update an existing draft
-
 
     // --- Fields moved from nested objects to the top level ---
     private String applicantName;
@@ -37,7 +40,9 @@ public class ApplicationAdmissionDraftRequest {
     // --- Nested DTO definitions for Address and Emergency Contact ---
     // These remain as they are part of the desired final structure.
     @Data
+    @Builder
     @NoArgsConstructor
+    @AllArgsConstructor
     public static class AddressDto {
         private String street;
         private String city;

@@ -1,19 +1,22 @@
 package com.thinkerscave.common.usrm.service.impl;
 
+import org.springframework.transaction.annotation.Transactional;
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.repository.UserRepository;
 import com.thinkerscave.common.usrm.service.LoginAttemptService;
 
-import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 
 @Service
+@Transactional(readOnly = true)
 public class LoginAttemptServiceImpl implements LoginAttemptService {
 
     private static final int MAX_ATTEMPTS = 3;
+    /** Auto-unlock after this many minutes */
+    private static final int LOCK_DURATION_MINUTES = 15;
 
     @Autowired
     private UserRepository userRepository;
@@ -47,9 +50,25 @@ public class LoginAttemptServiceImpl implements LoginAttemptService {
     }
 
     @Override
+    @Transactional
     public boolean isBlocked(String userName) {
         return userRepository.findByUserName(userName)
-                .map(User::getIsBlocked)
+                .map(user -> {
+                    if (!Boolean.TRUE.equals(user.getIsBlocked())) {
+                        return false;
+                    }
+                    // Auto-unlock if lock has expired
+                    if (user.getLockDateTime() != null
+                            && user.getLockDateTime().plusMinutes(LOCK_DURATION_MINUTES)
+                                    .isBefore(LocalDateTime.now())) {
+                        user.setIsBlocked(false);
+                        user.setAttempts(0);
+                        user.setLockDateTime(null);
+                        userRepository.save(user);
+                        return false;
+                    }
+                    return true;
+                })
                 .orElse(false);
     }
 }

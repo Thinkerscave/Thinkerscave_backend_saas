@@ -4,6 +4,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+
 @Data
 @NoArgsConstructor
 public class OrganisationListDTO {
@@ -21,9 +22,11 @@ public class OrganisationListDTO {
     private String ownerName;
     private String ownerEmail;
     private String ownerMobile;
+    private String ownerCode;
 
     // Additional fields for UI logic
     private boolean isGroup;
     private Long parentOrgId;
-    private Boolean isActive;// Sending the ID can be useful for the UI
+    private Boolean isActive;
+    private String tenantId; // Schema name
 }

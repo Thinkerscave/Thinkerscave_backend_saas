@@ -48,7 +48,7 @@ import java.time.LocalDate;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = false)
+
 public class AcademicYear extends Auditable {
 
     /**
@@ -95,6 +95,7 @@ public class AcademicYear extends Auditable {
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "organization_id", nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Organisation organization;
 
     /**

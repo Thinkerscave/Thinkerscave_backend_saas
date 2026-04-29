@@ -1,5 +1,6 @@
 package com.thinkerscave.common.admission.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +20,8 @@ import com.thinkerscave.common.admission.service.FollowUpService;
 import java.time.LocalDate;
 
 @RestController
-@RequestMapping("/api/staff/inquiries")
+@RequestMapping("/api/v1/inquiries")
+@Tag(name = "Inquiry Management", description = "Professional APIs for managing admissions inquiries and follow-ups")
 @RequiredArgsConstructor
 @Slf4j
 public class InquiryController {
@@ -27,9 +29,7 @@ public class InquiryController {
         private final InquiryService inquiryService;
         private final FollowUpService followUpService;
 
-        @io.swagger.v3.oas.annotations.Operation(summary = "Save or Update Inquiry", parameters = {
-                        @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-        })
+        @io.swagger.v3.oas.annotations.Operation(summary = "Save or Update Inquiry")
         @PostMapping
         public ResponseEntity<ApiResponse<InquiryResponse>> saveInquiry(
                         @RequestBody InquiryRequest request) {
@@ -44,9 +44,7 @@ public class InquiryController {
                                                 .build());
         }
 
-        @io.swagger.v3.oas.annotations.Operation(summary = "Get all inquiries", parameters = {
-                        @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-        })
+        @io.swagger.v3.oas.annotations.Operation(summary = "Get all inquiries")
         @GetMapping
         public ResponseEntity<ApiResponse<List<InquiryResponse>>> getAllInquiries() {
 
@@ -58,9 +56,7 @@ public class InquiryController {
                                                 .build());
         }
 
-        @io.swagger.v3.oas.annotations.Operation(summary = "Delete inquiry", parameters = {
-                        @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-        })
+        @io.swagger.v3.oas.annotations.Operation(summary = "Delete inquiry")
         @DeleteMapping("/{id}")
         public ResponseEntity<ApiResponse<Void>> deleteInquiry(@PathVariable Long id) {
 
@@ -74,9 +70,7 @@ public class InquiryController {
         }
 
         // ---------------- Follow-Up Dashboard ----------------
-        @io.swagger.v3.oas.annotations.Operation(summary = "Get dashboard inquiries", parameters = {
-                        @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-        })
+        @io.swagger.v3.oas.annotations.Operation(summary = "Get dashboard inquiries")
         @GetMapping("/follow-ups")
         public ResponseEntity<ApiResponse<List<InquiryResponse>>> getDashboardInquiries(
                         @RequestParam(required = false, defaultValue = "UPCOMING") String tab,
@@ -95,9 +89,7 @@ public class InquiryController {
         }
 
         // ---------------- Inquiry Summary ----------------
-        @io.swagger.v3.oas.annotations.Operation(summary = "Get inquiry summary", parameters = {
-                        @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-        })
+        @io.swagger.v3.oas.annotations.Operation(summary = "Get inquiry summary")
         @GetMapping("/{inquiryId}/summary")
         public ResponseEntity<ApiResponse<InquirySummaryResponse>> getInquirySummary(@PathVariable Long inquiryId) {
                 InquirySummaryResponse summary = inquiryService.getInquirySummary(inquiryId);
@@ -111,9 +103,7 @@ public class InquiryController {
         }
 
         // ---------------- Follow-Up History ----------------
-        @io.swagger.v3.oas.annotations.Operation(summary = "Get follow-up history", parameters = {
-                        @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-        })
+        @io.swagger.v3.oas.annotations.Operation(summary = "Get follow-up history")
         @GetMapping("/{inquiryId}/follow-ups")
         public ResponseEntity<ApiResponse<List<FollowUpResponse>>> getFollowUps(@PathVariable Long inquiryId) {
                 List<FollowUpResponse> list = followUpService.getFollowUps(inquiryId);
@@ -127,9 +117,7 @@ public class InquiryController {
         }
 
         // ---------------- Add Follow-Up ----------------
-        @io.swagger.v3.oas.annotations.Operation(summary = "Add follow-up", parameters = {
-                        @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-        })
+        @io.swagger.v3.oas.annotations.Operation(summary = "Add follow-up")
         @PostMapping("/{inquiryId}/follow-ups")
         public ResponseEntity<ApiResponse<FollowUpResponse>> addFollowUp(
                         @PathVariable Long inquiryId,
@@ -146,9 +134,7 @@ public class InquiryController {
         }
 
         // ---------------- Proceed to Admission ----------------
-        @io.swagger.v3.oas.annotations.Operation(summary = "Proceed to admission", parameters = {
-                        @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-        })
+        @io.swagger.v3.oas.annotations.Operation(summary = "Proceed to admission")
         @PostMapping("/{inquiryId}/proceed-admission")
         public ResponseEntity<ApiResponse<Void>> proceedToAdmission(@PathVariable Long inquiryId) {
                 inquiryService.proceedToAdmission(inquiryId);
@@ -161,9 +147,7 @@ public class InquiryController {
         }
 
         // ---------------- Mark Lost ----------------
-        @io.swagger.v3.oas.annotations.Operation(summary = "Mark inquiry as lost", parameters = {
-                        @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-        })
+        @io.swagger.v3.oas.annotations.Operation(summary = "Mark inquiry as lost")
         @PostMapping("/{inquiryId}/mark-lost")
         public ResponseEntity<ApiResponse<Void>> markLost(@PathVariable Long inquiryId) {
                 inquiryService.markLost(inquiryId);

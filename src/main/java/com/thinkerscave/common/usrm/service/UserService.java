@@ -3,6 +3,7 @@ package com.thinkerscave.common.usrm.service;
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.menum.domain.Role;
 import com.thinkerscave.common.usrm.dto.UserCreationContext;
+import com.thinkerscave.common.usrm.dto.UserRequestDTO;
 import com.thinkerscave.common.usrm.dto.UserResponseDTO;
 
 import java.util.List;
@@ -15,9 +16,7 @@ public interface UserService {
 	 */
 	User createUser(UserCreationContext context, Role role);
 
-	User registerUser(User user);
-
-	List<User> getUsers();
+	UserResponseDTO registerUser(UserRequestDTO dto);
 
 	List<UserResponseDTO> listUsers();
 
@@ -30,5 +29,11 @@ public interface UserService {
 	void updatePasswordAndInvalidateToken(User user, String newPassword);
 
 	Optional<UserResponseDTO> findByUsername(String username);
+
+	/**
+	 * Changes the password for an authenticated user (first-time login flow).
+	 * Sets isFirstTimeLogin = false.
+	 */
+	void changePasswordForCurrentUser(String username, String newPassword);
 
 }

@@ -2,13 +2,15 @@ package com.thinkerscave.common.menum.domain;
 
 import com.thinkerscave.common.auditing.Auditable;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.EqualsAndHashCode;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
 @EntityListeners(AuditingEntityListener.class)
-@Data
+@Getter
+@Setter
 @EqualsAndHashCode(callSuper = false)
 @Table(name = "menu_master")
 public class Menu extends Auditable {

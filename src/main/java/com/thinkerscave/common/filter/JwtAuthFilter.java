@@ -2,15 +2,18 @@ package com.thinkerscave.common.filter;
 
 import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.usrm.service.impl.JwtServiceImpl;
-import com.thinkerscave.common.usrm.service.impl.UserUserInfoDetailsService;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -18,24 +21,25 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Objects;
 
 /**
  * JwtAuthFilter - Validates JWT tokens and sets Spring Security context.
  * 
- * SECURITY: This filter validates that the tenant in the JWT matches
- * the tenant in the X-Tenant-ID header to prevent cross-tenant attacks.
+ * IMPORTANT: Runs AFTER TenantFilter. TenantContext is already set.
+ * This filter only handles JWT validation and Spring Security authentication.
  */
+@Slf4j
 @Component
+@Order(Ordered.HIGHEST_PRECEDENCE + 1) // Run AFTER TenantFilter
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     @Autowired
     private JwtServiceImpl jwtService;
 
     @Autowired
-    private UserUserInfoDetailsService userInfoDetailsService;
+    private org.springframework.security.core.userdetails.UserDetailsService userInfoDetailsService;
 
-    private static final String TENANT_HEADER = "X-Tenant-ID";
+    // private static final String TENANT_HEADER = "X-Tenant-ID"; // Unused
 
     @Override
     protected void doFilterInternal(
@@ -49,22 +53,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
-            username = jwtService.extractUsername(token);
-
-            // SECURITY: Validate tenant consistency between token and header
-            String tokenTenant = jwtService.extractTenantId(token);
-            String headerTenant = request.getHeader(TENANT_HEADER);
-
-            // If token has tenant claim, it MUST match the header
-            if (tokenTenant != null && !tokenTenant.isBlank()) {
-                if (!Objects.equals(tokenTenant, headerTenant)) {
-                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    response.getWriter()
-                            .write("{\"error\": \"Tenant mismatch: token tenant does not match request tenant\"}");
+            
+            // Check if TenantFilter already parsed the token and extracted the username
+            username = (String) request.getAttribute("JWT_USERNAME");
+            
+            if (username == null) {
+                try {
+                    username = jwtService.extractUsername(token);
+                } catch (Exception e) {
+                    log.error("Failed to extract username from token", e);
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid or expired JWT token");
                     return;
                 }
-                // Use tenant from token (more trusted than header)
-                TenantContext.setTenant(tokenTenant);
             }
         }
 
@@ -75,7 +75,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
+
+                SecurityContext context = SecurityContextHolder.createEmptyContext();
+                context.setAuthentication(authToken);
+                SecurityContextHolder.setContext(context);
             }
         }
 

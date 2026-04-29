@@ -8,7 +8,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class AuthRequest {
-	
+
+	@com.fasterxml.jackson.annotation.JsonProperty("userName")
 	private String username;
 	private String password;
 

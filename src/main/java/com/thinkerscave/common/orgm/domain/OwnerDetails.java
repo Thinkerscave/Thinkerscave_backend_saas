@@ -4,17 +4,17 @@ import com.thinkerscave.common.auditing.Auditable;
 import com.thinkerscave.common.usrm.domain.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-@Data
+@Getter
+@Setter
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @AllArgsConstructor
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = false)
 @Table(name = "owner_details")
 public class OwnerDetails extends Auditable {
 

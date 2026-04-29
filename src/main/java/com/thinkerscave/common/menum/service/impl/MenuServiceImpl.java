@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
  * @author Sandeep
  */
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class MenuServiceImpl implements MenuService {
 
@@ -34,7 +35,8 @@ public class MenuServiceImpl implements MenuService {
 
 	/** Saves a new menu or updates an existing one based on the code. */
 	@Override
-	public Menu saveOrUpdateMenu(MenuDTO dto) {
+	@Transactional
+	public MenuDTO saveOrUpdateMenu(MenuDTO dto) {
 		Menu menu = null;
 		try {
 			if (dto.getMenuCode() == null || dto.getMenuCode().isBlank()) {
@@ -55,18 +57,20 @@ public class MenuServiceImpl implements MenuService {
 			menu.setMenuOrder(dto.getOrder());
 			menu.setIsActive(dto.getIsActive() != null ? dto.getIsActive() : true);
 
-			return menuRepository.save(menu);
+			Menu savedMenu = menuRepository.save(menu);
+			return mapToDTO(savedMenu);
 
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to save or update menu: " + e.getMessage());
 		}
 	}
 
-	/** Returns all menu records. */
 	@Override
-	public List<Menu> displayMenudata() {
+	public List<MenuDTO> displayMenudata() {
 		try {
-			return menuRepository.findAll();
+			return menuRepository.findAll().stream()
+					.map(this::mapToDTO)
+					.toList();
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to fetch menu data: " + e.getMessage());
 		}
@@ -105,9 +109,9 @@ public class MenuServiceImpl implements MenuService {
 
 	/** Returns a single menu by its code. */
 	@Override
-	public Optional<Menu> displaySingleMenudata(String code) {
+	public Optional<MenuDTO> displaySingleMenudata(String code) {
 		try {
-			return menuRepository.findByMenuCode(code);
+			return menuRepository.findByMenuCode(code).map(this::mapToDTO);
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to fetch menu with code " + code + ": " + e.getMessage());
 		}
@@ -159,5 +163,15 @@ public class MenuServiceImpl implements MenuService {
 		menuRepository.saveAll(menus);
 		subMenuRepository.saveAll(subMenus);
 	}
-
+	private MenuDTO mapToDTO(Menu menu) {
+		MenuDTO dto = new MenuDTO();
+		dto.setName(menu.getName());
+		dto.setDescription(menu.getDescription());
+		dto.setUrl(menu.getUrl());
+		dto.setIcon(menu.getIcon());
+		dto.setMenuCode(menu.getMenuCode());
+		dto.setOrder(menu.getMenuOrder());
+		dto.setIsActive(menu.getIsActive());
+		return dto;
+	}
 }

@@ -7,6 +7,7 @@ import com.thinkerscave.common.usrm.repository.UserRepository;
 import com.thinkerscave.common.usrm.service.RefreshTokenService;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,10 +16,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class RefreshTokenServiceImpl implements RefreshTokenService {
 
-	private static final long REFRESH_TOKEN_DURATION_MS = 86400000L;
+	@Value("${refresh.token.expiration:86400000}")
+	private long refreshTokenDurationMs;
 
 	private final RefreshTokenRepository refreshTokenRepository;
 	private final UserRepository userRepository;
@@ -36,13 +39,13 @@ public class RefreshTokenServiceImpl implements RefreshTokenService {
 			// If it exists, UPDATE the existing token
 			refreshToken = existingTokenOpt.get();
 			refreshToken.setToken(UUID.randomUUID().toString());
-			refreshToken.setExpiryDate(Instant.now().plusMillis(REFRESH_TOKEN_DURATION_MS)); // Update expiry
+			refreshToken.setExpiryDate(Instant.now().plusMillis(refreshTokenDurationMs)); // Update expiry
 		} else {
 			// If it doesn't exist, CREATE a new one
 			refreshToken = RefreshToken.builder()
 					.user(user)
 					.token(UUID.randomUUID().toString())
-					.expiryDate(Instant.now().plusMillis(REFRESH_TOKEN_DURATION_MS))
+					.expiryDate(Instant.now().plusMillis(refreshTokenDurationMs))
 					.build();
 		}
 

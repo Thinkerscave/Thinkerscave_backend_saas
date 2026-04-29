@@ -1,5 +1,6 @@
 package com.thinkerscave.common.staff.controller;
 
+import com.thinkerscave.common.staff.domain.Branch;
 import com.thinkerscave.common.staff.service.BranchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -13,9 +14,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-@CrossOrigin("*")
 @RestController
-@RequestMapping("/api/branch")
+@RequestMapping("/api/v1/branches")
 @Tag(name = "Branch Management", description = "Operations related to branch management")
 @RequiredArgsConstructor
 @Slf4j
@@ -23,22 +23,33 @@ public class BranchController {
 
     private final BranchService branchService;
 
-    @Operation(summary = "Get All Branches", description = "Retrieve all active branches.", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Branches retrieved successfully"),
-            @ApiResponse(responseCode = "400", description = "Failed to retrieve branches")
-    })
+    @Operation(summary = "Get All Branches", description = "Retrieve all active branches for the current organization.")
     @GetMapping("/getAllBranch")
     public ResponseEntity<Map<String, Object>> getAllBranchDetails() {
         log.info("Fetching all branch details");
         Map<String, Object> result = branchService.getAllActiveBranch();
+        return Boolean.TRUE.equals(result.get("isOutcome"))
+                ? ResponseEntity.ok(result)
+                : ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+    }
 
-        if (Boolean.TRUE.equals(result.get("isOutcome"))) {
-            return ResponseEntity.ok(result);
-        } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
-        }
+    @Operation(summary = "Create or Update Branch")
+    @PostMapping("/saveOrUpdate")
+    public ResponseEntity<Map<String, Object>> saveOrUpdate(@RequestBody Branch branch) {
+        log.info("Saving/updating branch: {}", branch.getBranchName());
+        Map<String, Object> result = branchService.saveOrUpdate(branch);
+        return Boolean.TRUE.equals(result.get("isOutcome"))
+                ? ResponseEntity.ok(result)
+                : ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+    }
+
+    @Operation(summary = "Toggle Branch Active Status")
+    @PatchMapping("/{id}/toggle")
+    public ResponseEntity<Map<String, Object>> toggleActive(@PathVariable Long id) {
+        log.info("Toggling active status for branch id: {}", id);
+        Map<String, Object> result = branchService.toggleActive(id);
+        return Boolean.TRUE.equals(result.get("isOutcome"))
+                ? ResponseEntity.ok(result)
+                : ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
     }
 }

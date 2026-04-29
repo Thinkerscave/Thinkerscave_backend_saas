@@ -20,11 +20,13 @@ import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.repository.UserRepository;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
+@Transactional(readOnly = true)
 @Slf4j
 @RequiredArgsConstructor
 public class StaffServiceImpl implements StaffService {
@@ -36,6 +38,7 @@ public class StaffServiceImpl implements StaffService {
     private final RoleRepository roleRepository;
 
     @Override
+    @Transactional
     public Map<String, Object> saveOrUpdateStaff(StaffRequestDTO staffRequestDTO) {
         Map<String, Object> data = new HashMap<>();
 
@@ -77,7 +80,8 @@ public class StaffServiceImpl implements StaffService {
                     existingUser = userRepository.save(existingUser);
 
                     // Update the Existing Staff
-                    BeanUtils.copyProperties(staffRequestDTO, presentStaff, "hireDate", "id", "staffCode");
+                    BeanUtils.copyProperties(staffRequestDTO, presentStaff, "hireDate", "id", "staffCode",
+                            "organizationId");
                     presentStaff.setUser(existingUser);
                     presentStaff.setBranch(branch);
                     presentStaff.setDepartment(department);
@@ -99,15 +103,21 @@ public class StaffServiceImpl implements StaffService {
                     // Saving the New User
                     BeanUtils.copyProperties(staffRequestDTO, newUser, "id");
                     newUser.setRoles(List.of(userRole));
-                    // Here set the User(Code,Username,Password)
 
                     newUser = userRepository.save(newUser);
 
                     BeanUtils.copyProperties(staffRequestDTO, newStaff, "id");
-                    // Here set the Staff Code
                     newStaff.setUser(newUser);
                     newStaff.setBranch(branch);
                     newStaff.setDepartment(department);
+
+                    // ─── Set organization scope from context (multi-tenant isolation) ───
+                    Long orgId = com.thinkerscave.common.context.OrganizationContext.getOrganizationId();
+                    if (orgId != null) {
+                        newStaff.setOrganizationId(orgId);
+                    } else {
+                        log.warn("OrganizationContext is null when saving new Staff — tenant isolation may be broken");
+                    }
 
                     newStaff = staffRepository.save(newStaff);
 
@@ -138,16 +148,19 @@ public class StaffServiceImpl implements StaffService {
     public Map<String, Object> getAllStaff() {
         Map<String, Object> data = new HashMap<>();
         try {
-            List<Staff> staffList = staffRepository.findAll();
+            // ─── Multi-tenant isolation: only return staff for caller's org ────────
+            Long orgId = com.thinkerscave.common.context.OrganizationContext.getOrganizationId();
+            List<Staff> staffList = (orgId != null)
+                    ? staffRepository.findByOrganizationIdAndIsActive(orgId, true)
+                    : List.of(); // Return empty if no org context — never leak cross-org data
             if (!staffList.isEmpty()) {
                 data.put("isOutcome", true);
                 data.put("message", "All Staff Records Fetched ");
                 data.put("data", staffList);
             } else {
                 data.put("isOutcome", false);
-                data.put("message", "Unable to Fetch Staff Records ");
+                data.put("message", orgId == null ? "Organization context not set" : "No active staff found");
             }
-
         } catch (Exception e) {
             log.error("Exception occurred while Getting staff Details", e);
             data.put("isOutcome", false);
@@ -161,8 +174,13 @@ public class StaffServiceImpl implements StaffService {
         Map<String, Object> data = new HashMap<>();
         try {
             if (!staffCode.isEmpty()) {
-                Staff staff = staffRepository.findByStaffCode(staffCode)
-                        .orElseThrow(() -> new RuntimeException("Staff not found with code: " + staffCode));
+                Long orgId = com.thinkerscave.common.context.OrganizationContext.getOrganizationId();
+                // ─── Scope lookup to caller's org — prevents cross-org data access ──
+                Staff staff = (orgId != null)
+                        ? staffRepository.findByStaffCodeAndOrganizationId(staffCode, orgId)
+                                .orElseThrow(() -> new RuntimeException("Staff not found with code: " + staffCode))
+                        : staffRepository.findByStaffCode(staffCode)
+                                .orElseThrow(() -> new RuntimeException("Staff not found with code: " + staffCode));
                 if (staff.getId() != null) {
                     data.put("isOutcome", true);
                     data.put("message", "Staff Records Fetched ");
@@ -175,7 +193,6 @@ public class StaffServiceImpl implements StaffService {
                 data.put("isOutcome", false);
                 data.put("message", "Staff Code is Empty");
             }
-
         } catch (Exception e) {
             log.error("Exception occurred while Getting staff Detail", e);
             data.put("isOutcome", false);

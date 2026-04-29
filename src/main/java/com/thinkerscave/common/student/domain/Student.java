@@ -4,14 +4,16 @@ import com.thinkerscave.common.auditing.Auditable;
 import com.thinkerscave.common.commonModel.Address;
 import com.thinkerscave.common.usrm.domain.User;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDate;
 
 @Entity
-@Data
-@EqualsAndHashCode(callSuper = false)
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 @Table(name = "student")
 public class Student extends Auditable {
 
@@ -30,6 +32,7 @@ public class Student extends Auditable {
     private String lastName;
 
     @Column(length = 50, unique = true, nullable = false)
+    @EqualsAndHashCode.Include
     private String email;
 
     @Column(name = "mobile_number", nullable = false)
@@ -41,12 +44,12 @@ public class Student extends Auditable {
     private Long age;
 
     // One-to-one relation for current address
-    @OneToOne(cascade = CascadeType.ALL)
+    @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "current_address_id", referencedColumnName = "id")
     private Address currentAddress;
 
     // One-to-one relation for permanent address
-    @OneToOne(cascade = CascadeType.ALL)
+    @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "permanent_address_id", referencedColumnName = "id")
     private Address permanentAddress;
 
@@ -71,7 +74,7 @@ public class Student extends Auditable {
 
     @Column(length = 255, name = "is_active")
     private boolean isActive;
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "class_id")
     private ClassEntity classEntity;
 
@@ -79,11 +82,11 @@ public class Student extends Auditable {
     @JoinColumn(name = "section_id")
     private Section section;
 
-    @OneToOne(cascade = CascadeType.ALL)
+    @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "guardian_id", nullable = false)
     private Guardian parent;
 

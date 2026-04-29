@@ -4,6 +4,8 @@ import com.thinkerscave.common.course.domain.AcademicContainer;
 import com.thinkerscave.common.course.domain.AcademicYear;
 import com.thinkerscave.common.course.domain.Course;
 import com.thinkerscave.common.course.dto.AcademicContainerDTO;
+import com.thinkerscave.common.course.dto.AcademicYearDTO;
+import com.thinkerscave.common.course.dto.StructureTemplateDTO;
 import com.thinkerscave.common.course.enums.ContainerType;
 import com.thinkerscave.common.course.repository.AcademicContainerRepository;
 import com.thinkerscave.common.course.repository.AcademicYearRepository;
@@ -63,6 +65,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class AcademicStructureServiceImpl implements AcademicStructureService {
 
@@ -105,7 +108,7 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
      */
     @Override
     @Transactional
-    public AcademicYear createAcademicYear(Long orgId, String yearCode, String startDate, String endDate) {
+    public AcademicYearDTO createAcademicYear(Long orgId, String yearCode, String startDate, String endDate) {
         Organisation org = organizationRepository.findById(orgId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organisation not found with ID: " + orgId));
 
@@ -127,7 +130,8 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         academicYear.setIsActive(true);
 
         log.info("Creating new Academic Year: {} for Org: {}", yearCode, org.getOrgName());
-        return academicYearRepository.save(academicYear);
+        AcademicYear saved = academicYearRepository.save(academicYear);
+        return mapToYearDTO(saved);
     }
 
     /**
@@ -136,10 +140,12 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
      * 🛠️ Purpose: Lists all historical and future calendar cycles.
      */
     @Override
-    public List<AcademicYear> getAcademicYears(Long orgId) {
+    public List<AcademicYearDTO> getAcademicYears(Long orgId) {
         Organisation org = organizationRepository.findById(orgId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organisation not found with ID: " + orgId));
-        return academicYearRepository.findByOrganization(org);
+        return academicYearRepository.findByOrganization(org).stream()
+                .map(this::mapToYearDTO)
+                .toList();
     }
 
     /**
@@ -150,10 +156,11 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
      * to the 'Current' year data.
      */
     @Override
-    public AcademicYear getCurrentAcademicYear(Long orgId) {
+    public AcademicYearDTO getCurrentAcademicYear(Long orgId) {
         Organisation org = organizationRepository.findById(orgId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organisation not found with ID: " + orgId));
         return academicYearRepository.findByOrganizationAndIsCurrentTrue(org)
+                .map(this::mapToYearDTO)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No current academic year found for organisation ID: " + orgId));
     }
@@ -375,6 +382,51 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     }
 
     /**
+     * 🧩 generateDynamicStructure
+     * 
+     * 🛠️ Purpose: Flexible structure builder driven by Super Admin UI choices.
+     * 🏛️ Business Rationale: Adapts to any tenant configuration.
+     */
+    @Override
+    @Transactional
+    public void generateDynamicStructure(Long orgId, Long yearId, StructureTemplateDTO template) {
+        if (template.getRootStartRange() == null || template.getRootEndRange() == null) {
+            throw new IllegalArgumentException("Root sequence range is required.");
+        }
+
+        for (int i = template.getRootStartRange(); i <= template.getRootEndRange(); i++) {
+            String rootName = (template.getRootPrefix() != null ? template.getRootPrefix() + " " : "") + i;
+
+            AcademicContainerDTO parentDto = AcademicContainerDTO.builder()
+                    .containerType(template.getRootType() != null ? template.getRootType() : ContainerType.CLASS)
+                    .containerName(rootName.trim())
+                    .organisationId(orgId)
+                    .academicYearId(yearId)
+                    .level(1)
+                    .build();
+            AcademicContainerDTO savedParent = createContainer(parentDto);
+
+            if (template.getChildNames() != null && !template.getChildNames().isEmpty()) {
+                for (String childSuffix : template.getChildNames()) {
+                    String childName = (template.getChildPrefix() != null ? template.getChildPrefix() + " " : "")
+                            + childSuffix;
+
+                    AcademicContainerDTO childDto = AcademicContainerDTO.builder()
+                            .containerType(
+                                    template.getChildType() != null ? template.getChildType() : ContainerType.SECTION)
+                            .containerName(childName.trim())
+                            .organisationId(orgId)
+                            .academicYearId(yearId)
+                            .parentContainerId(savedParent.getContainerId())
+                            .level(2)
+                            .build();
+                    createContainer(childDto);
+                }
+            }
+        }
+    }
+
+    /**
      * Maps Entity to DTO while preserving the business-level hierarchy identifiers.
      */
     private AcademicContainerDTO mapToDTO(AcademicContainer container) {
@@ -393,6 +445,19 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
                 .capacity(container.getCapacity())
                 .currentStrength(container.getCurrentStrength())
                 .build();
+    }
+ 
+    private AcademicYearDTO mapToYearDTO(AcademicYear year) {
+        return new AcademicYearDTO(
+                year.getAcademicYearId(),
+                year.getYearCode(),
+                year.getYearName(),
+                year.getStartDate(),
+                year.getEndDate(),
+                year.getIsCurrent(),
+                year.getIsActive(),
+                year.getDescription()
+        );
     }
 
     /**

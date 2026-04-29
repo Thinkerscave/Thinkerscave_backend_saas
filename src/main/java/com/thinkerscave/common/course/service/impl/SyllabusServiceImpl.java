@@ -70,6 +70,7 @@ import java.util.stream.Collectors;
  */
 @Slf4j
 @Service
+@Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class SyllabusServiceImpl implements SyllabusService {
 

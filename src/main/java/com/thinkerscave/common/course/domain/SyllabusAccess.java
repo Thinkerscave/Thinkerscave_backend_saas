@@ -43,7 +43,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = false)
+
 public class SyllabusAccess extends Auditable {
 
     /**

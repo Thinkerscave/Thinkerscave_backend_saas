@@ -20,13 +20,16 @@ public interface OrganizationRepository extends JpaRepository<Organisation, Long
     Optional<Organisation> findByOrgCode(String orgCode);
 
     /**
-     * Finds all organizations that are marked as a 'group' and are currently active.
+     * Finds all organizations that are marked as a 'group' and are currently
+     * active.
      * These are eligible to be parent organizations.
-     * The method name is derived by Spring Data JPA to generate the query automatically.
+     * The method name is derived by Spring Data JPA to generate the query
+     * automatically.
      *
      * @return A list of parent-eligible Organisation entities.
      */
     List<Organisation> findByIsGroupTrueAndIsActiveTrue();
 
+    Optional<Organisation> findByTenantSchema(String tenantSchema);
 
 }

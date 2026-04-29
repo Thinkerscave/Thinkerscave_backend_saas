@@ -1,27 +1,23 @@
 package com.thinkerscave.common.usrm.controller;
 
-import com.thinkerscave.common.usrm.domain.RefreshToken;
-import com.thinkerscave.common.usrm.domain.User;
-import com.thinkerscave.common.usrm.dto.AuthRequest;
-import com.thinkerscave.common.usrm.dto.JwtResponce;
-import com.thinkerscave.common.usrm.dto.RefreshTokenRequest;
-import com.thinkerscave.common.usrm.dto.UserResponseDTO;
+import com.thinkerscave.common.config.TenantContext;
+import com.thinkerscave.common.service.TenantLookupService;
+import com.thinkerscave.common.usrm.dto.*;
 import com.thinkerscave.common.usrm.service.LoginAttemptService;
 import com.thinkerscave.common.usrm.service.RefreshTokenService;
 import com.thinkerscave.common.usrm.service.UserService;
 import com.thinkerscave.common.usrm.service.impl.JwtServiceImpl;
+import com.thinkerscave.common.commonModel.ApiResponse;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Encoders;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -30,6 +26,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
 
 import java.security.Key;
 import java.util.List;
@@ -52,11 +50,14 @@ public class UserController {
 
 	private final LoginAttemptService loginAttemptService;
 
+	private final TenantLookupService tenantLookupService;
+
 	@Operation(summary = "Register a new user")
 	@PostMapping("/register")
-	public ResponseEntity<User> registerUser(@RequestBody User user) {
-		User registeredUser = userService.registerUser(user);
-		return ResponseEntity.ok(registeredUser);
+	public ResponseEntity<ApiResponse<UserResponseDTO>> registerUser(@Valid @RequestBody UserRequestDTO userRequestDTO) {
+		log.info("Registering new user: {}", userRequestDTO.getUserName());
+		UserResponseDTO savedUser = userService.registerUser(userRequestDTO);
+		return ResponseEntity.status(201).body(ApiResponse.success("User registered successfully", savedUser));
 	}
 
 	/**
@@ -64,19 +65,17 @@ public class UserController {
 	 *
 	 * @return a ResponseEntity containing the list of users
 	 */
-	@Operation(summary = "List all registered users", parameters = {
-			@io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier", required = true, example = "public", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-	})
+	@Operation(summary = "List all registered users")
 	@ApiResponses(value = {
-			@ApiResponse(responseCode = "200", description = "Successfully retrieved list"),
-			@ApiResponse(responseCode = "403", description = "Access denied (Admin only)"),
-			@ApiResponse(responseCode = "401", description = "Unauthorized")
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Successfully retrieved list"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Access denied (Admin only)"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
 	})
 	@GetMapping("/list")
 	@PreAuthorize("hasAuthority('ROLE_ADMIN')")
-	public ResponseEntity<List<UserResponseDTO>> listUsers() {
+	public ResponseEntity<ApiResponse<List<UserResponseDTO>>> listUsers() {
 		List<UserResponseDTO> users = userService.listUsers();
-		return ResponseEntity.ok(users);
+		return ResponseEntity.ok(ApiResponse.success("Users retrieved successfully", users));
 	}
 
 	/**
@@ -85,21 +84,19 @@ public class UserController {
 	 * @param id the ID of the user
 	 * @return a ResponseEntity containing the user if found, or 404 if not
 	 */
-	@Operation(summary = "Get user by ID", parameters = {
-			@io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier", required = true, example = "public", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-	})
+	@Operation(summary = "Get user by ID")
 	@ApiResponses(value = {
-			@ApiResponse(responseCode = "200", description = "User found"),
-			@ApiResponse(responseCode = "404", description = "User not found"),
-			@ApiResponse(responseCode = "403", description = "Access denied (Admin only)"),
-			@ApiResponse(responseCode = "401", description = "Unauthorized")
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "User found"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "User not found"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "Access denied (Admin only)"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Unauthorized")
 	})
 	@GetMapping("/{id}")
 	@PreAuthorize("hasAuthority('ROLE_ADMIN')")
-	public ResponseEntity<UserResponseDTO> getUserById(@PathVariable Long id) {
-		Optional<UserResponseDTO> userOpt = userService.getUserById(id);
-		return userOpt.map(ResponseEntity::ok)
-				.orElseGet(() -> ResponseEntity.notFound().build());
+	public ResponseEntity<ApiResponse<UserResponseDTO>> getUserById(@PathVariable Long id) {
+		return userService.getUserById(id)
+				.map(dto -> ResponseEntity.ok(ApiResponse.success("User found", dto)))
+				.orElseGet(() -> ResponseEntity.status(404).body(ApiResponse.error("User not found")));
 	}
 
 	/**
@@ -117,12 +114,10 @@ public class UserController {
 	 */
 	@Operation(summary = "Generate Base64 JWT secret key (HS512)")
 	@GetMapping("/generateKey")
-	public String generateKey() {
-		// Generate a secure random key for HS256
+	public ResponseEntity<ApiResponse<String>> generateKey() {
 		Key key = Jwts.SIG.HS512.key().build();
-		// Encode the key as a Base64 string
 		String base64EncodedKey = Encoders.BASE64.encode(key.getEncoded());
-		return base64EncodedKey;
+		return ResponseEntity.ok(ApiResponse.success("Key generated successfully", base64EncodedKey));
 	}
 
 	/**
@@ -141,48 +136,65 @@ public class UserController {
 	 * </ul>
 	 *
 	 * @param authRequest the request object containing the username and password
-	 * @return a {@link JwtResponce} containing the access token and refresh token,
+	 * @return a {@link JwtResponse} containing the access token and refresh token,
 	 *         if authentication is successful
 	 * @throws RuntimeException if the user is blocked or if authentication fails
 	 */
-	@Operation(summary = "Login with credentials and receive JWT + Refresh Token", parameters = {
-			@io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-	})
+	@Operation(summary = "Login with credentials and receive JWT + Refresh Token", description = "Auto-detects tenant from username/email. X-Tenant-ID header is optional (for testing).")
 	@ApiResponses(value = {
-			@ApiResponse(responseCode = "200", description = "Authentication successful"),
-			@ApiResponse(responseCode = "403", description = "User is blocked"),
-			@ApiResponse(responseCode = "401", description = "Invalid credentials")
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "Authentication successful"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "User is blocked"),
+			@io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "Invalid credentials")
 	})
 	@PostMapping("/login")
-	public JwtResponce authenticationAndGetToken(@RequestBody AuthRequest authRequest) {
+	public ResponseEntity<ApiResponse<JwtResponse>> authenticationAndGetToken(@Valid @RequestBody AuthRequest authRequest) {
 
 		String username = authRequest.getUsername();
-
-		// 1. Check if user is blocked
-		if (loginAttemptService.isBlocked(username)) {
-			throw new RuntimeException("User account is temporarily locked due to too many failed login attempts.");
-		}
+		String tenantId = tenantLookupService.findTenantByEmailOrUsername(username);
+		TenantContext.setTenant(tenantId);
 
 		try {
-			// 2. Try authentication
+			if (loginAttemptService.isBlocked(username)) {
+				throw new org.springframework.security.authentication.LockedException(
+						"User account is temporarily locked due to too many failed login attempts.");
+			}
+
 			Authentication authentication = authenticationManager.authenticate(
 					new UsernamePasswordAuthenticationToken(username, authRequest.getPassword()));
 
-			// 3. If successful, record successful login
 			loginAttemptService.loginSucceeded(username);
+			Optional<UserResponseDTO> userOpt = userService.findByUsername(username);
+			com.thinkerscave.common.usrm.domain.RefreshToken refreshToken = refreshTokenService.createRefreshToken(username);
 
-			// 4. Generate tokens
-			RefreshToken refreshToken = refreshTokenService.createRefreshToken(username);
-			return JwtResponce.builder()
+			JwtResponse response = JwtResponse.builder()
 					.accessToken(jwtServiceImpl.generateToken(username))
 					.token(refreshToken.getToken())
+					.tenantId(tenantId)
+					.tenantName(formatTenantName(tenantId))
+					.user(userOpt.orElse(null))
 					.build();
 
+			return ResponseEntity.ok(ApiResponse.success("Login successful", response));
+
 		} catch (AuthenticationException ex) {
-			// 5. Record failed login attempt
 			loginAttemptService.loginFailed(username);
-			throw ex; // Let GlobalExceptionHandler handle the response
+			throw ex;
+		} finally {
+			TenantContext.clear();
 		}
+	}
+
+	/**
+	 * Helper method to format tenant ID into a human-readable name.
+	 * Example: "mumbai_school" -> "Mumbai School"
+	 */
+	private String formatTenantName(String tenantId) {
+		if (tenantId == null || tenantId.isEmpty() || "public".equals(tenantId)) {
+			return "Public";
+		}
+		return java.util.Arrays.stream(tenantId.split("[_-]"))
+				.map(word -> word.substring(0, 1).toUpperCase() + word.substring(1).toLowerCase())
+				.collect(java.util.stream.Collectors.joining(" "));
 	}
 
 	/**
@@ -191,47 +203,51 @@ public class UserController {
 	 * @param refreshTokenRequest the request containing the refresh token
 	 * @return a response containing the new JWT and the refresh token
 	 */
-	@Operation(summary = "Refresh the JWT using a valid refresh token", parameters = {
-			@io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier", required = false, example = "public", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-	})
+	@Operation(summary = "Refresh the JWT using a valid refresh token")
 	@PostMapping("/refreshToken")
-	public JwtResponce refreshToken(@RequestBody RefreshTokenRequest refreshTokenRequest) {
-		// Use the transactional service method to validate token and get initialized
-		// user
-		User user = refreshTokenService.validateAndGetUser(refreshTokenRequest.getToken());
-
+	public ResponseEntity<ApiResponse<JwtResponse>> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
+		com.thinkerscave.common.usrm.domain.User user = refreshTokenService.validateAndGetUser(refreshTokenRequest.getToken());
 		String accessToken = jwtServiceImpl.generateToken(user.getUserName());
 
-		// Build the response with the new JWT and the refresh token
-		return JwtResponce.builder()
+		JwtResponse response = JwtResponse.builder()
 				.accessToken(accessToken)
 				.token(refreshTokenRequest.getToken())
 				.build();
+		return ResponseEntity.ok(ApiResponse.success("Token refreshed successfully", response));
 	}
 
-	@Operation(summary = "Logout user and invalidate refresh token", parameters = {
-			@io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier", required = false, example = "public", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-	})
+	@Operation(summary = "Logout user and invalidate refresh token")
 	@PostMapping("/logout")
-	public ResponseEntity<String> logoutUser(@RequestBody RefreshTokenRequest refreshTokenRequest) {
-		// Invalidate refresh token in DB
+	public ResponseEntity<ApiResponse<Void>> logoutUser(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
 		refreshTokenService.deleteByToken(refreshTokenRequest.getToken());
-		return ResponseEntity.ok("Logged out successfully");
+		return ResponseEntity.ok(ApiResponse.success("Logged out successfully", null));
 	}
 
 	@Operation(summary = "Get current logged-in user details")
 	@GetMapping("/currentUserInfo")
-	public ResponseEntity<UserResponseDTO> getCurrentUser(Authentication authentication) {
+	public ResponseEntity<ApiResponse<UserResponseDTO>> getCurrentUser(Authentication authentication) {
 		if (authentication == null || !authentication.isAuthenticated()) {
-			return ResponseEntity.status(401).build();
+			return ResponseEntity.status(401).body(ApiResponse.error("Unauthorized"));
 		}
-
 		String username = authentication.getName();
-
 		UserResponseDTO dto = userService.findByUsername(username)
 				.orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+		return ResponseEntity.ok(ApiResponse.success("User info retrieved", dto));
+	}
 
-		return ResponseEntity.ok(dto);
+	@Operation(summary = "Change password for authenticated user (first-time login)", description = "Must be called with a valid JWT. Changes password and clears the first-time-login flag.")
+	@PatchMapping("/changePassword")
+	public ResponseEntity<ApiResponse<Void>> changePassword(
+			@Valid @RequestBody com.thinkerscave.common.usrm.dto.ChangePasswordRequest request,
+			Authentication authentication) {
+		if (authentication == null || !authentication.isAuthenticated()) {
+			return ResponseEntity.status(401).body(ApiResponse.error("Unauthorized"));
+		}
+		if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+			return ResponseEntity.badRequest().body(ApiResponse.error("Passwords do not match."));
+		}
+		userService.changePasswordForCurrentUser(authentication.getName(), request.getNewPassword());
+		return ResponseEntity.ok(ApiResponse.success("Password changed successfully.", null));
 	}
 
 }

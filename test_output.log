@@ -1,0 +1,178 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< com.mcvm:User-Management-Service >------------------
+[INFO] Building User-Management-Service 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.3.2:clean (default-clean) @ User-Management-Service ---
+[INFO] Deleting /Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas/target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ User-Management-Service ---
+[INFO] Copying 4 resources from src/main/resources to target/classes
+[INFO] Copying 8 resources from src/main/resources to target/classes
+[INFO] 
+[INFO] --- compiler:3.13.0:compile (default-compile) @ User-Management-Service ---
+[INFO] Recompiling the module because of changed source code.
+[INFO] Compiling 259 source files with javac [debug parameters release 21] to target/classes
+[WARNING] /Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas/src/main/java/com/thinkerscave/common/orgm/dto/TenantOnboardingRequest.java:[41,20] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas/src/main/java/com/thinkerscave/common/orgm/dto/TenantOnboardingRequest.java:[43,20] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas/src/main/java/com/thinkerscave/common/orgm/dto/TenantOnboardingRequest.java:[48,21] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas/src/main/java/com/thinkerscave/common/orgm/dto/TenantOnboardingRequest.java:[55,21] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas/src/main/java/com/thinkerscave/common/orgm/dto/TenantOnboardingRequest.java:[57,21] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[WARNING] /Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas/src/main/java/com/thinkerscave/common/admission/domain/Inquiry.java:[96,21] @Builder will ignore the initializing expression entirely. If you want the initializing expression to serve as default, add @Builder.Default. If it is not supposed to be settable during building, make the field final.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ User-Management-Service ---
+[INFO] skip non existing resourceDirectory /Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas/src/test/resources
+[INFO] 
+[INFO] --- compiler:3.13.0:testCompile (default-testCompile) @ User-Management-Service ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 5 source files with javac [debug parameters release 21] to target/test-classes
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ User-Management-Service ---
+[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
+[INFO] 
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.thinkerscave.common.security.SecurityIntegrationTest
+SLF4J(W): Class path contains multiple SLF4J providers.
+SLF4J(W): Found provider [ch.qos.logback.classic.spi.LogbackServiceProvider@11c9af63]
+SLF4J(W): Found provider [org.apache.logging.slf4j.SLF4JServiceProvider@757acd7b]
+SLF4J(W): See https://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J(I): Actual provider is of type [ch.qos.logback.classic.spi.LogbackServiceProvider@11c9af63]
+13:14:47.617 [main] INFO org.springframework.test.context.support.AnnotationConfigContextLoaderUtils -- Could not detect default configuration classes for test class [com.thinkerscave.common.security.SecurityIntegrationTest]: SecurityIntegrationTest does not declare any static, non-private, non-final, nested classes annotated with @Configuration.
+13:14:47.708 [main] INFO org.springframework.boot.test.context.SpringBootTestContextBootstrapper -- Found @SpringBootConfiguration com.thinkerscave.common.UserManagementServiceApplication for test class com.thinkerscave.common.security.SecurityIntegrationTest
+13:14:47.764 [main] INFO org.springframework.boot.devtools.restart.RestartApplicationListener -- Restart disabled due to context in which it is running
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.4)
+
+2026-02-06T13:14:48.028+05:30  INFO 5089 --- [           main] c.t.c.security.SecurityIntegrationTest   : Starting SecurityIntegrationTest using Java 21.0.8 with PID 5089 (started by bikashkumarnishank in /Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas)
+2026-02-06T13:14:48.029+05:30  INFO 5089 --- [           main] c.t.c.security.SecurityIntegrationTest   : No active profile set, falling back to 1 default profile: "default"
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+WARNING: A Java agent has been loaded dynamically (/Users/bikashkumarnishank/.m2/repository/net/bytebuddy/byte-buddy-agent/1.14.19/byte-buddy-agent-1.14.19.jar)
+WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
+WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
+WARNING: Dynamic loading of agents will be disallowed by default in a future release
+2026-02-06T13:14:49.614+05:30  INFO 5089 --- [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-02-06T13:14:49.614+05:30  WARN 5089 --- [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2026-02-06T13:14:50.005+05:30  INFO 5089 --- [           main] o.s.b.t.m.w.SpringBootMockServletContext : Initializing Spring TestDispatcherServlet ''
+2026-02-06T13:14:50.005+05:30  INFO 5089 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Initializing Servlet ''
+2026-02-06T13:14:50.006+05:30  INFO 5089 --- [           main] o.s.t.web.servlet.TestDispatcherServlet  : Completed initialization in 1 ms
+2026-02-06T13:14:50.026+05:30  INFO 5089 --- [           main] c.t.c.security.SecurityIntegrationTest   : Started SecurityIntegrationTest in 2.272 seconds (process running for 2.819)
+
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/v1/users/currentUserInfo
+       Parameters = {}
+          Headers = [Authorization:"Bearer valid.jwt.token"]
+             Body = null
+    Session Attrs = {}
+
+Handler:
+             Type = null
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 403
+    Error message = Access Denied
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = null
+             Body = 
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+
+MockHttpServletRequest:
+      HTTP Method = GET
+      Request URI = /api/v1/users/currentUserInfo
+       Parameters = {}
+          Headers = [Authorization:"Bearer valid.jwt.token"]
+             Body = null
+    Session Attrs = {}
+
+Handler:
+             Type = null
+
+Async:
+    Async started = false
+     Async result = null
+
+Resolved Exception:
+             Type = null
+
+ModelAndView:
+        View name = null
+             View = null
+            Model = null
+
+FlashMap:
+       Attributes = null
+
+MockHttpServletResponse:
+           Status = 403
+    Error message = Access Denied
+          Headers = [Vary:"Origin", "Access-Control-Request-Method", "Access-Control-Request-Headers", X-Content-Type-Options:"nosniff", X-XSS-Protection:"0", Cache-Control:"no-cache, no-store, max-age=0, must-revalidate", Pragma:"no-cache", Expires:"0", X-Frame-Options:"DENY"]
+     Content type = null
+             Body = 
+    Forwarded URL = null
+   Redirected URL = null
+          Cookies = []
+[ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 2.669 s <<< FAILURE! -- in com.thinkerscave.common.security.SecurityIntegrationTest
+[ERROR] com.thinkerscave.common.security.SecurityIntegrationTest.testProtectedEndpoint_WithValidToken_ShouldSucceed -- Time elapsed: 0.066 s <<< FAILURE!
+java.lang.AssertionError: Status expected:<200> but was:<403>
+	at org.springframework.test.util.AssertionErrors.fail(AssertionErrors.java:59)
+	at org.springframework.test.util.AssertionErrors.assertEquals(AssertionErrors.java:122)
+	at org.springframework.test.web.servlet.result.StatusResultMatchers.lambda$matcher$9(StatusResultMatchers.java:637)
+	at org.springframework.test.web.servlet.MockMvc$1.andExpect(MockMvc.java:214)
+	at com.thinkerscave.common.security.SecurityIntegrationTest.testProtectedEndpoint_WithValidToken_ShouldSucceed(SecurityIntegrationTest.java:119)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:580)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+	at java.base/java.util.ArrayList.forEach(ArrayList.java:1596)
+
+[INFO] 
+[INFO] Results:
+[INFO] 
+[ERROR] Failures: 
+[ERROR]   SecurityIntegrationTest.testProtectedEndpoint_WithValidToken_ShouldSucceed:119 Status expected:<200> but was:<403>
+[INFO] 
+[ERROR] Tests run: 4, Failures: 1, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  10.852 s
+[INFO] Finished at: 2026-02-06T13:14:50+05:30
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-surefire-plugin:3.2.5:test (default-test) on project User-Management-Service: There are test failures.
+[ERROR] 
+[ERROR] Please refer to /Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas/target/surefire-reports for the individual test results.
+[ERROR] Please refer to dump files (if any exist) [date].dump, [date]-jvmRun[N].dump and [date].dumpstream.
+[ERROR] -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException

@@ -2,7 +2,8 @@ package com.thinkerscave.common.menum.domain;
 
 import com.thinkerscave.common.auditing.Auditable;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.EqualsAndHashCode;
 
 import java.util.ArrayList;
@@ -10,7 +11,8 @@ import java.util.List;
 
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-@Data
+@Getter
+@Setter
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Entity
 @EntityListeners(AuditingEntityListener.class)
@@ -47,7 +49,7 @@ public class SubMenu extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "menu_id", nullable = false)
     private Menu menu;
-    
+
     @OneToMany(mappedBy = "subMenu", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<SubMenuPrivilegeMapping> privilegeMappings = new ArrayList<>();
 

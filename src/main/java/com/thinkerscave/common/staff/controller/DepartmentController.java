@@ -1,41 +1,51 @@
 package com.thinkerscave.common.staff.controller;
 
+import com.thinkerscave.common.staff.domain.Department;
 import com.thinkerscave.common.staff.service.DepartmentService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpStatus;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.Map;
 
-@CrossOrigin("*")
 @RestController
-@RequestMapping("/api/department")
+@RequestMapping("/api/v1/departments")
 @Tag(name = "Department", description = "Operations related to department management")
+@RequiredArgsConstructor
+@Slf4j
 public class DepartmentController {
 
-    @Autowired
-    private DepartmentService departmentService;
+    private final DepartmentService departmentService;
 
-    @Operation(summary = "Get All Departments", description = "Retrieve all active departments.", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Departments retrieved successfully"),
-            @ApiResponse(responseCode = "400", description = "Failed to retrieve departments")
-    })
+    @Operation(summary = "Get All Departments", description = "Retrieve all active departments for the current organization.")
     @GetMapping("/getAllDepartment")
     public ResponseEntity<Map<String, Object>> getAllDepartmentDetails() {
         Map<String, Object> result = departmentService.getAllActiveDepartment();
+        return Boolean.TRUE.equals(result.get("isOutcome"))
+                ? ResponseEntity.ok(result)
+                : ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+    }
 
-        if (Boolean.TRUE.equals(result.get("isOutcome"))) {
-            return ResponseEntity.ok(result);
-        } else {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
-        }
+    @Operation(summary = "Create or Update Department")
+    @PostMapping("/saveOrUpdate")
+    public ResponseEntity<Map<String, Object>> saveOrUpdate(@RequestBody Department department) {
+        log.info("Saving/updating department: {}", department.getDepartmentName());
+        Map<String, Object> result = departmentService.saveOrUpdate(department);
+        return Boolean.TRUE.equals(result.get("isOutcome"))
+                ? ResponseEntity.ok(result)
+                : ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+    }
+
+    @Operation(summary = "Toggle Department Active Status")
+    @PatchMapping("/{id}/toggle")
+    public ResponseEntity<Map<String, Object>> toggleActive(@PathVariable Long id) {
+        Map<String, Object> result = departmentService.toggleActive(id);
+        return Boolean.TRUE.equals(result.get("isOutcome"))
+                ? ResponseEntity.ok(result)
+                : ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
     }
 }

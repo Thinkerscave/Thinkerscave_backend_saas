@@ -1,78 +1,36 @@
 package com.thinkerscave.common.orgm.controller;
 
-import com.thinkerscave.common.exception.SchemaCreationException;
-//import com.thinkerscave.common.config.TenantContext;
-import com.thinkerscave.common.orgm.domain.Organisation;
-
 import com.thinkerscave.common.orgm.dto.*;
 import com.thinkerscave.common.orgm.service.OrganizationService;
-//import com.thinkerscave.common.orgm.service.SchemaInitializer;
-import com.thinkerscave.common.orgm.service.SchemaService;
+import com.thinkerscave.common.commonModel.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Collections;
+import jakarta.validation.Valid;
 import java.util.List;
 
-@CrossOrigin("*")
 @RestController
-@RequestMapping("/api/organizations")
+@RequestMapping("/api/v1/organizations")
 @Tag(name = "Organization Management", description = "APIs related to organization registration and management")
 @RequiredArgsConstructor
 @Slf4j
 public class OrganizationController {
 
     private final OrganizationService organizationService;
-    private final SchemaService schemaService;
 
-    @PostMapping("/register")
-    @Operation(summary = "Register a new organization", description = "Registers a new organization and creates its corresponding schema.", parameters = {
-            @Parameter(name = "X-Tenant-ID", description = "Schema Name", required = true, example = "demo_org", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    }, responses = {
-            @ApiResponse(responseCode = "200", description = "Successfully registered organization", content = @Content(mediaType = "application/json", schema = @Schema(implementation = OrgResponseDTO.class), examples = @ExampleObject(value = """
-                        {
-                          "message": "Organization registered successfully",
-                          "orgCode": "demo_org",
-                          "userCode": "admin_user"
-                        }
-                    """))),
-            @ApiResponse(responseCode = "400", description = "Schema already exists"),
-            @ApiResponse(responseCode = "500", description = "Internal server error")
-    })
-    public ResponseEntity<?> registerOrganization(@RequestBody OrgRequestDTO request) {
-        try {
-            log.info("Registering new organization: {}", request.getOrgName());
-            // Register Organization
-            OrgResponseDTO response = organizationService.saveOrganization(request);
-            return ResponseEntity.ok(response);
-
-        } catch (SchemaCreationException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Failed to create schema: " + e.getMessage());
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Unexpected error: " + e.getMessage());
-        }
-    }
-
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateOrganization(
+    public ResponseEntity<ApiResponse<OrgResponseDTO>> updateOrganization(
             @PathVariable Long id,
-            @RequestBody OrgUpdateDTO organizationUpdateDto) {
-        log.debug("Updating Organization ID: {}, Data: {}", id, organizationUpdateDto);
+            @Valid @RequestBody OrgUpdateDTO organizationUpdateDto) {
+        log.info("Updating Organization ID: {}", id);
         OrgResponseDTO response = organizationService.updateOrganization(id, organizationUpdateDto);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success("Organization updated successfully", response));
     }
 
     /**
@@ -82,34 +40,33 @@ public class OrganizationController {
      *
      * @return A ResponseEntity containing the list of parent organizations.
      */
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @GetMapping("/groups")
-    public ResponseEntity<List<ParentOrgDTO>> getParentOrganizations() {
+    public ResponseEntity<ApiResponse<List<ParentOrgDTO>>> getParentOrganizations() {
         List<ParentOrgDTO> parentOrgs = organizationService.getParentOrganizations();
-        return ResponseEntity.ok(parentOrgs);
+        return ResponseEntity.ok(ApiResponse.success("Parent organizations retrieved", parentOrgs));
     }
 
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @GetMapping("/all")
     @Operation(summary = "Get all organizations")
-    public ResponseEntity<List<OrganisationListDTO>> getAllOrganizations() {
-        try {
-            List<OrganisationListDTO> organizations = organizationService.getAllOrgsAsDTO();
-            return ResponseEntity.ok(organizations);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Collections.emptyList());
-        }
+    public ResponseEntity<ApiResponse<List<OrganisationListDTO>>> getAllOrganizations() {
+        List<OrganisationListDTO> organizations = organizationService.getAllOrgsAsDTO();
+        return ResponseEntity.ok(ApiResponse.success("All organizations retrieved", organizations));
     }
 
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @PatchMapping("/{orgCode}")
-    public ResponseEntity<String> toggleOrganizationStatus(@PathVariable String orgCode) {
+    public ResponseEntity<ApiResponse<String>> toggleOrganizationStatus(@PathVariable String orgCode) {
         String resultMessage = organizationService.softDeleteOrg(orgCode);
-        return ResponseEntity.ok(resultMessage);
+        return ResponseEntity.ok(ApiResponse.success(resultMessage, null));
     }
 
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @PutMapping("/owner/update")
-    public ResponseEntity<String> updateOwnerDetails(@RequestBody OwnerDTO dto) {
+    public ResponseEntity<ApiResponse<Void>> updateOwnerDetails(@Valid @RequestBody OwnerDTO dto) {
         organizationService.updateOwnerDetailsWithUser(dto);
-        return ResponseEntity.ok("Owner and user details updated successfully.");
+        return ResponseEntity.ok(ApiResponse.success("Owner and user details updated successfully.", null));
     }
 
 }

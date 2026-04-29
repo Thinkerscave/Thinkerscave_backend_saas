@@ -1,7 +1,8 @@
 package com.thinkerscave.common.course.service;
 
 import com.thinkerscave.common.course.dto.AcademicContainerDTO;
-import com.thinkerscave.common.course.domain.AcademicYear;
+import com.thinkerscave.common.course.dto.StructureTemplateDTO;
+import com.thinkerscave.common.course.dto.AcademicYearDTO;
 
 import java.util.List;
 
@@ -11,11 +12,11 @@ import java.util.List;
 public interface AcademicStructureService {
 
     // Academic Year
-    AcademicYear createAcademicYear(Long orgId, String yearCode, String startDate, String endDate);
+    AcademicYearDTO createAcademicYear(Long orgId, String yearCode, String startDate, String endDate);
 
-    List<AcademicYear> getAcademicYears(Long orgId);
+    List<AcademicYearDTO> getAcademicYears(Long orgId);
 
-    AcademicYear getCurrentAcademicYear(Long orgId);
+    AcademicYearDTO getCurrentAcademicYear(Long orgId);
 
     void setCurrentAcademicYear(Long orgId, Long yearId);
 
@@ -36,4 +37,6 @@ public interface AcademicStructureService {
     void generateSchoolStructure(Long orgId, Long yearId);
 
     void generateCollegeStructure(Long orgId, Long yearId, Long courseId);
+
+    void generateDynamicStructure(Long orgId, Long yearId, StructureTemplateDTO template);
 }

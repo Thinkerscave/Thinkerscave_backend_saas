@@ -19,20 +19,20 @@ import java.util.List;
 
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-@Data
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
 @Getter
 @Setter
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
 @Table(name = "users")
+@Builder
 public class User extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include
     private Long id;
 
     @Column(name = "user_code", unique = true, nullable = false)
@@ -48,6 +48,7 @@ public class User extends Auditable {
     private String lastName;
 
     @Column(name = "email", nullable = false, length = 255)
+    @EqualsAndHashCode.Include
     private String email;
 
     @Column(name = "mobile_number", nullable = false)
@@ -67,8 +68,6 @@ public class User extends Auditable {
 
     @Column(name = "state", length = 255)
     private String state;
-
-    @Builder.Default
     @Column(name = "country", length = 100)
     private String country = "India";
 
@@ -130,6 +129,10 @@ public class User extends Auditable {
     @ManyToMany(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
     private List<Role> roles = new ArrayList<>();
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "organization_users", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "organization_id"))
+    private List<com.thinkerscave.common.orgm.domain.Organisation> organizations = new ArrayList<>();
 
     // other Optional fields:
 

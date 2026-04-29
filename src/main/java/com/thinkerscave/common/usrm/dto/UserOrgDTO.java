@@ -9,10 +9,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class JwtResponce {
-	
-	private String accessToken;
-	private String token;
-	
-
+public class UserOrgDTO {
+    private Long orgId;
+    private String orgName;
+    private String orgCode;
 }

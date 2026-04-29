@@ -12,7 +12,7 @@ import com.thinkerscave.common.menum.repository.SubMenuPrivilegeMappingRepositor
 import com.thinkerscave.common.menum.repository.SubMenuRepository;
 import com.thinkerscave.common.menum.service.SubMenuService;
 
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -97,6 +97,7 @@ public class SubMenuServiceImpl implements SubMenuService {
 	 * Returns a submenu by its public code (safe for external APIs).
 	 */
 	@Override
+	@Transactional(readOnly = true)
 	public Optional<SubMenuResponseDTO> getSubMenuByCode(String code) {
 		return subMenuRepository.findBySubMenuCode(code).map(this::mapToResponseDTO);
 	}
@@ -105,6 +106,7 @@ public class SubMenuServiceImpl implements SubMenuService {
 	 * Returns all submenus sorted by sequence.
 	 */
 	@Override
+	@Transactional(readOnly = true)
 	public List<SubMenuResponseDTO> getAllSubMenus() {
 		return subMenuRepository.findAllByOrderBySubMenuOrderAsc().stream().map(this::mapToResponseDTO)
 				.collect(Collectors.toList());
@@ -114,6 +116,7 @@ public class SubMenuServiceImpl implements SubMenuService {
 	 * Returns all active submenus sorted by sequence.
 	 */
 	@Override
+	@Transactional(readOnly = true)
 	public List<SubMenuResponseDTO> getAllActiveSubMenus() {
 		return subMenuRepository.findByIsActiveTrueOrderBySubMenuOrderAsc().stream().map(this::mapToResponseDTO)
 				.collect(Collectors.toList());

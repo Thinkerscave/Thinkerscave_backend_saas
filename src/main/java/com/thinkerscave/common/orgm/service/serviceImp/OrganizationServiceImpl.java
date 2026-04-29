@@ -101,7 +101,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     // }
 
     @Override
-    @Transactional // Ensures the entire operation succeeds or fails together
+    @Transactional
     public OrgResponseDTO saveOrganization(OrgRequestDTO request) {
         // String schema = TenantContext.getTenant();
         // if (schema == null) {
@@ -116,21 +116,59 @@ public class OrganizationServiceImpl implements OrganizationService {
         User savedUser = userRepository.findByEmail(request.getOwnerEmail()).orElse(null);
 
         if (savedUser == null) {
-            logger.info("👤 [User] No existing user found. Creating a new user.");
-            User newUser = new User();
-            newUser.setFirstName(request.getOwnerName());
-            newUser.setLastName("");
-            newUser.setEmail(request.getOwnerEmail());
-            newUser.setMobileNumber(Long.valueOf(request.getOwnerMobile()));
-            newUser.setUserName(generateUniqueUserName(request.getOwnerName()));
+            // Only create a user in public schema if NOT called from tenant onboarding
+            // (tenant onboarding already created the user in the tenant schema)
+            if (request.getTenantSchema() != null && !request.getTenantSchema().isEmpty()) {
+                // Called from tenant onboarding — create a minimal public-schema user
+                // with the SAME password (already hashed by the caller)
+                logger.info("👤 [User] Tenant onboarding mode — creating linked public user for: {}",
+                        request.getOwnerEmail());
+                User newUser = new User();
+                newUser.setFirstName(request.getOwnerName() != null ? request.getOwnerName() : "Admin");
+                newUser.setLastName("");
+                newUser.setEmail(request.getOwnerEmail());
+                Long mobileNum = null;
+                if (request.getOwnerMobile() != null && !request.getOwnerMobile().trim().isEmpty()) {
+                    try {
+                        mobileNum = Long.valueOf(request.getOwnerMobile().trim());
+                    } catch (NumberFormatException e) {
+                        logger.warn("Invalid mobile number format: {}", request.getOwnerMobile());
+                        throw new IllegalArgumentException("Invalid mobile number format: " + request.getOwnerMobile());
+                    }
+                }
+                newUser.setMobileNumber(mobileNum);
+                newUser.setUserName(request.getOwnerEmail()); // Use email as username for consistency
+                newUser.setPassword("TENANT_MANAGED"); // Password is managed in tenant schema
+                newUser.setUserCode("USER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+                savedUser = userRepository.save(newUser);
+            } else {
+                // Standalone org registration — create a new user with a random password
+                logger.info("👤 [User] No existing user found. Creating a new user.");
+                User newUser = new User();
+                newUser.setFirstName(request.getOwnerName());
+                newUser.setLastName("");
+                newUser.setEmail(request.getOwnerEmail());
+                Long mobileNum = null;
+                if (request.getOwnerMobile() != null && !request.getOwnerMobile().trim().isEmpty()) {
+                    try {
+                        mobileNum = Long.valueOf(request.getOwnerMobile().trim());
+                    } catch (NumberFormatException e) {
+                        logger.warn("Invalid mobile number format for user {}: {}",
+                                request.getOwnerName(), request.getOwnerMobile());
+                        throw new IllegalArgumentException("Invalid mobile number format: " + request.getOwnerMobile());
+                    }
+                }
+                newUser.setMobileNumber(mobileNum);
+                newUser.setUserName(generateUniqueUserName(request.getOwnerName()));
 
-            // --- SECURITY FIX: Hash the password before saving ---
-            String rawPassword = generateRandomPassword();
-            initialPassword = rawPassword; // Capture for response
-            newUser.setPassword(passwordEncoder.encode(rawPassword));
+                // --- SECURITY FIX: Hash the password before saving ---
+                String rawPassword = generateRandomPassword();
+                initialPassword = rawPassword; // Capture for response
+                newUser.setPassword(passwordEncoder.encode(rawPassword));
 
-            newUser.setUserCode("USER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
-            savedUser = userRepository.save(newUser);
+                newUser.setUserCode("USER-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+                savedUser = userRepository.save(newUser);
+            }
         }
 
         // Step 2: Create the new Organisation, handling the parent relationship.
@@ -177,6 +215,7 @@ public class OrganizationServiceImpl implements OrganizationService {
         dto.setEstablishDate(org.getEstablishmentDate());
         dto.setGroup(org.getIsGroup());
         dto.setIsActive(org.getIsActive());
+        dto.setTenantId(org.getTenantSchema());
 
         // --- THIS IS THE FIX ---
         // Safely access lazy-loaded fields to get the real data.
@@ -188,6 +227,11 @@ public class OrganizationServiceImpl implements OrganizationService {
             dto.setOwnerName(org.getUser().getFirstName()); // Or getFullName() if you have it
             dto.setOwnerEmail(org.getUser().getEmail());
             dto.setOwnerMobile(String.valueOf(org.getUser().getMobileNumber()));
+
+            // Fetch owner code from OwnerDetails
+            ownerDetailsRepository.findByOrganization(org).ifPresent(owner -> {
+                dto.setOwnerCode(owner.getOwnerCode());
+            });
         }
 
         return dto;
@@ -243,7 +287,11 @@ public class OrganizationServiceImpl implements OrganizationService {
         // names.
         updateUserFullName(user, dto.ownerName());
         user.setEmail(dto.ownerEmail());
-        user.setMobileNumber(Long.parseLong(dto.ownerMobile())); // Assuming mobile is stored as a long
+        if (dto.ownerMobile() != null && !dto.ownerMobile().trim().isEmpty()) {
+            user.setMobileNumber(Long.valueOf(dto.ownerMobile().trim()));
+        } else {
+            user.setMobileNumber(null);
+        }
 
         // --- Step 4: Save all changes ---
         // Within a @Transactional method, JPA's dirty checking often makes explicit
@@ -348,14 +396,34 @@ public class OrganizationServiceImpl implements OrganizationService {
         ownerDetailsRepository.save(owner);
     }
 
-    /** Generates a unique username using name and timestamp. */
+    /** Generates a unique username securely to avoid collisions. */
     private String generateUniqueUserName(String fullName) {
-        return fullName.toLowerCase().replace(" ", "_") + "_" + System.currentTimeMillis() % 10000;
+        String baseName = fullName != null ? fullName.toLowerCase().replaceAll("[^a-z0-9]", "_") : "user";
+        String randomSuffix = UUID.randomUUID().toString().substring(0, 6);
+        return baseName + "_" + randomSuffix;
     }
 
-    /** Generates a random 10-character password. */
+    /** Generates a cryptographically secure random password meeting complexity requirements. */
     private String generateRandomPassword() {
-        return UUID.randomUUID().toString().substring(0, 10);
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        StringBuilder sb = new StringBuilder(12);
+        
+        for (int i = 0; i < 12; i++) {
+            sb.append(chars.charAt(random.nextInt(chars.length())));
+        }
+        
+        // Guarantee complexity requirements
+        sb.setCharAt(0, "ABCDEFGHIJKLMNOPQRSTUVWXYZ".charAt(random.nextInt(26)));
+        sb.setCharAt(1, "abcdefghijklmnopqrstuvwxyz".charAt(random.nextInt(26)));
+        sb.setCharAt(2, "0123456789".charAt(random.nextInt(10)));
+        sb.setCharAt(3, "!@#$%^&*".charAt(random.nextInt(8)));
+        
+        // Shuffle the characters
+        List<Character> charList = sb.chars().mapToObj(c -> (char) c).collect(Collectors.toList());
+        java.util.Collections.shuffle(charList, random);
+        
+        return charList.stream().collect(StringBuilder::new, StringBuilder::append, StringBuilder::append).toString();
     }
 
     /**
@@ -389,6 +457,11 @@ public class OrganizationServiceImpl implements OrganizationService {
         newOrg.setType(request.getOrgType() != null ? OrganizationType.valueOf(request.getOrgType()) : null);
         newOrg.setSubscriptionType(request.getSubscriptionType());
         newOrg.setIsActive(true); // Default to active on creation
+
+        // Link to tenant schema if provided (set during onboarding)
+        if (request.getTenantSchema() != null && !request.getTenantSchema().isEmpty()) {
+            newOrg.setTenantSchema(request.getTenantSchema());
+        }
 
         // Associate the owner User with this Organisation (as per your ER diagram)
         newOrg.setUser(ownerUser);

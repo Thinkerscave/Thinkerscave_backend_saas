@@ -11,6 +11,9 @@ import java.util.List;
 public class ApplicationStatusUpdateRequest {
     @NotNull(message = "Status is required")
     private ApplicationStatus status;
+    public java.util.List<String> getApplicationIds() { return applicationIds; }
+    public com.thinkerscave.common.admission.domain.ApplicationStatus getStatus() { return status; }
+
     
     @NotEmpty(message = "At least one application ID is required")
     private List<String> applicationIds;

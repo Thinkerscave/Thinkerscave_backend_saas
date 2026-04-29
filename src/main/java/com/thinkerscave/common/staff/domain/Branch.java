@@ -9,13 +9,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-@Data
 @Entity
 @AllArgsConstructor
 @NoArgsConstructor
-@Getter
-@Setter
-@EqualsAndHashCode(callSuper = false)
+@Data
+
 @Table(name = "branch")
 public class Branch extends Auditable {
 

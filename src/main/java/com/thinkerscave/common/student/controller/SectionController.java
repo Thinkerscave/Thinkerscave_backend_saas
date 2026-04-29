@@ -1,40 +1,54 @@
 package com.thinkerscave.common.student.controller;
 
-import com.thinkerscave.common.student.domain.Section;
+import com.thinkerscave.common.student.dto.SectionDTO;
 import com.thinkerscave.common.student.service.SectionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import com.thinkerscave.common.commonModel.ApiResponse;
 
 import java.util.Collections;
 import java.util.List;
+import jakarta.validation.Valid;
 
 @RestController
-@RequestMapping("/api/section")
-@CrossOrigin("*")
+@RequestMapping("/api/v1/sections")
+@Tag(name = "Section Management", description = "APIs for managing class sections/divisions")
 @RequiredArgsConstructor
 @Slf4j
 public class SectionController {
 
 	private final SectionService sectionService;
 
-	@io.swagger.v3.oas.annotations.Operation(summary = "Get sections by class ID", parameters = {
-			@io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-	})
+	@Operation(summary = "Get sections by class ID")
 	@GetMapping("getListOfSectionsByClassId/{classId}")
-	public List<Section> getListOfSectionsByClassId(@PathVariable("classId") Long classId) {
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF', 'TEACHER') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
+	public ResponseEntity<ApiResponse<List<SectionDTO>>> getListOfSectionsByClassId(@PathVariable("classId") Long classId) {
 		log.info("Fetching sections for classId: {}", classId);
-		List<Section> sectionList = sectionService.getListOfSectionByClassId(classId);
-		if (!sectionList.isEmpty()) {
-			return sectionList;
-		} else {
-			return Collections.emptyList();
-		}
+		List<SectionDTO> sectionList = sectionService.getListOfSectionByClassId(classId);
+		return ResponseEntity.ok(ApiResponse.success("Sections fetched successfully", sectionList));
 	}
 
-	@GetMapping("/hello")
-	public String ex() {
-		return "hello";
+	@Operation(summary = "Create or Update Section")
+	@PostMapping("/saveOrUpdate")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+	public ResponseEntity<ApiResponse<SectionDTO>> saveOrUpdate(@Valid @RequestBody SectionDTO sectionDTO) {
+		log.info("Saving/updating section: {}", sectionDTO.getSectionName());
+		SectionDTO savedSection = sectionService.saveOrUpdate(sectionDTO);
+		return ResponseEntity.ok(ApiResponse.success("Section saved successfully", savedSection));
 	}
 
+	@Operation(summary = "Delete Section")
+	@DeleteMapping("/{id}")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+	public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+		log.info("Deleting section id: {}", id);
+		sectionService.delete(id);
+		return ResponseEntity.ok(ApiResponse.success("Section deleted successfully", null));
+	}
 }

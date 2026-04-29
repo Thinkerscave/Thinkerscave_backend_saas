@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,7 +35,6 @@ import java.util.List;
  * a professional business operation and documented via Swagger/OpenAPI for
  * seamless developer onboarding.
  */
-@CrossOrigin("*")
 @RestController
 @RequestMapping("/api/v1/courses")
 @Tag(name = "Course Management", description = "Professional APIs for defining and managing institutional degree programs and courses")
@@ -58,9 +58,8 @@ public class CourseController {
      * @return ResponseEntity containing the persisted course details.
      */
     @PostMapping
-    @Operation(summary = "Register a new academic program", description = "Creates a new Course entity linked to the organization. Generates a unique business code if not provided.", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_ADD')")
+    @Operation(summary = "Register a new academic program", description = "Creates a new Course entity linked to the organization. Generates a unique business code if not provided.")
     public ResponseEntity<CourseResponseDTO> createCourse(@RequestBody CourseRequestDTO dto) {
         return ResponseEntity.ok(courseService.createCourse(dto));
     }
@@ -77,9 +76,8 @@ public class CourseController {
      * @return ResponseEntity with the updated state.
      */
     @PutMapping("/{courseId}")
-    @Operation(summary = "Update course administrative details", description = "Allows modification of name, description, fees, and eligibility. Use this for curriculum maintenance.", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_EDIT')")
+    @Operation(summary = "Update course administrative details", description = "Allows modification of name, description, fees, and eligibility. Use this for curriculum maintenance.")
     public ResponseEntity<CourseResponseDTO> updateCourse(@PathVariable Long courseId,
             @RequestBody CourseRequestDTO dto) {
         return ResponseEntity.ok(courseService.updateCourse(courseId, dto));
@@ -92,9 +90,8 @@ public class CourseController {
      * 🏛️ Business Rationale: Used in course detail pages and enrollment forms.
      */
     @GetMapping("/{courseId}")
-    @Operation(summary = "Fetch course profile", description = "Returns the full descriptive and administrative profile of a specific course.", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_VIEW')")
+    @Operation(summary = "Fetch course profile", description = "Returns the full descriptive and administrative profile of a specific course.")
     public ResponseEntity<CourseResponseDTO> getCourse(@PathVariable Long courseId) {
         return ResponseEntity.ok(courseService.getCourse(courseId));
     }
@@ -111,9 +108,8 @@ public class CourseController {
      * @return List of all courses belonging to the organisation.
      */
     @GetMapping("/org/{orgId}")
-    @Operation(summary = "List all institutional offerings", description = "Fetches the complete course catalogue for a specific SaaS tenant (Organization).", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_VIEW')")
+    @Operation(summary = "List all institutional offerings", description = "Fetches the complete course catalogue for a specific SaaS tenant (Organization).")
     public ResponseEntity<List<CourseResponseDTO>> getAllCoursesByOrg(@PathVariable Long orgId) {
         return ResponseEntity.ok(courseService.getAllCoursesByOrg(orgId));
     }
@@ -126,9 +122,8 @@ public class CourseController {
      * preserving data for alumni.
      */
     @DeleteMapping("/{courseId}")
-    @Operation(summary = "Deactivate an academic program", description = "Performs a soft-delete (isActive=false) on the course. History is preserved but the course is hidden from active enrollment.", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_DELETE')")
+    @Operation(summary = "Deactivate an academic program", description = "Performs a soft-delete (isActive=false) on the course. History is preserved but the course is hidden from active enrollment.")
     public ResponseEntity<Void> deleteCourse(@PathVariable Long courseId) {
         courseService.deleteCourse(courseId);
         return ResponseEntity.ok().build();
@@ -139,9 +134,8 @@ public class CourseController {
     // -------------------------------------------------------------------------
 
     @PostMapping("/{courseId}/subjects")
-    @Operation(summary = "Assign a subject to this course", description = "Links an existing subject to this course for a specific semester.", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_EDIT')")
+    @Operation(summary = "Assign a subject to this course", description = "Links an existing subject to this course for a specific semester.")
     public ResponseEntity<Void> assignSubject(
             @PathVariable Long courseId,
             @RequestBody CourseSubjectMappingDTO mappingDTO) {
@@ -158,9 +152,8 @@ public class CourseController {
     }
 
     @DeleteMapping("/{courseId}/subjects/{subjectId}")
-    @Operation(summary = "Remove a subject from this course", description = "Unlinks a subject from the course. Does not delete the subject entity.", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_EDIT')")
+    @Operation(summary = "Remove a subject from this course", description = "Unlinks a subject from the course. Does not delete the subject entity.")
     public ResponseEntity<Void> removeSubject(
             @PathVariable Long courseId,
             @PathVariable Long subjectId) {
@@ -169,9 +162,8 @@ public class CourseController {
     }
 
     @GetMapping("/{courseId}/subjects")
-    @Operation(summary = "List all subjects in this course", description = "Returns the curriculum structure (subjects) for this course.", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_VIEW')")
+    @Operation(summary = "List all subjects in this course", description = "Returns the curriculum structure (subjects) for this course.")
     public ResponseEntity<List<CourseSubjectMappingDTO>> getSubjects(@PathVariable Long courseId) {
         return ResponseEntity.ok(courseService.getSubjectsByCourse(courseId));
     }

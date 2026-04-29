@@ -30,6 +30,76 @@ public class SchemaInitializer {
         this.dataSource = dataSource;
     }
 
+    @PostConstruct
+    public void initializeGlobalTables() {
+        try (Connection connection = dataSource.getConnection();
+                Statement statement = connection.createStatement()) {
+
+            // 1. Create tenant_config
+            statement.execute("""
+                        CREATE TABLE IF NOT EXISTS public.tenant_config (
+                            id BIGSERIAL PRIMARY KEY,
+                            tenant_id VARCHAR(255) UNIQUE NOT NULL,
+                            tenant_name VARCHAR(500),
+                            subdomain VARCHAR(255) UNIQUE,
+                            custom_domain VARCHAR(255),
+                            is_active BOOLEAN DEFAULT true,
+                            max_users INTEGER DEFAULT 100,
+                            storage_limit_mb INTEGER DEFAULT 10240,
+                            features JSONB DEFAULT '{}'::jsonb,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            created_by VARCHAR(255),
+                            CONSTRAINT tenant_id_format CHECK (tenant_id ~ '^[a-z0-9_]{3,50}$')
+                        )
+                    """);
+
+            // 2. Create tenant_audit_log
+            statement.execute("""
+                        CREATE TABLE IF NOT EXISTS public.tenant_audit_log (
+                            id BIGSERIAL PRIMARY KEY,
+                            tenant_id VARCHAR(255) NOT NULL,
+                            action VARCHAR(50) NOT NULL,
+                            performed_by VARCHAR(255),
+                            performed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            details JSONB,
+                            ip_address VARCHAR(45),
+                            status VARCHAR(20) DEFAULT 'SUCCESS',
+                            error_message TEXT,
+                            duration_ms INTEGER,
+                            CONSTRAINT valid_status CHECK (status IN ('SUCCESS', 'FAILED', 'PENDING'))
+                        )
+                    """);
+
+            // 3. Create indexes
+            statement.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_tenant_config_subdomain ON public.tenant_config(subdomain)");
+            statement.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_tenant_config_active ON public.tenant_config(is_active)");
+            statement.execute("CREATE INDEX IF NOT EXISTS idx_audit_tenant ON public.tenant_audit_log(tenant_id)");
+
+            // 4. Create organization_users (Needed for Super Admin in public schema)
+            statement.execute("""
+                        CREATE TABLE IF NOT EXISTS public.organization_users (
+                            id BIGSERIAL PRIMARY KEY,
+                            organization_id BIGINT NOT NULL,
+                            user_id BIGINT NOT NULL,
+                            role_name VARCHAR(50),
+                            is_active BOOLEAN DEFAULT true,
+                            joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """);
+            statement.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_org_users_user ON public.organization_users(user_id)");
+            statement.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_org_users_org ON public.organization_users(organization_id)");
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to initialize global tables", e);
+        }
+    }
+
     /**
      * Creates a new schema for a tenant if it doesn't exist.
      * Also copies all table structures from public schema.
@@ -63,6 +133,15 @@ public class SchemaInitializer {
      * Copies all table structures from public schema to the target schema.
      * This ensures new tenants have all required tables.
      */
+    // Tables that should only exist in the public schema, not in tenant schemas
+    private static final java.util.Set<String> PUBLIC_ONLY_TABLES = java.util.Set.of(
+            "tenant_config", "tenant_audit_log", "user_tenant_mapping",
+            "organisation", "owner_details");
+
+    /**
+     * Copies table structures from public schema to the target schema,
+     * excluding tables that should only exist in the public schema.
+     */
     private void copyTablesFromPublic(String targetSchema, Connection connection) throws SQLException {
         // Get list of tables from public schema
         String getTablesQuery = "SELECT table_name FROM information_schema.tables " +
@@ -72,7 +151,10 @@ public class SchemaInitializer {
         try (Statement stmt = connection.createStatement();
                 ResultSet rs = stmt.executeQuery(getTablesQuery)) {
             while (rs.next()) {
-                tables.add(rs.getString("table_name"));
+                String tableName = rs.getString("table_name");
+                if (!PUBLIC_ONLY_TABLES.contains(tableName)) {
+                    tables.add(tableName);
+                }
             }
         }
 
@@ -98,10 +180,12 @@ public class SchemaInitializer {
     }
 
     private boolean schemaExists(String schemaName, Connection connection) throws SQLException {
-        String query = "SELECT schema_name FROM information_schema.schemata WHERE schema_name = '" + schemaName + "'";
-        try (Statement statement = connection.createStatement();
-                ResultSet rs = statement.executeQuery(query)) {
-            return rs.next();
+        String query = "SELECT schema_name FROM information_schema.schemata WHERE schema_name = ?";
+        try (java.sql.PreparedStatement ps = connection.prepareStatement(query)) {
+            ps.setString(1, schemaName);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         }
     }
 
@@ -137,12 +221,17 @@ public class SchemaInitializer {
 
     /**
      * Seeds an initial user into the tenant schema.
+     * Also syncs to public.user_tenant_mapping for auto-tenant detection.
      * 
      * @param schemaName The tenant schema
-     * @param username   Username
+     * @param username   Username (email)
      * @param password   Hashed Password
+     * @param roleCode   The role code (e.g., ADMIN, IT_SUPPORT)
+     * @param firstName  User's first name
+     * @param lastName   User's last name
      */
-    public void seedTenantUser(String schemaName, String username, String password) throws SQLException {
+    public void seedTenantUser(String schemaName, String username, String password, String roleCode, String firstName,
+            String lastName) throws SQLException {
         String sanitizedSchema = sanitizeSchemaName(schemaName);
 
         try (Connection connection = dataSource.getConnection()) {
@@ -150,14 +239,41 @@ public class SchemaInitializer {
                 throw new java.sql.SQLException("Schema " + schemaName + " does not exist");
             }
 
-            // 1. Ensure ADMIN role exists
-            long roleId = ensureRoleExists(sanitizedSchema, connection, "ADMIN");
+            // 1. Ensure Role exists
+            long roleId = ensureRoleExists(sanitizedSchema, connection, roleCode);
 
             // 2. Insert User
-            long userId = insertUser(sanitizedSchema, connection, username, password);
+            long userId = insertUser(sanitizedSchema, connection, username, password, firstName, lastName);
 
             // 3. Map User to Role
             assignRoleToUser(sanitizedSchema, connection, userId, roleId);
+
+            // 4. CRITICAL: Sync to user_tenant_mapping for auto-tenant detection
+            syncToUserTenantMapping(sanitizedSchema, connection, username);
+        }
+    }
+
+    /**
+     * Syncs user to public.user_tenant_mapping table.
+     * This enables auto-tenant detection during login.
+     */
+    private void syncToUserTenantMapping(String tenantId, Connection conn, String username) throws SQLException {
+        String sql = """
+                INSERT INTO public.user_tenant_mapping
+                (email, username, tenant_id, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ON CONFLICT (email)
+                DO UPDATE SET
+                    is_active = true,
+                    updated_at = CURRENT_TIMESTAMP,
+                    username = EXCLUDED.username
+                """;
+
+        try (java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, username); // email
+            ps.setString(2, username); // username (same as email for now)
+            ps.setString(3, tenantId);
+            ps.executeUpdate();
         }
     }
 
@@ -188,7 +304,8 @@ public class SchemaInitializer {
         throw new SQLException("Failed to create role");
     }
 
-    private long insertUser(String schema, Connection conn, String username, String password) throws SQLException {
+    private long insertUser(String schema, Connection conn, String username, String password, String firstName,
+            String lastName) throws SQLException {
         // Check if user exists
         String checkSql = String.format("SELECT id FROM \"%s\".users WHERE user_name = ?", schema);
         try (java.sql.PreparedStatement ps = conn.prepareStatement(checkSql)) {
@@ -201,18 +318,19 @@ public class SchemaInitializer {
         }
 
         // Insert user
-        // Note: Using hardcoded defaults for required fields
         String insertSql = String.format(
                 "INSERT INTO \"%s\".users (user_name, password, email, user_code, first_name, last_name, mobile_number, is_blocked, is_first_time_login, is_email_verified, is_mobile_verified, created_date) "
                         +
-                        "VALUES (?, ?, ?, ?, 'Admin', 'User', 1234567890, false, false, true, true, CURRENT_TIMESTAMP) RETURNING id",
+                        "VALUES (?, ?, ?, ?, ?, ?, 1234567890, false, false, true, true, CURRENT_TIMESTAMP) RETURNING id",
                 schema);
 
         try (java.sql.PreparedStatement ps = conn.prepareStatement(insertSql)) {
             ps.setString(1, username);
             ps.setString(2, password);
-            ps.setString(3, username + "@example.com"); // Dummy email
-            ps.setString(4, "ADM-" + System.currentTimeMillis()); // Unique user code
+            ps.setString(3, username);
+            ps.setString(4, "USR-" + System.currentTimeMillis());
+            ps.setString(5, firstName);
+            ps.setString(6, lastName);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getLong("id");

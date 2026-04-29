@@ -90,15 +90,24 @@ public class JwtServiceImpl implements JwtService {
 
     @Override
     public boolean validateToken(String token, UserDetails userDetails) {
-        final String username = extractUsername(token);
-        return (username.equals(userDetails.getUsername())
-                && !isTokenExpired(token)
-                && isTokenSignatureValid(token));
+        try {
+            Claims claims = extractAllClaims(token);
+            final String username = claims.getSubject();
+            boolean isExpired = claims.getExpiration().before(new Date());
+            
+            return (username.equals(userDetails.getUsername()) && !isExpired);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private SecretKey getKey() {
         byte[] keyBytes = Decoders.BASE64.decode(secretKey);
         return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    public Claims extractAllClaimsPublic(String token) {
+        return extractAllClaims(token);
     }
 
     private <T> T extractClaim(String token, Function<Claims, T> claimResolver) {

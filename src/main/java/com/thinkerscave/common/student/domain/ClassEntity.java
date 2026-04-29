@@ -1,15 +1,20 @@
 package com.thinkerscave.common.student.domain;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.EqualsAndHashCode;
 
 @Entity
-@Data
+@Getter
+@Setter
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Table(name = "class")
 public class ClassEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "class_id")
+    @EqualsAndHashCode.Include
     private Long classId;
 
     @Column(name = "class_name", nullable = false)

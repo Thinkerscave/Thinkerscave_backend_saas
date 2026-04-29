@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -34,7 +35,6 @@ import java.util.List;
  * mapped to multiple courses, and this controller provides the CRUD surface
  * to maintain that modularity.
  */
-@CrossOrigin("*")
 @RestController
 @RequestMapping("/api/v1/subjects")
 @Tag(name = "Subject Management", description = "Professional APIs for defining and managing modular units of study (Subjects)")
@@ -57,6 +57,7 @@ public class SubjectController {
      * @return ResponseEntity with the persisted subject.
      */
     @PostMapping
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_SUBJECTS_ADD')")
     @Operation(summary = "Define a new study module", description = "Creates a new Subject entity. Captures pedagogical details like credits, theory hours, and lab hours.", parameters = {
             @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
     })
@@ -72,6 +73,7 @@ public class SubjectController {
      * revised in the curriculum.
      */
     @PutMapping("/{subjectId}")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_SUBJECTS_EDIT')")
     @Operation(summary = "Update subject parameters", description = "Allows modification of credits, hour allocations, and descriptive metadata.", parameters = {
             @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
     })
@@ -88,6 +90,7 @@ public class SubjectController {
      * portals.
      */
     @GetMapping("/{subjectId}")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_SUBJECTS_VIEW')")
     @Operation(summary = "Fetch subject definition", description = "Returns the full academic and administrative definition of a specific subject.", parameters = {
             @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
     })
@@ -103,6 +106,7 @@ public class SubjectController {
      * association wizards.
      */
     @GetMapping("/org/{orgId}")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_SUBJECTS_VIEW')")
     @Operation(summary = "List all subjects in an organization", description = "Fetches the master subject catalogue for a specific SaaS tenant.", parameters = {
             @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
     })
@@ -118,6 +122,7 @@ public class SubjectController {
      * refer to this subject.
      */
     @DeleteMapping("/{subjectId}")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_SUBJECTS_DELETE')")
     @Operation(summary = "Deactivate a study module", description = "Performs a soft-delete (isActive=false). History is preserved to maintain references in historical syllabi.", parameters = {
             @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
     })

@@ -21,7 +21,7 @@ import java.time.LocalDate;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@EqualsAndHashCode(callSuper = false)
+
 public class Semester extends Auditable {
 
     @Id

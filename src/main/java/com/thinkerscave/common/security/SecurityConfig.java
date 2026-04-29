@@ -18,7 +18,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
 import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 @Configuration
@@ -31,6 +31,9 @@ public class SecurityConfig {
 
     @Autowired
     private TenantFilter tenantFilter;
+
+    @Autowired
+    private com.thinkerscave.common.filter.OrganizationFilter organizationFilter;
 
     /**
      * Configures the main HTTP security filter chain.
@@ -48,15 +51,15 @@ public class SecurityConfig {
                                 "/api/v1/users/register",
                                 "/api/v1/users/login",
                                 "/api/v1/users/refreshToken",
+                                "/api/v1/users/logout",
                                 "/api/v1/users/generateKey",
                                 "/api/password/**",
                                 "/api/public/**",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
-                                "/api/admissions/**", "/api/schema/init",
-                                "/api/organizations/**",
-                                "/api/tenant/**")
+                                "/api/admissions/**",
+                                "/api/schema/init")
                         .permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session
@@ -65,7 +68,8 @@ public class SecurityConfig {
                 // CRITICAL: TenantFilter MUST run first to set schema context.
                 // Anchoring to SecurityContextHolderFilter ensures it runs very early.
                 .addFilterBefore(tenantFilter, SecurityContextHolderFilter.class)
-                .addFilterAfter(jwtAuthFilter, TenantFilter.class)
+                .addFilterAfter(jwtAuthFilter, SecurityContextHolderFilter.class)
+                .addFilterAfter(organizationFilter, JwtAuthFilter.class)
                 .build();
     }
 
@@ -88,7 +92,17 @@ public class SecurityConfig {
         }
 
         configuration.setAllowedMethods(java.util.Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
-        configuration.setAllowedHeaders(java.util.Arrays.asList("*"));
+        // G8 Fix: Explicit header whitelist instead of wildcard "*"
+        // Wildcard headers + credentials=true is permissive; enumerate only what the
+        // app actually sends.
+        configuration.setAllowedHeaders(java.util.Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "X-Tenant-ID",
+                "X-Organization-ID",
+                "X-Requested-With",
+                "Accept",
+                "Origin"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
@@ -114,5 +128,19 @@ public class SecurityConfig {
         authenticationProvider.setUserDetailsService(userDetailsService);
         authenticationProvider.setPasswordEncoder(passwordEncoder());
         return authenticationProvider;
+    }
+
+    /**
+     * Prevent JwtAuthFilter from being automatically registered in the generic
+     * filter chain.
+     * It is manually added to the SecurityFilterChain.
+     */
+    @Bean
+    public org.springframework.boot.web.servlet.FilterRegistrationBean<JwtAuthFilter> jwtAuthFilterRegistration(
+            JwtAuthFilter filter) {
+        org.springframework.boot.web.servlet.FilterRegistrationBean<JwtAuthFilter> registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(
+                filter);
+        registration.setEnabled(false);
+        return registration;
     }
 }

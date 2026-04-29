@@ -1,0 +1,515 @@
+Starting application with JAVA_HOME=/Users/bikashkumarnishank/Library/Java/JavaVirtualMachines/ms-21.0.8/Contents/Home
+SLF4J(W): Class path contains multiple SLF4J providers.
+SLF4J(W): Found provider [ch.qos.logback.classic.spi.LogbackServiceProvider@6d78f375]
+SLF4J(W): Found provider [org.apache.logging.slf4j.SLF4JServiceProvider@50c87b21]
+SLF4J(W): See https://www.slf4j.org/codes.html#multiple_bindings for an explanation.
+SLF4J(I): Actual provider is of type [ch.qos.logback.classic.spi.LogbackServiceProvider@6d78f375]
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.3.4)
+
+2026-02-16T21:54:46.793+05:30  INFO 8619 --- [           main] c.t.c.UserManagementServiceApplication   : Starting UserManagementServiceApplication v0.0.1-SNAPSHOT using Java 21.0.8 with PID 8619 (/Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas/target/User-Management-Service-0.0.1-SNAPSHOT.jar started by bikashkumarnishank in /Users/bikashkumarnishank/Documents/ThinkersCave/Thinkerscave_backend_saas)
+2026-02-16T21:54:46.795+05:30  INFO 8619 --- [           main] c.t.c.UserManagementServiceApplication   : No active profile set, falling back to 1 default profile: "default"
+2026-02-16T21:54:47.329+05:30  INFO 8619 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-02-16T21:54:47.418+05:30  INFO 8619 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 84 ms. Found 37 JPA repository interfaces.
+2026-02-16T21:54:48.188+05:30  INFO 8619 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8181 (http)
+2026-02-16T21:54:48.196+05:30  INFO 8619 --- [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-02-16T21:54:48.197+05:30  INFO 8619 --- [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.30]
+2026-02-16T21:54:48.214+05:30  INFO 8619 --- [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-02-16T21:54:48.215+05:30  INFO 8619 --- [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1390 ms
+2026-02-16T21:54:48.391+05:30  INFO 8619 --- [           main] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-02-16T21:54:48.435+05:30  INFO 8619 --- [           main] org.hibernate.Version                    : HHH000412: Hibernate ORM core version 6.5.3.Final
+2026-02-16T21:54:48.455+05:30  INFO 8619 --- [           main] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-02-16T21:54:48.733+05:30  INFO 8619 --- [           main] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-02-16T21:54:48.753+05:30  INFO 8619 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-02-16T21:54:51.794+05:30  INFO 8619 --- [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection org.postgresql.jdbc.PgConnection@4c25687b
+2026-02-16T21:54:51.797+05:30  INFO 8619 --- [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-02-16T21:54:52.132+05:30  WARN 8619 --- [           main] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-02-16T21:54:53.749+05:30  INFO 8619 --- [           main] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-02-16T21:54:53.753+05:30  INFO 8619 --- [           main] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-02-16T21:54:54.121+05:30  INFO 8619 --- [           main] o.s.boot.web.servlet.RegistrationBean    : Filter jwtAuthFilterRegistration was not registered (disabled)
+2026-02-16T21:54:59.437+05:30  INFO 8619 --- [           main] o.s.d.j.r.query.QueryEnhancerFactory     : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-02-16T21:55:00.475+05:30  INFO 8619 --- [           main] eAuthenticationProviderManagerConfigurer : Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2026-02-16T21:55:00.475+05:30  WARN 8619 --- [           main] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with an AuthenticationProvider bean. UserDetailsService beans will not be used for username/password login. Consider removing the AuthenticationProvider bean. Alternatively, consider using the UserDetailsService in a manually instantiated DaoAuthenticationProvider.
+2026-02-16T21:55:01.305+05:30  INFO 8619 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8181 (http) with context path '/'
+2026-02-16T21:55:01.312+05:30  INFO 8619 --- [           main] c.t.c.UserManagementServiceApplication   : Started UserManagementServiceApplication in 14.816 seconds (process running for 15.309)
+Hibernate: 
+    select
+        count(*) 
+    from
+        inquiry i1_0
+2026-02-16T21:55:52.744+05:30  INFO 8619 --- [nio-8181-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-02-16T21:55:52.751+05:30  INFO 8619 --- [nio-8181-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2026-02-16T21:55:52.772+05:30  INFO 8619 --- [nio-8181-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 20 ms
+2026-02-16T21:55:52.986+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: UserController.authenticationAndGetToken() with arguments: [AuthRequest(username=super_admin_test_3, password=password123)]
+2026-02-16T21:55:52.987+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: TenantLookupService.findTenantByEmailOrUsername() with arguments: [super_admin_test_3]
+2026-02-16T21:55:53.644+05:30  WARN 8619 --- [nio-8181-exec-1] c.t.common.service.TenantLookupService   : No tenant found for identifier: 'super_admin_test_3'. Using default tenant 'public'
+2026-02-16T21:55:53.645+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: TenantLookupService.findTenantByEmailOrUsername() with result: public
+2026-02-16T21:55:53.645+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 658 ms
+2026-02-16T21:55:53.645+05:30  INFO 8619 --- [nio-8181-exec-1] c.t.c.usrm.controller.UserController     : Auto-detected tenant 'public' for user 'super_admin_test_3'
+2026-02-16T21:55:53.951+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: LoginAttemptServiceImpl.isBlocked() with arguments: [super_admin_test_3]
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.address,
+        u1_0.attempts,
+        u1_0.city,
+        u1_0.country,
+        u1_0.created_by,
+        u1_0.created_date,
+        u1_0.date_of_birth,
+        u1_0.email,
+        u1_0.first_name,
+        u1_0.gender,
+        u1_0.is_2fa_enabled,
+        u1_0.is_blocked,
+        u1_0.is_email_verified,
+        u1_0.is_first_time_login,
+        u1_0.is_mobile_verified,
+        u1_0.last_login_date,
+        u1_0.last_modified_by,
+        u1_0.last_modified_date,
+        u1_0.last_name,
+        u1_0.lock_date_time,
+        u1_0.max_device_allow,
+        u1_0.middle_name,
+        u1_0.mobile_number,
+        u1_0.password,
+        u1_0.photo_url,
+        u1_0.remarks,
+        u1_0.secret_operation,
+        u1_0.state,
+        u1_0.user_code,
+        u1_0.user_name,
+        u1_0.zip_code 
+    from
+        users u1_0 
+    where
+        u1_0.user_name=?
+2026-02-16T21:55:54.413+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: LoginAttemptServiceImpl.isBlocked() with result: false
+2026-02-16T21:55:54.413+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 462 ms
+2026-02-16T21:55:56.310+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: UserUserInfoDetailsService.loadUserByUsername() with arguments: [super_admin_test_3]
+DEBUG: Attempting to load user: super_admin_test_3
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.address,
+        u1_0.attempts,
+        u1_0.city,
+        u1_0.country,
+        u1_0.created_by,
+        u1_0.created_date,
+        u1_0.date_of_birth,
+        u1_0.email,
+        u1_0.first_name,
+        u1_0.gender,
+        u1_0.is_2fa_enabled,
+        u1_0.is_blocked,
+        u1_0.is_email_verified,
+        u1_0.is_first_time_login,
+        u1_0.is_mobile_verified,
+        u1_0.last_login_date,
+        u1_0.last_modified_by,
+        u1_0.last_modified_date,
+        u1_0.last_name,
+        u1_0.lock_date_time,
+        u1_0.max_device_allow,
+        u1_0.middle_name,
+        u1_0.mobile_number,
+        u1_0.password,
+        u1_0.photo_url,
+        u1_0.remarks,
+        u1_0.secret_operation,
+        u1_0.state,
+        u1_0.user_code,
+        u1_0.user_name,
+        u1_0.zip_code 
+    from
+        users u1_0 
+    where
+        u1_0.user_name=?
+DEBUG: Found user: super_admin_test_3, Password Hash: $2a$10$WAAi0f0P1azP.gDCxJQ7LeWSTF9CKQdqYgumRs8R9mFubycBrWeCS
+Hibernate: 
+    select
+        r1_0.user_id,
+        r1_1.role_id,
+        r1_1.created_by,
+        r1_1.created_date,
+        r1_1.description,
+        r1_1.is_active,
+        r1_1.last_modified_by,
+        r1_1.last_modified_date,
+        r1_1.organization_id,
+        r1_1.role_code,
+        r1_1.role_name,
+        r1_1.role_type 
+    from
+        user_roles r1_0 
+    join
+        role_master r1_1 
+            on r1_1.role_id=r1_0.role_id 
+    where
+        r1_0.user_id=?
+2026-02-16T21:55:57.008+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: UserUserInfoDetailsService.loadUserByUsername() with result: com.thinkerscave.common.security.UserInfoUserDetails@6a7b3fb5
+2026-02-16T21:55:57.009+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 698 ms
+2026-02-16T21:55:58.032+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: LoginAttemptServiceImpl.loginSucceeded() with arguments: [super_admin_test_3]
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.address,
+        u1_0.attempts,
+        u1_0.city,
+        u1_0.country,
+        u1_0.created_by,
+        u1_0.created_date,
+        u1_0.date_of_birth,
+        u1_0.email,
+        u1_0.first_name,
+        u1_0.gender,
+        u1_0.is_2fa_enabled,
+        u1_0.is_blocked,
+        u1_0.is_email_verified,
+        u1_0.is_first_time_login,
+        u1_0.is_mobile_verified,
+        u1_0.last_login_date,
+        u1_0.last_modified_by,
+        u1_0.last_modified_date,
+        u1_0.last_name,
+        u1_0.lock_date_time,
+        u1_0.max_device_allow,
+        u1_0.middle_name,
+        u1_0.mobile_number,
+        u1_0.password,
+        u1_0.photo_url,
+        u1_0.remarks,
+        u1_0.secret_operation,
+        u1_0.state,
+        u1_0.user_code,
+        u1_0.user_name,
+        u1_0.zip_code 
+    from
+        users u1_0 
+    where
+        u1_0.user_name=?
+2026-02-16T21:55:58.356+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: LoginAttemptServiceImpl.loginSucceeded() with result: null
+2026-02-16T21:55:58.356+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 324 ms
+2026-02-16T21:55:59.271+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: UserServiceImpl.findByUsername() with arguments: [super_admin_test_3]
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.address,
+        u1_0.attempts,
+        u1_0.city,
+        u1_0.country,
+        u1_0.created_by,
+        u1_0.created_date,
+        u1_0.date_of_birth,
+        u1_0.email,
+        u1_0.first_name,
+        u1_0.gender,
+        u1_0.is_2fa_enabled,
+        u1_0.is_blocked,
+        u1_0.is_email_verified,
+        u1_0.is_first_time_login,
+        u1_0.is_mobile_verified,
+        u1_0.last_login_date,
+        u1_0.last_modified_by,
+        u1_0.last_modified_date,
+        u1_0.last_name,
+        u1_0.lock_date_time,
+        u1_0.max_device_allow,
+        u1_0.middle_name,
+        u1_0.mobile_number,
+        u1_0.password,
+        u1_0.photo_url,
+        u1_0.remarks,
+        u1_0.secret_operation,
+        u1_0.state,
+        u1_0.user_code,
+        u1_0.user_name,
+        u1_0.zip_code 
+    from
+        users u1_0 
+    where
+        u1_0.user_name=?
+Hibernate: 
+    select
+        o1_0.user_id,
+        o1_1.org_id,
+        o1_1.affiliation,
+        o1_1.brand_name,
+        o1_1.city,
+        o1_1.country,
+        o1_1.created_by,
+        o1_1.created_date,
+        o1_1.description,
+        o1_1.email,
+        o1_1.establishment_date,
+        o1_1.is_active,
+        o1_1.is_group,
+        o1_1.last_modified_by,
+        o1_1.last_modified_date,
+        o1_1.logo_url,
+        o1_1.org_code,
+        o1_1.org_name,
+        o1_1.org_url,
+        o1_1.parent_org_id,
+        o1_1.phone_number,
+        o1_1.registration_number,
+        o1_1.state,
+        o1_1.subscription_type,
+        o1_1.tenant_schema,
+        o1_1.type,
+        o1_1.user_id,
+        o1_1.website,
+        o1_1.zip_code 
+    from
+        organization_users o1_0 
+    join
+        organisation o1_1 
+            on o1_1.org_id=o1_0.organization_id 
+    where
+        o1_0.user_id=?
+Hibernate: 
+    select
+        r1_0.user_id,
+        r1_1.role_id,
+        r1_1.created_by,
+        r1_1.created_date,
+        r1_1.description,
+        r1_1.is_active,
+        r1_1.last_modified_by,
+        r1_1.last_modified_date,
+        r1_1.organization_id,
+        r1_1.role_code,
+        r1_1.role_name,
+        r1_1.role_type 
+    from
+        user_roles r1_0 
+    join
+        role_master r1_1 
+            on r1_1.role_id=r1_0.role_id 
+    where
+        r1_0.user_id=?
+2026-02-16T21:56:00.273+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: UserServiceImpl.findByUsername() with result: Optional[UserResponseDTO(id=23, userCode=SA_TEST_03, userName=super_admin_test_3, email=super_admin_test_3@example.com, firstName=Super, middleName=null, lastName=Admin3, address=null, city=null, state=null, mobileNumber=9876543212, isBlocked=false, maxDeviceAllow=null, firstTimeLogin=true, roles=[SUPER_ADMIN], orgType=null, organizations=[])]
+2026-02-16T21:56:00.280+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 1002 ms
+2026-02-16T21:56:01.218+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: RefreshTokenServiceImpl.createRefreshToken() with arguments: [super_admin_test_3]
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.address,
+        u1_0.attempts,
+        u1_0.city,
+        u1_0.country,
+        u1_0.created_by,
+        u1_0.created_date,
+        u1_0.date_of_birth,
+        u1_0.email,
+        u1_0.first_name,
+        u1_0.gender,
+        u1_0.is_2fa_enabled,
+        u1_0.is_blocked,
+        u1_0.is_email_verified,
+        u1_0.is_first_time_login,
+        u1_0.is_mobile_verified,
+        u1_0.last_login_date,
+        u1_0.last_modified_by,
+        u1_0.last_modified_date,
+        u1_0.last_name,
+        u1_0.lock_date_time,
+        u1_0.max_device_allow,
+        u1_0.middle_name,
+        u1_0.mobile_number,
+        u1_0.password,
+        u1_0.photo_url,
+        u1_0.remarks,
+        u1_0.secret_operation,
+        u1_0.state,
+        u1_0.user_code,
+        u1_0.user_name,
+        u1_0.zip_code 
+    from
+        users u1_0 
+    where
+        u1_0.user_name=?
+Hibernate: 
+    select
+        rt1_0.id,
+        rt1_0.expiry_date,
+        rt1_0.token,
+        rt1_0.user_id 
+    from
+        refresh_token rt1_0 
+    where
+        rt1_0.user_id=?
+Hibernate: 
+    insert 
+    into
+        refresh_token
+        (expiry_date, token, user_id) 
+    values
+        (?, ?, ?) 
+    returning id
+2026-02-16T21:56:02.181+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: RefreshTokenServiceImpl.createRefreshToken() with result: RefreshToken(id=20, token=f208e135-928d-41a8-bf44-e3606af6444c, expiryDate=2026-02-17T16:26:01.851023Z, user=User(id=23, userCode=SA_TEST_03, firstName=Super, middleName=null, lastName=Admin3, email=super_admin_test_3@example.com, mobileNumber=9876543212, userName=super_admin_test_3, password=$2a$10$WAAi0f0P1azP.gDCxJQ7LeWSTF9CKQdqYgumRs8R9mFubycBrWeCS, address=null, city=null, state=null, country=India, zipCode=null, photoUrl=null, dateOfBirth=null, gender=null, isBlocked=false, is2faEnabled=false, maxDeviceAllow=null, attempts=null, lockDateTime=null, secretOperation=null, remarks=null, isFirstTimeLogin=true, isEmailVerified=false, isMobileVerified=false, lastLoginDate=null))
+2026-02-16T21:56:02.185+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 964 ms
+2026-02-16T21:56:02.761+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: JwtServiceImpl.generateToken() with arguments: [super_admin_test_3]
+2026-02-16T21:56:02.873+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: JwtServiceImpl.generateToken() with result: eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJzdXBlcl9hZG1pbl90ZXN0XzMiLCJpYXQiOjE3NzEyNTkxNjIsImV4cCI6MTc3MTI2MDA2Mn0.tBEzapQMHOokceFgmIoBhUg6PtBMX3lWXa5qDYRSyd6_Gfm9vz-4WSKaWtwEvoJftN0qb2WuJo4nhs8cTYpWCg
+2026-02-16T21:56:02.873+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 112 ms
+2026-02-16T21:56:02.873+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: UserController.authenticationAndGetToken() with result: JwtResponce(accessToken=eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJzdXBlcl9hZG1pbl90ZXN0XzMiLCJpYXQiOjE3NzEyNTkxNjIsImV4cCI6MTc3MTI2MDA2Mn0.tBEzapQMHOokceFgmIoBhUg6PtBMX3lWXa5qDYRSyd6_Gfm9vz-4WSKaWtwEvoJftN0qb2WuJo4nhs8cTYpWCg, token=f208e135-928d-41a8-bf44-e3606af6444c, tenantId=public, tenantName=Public, user=UserResponseDTO(id=23, userCode=SA_TEST_03, userName=super_admin_test_3, email=super_admin_test_3@example.com, firstName=Super, middleName=null, lastName=Admin3, address=null, city=null, state=null, mobileNumber=9876543212, isBlocked=false, maxDeviceAllow=null, firstTimeLogin=true, roles=[SUPER_ADMIN], orgType=null, organizations=[]))
+2026-02-16T21:56:02.873+05:30  INFO 8619 --- [nio-8181-exec-1] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 9888 ms
+2026-02-16T21:57:53.893+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: JwtServiceImpl.extractTenantId() with arguments: [eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJzdXBlcl9hZG1pbl90ZXN0XzMiLCJpYXQiOjE3NzEyNTkxNjIsImV4cCI6MTc3MTI2MDA2Mn0.tBEzapQMHOokceFgmIoBhUg6PtBMX3lWXa5qDYRSyd6_Gfm9vz-4WSKaWtwEvoJftN0qb2WuJo4nhs8cTYpWCg]
+2026-02-16T21:57:54.167+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: JwtServiceImpl.extractTenantId() with result: null
+2026-02-16T21:57:54.167+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 281 ms
+2026-02-16T21:57:54.185+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: JwtServiceImpl.extractUsername() with arguments: [eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJzdXBlcl9hZG1pbl90ZXN0XzMiLCJpYXQiOjE3NzEyNTkxNjIsImV4cCI6MTc3MTI2MDA2Mn0.tBEzapQMHOokceFgmIoBhUg6PtBMX3lWXa5qDYRSyd6_Gfm9vz-4WSKaWtwEvoJftN0qb2WuJo4nhs8cTYpWCg]
+2026-02-16T21:57:54.186+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: JwtServiceImpl.extractUsername() with result: super_admin_test_3
+2026-02-16T21:57:54.186+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 1 ms
+2026-02-16T21:57:54.762+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: UserUserInfoDetailsService.loadUserByUsername() with arguments: [super_admin_test_3]
+DEBUG: Attempting to load user: super_admin_test_3
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.address,
+        u1_0.attempts,
+        u1_0.city,
+        u1_0.country,
+        u1_0.created_by,
+        u1_0.created_date,
+        u1_0.date_of_birth,
+        u1_0.email,
+        u1_0.first_name,
+        u1_0.gender,
+        u1_0.is_2fa_enabled,
+        u1_0.is_blocked,
+        u1_0.is_email_verified,
+        u1_0.is_first_time_login,
+        u1_0.is_mobile_verified,
+        u1_0.last_login_date,
+        u1_0.last_modified_by,
+        u1_0.last_modified_date,
+        u1_0.last_name,
+        u1_0.lock_date_time,
+        u1_0.max_device_allow,
+        u1_0.middle_name,
+        u1_0.mobile_number,
+        u1_0.password,
+        u1_0.photo_url,
+        u1_0.remarks,
+        u1_0.secret_operation,
+        u1_0.state,
+        u1_0.user_code,
+        u1_0.user_name,
+        u1_0.zip_code 
+    from
+        users u1_0 
+    where
+        u1_0.user_name=?
+DEBUG: Found user: super_admin_test_3, Password Hash: $2a$10$WAAi0f0P1azP.gDCxJQ7LeWSTF9CKQdqYgumRs8R9mFubycBrWeCS
+Hibernate: 
+    select
+        r1_0.user_id,
+        r1_1.role_id,
+        r1_1.created_by,
+        r1_1.created_date,
+        r1_1.description,
+        r1_1.is_active,
+        r1_1.last_modified_by,
+        r1_1.last_modified_date,
+        r1_1.organization_id,
+        r1_1.role_code,
+        r1_1.role_name,
+        r1_1.role_type 
+    from
+        user_roles r1_0 
+    join
+        role_master r1_1 
+            on r1_1.role_id=r1_0.role_id 
+    where
+        r1_0.user_id=?
+2026-02-16T21:57:55.381+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: UserUserInfoDetailsService.loadUserByUsername() with result: com.thinkerscave.common.security.UserInfoUserDetails@51fadf1b
+2026-02-16T21:57:55.382+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 619 ms
+2026-02-16T21:57:56.326+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: JwtServiceImpl.validateToken() with arguments: [eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJzdXBlcl9hZG1pbl90ZXN0XzMiLCJpYXQiOjE3NzEyNTkxNjIsImV4cCI6MTc3MTI2MDA2Mn0.tBEzapQMHOokceFgmIoBhUg6PtBMX3lWXa5qDYRSyd6_Gfm9vz-4WSKaWtwEvoJftN0qb2WuJo4nhs8cTYpWCg, com.thinkerscave.common.security.UserInfoUserDetails@51fadf1b]
+2026-02-16T21:57:56.336+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: JwtServiceImpl.validateToken() with result: true
+2026-02-16T21:57:56.336+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 10 ms
+2026-02-16T21:57:56.685+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: OrganizationController.getAllOrganizations() with arguments: []
+2026-02-16T21:57:56.964+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ➡️ Entering: OrganizationServiceImpl.getAllOrgsAsDTO() with arguments: []
+Hibernate: 
+    select
+        o1_0.org_id,
+        o1_0.affiliation,
+        o1_0.brand_name,
+        o1_0.city,
+        o1_0.country,
+        o1_0.created_by,
+        o1_0.created_date,
+        o1_0.description,
+        o1_0.email,
+        o1_0.establishment_date,
+        o1_0.is_active,
+        o1_0.is_group,
+        o1_0.last_modified_by,
+        o1_0.last_modified_date,
+        o1_0.logo_url,
+        o1_0.org_code,
+        o1_0.org_name,
+        o1_0.org_url,
+        o1_0.parent_org_id,
+        o1_0.phone_number,
+        o1_0.registration_number,
+        o1_0.state,
+        o1_0.subscription_type,
+        o1_0.tenant_schema,
+        o1_0.type,
+        o1_0.user_id,
+        o1_0.website,
+        o1_0.zip_code 
+    from
+        organisation o1_0
+Hibernate: 
+    select
+        u1_0.id,
+        u1_0.address,
+        u1_0.attempts,
+        u1_0.city,
+        u1_0.country,
+        u1_0.created_by,
+        u1_0.created_date,
+        u1_0.date_of_birth,
+        u1_0.email,
+        u1_0.first_name,
+        u1_0.gender,
+        u1_0.is_2fa_enabled,
+        u1_0.is_blocked,
+        u1_0.is_email_verified,
+        u1_0.is_first_time_login,
+        u1_0.is_mobile_verified,
+        u1_0.last_login_date,
+        u1_0.last_modified_by,
+        u1_0.last_modified_date,
+        u1_0.last_name,
+        u1_0.lock_date_time,
+        u1_0.max_device_allow,
+        u1_0.middle_name,
+        u1_0.mobile_number,
+        u1_0.password,
+        u1_0.photo_url,
+        u1_0.remarks,
+        u1_0.secret_operation,
+        u1_0.state,
+        u1_0.user_code,
+        u1_0.user_name,
+        u1_0.zip_code 
+    from
+        users u1_0 
+    where
+        u1_0.id=?
+2026-02-16T21:57:57.597+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: OrganizationServiceImpl.getAllOrgsAsDTO() with result: [OrganisationListDTO(orgId=1, orgCode=ORG-69D00B78, orgName=Demo Group, brandName=Demo Group, orgUrl=null, orgType=COLLEGE, city=Test City, state=TS, establishDate=2026-02-14, ownerName=Demo Admin, ownerEmail=admin@demogroup.com, ownerMobile=9999999999, isGroup=false, parentOrgId=null, isActive=true)]
+2026-02-16T21:57:57.608+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 634 ms
+2026-02-16T21:57:58.263+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ✅ Exiting: OrganizationController.getAllOrganizations() with result: <200 OK OK,[OrganisationListDTO(orgId=1, orgCode=ORG-69D00B78, orgName=Demo Group, brandName=Demo Group, orgUrl=null, orgType=COLLEGE, city=Test City, state=TS, establishDate=2026-02-14, ownerName=Demo Admin, ownerEmail=admin@demogroup.com, ownerMobile=9999999999, isGroup=false, parentOrgId=null, isActive=true)],[]>
+2026-02-16T21:57:58.267+05:30  INFO 8619 --- [nio-8181-exec-2] c.thinkerscave.common.aop.LoggingAspect  : ⏱️ Execution time: 1578 ms
+./run_app.sh: line 8:  8619 Killed: 9               $JAVA_HOME/bin/java -jar target/User-Management-Service-0.0.1-SNAPSHOT.jar

@@ -11,7 +11,8 @@ public enum OrganizationType {
     INSTITUTION("Institution"),
     GROUP("Group of Institutions"),
     TRAINING_CENTER("Training Center"),
-    COACHING_CENTER("Coaching Center");
+    COACHING_CENTER("Coaching Center"),
+    NURSING("Nursing");
 
     private final String displayName;
 

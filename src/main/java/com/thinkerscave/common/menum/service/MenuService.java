@@ -9,11 +9,11 @@ import java.util.Map;
 import java.util.Optional;
 
 public interface MenuService {
-	Menu saveOrUpdateMenu(MenuDTO dto);
+	MenuDTO saveOrUpdateMenu(MenuDTO dto);
 
-	List<Menu> displayMenudata();
+	List<MenuDTO> displayMenudata();
 
-	Optional<Menu> displaySingleMenudata(String code);
+	Optional<MenuDTO> displaySingleMenudata(String code);
 
 	String toggleMenuStatus(String code, boolean status);
 

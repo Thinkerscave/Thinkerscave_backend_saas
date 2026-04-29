@@ -5,21 +5,22 @@ import com.thinkerscave.common.shared.enums.OrganizationType;
 import com.thinkerscave.common.usrm.domain.User;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDate; // Use LocalDate for dates without time
 
-@Data
+@Getter
+@Setter
 @Entity
 @EntityListeners(AuditingEntityListener.class)
 @AllArgsConstructor
 @NoArgsConstructor
-@EqualsAndHashCode(callSuper = false)
 @Table(name = "organisation")
 public class Organisation extends Auditable {
     @Id
@@ -99,6 +100,12 @@ public class Organisation extends Auditable {
     private String description;
 
     // --- NEW FIELDS END ---
+
+    // --- NEW FIELDS END ---
+
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "tenant_settings", columnDefinition = "jsonb")
+    private String tenantSettings;
 
     @Column(name = "is_active")
     private Boolean isActive = true;

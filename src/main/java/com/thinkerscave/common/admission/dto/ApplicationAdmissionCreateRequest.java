@@ -33,4 +33,18 @@ public class ApplicationAdmissionCreateRequest {
     private List<String> uploadedDocuments;
     private ApplicationStatus status;
     private String internalComments;
+    public String getApplicantName() { return applicantName; }
+    public java.time.LocalDateTime getDateOfBirth() { return dateOfBirth; }
+    public String getGender() { return gender; }
+    public String getApplyingForSchoolOrCollege() { return applyingForSchoolOrCollege; }
+    public String getParentName() { return parentName; }
+    public String getGuardianName() { return guardianName; }
+    public String getContactNumber() { return contactNumber; }
+    public String getEmail() { return email; }
+    public AddressDto getAddress() { return address; }
+    public EmergencyContactDto getEmergencyContact() { return emergencyContact; }
+    public java.util.List<String> getUploadedDocuments() { return uploadedDocuments; }
+    public com.thinkerscave.common.admission.domain.ApplicationStatus getStatus() { return status; }
+    public String getInternalComments() { return internalComments; }
+
 }

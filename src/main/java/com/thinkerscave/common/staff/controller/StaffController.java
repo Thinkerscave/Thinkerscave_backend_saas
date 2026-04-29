@@ -7,13 +7,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-@CrossOrigin("*")
 @RestController
-@RequestMapping("/api/staff")
+@RequestMapping("/api/v1/staff")
 @Tag(name = "Staff Management", description = "Operations related to staff management")
 @RequiredArgsConstructor
 @Slf4j
@@ -21,10 +21,9 @@ public class StaffController {
 
     private final StaffService staffService;
 
-    @io.swagger.v3.oas.annotations.Operation(summary = "Save or Update Staff", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @io.swagger.v3.oas.annotations.Operation(summary = "Save or Update Staff")
     @PostMapping(value = "/saveOrUpdateStaff", name = "Save or Update Staff Request")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('STAFF_DIRECTORY_ADD') or hasAuthority('STAFF_DIRECTORY_EDIT')")
     public ResponseEntity<Map<String, Object>> saveOrUpdateStaffDetails(
             @RequestPart("staffData") StaffRequestDTO staffRequestDTO) {
         log.info("Received request to save/update staff: {} {}", staffRequestDTO.getFirstName(),
@@ -41,10 +40,9 @@ public class StaffController {
 
     }
 
-    @io.swagger.v3.oas.annotations.Operation(summary = "Get all staff members", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get all staff members")
     @GetMapping("/getAllStaff")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'IT_SUPPORT') or hasAuthority('STAFF_DIRECTORY_VIEW')")
     public ResponseEntity<Map<String, Object>> getAllStaffDetails() {
         log.info("Fetching all staff details");
         Map<String, Object> result = staffService.getAllStaff();
@@ -56,10 +54,9 @@ public class StaffController {
         }
     }
 
-    @io.swagger.v3.oas.annotations.Operation(summary = "Get staff by code", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get staff by code")
     @GetMapping("/getStaffByCode/{staffCode}")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'IT_SUPPORT') or hasAuthority('STAFF_DIRECTORY_VIEW')")
     public ResponseEntity<Map<String, Object>> getStaffByCode(@PathVariable String staffCode) {
         log.info("Fetching staff by code: {}", staffCode);
         Map<String, Object> result = staffService.getByStaffCode(staffCode);
@@ -71,10 +68,9 @@ public class StaffController {
         }
     }
 
-    @io.swagger.v3.oas.annotations.Operation(summary = "Set staff active status", parameters = {
-            @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
-    })
+    @io.swagger.v3.oas.annotations.Operation(summary = "Set staff active status")
     @DeleteMapping("/staffActiveStatus/{staffCode}")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('STAFF_DIRECTORY_DELETE')")
     public ResponseEntity<Map<String, Object>> setStaffActiveStatus(@PathVariable String staffCode) {
         log.info("Changing active status for staff: {}", staffCode);
         Map<String, Object> result = staffService.staffActiveStatus(staffCode);

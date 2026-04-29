@@ -9,6 +9,7 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @Getter
 @Setter
+@Builder
 public class OrgRequestDTO {
 
     // General Info
@@ -29,4 +30,7 @@ public class OrgRequestDTO {
     private String ownerName;
     private String ownerEmail;
     private String ownerMobile;
+
+    // Tenant linkage (set during onboarding)
+    private String tenantSchema;
 }
