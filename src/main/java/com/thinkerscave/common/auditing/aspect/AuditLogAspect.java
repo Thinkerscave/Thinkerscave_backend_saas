@@ -41,6 +41,9 @@ public class AuditLogAspect {
     private final JdbcTemplate jdbcTemplate;
     private final ObjectMapper objectMapper;
 
+    @org.springframework.beans.factory.annotation.Value("${app.multi-tenancy.enabled:true}")
+    private boolean multiTenancyEnabled;
+
     /**
      * Around advice for @Auditable methods.
      * Captures method execution and logs to audit table.
@@ -169,6 +172,11 @@ public class AuditLogAspect {
     private void saveAuditLog(String tenantId, Long organizationId, String action,
             String description, String performedBy, Map<String, Object> details,
             String status, String errorMessage, long durationMs) {
+
+        if (!multiTenancyEnabled) {
+            log.debug("Audit log skipped in dev mode: action={}, status={}", action, status);
+            return;
+        }
 
         String sql = """
                 INSERT INTO organization_audit_log

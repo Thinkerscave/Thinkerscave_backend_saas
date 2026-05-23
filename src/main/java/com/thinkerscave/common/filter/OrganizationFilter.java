@@ -34,11 +34,15 @@ import java.util.List;
 public class OrganizationFilter extends OncePerRequestFilter {
 
     private static final String ORG_HEADER = "X-Organization-ID";
+    private static final Long DEV_DEFAULT_ORG_ID = 1L;
 
     // JPA repositories — these queries run in the current TENANT schema
     // automatically
     private final UserRepository userRepository;
     private final OrganizationUserRepository orgUserRepository;
+
+    @org.springframework.beans.factory.annotation.Value("${app.multi-tenancy.enabled:true}")
+    private boolean multiTenancyEnabled;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -46,6 +50,13 @@ public class OrganizationFilter extends OncePerRequestFilter {
             FilterChain filterChain) throws ServletException, IOException {
 
         try {
+            // DEV MODE: Always set default org context
+            if (!multiTenancyEnabled) {
+                OrganizationContext.setOrganizationId(DEV_DEFAULT_ORG_ID);
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 
             // Only process for authenticated requests

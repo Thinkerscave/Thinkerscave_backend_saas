@@ -8,9 +8,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.lang.NonNull;
@@ -41,7 +41,6 @@ import java.io.IOException;
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
-@RequiredArgsConstructor
 public class TenantFilter extends OncePerRequestFilter {
 
     private static final String TENANT_HEADER = "X-Tenant-ID";
@@ -52,6 +51,14 @@ public class TenantFilter extends OncePerRequestFilter {
     private final JwtServiceImpl jwtService;
     private final SubdomainTenantResolver subdomainResolver;
 
+    public TenantFilter(JwtServiceImpl jwtService, @Lazy SubdomainTenantResolver subdomainResolver) {
+        this.jwtService = jwtService;
+        this.subdomainResolver = subdomainResolver;
+    }
+
+    @org.springframework.beans.factory.annotation.Value("${app.multi-tenancy.enabled:true}")
+    private boolean multiTenancyEnabled;
+
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
@@ -59,6 +66,13 @@ public class TenantFilter extends OncePerRequestFilter {
             @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         try {
+            // DEV MODE: Skip multi-tenant resolution, use default tenant
+            if (!multiTenancyEnabled) {
+                TenantContext.setTenant(DEFAULT_TENANT);
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             String tenant = null;
 
             // Priority 0: Extract tenant from subdomain (production mode - best UX)

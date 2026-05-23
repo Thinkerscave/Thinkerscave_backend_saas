@@ -19,7 +19,7 @@
     <packaging>jar</packaging>
 
     <properties>
-        <java.version>21</java.version>
+        <java.version>17</java.version>
     </properties>
 
     <!-- ARCHITECTURAL FIX: Global Logging Exclusion -->
@@ -135,7 +135,7 @@
     <dependency>
         <groupId>com.h2database</groupId>
         <artifactId>h2</artifactId>
-        <scope>test</scope>
+        <scope>runtime</scope>
     </dependency>
     </dependencies>
 

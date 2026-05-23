@@ -26,12 +26,19 @@ public class SchemaInitializer {
     @Value("${spring.datasource.url}")
     private String dataSourceUrl;
 
+    @Value("${app.multi-tenancy.enabled:true}")
+    private boolean multiTenancyEnabled;
+
     public SchemaInitializer(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 
     @PostConstruct
     public void initializeGlobalTables() {
+        // Skip PostgreSQL-specific schema initialization in dev mode (H2)
+        if (!multiTenancyEnabled) {
+            return;
+        }
         try (Connection connection = dataSource.getConnection();
                 Statement statement = connection.createStatement()) {
 

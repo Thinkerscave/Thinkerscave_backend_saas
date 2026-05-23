@@ -18,7 +18,7 @@ import java.util.Date;
 import java.util.List;
 
 @Component
-@org.springframework.context.annotation.Profile("!test")
+@org.springframework.context.annotation.Profile("!test & !dev")
 @RequiredArgsConstructor
 @Slf4j
 public class DataSeeder implements CommandLineRunner {
@@ -28,7 +28,7 @@ public class DataSeeder implements CommandLineRunner {
 
         @Override
         public void run(String... args) throws Exception {
-                if (inquiryRepository.count() > 15) {
+                if (inquiryRepository.count() > 0) {
                         return;
                 }
 

@@ -4,6 +4,7 @@ import com.thinkerscave.common.filter.JwtAuthFilter;
 import com.thinkerscave.common.filter.TenantFilter;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -25,6 +26,9 @@ import org.springframework.security.web.context.SecurityContextHolderFilter;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    @Value("${app.multi-tenancy.enabled:true}")
+    private boolean multiTenancyEnabled;
 
     @Autowired
     private JwtAuthFilter jwtAuthFilter;
@@ -59,9 +63,11 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui.html",
                                 "/api/admissions/**",
-                                "/api/schema/init")
+                                "/api/schema/init",
+                                "/h2-console/**")
                         .permitAll()
                         .anyRequest().authenticated())
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(authenticationProvider)
@@ -84,6 +90,9 @@ public class SecurityConfig {
         String allowedOriginsEnv = System.getenv("ALLOWED_ORIGINS");
         if (allowedOriginsEnv != null && !allowedOriginsEnv.isEmpty()) {
             configuration.setAllowedOrigins(java.util.Arrays.asList(allowedOriginsEnv.split(",")));
+        } else if (!multiTenancyEnabled) {
+            // Dev mode: allow any localhost port
+            configuration.setAllowedOriginPatterns(java.util.Arrays.asList("http://localhost:*"));
         } else {
             // Default for development - CHANGE IN PRODUCTION!
             configuration.setAllowedOrigins(java.util.Arrays.asList(

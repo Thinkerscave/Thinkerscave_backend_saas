@@ -19,6 +19,9 @@ public class TenantLookupService {
 
     private final JdbcTemplate jdbcTemplate;
 
+    @org.springframework.beans.factory.annotation.Value("${app.multi-tenancy.enabled:true}")
+    private boolean multiTenancyEnabled;
+
     /**
      * Finds the tenant ID associated with a given email or username.
      * 
@@ -26,6 +29,10 @@ public class TenantLookupService {
      * @return tenant ID (database schema name) or "public" if not found
      */
     public String findTenantByEmailOrUsername(String identifier) {
+        if (!multiTenancyEnabled) {
+            return "public";
+        }
+
         if (identifier == null || identifier.trim().isEmpty()) {
             log.warn("Empty identifier provided for tenant lookup");
             return "public";
@@ -59,6 +66,10 @@ public class TenantLookupService {
      * @return true if user exists in mapping, false otherwise
      */
     public boolean userExistsInMapping(String identifier) {
+        if (!multiTenancyEnabled) {
+            return true;
+        }
+
         if (identifier == null || identifier.trim().isEmpty()) {
             return false;
         }
@@ -88,6 +99,11 @@ public class TenantLookupService {
      * @param tenantId Tenant/schema ID
      */
     public void upsertUserTenantMapping(String email, String username, String tenantId) {
+        if (!multiTenancyEnabled) {
+            log.debug("Multi-tenancy disabled, skipping upsertUserTenantMapping");
+            return;
+        }
+
         String sql = """
                 INSERT INTO public.user_tenant_mapping (email, username, tenant_id)
                 VALUES (?, ?, ?)

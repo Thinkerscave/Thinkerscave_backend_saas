@@ -2,6 +2,7 @@ package com.thinkerscave.common.config;
 
 import org.hibernate.engine.jdbc.connections.spi.MultiTenantConnectionProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
@@ -17,6 +18,7 @@ import java.sql.SQLException;
  * `SET search_path` mechanism, enabling schema-based multi-tenancy.
  */
 @Component
+@Profile("!dev")
 public class SchemaMultiTenantConnectionProvider implements MultiTenantConnectionProvider<String> {
 
     @Autowired

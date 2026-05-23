@@ -104,7 +104,7 @@ public class Organisation extends Auditable {
     // --- NEW FIELDS END ---
 
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
-    @Column(name = "tenant_settings", columnDefinition = "jsonb")
+    @Column(name = "tenant_settings")
     private String tenantSettings;
 
     @Column(name = "is_active")
