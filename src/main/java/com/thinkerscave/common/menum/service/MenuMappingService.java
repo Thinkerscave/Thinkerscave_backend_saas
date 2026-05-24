@@ -12,6 +12,8 @@ public interface MenuMappingService {
 
 	List<MenuMappingDTO> getActiveMenuTree();
 
+	RoleMenuMappingRequest getRoleMenuPrivileges(Long roleId);
+
 	void assignRoleMenuPrivileges(RoleMenuMappingRequest request);
 
 }

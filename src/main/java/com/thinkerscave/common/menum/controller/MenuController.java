@@ -71,4 +71,12 @@ public class MenuController {
 		String result = menuService.toggleMenuStatus(code, status);
 		return ResponseEntity.ok(ApiResponse.success(result, null));
 	}
+
+	@DeleteMapping("/{code}")
+	@io.swagger.v3.oas.annotations.Operation(summary = "Delete menu")
+	public ResponseEntity<ApiResponse<Void>> deleteMenu(@PathVariable String code) {
+		log.info("API Request - Delete Menu: {}", code);
+		String result = menuService.deleteMenu(code);
+		return ResponseEntity.ok(ApiResponse.success(result, null));
+	}
 }

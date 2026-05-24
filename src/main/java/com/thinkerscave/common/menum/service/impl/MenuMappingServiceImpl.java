@@ -4,6 +4,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -43,7 +44,6 @@ public class MenuMappingServiceImpl implements MenuMappingService {
         public List<SideMenuDTO> getRoleBasedSideMenu(Long roleId) {
                 List<RoleMenuPrivilegeMapping> mappings = roleMenuPrivilegeMappingRepository.findByRoleId(roleId);
 
-                // Group by Menu → SubMenu
                 Map<Menu, Map<SubMenu, List<Privilege>>> grouped = mappings.stream()
                                 .collect(Collectors.groupingBy(
                                                 m -> m.getSubMenu().getMenu(),
@@ -55,10 +55,19 @@ public class MenuMappingServiceImpl implements MenuMappingService {
 
                 List<SideMenuDTO> menuList = new ArrayList<>();
 
-                for (Map.Entry<Menu, Map<SubMenu, List<Privilege>>> menuEntry : grouped.entrySet()) {
+                List<Map.Entry<Menu, Map<SubMenu, List<Privilege>>>> sortedMenuEntries = grouped.entrySet().stream()
+                                .sorted(Comparator.comparingInt(entry -> entry.getKey().getMenuOrder() != null
+                                                ? entry.getKey().getMenuOrder()
+                                                : 999))
+                                .toList();
+
+                for (Map.Entry<Menu, Map<SubMenu, List<Privilege>>> menuEntry : sortedMenuEntries) {
                         Menu menu = menuEntry.getKey();
 
-                        // Sort sub-menus by subMenuOrder, then map to SideMenuDTO
+                        if ("MENU_DASHBOARD".equalsIgnoreCase(menu.getMenuCode())) {
+                                continue;
+                        }
+
                         List<SideMenuDTO> subMenuDTOs = menuEntry.getValue().entrySet().stream()
                                         .sorted(Comparator.comparingInt(e -> {
                                                 Integer order = e.getKey().getSubMenuOrder();
@@ -79,36 +88,49 @@ public class MenuMappingServiceImpl implements MenuMappingService {
 
                                                 return new SideMenuDTO(
                                                                 subMenu.getSubMenuName(),
-                                                                subMenu.getSubMenuIcon(),
+                                                                normalizeIcon(subMenu.getSubMenuIcon()),
                                                                 routerLink,
                                                                 null,
                                                                 privileges);
                                         })
                                         .toList();
 
+                        if (subMenuDTOs.isEmpty()) {
+                                continue;
+                        }
+
                         SideMenuDTO menuDTO = new SideMenuDTO(
                                         menu.getName(),
-                                        menu.getIcon(),
-                                        null, // parent menus don't navigate — they are group headers
+                                        normalizeIcon(menu.getIcon()),
+                                        null,
                                         subMenuDTOs,
                                         Collections.emptyList());
 
                         menuList.add(menuDTO);
                 }
 
-                // Sort menu groups by their menuOrder
-                menuList.sort(Comparator.comparingInt(m -> {
-                        // We can't access menu entity here, but menus are already grouped — order is
-                        // approximate
-                        return 0;
-                }));
-
-                // Add static Dashboard at the top
                 SideMenuDTO dashboard = new SideMenuDTO("Dashboard", "pi pi-home", "/app", null,
                                 Collections.emptyList());
                 menuList.add(0, dashboard);
 
                 return menuList;
+        }
+
+        @Override
+        public RoleMenuMappingRequest getRoleMenuPrivileges(Long roleId) {
+                Map<Long, List<Long>> grouped = roleMenuPrivilegeMappingRepository.findByRoleId(roleId).stream()
+                                .collect(Collectors.groupingBy(
+                                                mapping -> mapping.getSubMenu().getSubMenuId(),
+                                                LinkedHashMap::new,
+                                                Collectors.mapping(
+                                                                mapping -> mapping.getPrivilege().getPrivilegeId(),
+                                                                Collectors.toList())));
+
+                List<RoleMenuMappingRequest.SubMenuPrivilegeDTO> subMenuPrivileges = grouped.entrySet().stream()
+                                .map(entry -> new RoleMenuMappingRequest.SubMenuPrivilegeDTO(entry.getKey(), entry.getValue()))
+                                .toList();
+
+                return new RoleMenuMappingRequest(roleId, subMenuPrivileges);
         }
 
         @Override
@@ -159,6 +181,24 @@ public class MenuMappingServiceImpl implements MenuMappingService {
                         }
                 }
 
+        }
+
+        private String normalizeIcon(String icon) {
+                if (icon == null || icon.isBlank()) {
+                        return "pi pi-circle";
+                }
+
+                String value = icon.trim();
+                if (value.startsWith("pi pi-")) {
+                        return value;
+                }
+                if (value.startsWith("pi-")) {
+                        return "pi " + value;
+                }
+                if (value.startsWith("pi ")) {
+                        return value;
+                }
+                return "pi pi-" + value;
         }
 
 }

@@ -118,6 +118,21 @@ public class MenuServiceImpl implements MenuService {
 	}
 
 	@Override
+	@Transactional
+	public String deleteMenu(String code) {
+		Menu menu = menuRepository.findByMenuCode(code)
+				.orElseThrow(() -> new RuntimeException("Menu not found with code: " + code));
+
+		menu.setIsActive(false);
+		List<SubMenu> subMenus = subMenuRepository.findByMenu_MenuIdOrderBySubMenuOrderAsc(menu.getMenuId());
+		subMenus.forEach(subMenu -> subMenu.setIsActive(false));
+		subMenuRepository.saveAll(subMenus);
+		menuRepository.save(menu);
+
+		return "Menu deleted successfully";
+	}
+
+	@Override
 	public List<MenuOrderDTO> getMenuSequence() {
 		// Fetch all menus ordered
 		List<Menu> menus = menuRepository.findAllByOrderByMenuOrderAsc();
@@ -147,14 +162,14 @@ public class MenuServiceImpl implements MenuService {
 		List<SubMenu> subMenus = new ArrayList<>();
 
 		for (MenuOrderDTO menuOrder : menuOrders) {
-			Menu menu = new Menu();
-			menu.setMenuId(menuOrder.getMenuId());
+			Menu menu = menuRepository.findById(menuOrder.getMenuId())
+					.orElseThrow(() -> new RuntimeException("Menu not found with id: " + menuOrder.getMenuId()));
 			menu.setMenuOrder(menuOrder.getMenuOrder());
 			menus.add(menu);
 
 			for (SubMenuOrderDTO sub : menuOrder.getSubMenus()) {
-				SubMenu submenu = new SubMenu();
-				submenu.setSubMenuId(sub.getSubMenuId());
+				SubMenu submenu = subMenuRepository.findById(sub.getSubMenuId())
+						.orElseThrow(() -> new RuntimeException("Submenu not found with id: " + sub.getSubMenuId()));
 				submenu.setSubMenuOrder(sub.getSubMenuOrder());
 				subMenus.add(submenu);
 			}

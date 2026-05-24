@@ -177,6 +177,16 @@ public class SubMenuServiceImpl implements SubMenuService {
 	}
 
 	@Override
+	@Transactional
+	public String deleteSubMenu(String code) {
+		SubMenu subMenu = subMenuRepository.findBySubMenuCode(code)
+				.orElseThrow(() -> new RuntimeException("Submenu not found with code: " + code));
+		subMenu.setIsActive(false);
+		subMenuRepository.save(subMenu);
+		return "Sub-menu deleted successfully";
+	}
+
+	@Override
 	public List<Privilege> getAllPrivileges() {
 		return privilegeRepository.findAll();
 	}

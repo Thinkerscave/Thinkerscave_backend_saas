@@ -19,5 +19,7 @@ public interface SubMenuService {
 
 	String updateSubMenuStatus(String code, boolean status);
 
+	String deleteSubMenu(String code);
+
 	List<Privilege> getAllPrivileges();
 }

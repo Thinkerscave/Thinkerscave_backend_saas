@@ -94,6 +94,14 @@ public class SubMenuController {
                 return ResponseEntity.ok(ApiResponse.success(result, null));
         }
 
+        @io.swagger.v3.oas.annotations.Operation(summary = "Delete submenu")
+        @DeleteMapping("/{code}")
+        public ResponseEntity<ApiResponse<Void>> deleteSubMenu(@PathVariable String code) {
+                log.info("API Request - Delete SubMenu: {}", code);
+                String result = subMenuService.deleteSubMenu(code);
+                return ResponseEntity.ok(ApiResponse.success(result, null));
+        }
+
         @io.swagger.v3.oas.annotations.Operation(summary = "Get all privileges")
         @GetMapping("/getPrivileges")
         public ResponseEntity<ApiResponse<List<PrivilegeDTO>>> getAllPrivileges() {

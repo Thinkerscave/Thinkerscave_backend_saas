@@ -153,8 +153,11 @@ INSERT INTO sub_menu_master (sub_menu_id, sub_menu_name, sub_menu_code, sub_menu
 (18, 'Manage Inquiry', 'INQ_MANAGE', 'Inquiry CRUD', '/app/inquiry/manage', 'pi pi-phone', 1, TRUE, 6),
 (19, 'Follow-ups', 'INQ_FOLLOWUP', 'Inquiry follow-ups', '/app/inquiry/followup', 'pi pi-reply', 2, TRUE, 6),
 (20, 'Menu Management', 'ADMIN_MENU', 'Menu configuration', '/app/manage-menu', 'pi pi-bars', 1, TRUE, 8),
-(21, 'Role Management', 'ADMIN_ROLE', 'Role and permissions', '/app/role/manage', 'pi pi-shield', 2, TRUE, 8),
-(22, 'Organization', 'ADMIN_ORG', 'Organization settings', '/app/organization-registration', 'pi pi-globe', 3, TRUE, 8);
+(21, 'Role Management', 'ADMIN_ROLE', 'Role and permissions', '/app/role/manage', 'pi pi-shield', 5, TRUE, 8),
+(22, 'Organization', 'ADMIN_ORG', 'Organization settings', '/app/organization-registration', 'pi pi-globe', 6, TRUE, 8),
+(23, 'Sub Menu Management', 'ADMIN_SUB_MENU', 'Sub-menu configuration', '/app/manage-sub-menu', 'pi pi-list-check', 2, TRUE, 8),
+(24, 'Menu Sequence Management', 'ADMIN_MENU_SEQUENCE', 'Menu and sub-menu ordering', '/app/menu-sequence', 'pi pi-sort-alt', 3, TRUE, 8),
+(25, 'Role Menu Mapping', 'ADMIN_ROLE_MENU_MAPPING', 'Role-based menu and privilege mapping', '/app/role-menu-mapping', 'pi pi-lock', 4, TRUE, 8);
 
 -- ============================================
 -- 11. SUBMENU-PRIVILEGE MAPPING
@@ -170,7 +173,10 @@ INSERT INTO submenu_privilege_mapping (mapping_id, sub_menu_id, privilege_id) VA
 (55,16,1),(56,16,2),(57,16,3),(58,17,1),(59,17,2),(60,17,3),
 (61,18,1),(62,18,2),(63,18,3),(64,18,4),(65,19,1),(66,19,2),(67,19,3),
 (68,20,1),(69,20,2),(70,20,3),(71,20,4),(72,21,1),(73,21,2),(74,21,3),(75,21,4),
-(76,22,1),(77,22,2),(78,22,3);
+(76,22,1),(77,22,2),(78,22,3),
+(79,23,1),(80,23,2),(81,23,3),(82,23,4),
+(83,24,1),(84,24,2),(85,24,3),(86,24,4),
+(87,25,1),(88,25,2),(89,25,3),(90,25,4);
 
 -- ============================================
 -- 12. ROLE-SUBMENU-PRIVILEGE MAPPING
@@ -195,7 +201,13 @@ INSERT INTO role_submenu_privilege_mapping (mapping_id, role_id, sub_menu_id, pr
 (91,2,10,1),(92,2,10,2),(93,2,11,1),(94,2,11,2),(95,2,12,1),(96,2,12,2),(97,2,12,5),
 (98,2,15,1),(99,2,15,2),(100,2,18,1),(101,2,18,2),(102,2,18,3),
 -- TEACHER
-(103,3,1,1),(104,3,10,1),(105,3,11,1),(106,3,12,1),(107,3,15,1),(108,3,15,2),(109,3,2,1);
+(103,3,1,1),(104,3,10,1),(105,3,11,1),(106,3,12,1),(107,3,15,1),(108,3,15,2),(109,3,2,1),
+-- SUPER_ADMIN: menu administration pages
+(110,1,23,1),(111,1,23,2),(112,1,23,3),(113,1,23,4),
+(114,1,24,1),(115,1,24,2),(116,1,24,3),(117,1,24,4),
+(118,1,25,1),(119,1,25,2),(120,1,25,3),(121,1,25,4),
+-- ADMIN: menu administration pages
+(122,2,23,1),(123,2,23,3),(124,2,24,1),(125,2,24,3),(126,2,25,1),(127,2,25,3);
 
 -- ============================================
 -- 13. DEPARTMENTS

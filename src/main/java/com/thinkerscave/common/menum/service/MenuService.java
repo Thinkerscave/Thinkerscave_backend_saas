@@ -17,6 +17,8 @@ public interface MenuService {
 
 	String toggleMenuStatus(String code, boolean status);
 
+	String deleteMenu(String code);
+
 	List<Map<String, Object>> getAllActiveMenus();
 
 	List<MenuOrderDTO> getMenuSequence();

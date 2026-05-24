@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -42,6 +43,13 @@ public class MenuMappingController {
         public ResponseEntity<ApiResponse<List<MenuMappingDTO>>> getActiveMenuTree() {
                 List<MenuMappingDTO> result = menuMappingService.getActiveMenuTree();
                 return ResponseEntity.ok(ApiResponse.success("Menu tree retrieved successfully", result));
+        }
+
+        @io.swagger.v3.oas.annotations.Operation(summary = "Get assigned privileges for a role")
+        @GetMapping("/role/{roleId}")
+        public ResponseEntity<ApiResponse<RoleMenuMappingRequest>> getRoleMenuPrivileges(@PathVariable Long roleId) {
+                RoleMenuMappingRequest result = menuMappingService.getRoleMenuPrivileges(roleId);
+                return ResponseEntity.ok(ApiResponse.success("Role menu privileges retrieved successfully", result));
         }
 
         @io.swagger.v3.oas.annotations.Operation(summary = "Assign role menu privileges")
