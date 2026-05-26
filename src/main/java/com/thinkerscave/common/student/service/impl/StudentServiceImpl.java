@@ -155,12 +155,12 @@ public class StudentServiceImpl implements StudentService {
 					permanent.setZipCode(dto.getPermanentZipCode());
 					permanent.setAddressLine(dto.getPermanentAddressLine());
 				}
-				student.setSameAddress(dto.getIsSameAddress());
+				student.setIsSameAddress(dto.getIsSameAddress());
 				student.setCurrentAddress(current);
 				student.setPermanentAddress(permanent);
 				student.setUser(studentUser);
 				student.setParent(guardian);
-				student.setActive(true);
+				student.setIsActive(true);
 
 				classRepository.findById(dto.getClassId()).ifPresent(student::setClassEntity);
 				sectionRepository.findById(dto.getSectionId()).ifPresent(student::setSection);
@@ -279,7 +279,7 @@ public class StudentServiceImpl implements StudentService {
 		Long orgId = com.thinkerscave.common.context.OrganizationContext.getOrganizationId();
 		Student student = studentRepository.findByStudentIdAndOrganizationId(id, orgId)
 				.orElseThrow(() -> new RuntimeException("Student not found"));
-		student.setActive(false);
+		student.setIsActive(false);
 		studentRepository.save(student);
 	}
 
@@ -295,7 +295,7 @@ public class StudentServiceImpl implements StudentService {
 		dto.setDateOfBirth(student.getDateOfBirth());
 		dto.setRollNumber(student.getRollNumber());
 		dto.setEnrollmentDate(student.getEnrollmentDate());
-		dto.setActive(student.isActive());
+		dto.setActive(student.getIsActive() != null && student.getIsActive());
 		dto.setRemarks(student.getRemarks());
 
 		if (student.getClassEntity() != null) {

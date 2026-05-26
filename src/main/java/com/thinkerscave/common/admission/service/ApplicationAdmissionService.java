@@ -380,12 +380,12 @@ public class ApplicationAdmissionService {
         student.setGender(application.getGender());
         student.setDateOfBirth(application.getDateOfBirth().toLocalDate());
         student.setEnrollmentDate(LocalDate.now());
-        student.setActive(true);
+        student.setIsActive(true);
 
         // Set addresses (current and permanent same at start)
         student.setCurrentAddress(savedAddress);
         student.setPermanentAddress(savedAddress);
-        student.setSameAddress(true);
+        student.setIsSameAddress(true);
 
         // Generate roll number (simple implementation)
         student.setRollNumber(generateRollNumber());

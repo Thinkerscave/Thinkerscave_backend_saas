@@ -29,7 +29,7 @@ public class TenantSettingsService {
      * OrganizationType.
      */
     public TenantConfigDTO getTenantConfigBySchema(String tenantSchema) {
-        Optional<Organisation> orgOptional = organisationRepository.findByTenantSchema(tenantSchema);
+        Optional<Organisation> orgOptional = organisationRepository.findFirstByTenantSchema(tenantSchema);
 
         if (orgOptional.isEmpty()) {
             return getDefaultConfig(OrganizationType.SCHOOL); // Fallback

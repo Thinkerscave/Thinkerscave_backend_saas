@@ -32,4 +32,6 @@ public interface OrganizationRepository extends JpaRepository<Organisation, Long
 
     Optional<Organisation> findByTenantSchema(String tenantSchema);
 
+    Optional<Organisation> findFirstByTenantSchema(String tenantSchema);
+
 }

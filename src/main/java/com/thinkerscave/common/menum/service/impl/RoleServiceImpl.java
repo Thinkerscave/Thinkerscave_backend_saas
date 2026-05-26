@@ -1,6 +1,7 @@
 package com.thinkerscave.common.menum.service.impl;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -36,7 +37,11 @@ public class RoleServiceImpl implements RoleService {
         }
 
         role.setRoleName(dto.getRoleName());
-        role.setRoleCode(dto.getRoleName());
+        String requestedCode = dto.getRoleCode();
+        if (requestedCode == null || requestedCode.isBlank()) {
+            requestedCode = dto.getRoleName();
+        }
+        role.setRoleCode(normalizeRoleCode(requestedCode));
         role.setDescription(dto.getDescription());
         role.setIsActive(dto.getIsActive() != null ? dto.getIsActive() : true);
         role.setRoleType(dto.getRoleType());
@@ -68,7 +73,7 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public void updateRoleStatus(Long roleId, Boolean status) {
-        log.info("Updating role status - roleId: {}, roleCode: {}, status: {}", roleId, status);
+        log.info("Updating role status - roleId: {}, status: {}", roleId, status);
 
         Role role;
         if (roleId != null) {
@@ -109,6 +114,16 @@ public class RoleServiceImpl implements RoleService {
                         role.getRoleName(),
                         role.getRoleCode()))
                 .collect(Collectors.toList());
+    }
+
+    private String normalizeRoleCode(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim()
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
     }
 
 }

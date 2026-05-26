@@ -63,7 +63,9 @@ public class SubMenuServiceImpl implements SubMenuService {
 		subMenu.setSubMenuName(dto.getSubMenuName());
 		subMenu.setSubMenuUrl(dto.getSubMenuUrl());
 		subMenu.setSubMenuIcon(dto.getSubMenuIcon());
-		subMenu.setSubMenuOrder(dto.getSubMenuOrder());
+		if (dto.getSubMenuOrder() != null) {
+			subMenu.setSubMenuOrder(dto.getSubMenuOrder());
+		}
 		subMenu.setIsActive(dto.getSubMenuIsActive() != null ? dto.getSubMenuIsActive() : true);
 		subMenu.setSubMenuDescription(dto.getSubMenuDescription());
 

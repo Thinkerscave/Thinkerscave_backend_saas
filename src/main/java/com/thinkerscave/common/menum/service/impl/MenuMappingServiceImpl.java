@@ -42,7 +42,11 @@ public class MenuMappingServiceImpl implements MenuMappingService {
 
         @Override
         public List<SideMenuDTO> getRoleBasedSideMenu(Long roleId) {
-                List<RoleMenuPrivilegeMapping> mappings = roleMenuPrivilegeMappingRepository.findByRoleId(roleId);
+                List<RoleMenuPrivilegeMapping> mappings = roleMenuPrivilegeMappingRepository.findByRoleId(roleId)
+                                .stream()
+                                .filter(mapping -> Boolean.TRUE.equals(mapping.getSubMenu().getIsActive()))
+                                .filter(mapping -> Boolean.TRUE.equals(mapping.getSubMenu().getMenu().getIsActive()))
+                                .toList();
 
                 Map<Menu, Map<SubMenu, List<Privilege>>> grouped = mappings.stream()
                                 .collect(Collectors.groupingBy(

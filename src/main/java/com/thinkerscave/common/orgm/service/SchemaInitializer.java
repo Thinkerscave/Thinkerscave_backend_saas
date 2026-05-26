@@ -1,6 +1,7 @@
 package com.thinkerscave.common.orgm.service;
 
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -17,8 +18,14 @@ import java.sql.Statement;
  * 1. Creates a new PostgreSQL schema for each tenant
  * 2. Lets Hibernate auto-generate tables via ddl-auto=update
  * 3. Seeds default data (menus, privileges, roles)
+ * 
+ * In dev/test profiles, the @PostConstruct initialization is skipped because:
+ * - H2 uses a single PUBLIC schema with Hibernate DDL auto-creation
+ * - data-dev.sql handles all seeding
+ * - PostgreSQL-specific DDL syntax (BIGSERIAL, JSONB) doesn't work in H2
  */
 @Service
+@Slf4j
 public class SchemaInitializer {
 
     private final DataSource dataSource;
@@ -26,8 +33,8 @@ public class SchemaInitializer {
     @Value("${spring.datasource.url}")
     private String dataSourceUrl;
 
-    @Value("${app.multi-tenancy.enabled:true}")
-    private boolean multiTenancyEnabled;
+    @Value("${spring.datasource.driver-class-name:}")
+    private String driverClassName;
 
     public SchemaInitializer(DataSource dataSource) {
         this.dataSource = dataSource;
@@ -35,8 +42,9 @@ public class SchemaInitializer {
 
     @PostConstruct
     public void initializeGlobalTables() {
-        // Skip PostgreSQL-specific schema initialization in dev mode (H2)
-        if (!multiTenancyEnabled) {
+        // Skip PostgreSQL-specific DDL in H2 (dev/test profiles)
+        if (isH2Database()) {
+            log.info("⏭️ Skipping SchemaInitializer @PostConstruct — H2 detected. Tables created by Hibernate DDL + data-dev.sql.");
             return;
         }
         try (Connection connection = dataSource.getConnection();
@@ -406,5 +414,18 @@ public class SchemaInitializer {
             throw new IllegalArgumentException("Schema name cannot be null or empty");
         }
         return schemaName.toLowerCase().replaceAll("[^a-z0-9_]", "");
+    }
+
+    /**
+     * Detects if the current datasource is H2 (dev/test).
+     */
+    private boolean isH2Database() {
+        if (driverClassName != null && driverClassName.contains("h2")) {
+            return true;
+        }
+        if (dataSourceUrl != null && dataSourceUrl.contains("h2")) {
+            return true;
+        }
+        return false;
     }
 }

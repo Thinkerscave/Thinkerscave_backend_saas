@@ -28,12 +28,12 @@ public class UserInfoUserDetails implements UserDetails {
 		this.password = user.getPassword();
 		this.blocked = Boolean.TRUE.equals(user.getIsBlocked());
 
-		// 1. Base Roles
+		// 1. Base Roles (use roleCode for authority matching)
 		this.authorities = user.getRoles().stream()
 				.flatMap(role -> {
-					String roleName = role.getRoleName();
-					String roleWithPrefix = roleName.startsWith("ROLE_") ? roleName : "ROLE_" + roleName;
-					String roleWithoutPrefix = roleName.replaceFirst("^ROLE_", "");
+					String roleCode = role.getRoleCode() != null ? role.getRoleCode() : role.getRoleName();
+					String roleWithPrefix = roleCode.startsWith("ROLE_") ? roleCode : "ROLE_" + roleCode;
+					String roleWithoutPrefix = roleCode.replaceFirst("^ROLE_", "");
 					return java.util.stream.Stream.of(
 							new SimpleGrantedAuthority(roleWithPrefix),
 							new SimpleGrantedAuthority(roleWithoutPrefix));

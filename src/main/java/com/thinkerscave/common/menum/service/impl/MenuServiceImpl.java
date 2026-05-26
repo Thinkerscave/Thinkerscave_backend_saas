@@ -180,6 +180,8 @@ public class MenuServiceImpl implements MenuService {
 	}
 	private MenuDTO mapToDTO(Menu menu) {
 		MenuDTO dto = new MenuDTO();
+		dto.setMenuId(menu.getMenuId());
+		dto.setSlNo(menu.getMenuId());
 		dto.setName(menu.getName());
 		dto.setDescription(menu.getDescription());
 		dto.setUrl(menu.getUrl());

@@ -15,6 +15,7 @@ import java.util.List;
  * 
  * @author System
  */
+@Data
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Builder
 public class ApiError {

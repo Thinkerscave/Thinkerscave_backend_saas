@@ -54,7 +54,7 @@ public class Student extends Auditable {
     private Address permanentAddress;
 
     @Column(length = 50, unique = true, name = "is_same_address")
-    private boolean isSameAddress;
+    private Boolean isSameAddress;
 
     @Column(length = 50, unique = true, name = "date_of_birth")
     private LocalDate dateOfBirth;
@@ -73,7 +73,7 @@ public class Student extends Auditable {
     private String photoUrl;
 
     @Column(length = 255, name = "is_active")
-    private boolean isActive;
+    private Boolean isActive;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "class_id")
     private ClassEntity classEntity;

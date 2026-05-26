@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class MenuDTO {
 
+    private Long menuId;
+    private Long slNo;
     private String name;
     private String description;
     private String url;

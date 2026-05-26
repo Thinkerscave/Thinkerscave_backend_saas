@@ -30,6 +30,9 @@ public class SecurityConfig {
     @Value("${app.multi-tenancy.enabled:true}")
     private boolean multiTenancyEnabled;
 
+    @Value("${app.cors.allowed-origins:}")
+    private String configuredAllowedOrigins;
+
     @Autowired
     private JwtAuthFilter jwtAuthFilter;
 
@@ -86,18 +89,25 @@ public class SecurityConfig {
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
 
-        // Get allowed origins from environment variable
+        // Get allowed origins from environment variable or Spring configuration.
         String allowedOriginsEnv = System.getenv("ALLOWED_ORIGINS");
         if (allowedOriginsEnv != null && !allowedOriginsEnv.isEmpty()) {
-            configuration.setAllowedOrigins(java.util.Arrays.asList(allowedOriginsEnv.split(",")));
+            configuration.setAllowedOriginPatterns(parseOrigins(allowedOriginsEnv));
+        } else if (configuredAllowedOrigins != null && !configuredAllowedOrigins.isBlank()) {
+            configuration.setAllowedOriginPatterns(parseOrigins(configuredAllowedOrigins));
         } else if (!multiTenancyEnabled) {
             // Dev mode: allow any localhost port
-            configuration.setAllowedOriginPatterns(java.util.Arrays.asList("http://localhost:*"));
+            configuration.setAllowedOriginPatterns(java.util.Arrays.asList(
+                    "http://localhost:*",
+                    "http://127.0.0.1:*"));
         } else {
             // Default for development - CHANGE IN PRODUCTION!
-            configuration.setAllowedOrigins(java.util.Arrays.asList(
+            configuration.setAllowedOriginPatterns(java.util.Arrays.asList(
                     "http://localhost:3000",
-                    "http://localhost:4200"));
+                    "http://localhost:4200",
+                    "http://localhost:4300",
+                    "http://127.0.0.1:4200",
+                    "http://127.0.0.1:4300"));
         }
 
         configuration.setAllowedMethods(java.util.Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
@@ -118,6 +128,13 @@ public class SecurityConfig {
         org.springframework.web.cors.UrlBasedCorsConfigurationSource source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    private java.util.List<String> parseOrigins(String rawOrigins) {
+        return java.util.Arrays.stream(rawOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList();
     }
 
     @Bean
