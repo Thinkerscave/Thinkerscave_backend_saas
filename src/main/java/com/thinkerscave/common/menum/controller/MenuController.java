@@ -2,7 +2,7 @@ package com.thinkerscave.common.menum.controller;
 
 import com.thinkerscave.common.menum.dto.MenuDTO;
 import com.thinkerscave.common.menum.service.MenuService;
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

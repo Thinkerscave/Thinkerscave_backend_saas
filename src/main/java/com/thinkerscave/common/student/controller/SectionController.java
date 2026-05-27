@@ -10,7 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 
 import java.util.Collections;
 import java.util.List;

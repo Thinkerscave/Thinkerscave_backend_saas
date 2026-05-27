@@ -2,7 +2,7 @@ package com.thinkerscave.common.student.controller;
 
 import com.thinkerscave.common.student.dto.ClassDTO;
 import com.thinkerscave.common.student.service.ClassService;
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

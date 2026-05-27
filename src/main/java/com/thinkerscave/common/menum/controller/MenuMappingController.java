@@ -16,7 +16,7 @@ import com.thinkerscave.common.menum.dto.RoleMenuMappingRequest;
 import com.thinkerscave.common.menum.dto.SideMenuDTO;
 import com.thinkerscave.common.menum.service.MenuMappingService;
 import com.thinkerscave.common.security.UserInfoUserDetails;
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

@@ -2,7 +2,7 @@ package com.thinkerscave.common.orgm.controller;
 
 import com.thinkerscave.common.orgm.dto.*;
 import com.thinkerscave.common.orgm.service.OrganizationService;
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

@@ -5,7 +5,7 @@ import com.thinkerscave.common.course.dto.AcademicContainerDTO;
 import com.thinkerscave.common.course.dto.AcademicYearDTO;
 import com.thinkerscave.common.course.dto.StructureTemplateDTO;
 import com.thinkerscave.common.course.service.AcademicStructureService;
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

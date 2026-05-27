@@ -3,7 +3,7 @@ package com.thinkerscave.common.orgm.controller;
 import com.thinkerscave.common.config.TenantContext;
 import com.thinkerscave.common.orgm.dto.TenantConfigDTO;
 import com.thinkerscave.common.orgm.service.TenantSettingsService;
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

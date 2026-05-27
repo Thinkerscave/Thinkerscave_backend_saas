@@ -4,7 +4,7 @@ import com.thinkerscave.common.menum.dto.PrivilegeDTO;
 import com.thinkerscave.common.menum.dto.SubMenuRequestDTO;
 import com.thinkerscave.common.menum.dto.SubMenuResponseDTO;
 import com.thinkerscave.common.menum.service.SubMenuService;
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -4,7 +4,7 @@ import com.thinkerscave.common.orgm.dto.TenantOnboardingRequest;
 import com.thinkerscave.common.orgm.dto.TenantOnboardingResponse;
 import com.thinkerscave.common.orgm.dto.TenantStatusResponse;
 import com.thinkerscave.common.orgm.service.TenantOnboardingService;
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.thinkerscave.common.menum.dto.MenuOrderDTO;
 import com.thinkerscave.common.menum.service.MenuService;
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 
 import org.springframework.web.bind.annotation.RequestBody;
 import io.swagger.v3.oas.annotations.tags.Tag;

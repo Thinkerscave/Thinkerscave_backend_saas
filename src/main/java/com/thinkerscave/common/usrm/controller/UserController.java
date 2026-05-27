@@ -7,7 +7,7 @@ import com.thinkerscave.common.usrm.service.LoginAttemptService;
 import com.thinkerscave.common.usrm.service.RefreshTokenService;
 import com.thinkerscave.common.usrm.service.UserService;
 import com.thinkerscave.common.usrm.service.impl.JwtServiceImpl;
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Encoders;

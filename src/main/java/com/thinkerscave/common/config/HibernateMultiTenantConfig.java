@@ -69,19 +69,12 @@ public class HibernateMultiTenantConfig {
 
         LocalContainerEntityManagerFactoryBean emf = new LocalContainerEntityManagerFactoryBean();
         emf.setDataSource(dataSource);
-        emf.setPackagesToScan(
-                "com.thinkerscave.common.usrm.domain",
-                "com.thinkerscave.common.role.domain",
-                "com.thinkerscave.common.orgm.domain",
-                "com.thinkerscave.common.menum.domain",
-                "com.thinkerscave.common.staff.domain",
-                "com.thinkerscave.common.admission.domain",
-                "com.thinkerscave.common.student.domain",
-                "com.thinkerscave.common.course.domain",
-                "com.thinkerscave.common.attendance.domain",
-                "com.thinkerscave.common.leave.domain",
-                "com.thinkerscave.common.payroll.domain",
-                "com.thinkerscave.common.commonModel");
+        // Single broad scan covers every entity/mapped-superclass package under
+        // com.thinkerscave.common (audit, communication, enrollment, exam,
+        // fee, promotion, rbac, workflow, etc.). Keeps the EMF in sync with
+        // @EntityScan declared on JpaConfig so adding a new module doesn't
+        // require touching this file.
+        emf.setPackagesToScan("com.thinkerscave.common");
         emf.setJpaVendorAdapter(jpaVendorAdapter);
         emf.setJpaPropertyMap(properties);
         return emf;

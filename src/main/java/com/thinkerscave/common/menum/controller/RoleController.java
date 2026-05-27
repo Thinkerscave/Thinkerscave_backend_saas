@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import com.thinkerscave.common.menum.dto.RoleDTO;
 import com.thinkerscave.common.menum.dto.RoleLookupDTO;
 import com.thinkerscave.common.menum.service.RoleService;
-import com.thinkerscave.common.commonModel.ApiResponse;
+import com.thinkerscave.common.dto.ApiResponse;
 import jakarta.validation.Valid;
 
 import java.util.HashMap;
