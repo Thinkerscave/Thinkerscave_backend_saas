@@ -5,6 +5,7 @@ import com.thinkerscave.common.course.dto.SyllabusResponseDTO;
 import com.thinkerscave.common.course.enums.ProgressStatus;
 import com.thinkerscave.common.course.service.ProgressTrackingService;
 import com.thinkerscave.common.course.service.SyllabusService;
+import com.thinkerscave.common.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -74,7 +75,14 @@ public class SyllabusController {
         @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_SYLLABUS_VIEW')")
         @Operation(summary = "Get latest curriculum for a subject", description = "Fetches the highest version number available for a given subject.")
         public ResponseEntity<SyllabusResponseDTO> getLatestSyllabus(@PathVariable Long subjectId) {
-                return ResponseEntity.ok(syllabusService.getLatestSyllabusBySubject(subjectId));
+                try {
+                        return ResponseEntity.ok(syllabusService.getLatestSyllabusBySubject(subjectId));
+                } catch (ResourceNotFoundException exception) {
+                        if ("No syllabus found for this subject".equals(exception.getMessage())) {
+                                return ResponseEntity.noContent().build();
+                        }
+                        throw exception;
+                }
         }
 
         /**

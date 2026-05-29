@@ -6,6 +6,7 @@ import com.thinkerscave.common.staff.domain.Branch;
 import com.thinkerscave.common.staff.domain.Department;
 import com.thinkerscave.common.staff.domain.Staff;
 import com.thinkerscave.common.staff.dto.StaffRequestDTO;
+import com.thinkerscave.common.staff.dto.StaffResponseDTO;
 import com.thinkerscave.common.staff.repository.BranchRepository;
 import com.thinkerscave.common.staff.repository.DepartmentRepository;
 import com.thinkerscave.common.staff.repository.StaffRepository;
@@ -90,7 +91,7 @@ public class StaffServiceImpl implements StaffService {
                     if (presentStaff.getId() != null) {
                         data.put("isOutcome", true);
                         data.put("message", "Staff Record Updated ");
-                        data.put("data", presentStaff);
+                        data.put("data", toResponse(presentStaff));
                     } else {
                         data.put("isOutcome", false);
                         data.put("message", "Unable To Update Staff Record ");
@@ -124,7 +125,7 @@ public class StaffServiceImpl implements StaffService {
                     if (newStaff.getId() != null) {
                         data.put("isOutcome", true);
                         data.put("message", "Staff Record Saved ");
-                        data.put("data", newStaff);
+                        data.put("data", toResponse(newStaff));
                     } else {
                         data.put("isOutcome", false);
                         data.put("message", "Unable To Save Staff Record ");
@@ -150,8 +151,11 @@ public class StaffServiceImpl implements StaffService {
         try {
             // ─── Multi-tenant isolation: only return staff for caller's org ────────
             Long orgId = com.thinkerscave.common.context.OrganizationContext.getOrganizationId();
-            List<Staff> staffList = (orgId != null)
+                List<StaffResponseDTO> staffList = (orgId != null)
                     ? staffRepository.findByOrganizationIdAndIsActive(orgId, true)
+                        .stream()
+                        .map(this::toResponse)
+                        .toList()
                     : List.of(); // Return empty if no org context — never leak cross-org data
             if (!staffList.isEmpty()) {
                 data.put("isOutcome", true);
@@ -184,7 +188,7 @@ public class StaffServiceImpl implements StaffService {
                 if (staff.getId() != null) {
                     data.put("isOutcome", true);
                     data.put("message", "Staff Records Fetched ");
-                    data.put("data", staff);
+                    data.put("data", toResponse(staff));
                 } else {
                     data.put("isOutcome", false);
                     data.put("message", "Unable to Fetch Staff Record With Code" + staffCode);
@@ -233,6 +237,44 @@ public class StaffServiceImpl implements StaffService {
             data.put("message", "Unexpected error occurred: " + e.getMessage());
         }
         return data;
+    }
+
+    private StaffResponseDTO toResponse(Staff staff) {
+        if (staff == null) {
+            return null;
+        }
+        User user = staff.getUser();
+        Branch branch = staff.getBranch();
+        Department department = staff.getDepartment();
+
+        return StaffResponseDTO.builder()
+                .id(staff.getId())
+                .staffId(staff.getId())
+                .staffCode(staff.getStaffCode())
+                .userId(user != null ? user.getId() : null)
+                .userName(user != null ? user.getUserName() : null)
+                .firstName(staff.getFirstName())
+                .middleName(staff.getMiddleName())
+                .lastName(staff.getLastName())
+                .email(staff.getEmail())
+                .mobileNumber(staff.getMobileNumber())
+                .gender(staff.getGender())
+                .dateOfBirth(staff.getDateOfBirth())
+                .hireDate(staff.getHireDate())
+                .photoUrl(staff.getPhotoUrl())
+                .address(staff.getAddress())
+                .city(staff.getCity())
+                .state(staff.getState())
+                .remarks(staff.getRemarks())
+                .isActive(staff.getIsActive())
+                .organizationId(staff.getOrganizationId())
+                .branchId(branch != null ? branch.getId() : null)
+                .branchCode(branch != null ? branch.getBranchCode() : null)
+                .branchName(branch != null ? branch.getBranchName() : null)
+                .departmentId(department != null ? department.getId() : null)
+                .departmentCode(department != null ? department.getDepartmentCode() : null)
+                .departmentName(department != null ? department.getDepartmentName() : null)
+                .build();
     }
 
 }

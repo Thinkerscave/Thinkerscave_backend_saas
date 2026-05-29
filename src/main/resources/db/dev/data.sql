@@ -142,11 +142,11 @@ INSERT INTO sub_menu_master (sub_menu_id, sub_menu_name, sub_menu_code, sub_menu
 (7, 'Branches', 'STAFF_BRANCH', 'Branch management', '/app/manage-branch', 'pi pi-building', 3, TRUE, 3),
 (8, 'Salary', 'STAFF_SALARY', 'Payroll management', '/app/salary', 'pi pi-money-bill', 4, TRUE, 3),
 (9, 'Leave', 'STAFF_LEAVE', 'Leave management', '/app/leave', 'pi pi-calendar-minus', 5, TRUE, 3),
-(10, 'Courses', 'ACAD_COURSES', 'Course management', '/app/academics/courses', 'pi pi-book', 1, TRUE, 4),
-(11, 'Subjects', 'ACAD_SUBJECTS', 'Subject management', '/app/academics/subjects', 'pi pi-file', 2, TRUE, 4),
-(12, 'Syllabus', 'ACAD_SYLLABUS', 'Syllabus management', '/app/academics/syllabus', 'pi pi-list', 3, TRUE, 4),
-(13, 'Academic Structure', 'ACAD_STRUCTURE', 'Academic hierarchy', '/app/academics/structure', 'pi pi-share-alt', 4, TRUE, 4),
-(14, 'Curriculum', 'ACAD_CURRICULUM', 'Subject-course mapping', '/app/academics/curriculum', 'pi pi-link', 5, TRUE, 4),
+(10, 'Academic Dashboard', 'ACAD_DASHBOARD', 'Academic workspace overview', '/app/academics/dashboard', 'pi pi-chart-line', 1, TRUE, 4),
+(11, 'Academic Years', 'ACAD_YEARS', 'Academic year lifecycle', '/app/academics/years', 'pi pi-calendar-clock', 2, TRUE, 4),
+(12, 'Classes & Sections', 'ACAD_CLASSES_SECTIONS', 'Class and section workspace', '/app/academics/classes', 'pi pi-sitemap', 3, TRUE, 4),
+(13, 'Subjects', 'ACAD_SUBJECTS', 'Subject workspace', '/app/academics/subjects', 'pi pi-book', 4, TRUE, 4),
+(14, 'Curriculum Planner', 'ACAD_CURRICULUM', 'Curriculum planning workspace', '/app/academics/curriculum', 'pi pi-sliders-h', 5, TRUE, 4),
 (15, 'Class Attendance', 'ATT_CLASS', 'Student attendance', '/app/attendance/class', 'pi pi-check-square', 1, TRUE, 5),
 (16, 'Staff Attendance', 'ATT_STAFF', 'Staff attendance', '/app/attendance/staff', 'pi pi-user-edit', 2, TRUE, 5),
 (17, 'Hostel Attendance', 'ATT_HOSTEL', 'Hostel attendance', '/app/attendance/hostel', 'pi pi-building', 3, TRUE, 5),
@@ -158,6 +158,15 @@ INSERT INTO sub_menu_master (sub_menu_id, sub_menu_name, sub_menu_code, sub_menu
 (23, 'Audit & Activity', 'ADMIN_AUDIT_ACTIVITY', 'Administration activity and change history', '/app/audit-activity', 'pi pi-history', 4, TRUE, 8),
 (24, 'Role Management', 'ADMIN_ROLE', 'Legacy role management entry retained inactive for migration safety', '/app/role/manage', 'pi pi-shield', 5, FALSE, 8),
 (25, 'Role Menu Mapping', 'ADMIN_ROLE_MENU_MAPPING', 'Legacy role-menu mapping entry retained inactive for migration safety', '/app/role-menu-mapping', 'pi pi-lock', 6, FALSE, 8);
+
+INSERT INTO sub_menu_master (sub_menu_id, sub_menu_name, sub_menu_code, sub_menu_description, sub_menu_url, sub_menu_icon, sub_menu_order, is_active, menu_id) VALUES
+(26, 'Syllabus Delivery', 'ACAD_SYLLABUS', 'Syllabus planning and delivery tracking', '/app/academics/syllabus', 'pi pi-list-check', 6, TRUE, 4),
+(27, 'Teacher Allocation', 'ACAD_TEACHER_ALLOCATION', 'Subject and workload assignment', '/app/academics/teacher-allocation', 'pi pi-user-plus', 7, TRUE, 4),
+(28, 'Class Teacher Allocation', 'ACAD_CLASS_TEACHER', 'Class ownership assignment', '/app/academics/class-teacher-allocation', 'pi pi-id-card', 8, TRUE, 4),
+(29, 'Timetable', 'ACAD_TIMETABLE', 'Academic timetable scheduler', '/app/academics/timetable', 'pi pi-table', 9, TRUE, 4),
+(30, 'Academic Calendar', 'ACAD_CALENDAR', 'Academic calendar events and milestones', '/app/academics/calendar', 'pi pi-calendar', 10, TRUE, 4),
+(31, 'Academic Hierarchy', 'ACAD_HIERARCHY', 'Academic hierarchy and capacity view', '/app/academics/hierarchy', 'pi pi-sitemap', 11, TRUE, 4),
+(32, 'Academic Settings', 'ACAD_SETTINGS', 'Academic operating rules and preferences', '/app/academics/settings', 'pi pi-cog', 12, TRUE, 4);
 
 -- ============================================
 -- 11. SUBMENU-PRIVILEGE MAPPING
@@ -177,6 +186,15 @@ INSERT INTO submenu_privilege_mapping (mapping_id, sub_menu_id, privilege_id) VA
 (79,23,1),(80,23,2),(81,23,3),(82,23,4),
 (83,24,1),(84,24,2),(85,24,3),(86,24,4),
 (87,25,1),(88,25,2),(89,25,3),(90,25,4);
+
+INSERT INTO submenu_privilege_mapping (mapping_id, sub_menu_id, privilege_id) VALUES
+(91,26,1),(92,26,2),(93,26,3),(94,26,4),
+(95,27,1),(96,27,2),(97,27,3),(98,27,4),
+(99,28,1),(100,28,2),(101,28,3),(102,28,4),
+(103,29,1),(104,29,2),(105,29,3),(106,29,4),
+(107,30,1),(108,30,2),(109,30,3),(110,30,4),
+(111,31,1),(112,31,2),(113,31,3),(114,31,4),
+(115,32,1),(116,32,2),(117,32,3),(118,32,4);
 
 -- ============================================
 -- 12. ROLE-SUBMENU-PRIVILEGE MAPPING
@@ -209,6 +227,26 @@ INSERT INTO role_submenu_privilege_mapping (mapping_id, role_id, sub_menu_id, pr
 -- ADMIN: simplified administration pages
 (122,2,20,1),(123,2,20,3),(124,2,22,1),(125,2,22,3),(126,2,23,1),(127,2,23,3);
 
+INSERT INTO role_submenu_privilege_mapping (mapping_id, role_id, sub_menu_id, privilege_id) VALUES
+-- SUPER_ADMIN: complete academic workspace
+(128,1,26,1),(129,1,26,2),(130,1,26,3),(131,1,26,4),
+(132,1,27,1),(133,1,27,2),(134,1,27,3),(135,1,27,4),
+(136,1,28,1),(137,1,28,2),(138,1,28,3),(139,1,28,4),
+(140,1,29,1),(141,1,29,2),(142,1,29,3),(143,1,29,4),
+(144,1,30,1),(145,1,30,2),(146,1,30,3),(147,1,30,4),
+(148,1,31,1),(149,1,31,2),(150,1,31,3),(151,1,31,4),
+(152,1,32,1),(153,1,32,2),(154,1,32,3),(155,1,32,4),
+-- ADMIN: operate academic workspace
+(156,2,26,1),(157,2,26,2),(158,2,26,3),
+(159,2,27,1),(160,2,27,2),(161,2,27,3),
+(162,2,28,1),(163,2,28,2),(164,2,28,3),
+(165,2,29,1),(166,2,29,2),(167,2,29,3),
+(168,2,30,1),(169,2,30,2),(170,2,30,3),
+(171,2,31,1),(172,2,31,2),(173,2,31,3),
+(174,2,32,1),(175,2,32,2),(176,2,32,3),
+-- TEACHER: academic workspace visibility
+(177,3,26,1),(178,3,27,1),(179,3,28,1),(180,3,29,1),(181,3,30,1),(182,3,31,1);
+
 -- ============================================
 -- 13. DEPARTMENTS
 -- ============================================
@@ -227,11 +265,33 @@ INSERT INTO branch (branch_id, branch_name, location, branch_code, is_active, or
 (2, 'Whitefield Campus', 'Bangalore, Whitefield', 'BR-WF', TRUE, 1);
 
 -- ============================================
+-- 14A. ADDITIONAL ACADEMIC STAFF USERS
+-- ============================================
+INSERT INTO users (id, user_code, first_name, middle_name, last_name, email, mobile_number, user_name, password, address, city, state, country, zip_code, gender, is_blocked, is_2fa_enabled, attempts, is_first_time_login, is_email_verified, is_mobile_verified, date_of_birth, last_login_date) VALUES
+(11, 'USR011', 'Nisha', NULL, 'Iyer', 'nisha.iyer@thinkerscave.com', 9876543222, 'teacher3', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '18 Basavanagudi', 'Bangalore', 'Karnataka', 'India', '560004', 'Female', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1993-02-14', '2026-05-20'),
+(12, 'USR012', 'Farhan', NULL, 'Khan', 'farhan.khan@thinkerscave.com', 9876543223, 'teacher4', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '91 Richmond Town', 'Bangalore', 'Karnataka', 'India', '560025', 'Male', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1987-09-21', '2026-05-20');
+
+INSERT INTO user_roles (user_id, role_id) VALUES
+(11, 3), (12, 3);
+
+INSERT INTO organization_users (id, organization_id, user_id, role_name, is_active, joined_at, updated_at) VALUES
+(11, 1, 11, 'TEACHER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(12, 1, 12, 'TEACHER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+
+INSERT INTO user_tenant_mapping (email, username, tenant_id, is_active) VALUES
+('nisha.iyer@thinkerscave.com', 'teacher3', 'public', TRUE),
+('farhan.khan@thinkerscave.com', 'teacher4', 'public', TRUE);
+
+-- ============================================
 -- 15. STAFF
 -- ============================================
 INSERT INTO staff (staff_id, staff_code, first_name, middle_name, last_name, email, mobile_number, gender, date_of_birth, hire_date, address, city, state, remarks, is_active, organization_id, user_id, branch_id, department_id) VALUES
 (1, 'STF001', 'Amit', 'K', 'Verma', 'amit.verma@thinkerscave.com', 9876543212, 'Male', '1990-11-10', '2021-06-01', '78 Residency Road', 'Bangalore', 'Karnataka', 'Senior Math Teacher', TRUE, 1, 3, 1, 1),
 (2, 'STF002', 'Sunita', NULL, 'Patel', 'sunita.patel@thinkerscave.com', 9876543213, 'Female', '1992-04-05', '2022-01-15', '22 Brigade Road', 'Bangalore', 'Karnataka', 'Science Teacher', TRUE, 1, 4, 1, 2);
+
+INSERT INTO staff (staff_id, staff_code, first_name, middle_name, last_name, email, mobile_number, gender, date_of_birth, hire_date, address, city, state, remarks, is_active, organization_id, user_id, branch_id, department_id) VALUES
+(3, 'STF003', 'Nisha', NULL, 'Iyer', 'nisha.iyer@thinkerscave.com', 9876543222, 'Female', '1993-02-14', '2023-04-10', '18 Basavanagudi', 'Bangalore', 'Karnataka', 'English and Humanities Faculty', TRUE, 1, 11, 1, 3),
+(4, 'STF004', 'Farhan', NULL, 'Khan', 'farhan.khan@thinkerscave.com', 9876543223, 'Male', '1987-09-21', '2020-07-12', '91 Richmond Town', 'Bangalore', 'Karnataka', 'Computer Science and STEM Faculty', TRUE, 1, 12, 1, 4);
 
 -- ============================================
 -- 16. CLASSES
@@ -307,6 +367,30 @@ INSERT INTO academic_years (academic_year_id, year_code, year_name, start_date, 
 (2, 'AY-2024-25', 'Academic Year 2024-25', '2024-04-01', '2025-03-31', FALSE, TRUE, 'Previous academic year', 1);
 
 -- ============================================
+-- 23A. ACADEMIC CONTAINERS
+-- ============================================
+INSERT INTO academic_containers (container_id, container_type, container_code, container_name, description, organization_id, academic_year_id, course_id, parent_container_id, level, capacity, current_strength, display_order, is_active, metadata) VALUES
+(1, 'CLASS', 'AY25-C08', 'Class 8', 'Middle school learning cohort for the current academic year', 1, 1, 1, NULL, 1, 80, 42, 1, TRUE, '{"wing":"North","shift":"Morning"}'),
+(2, 'CLASS', 'AY25-C09', 'Class 9', 'Foundation cohort for secondary readiness', 1, 1, 1, NULL, 1, 80, 47, 2, TRUE, '{"wing":"North","shift":"Morning"}'),
+(3, 'CLASS', 'AY25-C10', 'Class 10', 'Board examination cohort with focused delivery governance', 1, 1, 1, NULL, 1, 90, 58, 3, TRUE, '{"wing":"East","shift":"Morning","board":"CBSE"}'),
+(4, 'CLASS', 'AY25-C11-SCI', 'Class 11 - Science', 'Higher secondary science stream cohort', 1, 1, 2, NULL, 1, 60, 34, 4, TRUE, '{"wing":"Science","labAccess":true}'),
+(5, 'CLASS', 'AY25-C11-COM', 'Class 11 - Commerce', 'Higher secondary commerce stream cohort', 1, 1, 3, NULL, 1, 60, 29, 5, TRUE, '{"wing":"Commerce","labAccess":false}'),
+(6, 'CLASS', 'AY25-C12-SCI', 'Class 12 - Science', 'Final-year science stream cohort', 1, 1, 2, NULL, 1, 60, 38, 6, TRUE, '{"wing":"Science","labAccess":true}'),
+(7, 'CLASS', 'AY25-C12-COM', 'Class 12 - Commerce', 'Final-year commerce stream cohort', 1, 1, 3, NULL, 1, 60, 31, 7, TRUE, '{"wing":"Commerce","labAccess":false}');
+
+INSERT INTO academic_containers (container_id, container_type, container_code, container_name, description, organization_id, academic_year_id, course_id, parent_container_id, level, capacity, current_strength, display_order, is_active, metadata) VALUES
+(8, 'SECTION', 'AY25-C08-A', 'Class 8 - Section A', 'Primary section for Class 8 morning batch', 1, 1, 1, 1, 2, 40, 22, 1, TRUE, '{"room":"A-201","mentor":"Nisha Iyer"}'),
+(9, 'SECTION', 'AY25-C08-B', 'Class 8 - Section B', 'Second section for Class 8 morning batch', 1, 1, 1, 1, 2, 40, 20, 2, TRUE, '{"room":"A-202"}'),
+(10, 'SECTION', 'AY25-C09-A', 'Class 9 - Section A', 'Primary section for Class 9', 1, 1, 1, 2, 2, 40, 24, 1, TRUE, '{"room":"A-301"}'),
+(11, 'SECTION', 'AY25-C09-B', 'Class 9 - Section B', 'Second section for Class 9', 1, 1, 1, 2, 2, 40, 23, 2, TRUE, '{"room":"A-302"}'),
+(12, 'SECTION', 'AY25-C10-A', 'Class 10 - Section A', 'Board cohort section A', 1, 1, 1, 3, 2, 45, 30, 1, TRUE, '{"room":"B-101","boardFocus":true}'),
+(13, 'SECTION', 'AY25-C10-B', 'Class 10 - Section B', 'Board cohort section B', 1, 1, 1, 3, 2, 45, 28, 2, TRUE, '{"room":"B-102","boardFocus":true}'),
+(14, 'SECTION', 'AY25-C11-SCI-A', 'Class 11 Science - Section A', 'Science stream section with lab linkage', 1, 1, 2, 4, 2, 60, 34, 1, TRUE, '{"room":"S-101","lab":"Physics Lab"}'),
+(15, 'SECTION', 'AY25-C11-COM-A', 'Class 11 Commerce - Section A', 'Commerce stream section', 1, 1, 3, 5, 2, 60, 29, 1, TRUE, '{"room":"C-101"}'),
+(16, 'SECTION', 'AY25-C12-SCI-A', 'Class 12 Science - Section A', 'Final-year science stream section', 1, 1, 2, 6, 2, 60, 38, 1, TRUE, '{"room":"S-201","lab":"Chemistry Lab"}'),
+(17, 'SECTION', 'AY25-C12-COM-A', 'Class 12 Commerce - Section A', 'Final-year commerce stream section', 1, 1, 3, 7, 2, 60, 31, 1, TRUE, '{"room":"C-201"}');
+
+-- ============================================
 -- 24. SEMESTERS
 -- ============================================
 INSERT INTO semesters (semester_id, semester_name, semester_number, start_date, end_date, is_current, is_active, description, academic_year_id, organization_id) VALUES
@@ -323,12 +407,74 @@ INSERT INTO course_subject_mapping (mapping_id, course_id, subject_id, semester,
 (7, 2, 7, 1, TRUE, TRUE, 1, 1), (8, 2, 8, 1, TRUE, TRUE, 2, 1);
 
 -- ============================================
+-- 25A. TEACHER ALLOCATIONS
+-- ============================================
+INSERT INTO class_subject_teacher (mapping_id, class_id, organization_id, section_id, subject_id, teacher_id, academic_year_id, semester_id, periods_per_week, is_active) VALUES
+(1, 3, 1, 5, 1, 1, 1, 2, 5, TRUE),
+(2, 3, 1, 5, 2, 2, 1, 2, 5, TRUE),
+(3, 2, 1, 3, 3, 3, 1, 2, 4, TRUE),
+(4, 1, 1, 1, 6, 4, 1, 2, 3, TRUE),
+(5, 4, 1, 7, 7, 2, 1, 2, 5, TRUE),
+(6, 4, 1, 7, 8, 4, 1, 2, 5, TRUE),
+(7, 6, 1, 9, 7, 2, 1, 2, 5, TRUE),
+(8, 5, 1, 8, 3, 3, 1, 2, 4, TRUE),
+(9, 2, 1, 4, 1, 1, 1, 2, 5, TRUE),
+(10, 3, 1, 6, 4, 3, 1, 2, 4, TRUE);
+
+-- ============================================
+-- 25B. CLASS TEACHER OWNERSHIP
+-- ============================================
+INSERT INTO class_teacher_assignment (assignment_id, organization_id, academic_year_id, class_id, section_id, teacher_id, effective_from, effective_to, is_active, notes) VALUES
+(1, 1, 1, 3, 5, 1, '2025-04-01', NULL, TRUE, 'Board readiness mentor for Class 10 Section A.'),
+(2, 1, 1, 4, 7, 2, '2025-04-01', NULL, TRUE, 'Science stream academic owner and parent liaison.');
+
+-- ============================================
+-- 25C. TIMETABLE SLOTS
+-- ============================================
+INSERT INTO timetable_slot (slot_id, organization_id, academic_year_id, class_id, section_id, subject_id, teacher_id, day_of_week, period_number, start_time, end_time, room_name, is_active) VALUES
+(1, 1, 1, 3, 5, 1, 1, 'MONDAY', 1, '08:30:00', '09:15:00', 'B-101', TRUE),
+(2, 1, 1, 3, 5, 2, 2, 'MONDAY', 2, '09:20:00', '10:05:00', 'Science Lab 1', TRUE),
+(3, 1, 1, 2, 3, 3, 3, 'TUESDAY', 1, '08:30:00', '09:15:00', 'A-301', TRUE),
+(4, 1, 1, 1, 1, 6, 4, 'TUESDAY', 2, '09:20:00', '10:05:00', 'Computer Lab', TRUE),
+(5, 1, 1, 4, 7, 7, 2, 'WEDNESDAY', 1, '08:30:00', '09:15:00', 'Physics Lab', TRUE),
+(6, 1, 1, 4, 7, 8, 4, 'WEDNESDAY', 2, '09:20:00', '10:05:00', 'Chemistry Lab', TRUE),
+(7, 1, 1, 5, 8, 3, 3, 'THURSDAY', 3, '10:20:00', '11:05:00', 'C-101', TRUE),
+(8, 1, 1, 3, 6, 4, 3, 'FRIDAY', 4, '11:10:00', '11:55:00', 'B-102', TRUE);
+
+-- ============================================
+-- 25D. ACADEMIC CALENDAR EVENTS
+-- ============================================
+INSERT INTO academic_calendar_event (event_id, organization_id, academic_year_id, title, event_type, start_date, end_date, all_day, is_active, description) VALUES
+(1, 1, 1, 'Term 2 Curriculum Freeze', 'DEADLINE', '2026-01-10', '2026-01-10', TRUE, TRUE, 'Final date for departments to lock Term 2 syllabus pacing.'),
+(2, 1, 1, 'Class 10 Board Mock Assessment', 'EXAM', '2026-01-20', '2026-01-24', TRUE, TRUE, 'Full mock assessment cycle for Class 10 board cohort.'),
+(3, 1, 1, 'Republic Day Holiday', 'HOLIDAY', '2026-01-26', '2026-01-26', TRUE, TRUE, 'Campus closed for Republic Day.'),
+(4, 1, 1, 'Parent Academic Review', 'MEETING', '2026-02-07', '2026-02-07', TRUE, TRUE, 'Section-wise academic review meeting with parents.'),
+(5, 1, 1, 'Annual Exhibition Week', 'EVENT', '2026-02-16', '2026-02-20', TRUE, TRUE, 'Integrated academic showcase across science, commerce and humanities.');
+
+-- ============================================
+-- 25E. ACADEMIC SETTINGS
+-- ============================================
+INSERT INTO academic_setting (setting_id, organization_id, setting_key, setting_value, value_type, category, is_active, description) VALUES
+(1, 1, 'GRADING_SCALE', 'LETTER', 'TEXT', 'ASSESSMENT', TRUE, 'Default grading scale used across academic evaluations.'),
+(2, 1, 'PERIODS_PER_DAY', '8', 'NUMBER', 'TIMETABLE', TRUE, 'Default number of instructional periods per day.'),
+(3, 1, 'ATTENDANCE_LINKAGE', 'true', 'BOOLEAN', 'ATTENDANCE', TRUE, 'Controls whether timetable periods feed attendance workflows.'),
+(4, 1, 'PROMOTION_RULE', 'ANNUAL_REVIEW', 'TEXT', 'PROMOTION', TRUE, 'Default promotion evaluation strategy.'),
+(5, 1, 'SECTION_CAPACITY', '40', 'NUMBER', 'STRUCTURE', TRUE, 'Default capacity used when creating new sections.');
+
+-- ============================================
 -- 26. SYLLABUS
 -- ============================================
 INSERT INTO syllabus (syllabus_id, syllabus_code, title, description, total_hours, version, status, is_active, subject_id, academic_year_id, organization_id) VALUES
 (1, 'SYL-MATH-10-2025', 'Mathematics Class 10', 'Complete CBSE Math syllabus', 180, '1.0', 'PUBLISHED', TRUE, 1, 1, 1),
 (2, 'SYL-SCI-10-2025', 'Science Class 10', 'Complete CBSE Science syllabus', 200, '1.0', 'PUBLISHED', TRUE, 2, 1, 1),
 (3, 'SYL-ENG-10-2025', 'English Class 10', 'CBSE English syllabus', 160, '1.0', 'APPROVED', TRUE, 3, 1, 1);
+
+INSERT INTO syllabus (syllabus_id, syllabus_code, title, description, total_hours, version, status, is_active, subject_id, academic_year_id, organization_id) VALUES
+(4, 'SYL-SST-10-2025', 'Social Science Class 10', 'Integrated history, civics, geography and economics plan', 150, '1.0', 'PUBLISHED', TRUE, 4, 1, 1),
+(5, 'SYL-HIN-10-2025', 'Hindi Class 10', 'Hindi language and literature delivery plan', 140, '1.0', 'APPROVED', TRUE, 5, 1, 1),
+(6, 'SYL-CS-10-2025', 'Computer Science Class 10', 'Programming fundamentals and digital literacy plan', 120, '1.0', 'PUBLISHED', TRUE, 6, 1, 1),
+(7, 'SYL-PHY-12-2025', 'Physics Class 12', 'Senior secondary physics theory and lab curriculum', 190, '1.0', 'PUBLISHED', TRUE, 7, 1, 1),
+(8, 'SYL-CHEM-12-2025', 'Chemistry Class 12', 'Senior secondary chemistry theory and lab curriculum', 190, '1.0', 'PUBLISHED', TRUE, 8, 1, 1);
 
 -- ============================================
 -- 27. CHAPTERS
@@ -342,6 +488,13 @@ INSERT INTO chapters (chapter_id, chapter_name, chapter_number, description, est
 (6, 'Chemical Reactions', 1, 'Types of chemical reactions', 20, 'Identify and balance reactions', TRUE, 2),
 (7, 'Acids, Bases and Salts', 2, 'Properties, pH scale', 18, 'Understand pH concept', TRUE, 2),
 (8, 'Light', 3, 'Reflection and Refraction', 25, 'Apply laws of optics', TRUE, 2);
+
+INSERT INTO chapters (chapter_id, chapter_name, chapter_number, description, estimated_hours, learning_objectives, is_active, syllabus_id) VALUES
+(9, 'Democratic Politics', 1, 'Institutions, participation and constitutional values', 24, 'Interpret political systems and civic responsibilities', TRUE, 4),
+(10, 'Hindi Kavy Khand', 1, 'Poetry appreciation and literary analysis', 22, 'Analyze themes, style and expression in prescribed poems', TRUE, 5),
+(11, 'Programming Basics', 1, 'Algorithms, variables and control flow', 28, 'Write simple programs using structured logic', TRUE, 6),
+(12, 'Electrostatics', 1, 'Charges, fields and potential', 30, 'Apply electrostatic principles to numerical and lab problems', TRUE, 7),
+(13, 'Solutions and Electrochemistry', 1, 'Concentration, cells and reactions', 32, 'Connect chemical theory with practical observations', TRUE, 8);
 
 -- ============================================
 -- 28. TOPICS
@@ -357,6 +510,18 @@ INSERT INTO topics (topic_id, topic_name, topic_number, description, estimated_h
 (8, 'Chemical Equations', 1, 'Writing and balancing', 5, TRUE, 6),
 (9, 'Types of Reactions', 2, 'Combination, decomposition', 8, TRUE, 6),
 (10, 'Oxidation in Daily Life', 3, 'Corrosion and rancidity', 7, TRUE, 6);
+
+INSERT INTO topics (topic_id, topic_name, topic_number, description, estimated_hours, is_active, chapter_id) VALUES
+(11, 'Federalism', 1, 'Division of powers and democratic participation', 8, TRUE, 9),
+(12, 'Political Parties', 2, 'Party systems, challenges and reforms', 8, TRUE, 9),
+(13, 'Kavita Pathan', 1, 'Guided poetry reading and recitation', 8, TRUE, 10),
+(14, 'Sahityik Vishleshan', 2, 'Theme, imagery and language analysis', 8, TRUE, 10),
+(15, 'Variables and Data Types', 1, 'Core programming constructs', 8, TRUE, 11),
+(16, 'Conditionals and Loops', 2, 'Decision making and repetition', 10, TRUE, 11),
+(17, 'Electric Field', 1, 'Field intensity and field lines', 10, TRUE, 12),
+(18, 'Electric Potential', 2, 'Potential, energy and equipotential surfaces', 10, TRUE, 12),
+(19, 'Concentration Terms', 1, 'Molarity, molality and solution strength', 10, TRUE, 13),
+(20, 'Electrochemical Cells', 2, 'Cell potential and applications', 10, TRUE, 13);
 
 -- ============================================
 -- 29. ATTENDANCE
@@ -418,3 +583,25 @@ INSERT INTO admission_form_template (id, tenant_id, title, description, guidelin
 -- ============================================
 INSERT INTO owner_details (owner_id, owner_code, owner_name, gender, owner_email, owner_mobile, user_id, org_id) VALUES
 (1, 'OWN001', 'Rajesh Kumar', 'Male', 'admin@thinkerscave.com', '9876543210', 1, 1);
+
+-- ============================================
+-- 36. H2 IDENTITY RESTARTS FOR SEEDED DEV DATA
+-- ============================================
+ALTER TABLE users ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE department ALTER COLUMN department_id RESTART WITH 100;
+ALTER TABLE branch ALTER COLUMN branch_id RESTART WITH 100;
+ALTER TABLE staff ALTER COLUMN staff_id RESTART WITH 100;
+ALTER TABLE "CLASS" ALTER COLUMN class_id RESTART WITH 100;
+ALTER TABLE section ALTER COLUMN section_id RESTART WITH 100;
+ALTER TABLE courses ALTER COLUMN course_id RESTART WITH 100;
+ALTER TABLE subjects ALTER COLUMN subject_id RESTART WITH 100;
+ALTER TABLE academic_years ALTER COLUMN academic_year_id RESTART WITH 100;
+ALTER TABLE syllabus ALTER COLUMN syllabus_id RESTART WITH 100;
+ALTER TABLE chapters ALTER COLUMN chapter_id RESTART WITH 100;
+ALTER TABLE topics ALTER COLUMN topic_id RESTART WITH 100;
+ALTER TABLE academic_containers ALTER COLUMN container_id RESTART WITH 100;
+ALTER TABLE class_subject_teacher ALTER COLUMN mapping_id RESTART WITH 100;
+ALTER TABLE class_teacher_assignment ALTER COLUMN assignment_id RESTART WITH 100;
+ALTER TABLE timetable_slot ALTER COLUMN slot_id RESTART WITH 100;
+ALTER TABLE academic_calendar_event ALTER COLUMN event_id RESTART WITH 100;
+ALTER TABLE academic_setting ALTER COLUMN setting_id RESTART WITH 100;

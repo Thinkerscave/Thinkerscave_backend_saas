@@ -108,10 +108,11 @@ public class DefaultDataSeeder {
 
         // Menu 2: Academics
         seedMenu(schema, "Academics", "/academics", "book", 2);
-        seedSubMenu(schema, "Academics", "Academic Structure", "/academics/structure", "ACADEMIC_STRUCTURE", 1);
-        seedSubMenu(schema, "Academics", "Courses", "/academics/courses", "MANAGE_COURSES", 2);
-        seedSubMenu(schema, "Academics", "Subjects", "/academics/subjects", "MANAGE_SUBJECTS", 3);
-        seedSubMenu(schema, "Academics", "Syllabus", "/academics/syllabus", "MANAGE_SYLLABUS", 4);
+        seedSubMenu(schema, "Academics", "Academic Dashboard", "/academics/dashboard", "ACADEMIC_STRUCTURE", 1);
+        seedSubMenu(schema, "Academics", "Academic Years", "/academics/years", "MANAGE_COURSES", 2);
+        seedSubMenu(schema, "Academics", "Classes & Sections", "/academics/classes", "MANAGE_COURSES", 3);
+        seedSubMenu(schema, "Academics", "Subjects", "/academics/subjects", "MANAGE_SUBJECTS", 4);
+        seedSubMenu(schema, "Academics", "Syllabus Workspace", "/academics/syllabus", "MANAGE_SYLLABUS", 5);
 
         // Menu 3: Students
         seedMenu(schema, "Students", "/students", "school", 3);
