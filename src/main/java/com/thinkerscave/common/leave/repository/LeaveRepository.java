@@ -2,6 +2,8 @@ package com.thinkerscave.common.leave.repository;
 
 import com.thinkerscave.common.leave.domain.LeaveRequest;
 import com.thinkerscave.common.leave.domain.LeaveRequest.LeaveStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -18,8 +20,13 @@ public interface LeaveRepository extends JpaRepository<LeaveRequest, Long> {
 
     List<LeaveRequest> findByOrganizationIdOrderByCreatedDateDesc(Long organizationId);
 
+    Page<LeaveRequest> findByOrganizationId(Long organizationId, Pageable pageable);
+
     List<LeaveRequest> findByOrganizationIdAndAppliedByOrderByCreatedDateDesc(
             Long organizationId, String appliedBy);
+
+    Page<LeaveRequest> findByOrganizationIdAndAppliedBy(
+            Long organizationId, String appliedBy, Pageable pageable);
 
     List<LeaveRequest> findByOrganizationIdAndStatus(Long organizationId, LeaveStatus status);
 

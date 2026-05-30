@@ -7,7 +7,9 @@ import com.thinkerscave.common.menum.service.impl.SubMenuServiceImpl;
 import com.thinkerscave.common.menum.service.impl.RoleServiceImpl;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class DbCheckRunner implements CommandLineRunner {
@@ -17,26 +19,24 @@ public class DbCheckRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        System.out.println("\n\n====== REPOSITORY CHECK START ======");
+        log.info("====== REPOSITORY CHECK START ======");
 
         try {
-            System.out.println("Checking subMenuService.getAllSubMenus()...");
+            log.debug("Checking subMenuService.getAllSubMenus()...");
             subMenuService.getAllSubMenus();
-            System.out.println("SubMenuService PASSED");
+            log.info("SubMenuService PASSED");
         } catch (Exception e) {
-            System.out.println("SubMenuService ERROR: " + e.getMessage());
-            e.printStackTrace();
+            log.error("SubMenuService ERROR: {}", e.getMessage(), e);
         }
 
         try {
-            System.out.println("Checking roleService.getAllRoles()...");
+            log.debug("Checking roleService.getAllRoles()...");
             roleService.getAllRoles();
-            System.out.println("RoleService PASSED");
+            log.info("RoleService PASSED");
         } catch (Exception e) {
-            System.out.println("RoleService ERROR: " + e.getMessage());
-            e.printStackTrace();
+            log.error("RoleService ERROR: {}", e.getMessage(), e);
         }
 
-        System.out.println("====== REPOSITORY CHECK END ======\n\n");
+        log.info("====== REPOSITORY CHECK END ======");
     }
 }

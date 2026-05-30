@@ -13,6 +13,7 @@ import com.thinkerscave.common.menum.service.MenuService;
 import com.thinkerscave.common.dto.ApiResponse;
 
 import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -38,7 +39,7 @@ public class MenuSequenceController {
     // Save new order
     @io.swagger.v3.oas.annotations.Operation(summary = "Save menu sequence")
     @PostMapping
-    public ResponseEntity<ApiResponse<Void>> saveMenuSequence(@RequestBody List<MenuOrderDTO> menuOrders) {
+    public ResponseEntity<ApiResponse<Void>> saveMenuSequence(@Valid @RequestBody List<MenuOrderDTO> menuOrders) {
         log.info("API Request - Save Menu Sequence");
         menuService.saveMenuSequence(menuOrders);
         return ResponseEntity.ok(ApiResponse.success("Menu sequence saved successfully", null));

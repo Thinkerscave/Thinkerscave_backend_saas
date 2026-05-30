@@ -17,6 +17,7 @@ import com.thinkerscave.common.menum.dto.SideMenuDTO;
 import com.thinkerscave.common.menum.service.MenuMappingService;
 import com.thinkerscave.common.security.UserInfoUserDetails;
 import com.thinkerscave.common.dto.ApiResponse;
+import jakarta.validation.Valid;
 
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +56,7 @@ public class MenuMappingController {
         @io.swagger.v3.oas.annotations.Operation(summary = "Assign role menu privileges")
         @PostMapping("/assign")
         public ResponseEntity<ApiResponse<Void>> assignRoleMenuPrivileges(
-                        @RequestBody RoleMenuMappingRequest request) {
+                        @Valid @RequestBody RoleMenuMappingRequest request) {
                 menuMappingService.assignRoleMenuPrivileges(request);
                 return ResponseEntity.ok(ApiResponse.success("Role menu privileges assigned successfully!", null));
         }

@@ -13,6 +13,8 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.EqualsAndHashCode;
@@ -22,6 +24,11 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = false)
 @EntityListeners(AuditingEntityListener.class)
 @Entity(name = "role_master")
+@Table(name = "role_master", indexes = {
+    @Index(name = "idx_role_code", columnList = "role_code"),
+    @Index(name = "idx_role_org", columnList = "organization_id"),
+    @Index(name = "idx_role_active", columnList = "is_active")
+})
 public class Role extends Auditable {
 
     @Id
@@ -37,21 +44,6 @@ public class Role extends Auditable {
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
-    public Long getRoleId() { return roleId; }
-    public void setRoleId(Long roleId) { this.roleId = roleId; }
-    
-    public String getRoleName() { return roleName; }
-    public void setRoleName(String roleName) { this.roleName = roleName; }
-    
-    public String getRoleCode() { return roleCode; }
-    public void setRoleCode(String roleCode) { this.roleCode = roleCode; }
-    
-    public String getDescription() { return description; }
-    public void setDescription(String description) { this.description = description; }
-    
-    public Boolean getIsActive() { return isActive; }
-    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
-
 
     @Column(name = "is_active")
     private Boolean isActive = true;

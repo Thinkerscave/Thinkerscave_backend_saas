@@ -47,6 +47,13 @@ public class PayrollServiceImpl implements PayrollService {
 
     @Override
     @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<PayrollDTO> getAllPayroll(org.springframework.data.domain.Pageable pageable) {
+        Long orgId = requireOrgId();
+        return payrollRepository.findByOrganizationId(orgId, pageable).map(this::toDTO);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PayrollDTO getByStaffId(Long staffId) {
         Long orgId = requireOrgId();
         return payrollRepository.findByOrganizationIdAndStaffId(orgId, staffId)

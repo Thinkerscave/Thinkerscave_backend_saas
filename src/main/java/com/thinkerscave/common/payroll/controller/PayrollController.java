@@ -5,6 +5,8 @@ import com.thinkerscave.common.payroll.service.PayrollService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -26,6 +28,13 @@ public class PayrollController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public ResponseEntity<List<PayrollDTO>> getAllPayroll() {
         return ResponseEntity.ok(payrollService.getAllPayroll());
+    }
+
+    @Operation(summary = "Get payroll records (paginated)")
+    @GetMapping("/paged")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+    public ResponseEntity<Page<PayrollDTO>> getAllPayrollPaged(Pageable pageable) {
+        return ResponseEntity.ok(payrollService.getAllPayroll(pageable));
     }
 
     @Operation(summary = "Get payroll for a specific staff")

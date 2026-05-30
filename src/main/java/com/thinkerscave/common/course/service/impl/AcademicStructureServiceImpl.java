@@ -16,6 +16,8 @@ import com.thinkerscave.common.orgm.domain.Organisation;
 import com.thinkerscave.common.orgm.repository.OrganizationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -108,6 +110,7 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
      */
     @Override
     @Transactional
+    @CacheEvict(value = "academicYears", key = "#orgId")
     public AcademicYearDTO createAcademicYear(Long orgId, String yearCode, String startDate, String endDate) {
         Organisation org = organizationRepository.findById(orgId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organisation not found with ID: " + orgId));
@@ -140,6 +143,7 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
      * 🛠️ Purpose: Lists all historical and future calendar cycles.
      */
     @Override
+    @Cacheable(value = "academicYears", key = "#orgId")
     public List<AcademicYearDTO> getAcademicYears(Long orgId) {
         Organisation org = organizationRepository.findById(orgId)
                 .orElseThrow(() -> new ResourceNotFoundException("Organisation not found with ID: " + orgId));

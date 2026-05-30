@@ -14,7 +14,11 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
-@Table(name = "student")
+@Table(name = "student", indexes = {
+    @Index(name = "idx_student_org", columnList = "organization_id"),
+    @Index(name = "idx_student_email", columnList = "email"),
+    @Index(name = "idx_student_active", columnList = "is_active")
+})
 public class Student extends Auditable {
 
     @Id
@@ -53,13 +57,13 @@ public class Student extends Auditable {
     @JoinColumn(name = "permanent_address_id", referencedColumnName = "id")
     private Address permanentAddress;
 
-    @Column(length = 50, unique = true, name = "is_same_address")
+    @Column(name = "is_same_address")
     private Boolean isSameAddress;
 
-    @Column(length = 50, unique = true, name = "date_of_birth")
+    @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
-    @Column(length = 50, unique = true, name = "enrollment_date")
+    @Column(name = "enrollment_date")
     private LocalDate enrollmentDate;
 
     // Student Roll Number

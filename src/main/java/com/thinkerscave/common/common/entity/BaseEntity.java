@@ -33,6 +33,6 @@ public abstract class BaseEntity {
     private Long id;
 
     @Version
-    @Column(name = "version", nullable = false)
-    private Long version;
+    @Column(name = "version", nullable = false, columnDefinition = "BIGINT DEFAULT 0")
+    private long version;
 }

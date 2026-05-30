@@ -3,6 +3,8 @@ package com.thinkerscave.common.admission.controller;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -10,6 +12,7 @@ import com.thinkerscave.common.admission.dto.InquiryRequest;
 import com.thinkerscave.common.admission.dto.InquiryResponse;
 import com.thinkerscave.common.admission.service.InquiryService;
 import com.thinkerscave.common.dto.ApiResponse;
+import jakarta.validation.Valid;
 
 import java.util.List;
 
@@ -32,7 +35,7 @@ public class InquiryController {
         @io.swagger.v3.oas.annotations.Operation(summary = "Save or Update Inquiry")
         @PostMapping
         public ResponseEntity<ApiResponse<InquiryResponse>> saveInquiry(
-                        @RequestBody InquiryRequest request) {
+                        @Valid @RequestBody InquiryRequest request) {
 
                 InquiryResponse response = inquiryService.saveOrUpdate(request);
 
@@ -54,6 +57,12 @@ public class InquiryController {
                                                 .message("Inquiry list fetched successfully")
                                                 .data(inquiryService.getAll())
                                                 .build());
+        }
+
+        @io.swagger.v3.oas.annotations.Operation(summary = "Get inquiries (paginated)")
+        @GetMapping("/paged")
+        public ResponseEntity<ApiResponse<Page<InquiryResponse>>> getAllInquiriesPaged(Pageable pageable) {
+                return ResponseEntity.ok(ApiResponse.success(inquiryService.getAll(pageable)));
         }
 
         @io.swagger.v3.oas.annotations.Operation(summary = "Delete inquiry")
@@ -121,7 +130,7 @@ public class InquiryController {
         @PostMapping("/{inquiryId}/follow-ups")
         public ResponseEntity<ApiResponse<FollowUpResponse>> addFollowUp(
                         @PathVariable Long inquiryId,
-                        @RequestBody FollowUpRequest request) {
+                        @Valid @RequestBody FollowUpRequest request) {
 
                 FollowUpResponse response = followUpService.addFollowUp(inquiryId, request);
 

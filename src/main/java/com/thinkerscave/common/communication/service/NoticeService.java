@@ -7,6 +7,7 @@ import com.thinkerscave.common.communication.domain.NoticeAudience;
 import com.thinkerscave.common.communication.domain.NoticeStatus;
 import com.thinkerscave.common.communication.dto.NoticeAudienceDTO;
 import com.thinkerscave.common.communication.dto.NoticeDTO;
+import com.thinkerscave.common.communication.mapper.CommunicationMapper;
 import com.thinkerscave.common.communication.repository.NoticeAudienceRepository;
 import com.thinkerscave.common.communication.repository.NoticeRepository;
 import com.thinkerscave.common.context.OrganizationContext;
@@ -35,22 +36,23 @@ public class NoticeService {
     private final NoticeRepository noticeRepository;
     private final NoticeAudienceRepository audienceRepository;
     private final AuditPublisher auditPublisher;
+    private final CommunicationMapper communicationMapper;
 
     public Page<NoticeDTO> listByStatus(NoticeStatus status, Pageable pageable) {
         return noticeRepository.findByOrganizationIdAndStatus(currentOrgId(), status, pageable)
-                .map(this::toDto);
+                .map(communicationMapper::toNoticeDto);
     }
 
     public List<NoticeDTO> activeForToday() {
         return noticeRepository.findByOrganizationIdAndStatusAndPublishDateLessThanEqual(
                 currentOrgId(), NoticeStatus.PUBLISHED, LocalDate.now())
-                .stream().map(this::toDto).toList();
+                .stream().map(communicationMapper::toNoticeDto).toList();
     }
 
     public NoticeDTO get(Long id) {
         Notice n = load(id);
-        NoticeDTO dto = toDto(n);
-        dto.setAudiences(audienceRepository.findByNoticeId(id).stream().map(this::toDto).toList());
+        NoticeDTO dto = communicationMapper.toNoticeDto(n);
+        dto.setAudiences(audienceRepository.findByNoticeId(id).stream().map(communicationMapper::toNoticeAudienceDto).toList());
         return dto;
     }
 
@@ -107,7 +109,7 @@ public class NoticeService {
         Notice saved = noticeRepository.save(n);
         auditPublisher.publish(AuditEventType.STATE_CHANGE, "notice.publish",
                 "Notice", id, "Notice published: " + n.getTitle());
-        return toDto(saved);
+        return communicationMapper.toNoticeDto(saved);
     }
 
     @Transactional
@@ -117,7 +119,7 @@ public class NoticeService {
         Notice saved = noticeRepository.save(n);
         auditPublisher.publish(AuditEventType.STATE_CHANGE, "notice.archive",
                 "Notice", id, "Notice archived");
-        return toDto(saved);
+        return communicationMapper.toNoticeDto(saved);
     }
 
     @Transactional
@@ -135,29 +137,6 @@ public class NoticeService {
     private Notice load(Long id) {
         return noticeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Notice not found: " + id));
-    }
-
-    private NoticeDTO toDto(Notice n) {
-        return NoticeDTO.builder()
-                .id(n.getId())
-                .title(n.getTitle())
-                .content(n.getContent())
-                .category(n.getCategory())
-                .pinned(n.isPinned())
-                .publishDate(n.getPublishDate())
-                .expiryDate(n.getExpiryDate())
-                .status(n.getStatus())
-                .attachmentUrl(n.getAttachmentUrl())
-                .publishedByUserId(n.getPublishedByUserId())
-                .build();
-    }
-
-    private NoticeAudienceDTO toDto(NoticeAudience a) {
-        return NoticeAudienceDTO.builder()
-                .id(a.getId())
-                .audienceType(a.getAudienceType())
-                .refId(a.getRefId())
-                .build();
     }
 
     private Long currentOrgId() {

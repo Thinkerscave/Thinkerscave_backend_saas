@@ -9,6 +9,7 @@ import com.thinkerscave.common.exception.ConflictException;
 import com.thinkerscave.common.exception.ResourceNotFoundException;
 import com.thinkerscave.common.workflow.domain.WorkflowConfig;
 import com.thinkerscave.common.workflow.dto.WorkflowConfigDTO;
+import com.thinkerscave.common.workflow.mapper.WorkflowMapper;
 import com.thinkerscave.common.workflow.repository.WorkflowConfigRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,19 +31,20 @@ public class WorkflowConfigService {
 
     private final WorkflowConfigRepository workflowRepository;
     private final AuditPublisher auditPublisher;
+    private final WorkflowMapper workflowMapper;
 
     public List<WorkflowConfigDTO> list() {
         return workflowRepository.findByOrganizationId(currentOrgId())
-                .stream().map(this::toDto).toList();
+                .stream().map(workflowMapper::toDto).toList();
     }
 
     public WorkflowConfigDTO get(Long id) {
-        return toDto(load(id));
+        return workflowMapper.toDto(load(id));
     }
 
     public Optional<WorkflowConfigDTO> findByKey(String workflowKey) {
         return workflowRepository.findByOrganizationIdAndWorkflowKey(currentOrgId(), workflowKey)
-                .map(this::toDto);
+                .map(workflowMapper::toDto);
     }
 
     @Transactional
@@ -88,7 +90,7 @@ public class WorkflowConfigService {
                 creating ? "WORKFLOW_CONFIG_CREATE" : "WORKFLOW_CONFIG_UPDATE",
                 "WorkflowConfig", w.getId(),
                 "Workflow config " + w.getWorkflowKey() + (creating ? " created" : " updated"));
-        return toDto(w);
+        return workflowMapper.toDto(w);
     }
 
     @Transactional
@@ -107,20 +109,6 @@ public class WorkflowConfigService {
             throw new ResourceNotFoundException("Workflow config not found: " + id);
         }
         return w;
-    }
-
-    private WorkflowConfigDTO toDto(WorkflowConfig w) {
-        return WorkflowConfigDTO.builder()
-                .id(w.getId())
-                .workflowKey(w.getWorkflowKey())
-                .displayName(w.getDisplayName())
-                .description(w.getDescription())
-                .requireApproval(w.isRequireApproval())
-                .approvalLevels(w.getApprovalLevels())
-                .approverRoleCodes(w.getApproverRoleCodes())
-                .autoCloseAfterDays(w.getAutoCloseAfterDays())
-                .status(w.getStatus())
-                .build();
     }
 
     private Long currentOrgId() {

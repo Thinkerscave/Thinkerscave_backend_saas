@@ -3,6 +3,8 @@ package com.thinkerscave.common.admission.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import com.thinkerscave.common.admission.domain.Inquiry;
@@ -16,6 +18,8 @@ public interface InquiryRepository extends JpaRepository<Inquiry,Long> {
 	Optional<Inquiry> findByInquiryIdAndIsDeletedFalse(Long inquiryId);
 
     List<Inquiry> findAllByIsDeletedFalseOrderByCreatedDateDesc();
+
+    Page<Inquiry> findAllByIsDeletedFalse(Pageable pageable);
 
     boolean existsByMobileNumberAndIsDeletedFalse(String mobileNumber);
 

@@ -419,7 +419,7 @@ public class SchemaInitializer {
     /**
      * Detects if the current datasource is H2 (dev/test).
      */
-    private boolean isH2Database() {
+    public boolean isH2Database() {
         if (driverClassName != null && driverClassName.contains("h2")) {
             return true;
         }

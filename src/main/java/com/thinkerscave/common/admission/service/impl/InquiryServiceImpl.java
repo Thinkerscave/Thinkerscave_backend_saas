@@ -18,9 +18,9 @@ import com.thinkerscave.common.security.SecurityUtil;
 
 import com.thinkerscave.common.admission.dto.InquirySummaryResponse;
 import com.thinkerscave.common.admission.enums.InquiryStatus;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -65,12 +65,12 @@ public class InquiryServiceImpl implements InquiryService {
             inquiry = new Inquiry();
             inquiry.setStatus(InquiryStatus.NEW);
             inquiry.setIsDeleted(false);
-            inquiry.setCreatedDate(new Date());
+            inquiry.setCreatedDate(Instant.now());
             inquiry.setCreatedBy(userName);
         }
 
         mapRequestToEntity(request, inquiry);
-        inquiry.setLastModifiedDate(new Date());
+        inquiry.setLastModifiedDate(Instant.now());
         inquiry.setLastModifiedBy(userName);
 
         Inquiry saved = inquiryRepository.save(inquiry);
@@ -89,6 +89,12 @@ public class InquiryServiceImpl implements InquiryService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<InquiryResponse> getAll(org.springframework.data.domain.Pageable pageable) {
+        return inquiryRepository.findAllByIsDeletedFalse(pageable).map(this::mapToResponse);
+    }
+
     // ================= DELETE (SOFT) =================
 
     @Override
@@ -100,7 +106,7 @@ public class InquiryServiceImpl implements InquiryService {
                 );
 
         inquiry.setIsDeleted(true);
-        inquiry.setLastModifiedDate(new Date());
+        inquiry.setLastModifiedDate(Instant.now());
         inquiry.setLastModifiedBy(SecurityUtil.getCurrentUsername());
         inquiryRepository.save(inquiry);
     }

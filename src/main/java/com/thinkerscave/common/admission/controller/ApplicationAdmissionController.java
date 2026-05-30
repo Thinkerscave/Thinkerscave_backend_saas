@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
+import java.util.List;
 
 /**
  * REST controller for ApplicationAdmission APIs.
@@ -26,6 +27,13 @@ public class ApplicationAdmissionController {
 
         private final ApplicationAdmissionService service;
 
+        @Operation(summary = "Get all admission applications", description = "Lists admission applications for workspace dashboards and review queues.")
+        @GetMapping
+        public ResponseEntity<List<ApplicationAdmissionResponse>> getAll(
+                        @RequestParam(required = false) Long organizationId) {
+                return ResponseEntity.ok(service.getAll(organizationId));
+        }
+
         /**
          * Saves an application form as a draft.
          * 
@@ -35,7 +43,7 @@ public class ApplicationAdmissionController {
         @Operation(summary = "Save Application as Draft", description = "Saves the current application progress as a draft. Can be used to create a new draft or update an existing one.")
         @PostMapping("/draft")
         public ResponseEntity<ApplicationAdmissionResponse> saveDraft(
-                        @RequestBody ApplicationAdmissionDraftRequest request) {
+                        @Valid @RequestBody ApplicationAdmissionDraftRequest request) {
                 ApplicationAdmissionResponse draftResponse = service.saveDraft(request);
                 return new ResponseEntity<>(draftResponse, HttpStatus.CREATED);
         }
@@ -49,7 +57,7 @@ public class ApplicationAdmissionController {
         @Operation(summary = "Create Application Admission", description = "Creates a new application admission with applicant details.")
         @PostMapping
         public ResponseEntity<ApplicationAdmissionResponse> create(
-                        @RequestBody ApplicationAdmissionCreateRequest request) {
+                        @Valid @RequestBody ApplicationAdmissionCreateRequest request) {
                 return ResponseEntity.ok(service.create(request));
         }
 
@@ -63,7 +71,7 @@ public class ApplicationAdmissionController {
         @Operation(summary = "Edit Application Admission", description = "Edits an existing application admission by its ID.")
         @PutMapping("/{id}")
         public ResponseEntity<ApplicationAdmissionResponse> edit(@PathVariable String id,
-                        @RequestBody ApplicationAdmissionEditRequest request) {
+                        @Valid @RequestBody ApplicationAdmissionEditRequest request) {
                 Optional<ApplicationAdmissionResponse> response = service.edit(id, request);
                 return response.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
         }

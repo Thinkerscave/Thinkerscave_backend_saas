@@ -11,7 +11,14 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 @Data
-@Table(name = "staff")
+@Table(name = "staff", indexes = {
+    @Index(name = "idx_staff_org", columnList = "organization_id"),
+    @Index(name = "idx_staff_code", columnList = "staff_code"),
+    @Index(name = "idx_staff_email", columnList = "email"),
+    @Index(name = "idx_staff_department", columnList = "department_id"),
+    @Index(name = "idx_staff_branch", columnList = "branch_id"),
+    @Index(name = "idx_staff_active", columnList = "is_active")
+})
 public class Staff extends Auditable {
 
     @Id

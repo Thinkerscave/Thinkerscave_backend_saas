@@ -117,6 +117,12 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<UserResponseDTO> listUsers(org.springframework.data.domain.Pageable pageable) {
+        return userRepository.findAll(pageable).map(this::mapToUserResponseDTO);
+    }
+
     /**
      * Retrieves a user by ID and maps it to a response DTO.
      *

@@ -26,7 +26,11 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true, callSuper = false)
-@Table(name = "users")
+@Table(name = "users", indexes = {
+    @Index(name = "idx_user_username", columnList = "user_name"),
+    @Index(name = "idx_user_email", columnList = "email"),
+    @Index(name = "idx_user_code", columnList = "user_code")
+})
 @Builder
 public class User extends Auditable {
 

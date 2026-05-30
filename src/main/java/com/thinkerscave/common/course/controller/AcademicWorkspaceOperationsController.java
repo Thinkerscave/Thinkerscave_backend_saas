@@ -8,6 +8,7 @@ import com.thinkerscave.common.course.service.AcademicWorkspaceOperationsService
 import com.thinkerscave.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -41,7 +42,7 @@ public class AcademicWorkspaceOperationsController {
 
     @PostMapping("/class-teachers")
     @Operation(summary = "Create class teacher assignment")
-    public ResponseEntity<ApiResponse<ClassTeacherAssignmentDTO>> createClassTeacherAssignment(@RequestBody ClassTeacherAssignmentDTO dto) {
+    public ResponseEntity<ApiResponse<ClassTeacherAssignmentDTO>> createClassTeacherAssignment(@Valid @RequestBody ClassTeacherAssignmentDTO dto) {
         return ResponseEntity.ok(ApiResponse.created("Class teacher assignment saved successfully",
                 operationsService.saveClassTeacherAssignment(dto)));
     }
@@ -50,7 +51,7 @@ public class AcademicWorkspaceOperationsController {
     @Operation(summary = "Update class teacher assignment")
     public ResponseEntity<ApiResponse<ClassTeacherAssignmentDTO>> updateClassTeacherAssignment(
             @PathVariable Long id,
-            @RequestBody ClassTeacherAssignmentDTO dto) {
+            @Valid @RequestBody ClassTeacherAssignmentDTO dto) {
         dto.setAssignmentId(id);
         return ResponseEntity.ok(ApiResponse.success("Class teacher assignment updated successfully",
                 operationsService.saveClassTeacherAssignment(dto)));
@@ -78,7 +79,7 @@ public class AcademicWorkspaceOperationsController {
 
     @PostMapping("/timetable-slots")
     @Operation(summary = "Create timetable slot")
-    public ResponseEntity<ApiResponse<TimetableSlotDTO>> createTimetableSlot(@RequestBody TimetableSlotDTO dto) {
+    public ResponseEntity<ApiResponse<TimetableSlotDTO>> createTimetableSlot(@Valid @RequestBody TimetableSlotDTO dto) {
         return ResponseEntity.ok(ApiResponse.created("Timetable slot saved successfully",
                 operationsService.saveTimetableSlot(dto)));
     }
@@ -87,7 +88,7 @@ public class AcademicWorkspaceOperationsController {
     @Operation(summary = "Update timetable slot")
     public ResponseEntity<ApiResponse<TimetableSlotDTO>> updateTimetableSlot(
             @PathVariable Long id,
-            @RequestBody TimetableSlotDTO dto) {
+            @Valid @RequestBody TimetableSlotDTO dto) {
         dto.setSlotId(id);
         return ResponseEntity.ok(ApiResponse.success("Timetable slot updated successfully",
                 operationsService.saveTimetableSlot(dto)));
@@ -113,7 +114,7 @@ public class AcademicWorkspaceOperationsController {
 
     @PostMapping("/calendar-events")
     @Operation(summary = "Create academic calendar event")
-    public ResponseEntity<ApiResponse<AcademicCalendarEventDTO>> createCalendarEvent(@RequestBody AcademicCalendarEventDTO dto) {
+    public ResponseEntity<ApiResponse<AcademicCalendarEventDTO>> createCalendarEvent(@Valid @RequestBody AcademicCalendarEventDTO dto) {
         return ResponseEntity.ok(ApiResponse.created("Academic calendar event saved successfully",
                 operationsService.saveCalendarEvent(dto)));
     }
@@ -122,7 +123,7 @@ public class AcademicWorkspaceOperationsController {
     @Operation(summary = "Update academic calendar event")
     public ResponseEntity<ApiResponse<AcademicCalendarEventDTO>> updateCalendarEvent(
             @PathVariable Long id,
-            @RequestBody AcademicCalendarEventDTO dto) {
+            @Valid @RequestBody AcademicCalendarEventDTO dto) {
         dto.setEventId(id);
         return ResponseEntity.ok(ApiResponse.success("Academic calendar event updated successfully",
                 operationsService.saveCalendarEvent(dto)));
@@ -146,7 +147,7 @@ public class AcademicWorkspaceOperationsController {
 
     @PostMapping("/settings")
     @Operation(summary = "Create or update academic setting")
-    public ResponseEntity<ApiResponse<AcademicSettingDTO>> saveSetting(@RequestBody AcademicSettingDTO dto) {
+    public ResponseEntity<ApiResponse<AcademicSettingDTO>> saveSetting(@Valid @RequestBody AcademicSettingDTO dto) {
         return ResponseEntity.ok(ApiResponse.success("Academic setting saved successfully",
                 operationsService.saveAcademicSetting(dto)));
     }
@@ -155,7 +156,7 @@ public class AcademicWorkspaceOperationsController {
     @Operation(summary = "Update academic setting")
     public ResponseEntity<ApiResponse<AcademicSettingDTO>> updateSetting(
             @PathVariable Long id,
-            @RequestBody AcademicSettingDTO dto) {
+            @Valid @RequestBody AcademicSettingDTO dto) {
         dto.setSettingId(id);
         return ResponseEntity.ok(ApiResponse.success("Academic setting updated successfully",
                 operationsService.saveAcademicSetting(dto)));

@@ -60,6 +60,7 @@ public class TenantOnboardingService {
         String tenantId = sanitizeTenantId(request.getTenantName());
         long startTime = System.currentTimeMillis();
         boolean schemaCreated = false;
+        boolean h2Database = schemaInitializer.isH2Database();
 
         log.info("🚀 Starting onboarding for tenant: {}", tenantId);
 
@@ -68,33 +69,41 @@ public class TenantOnboardingService {
             validateTenantRequest(request);
             log.debug("✅ Validation passed for tenant: {}", tenantId);
 
-            // Step 2: Create schema
-            boolean created = schemaInitializer.createSchemaIfNotExists(tenantId);
-            if (!created) {
-                throw new TenantAlreadyExistsException("Tenant '" + tenantId + "' already exists");
-            }
-            schemaCreated = true;
-            log.info("✅ Schema created: {}", tenantId);
-
-            // Step 3: Seed admin user & IT Support user (includes user_tenant_mapping sync)
             String hashedPassword = passwordEncoder.encode(request.getAdminPassword());
-            schemaInitializer.seedTenantUser(tenantId, request.getAdminEmail(), hashedPassword, "ADMIN",
-                    request.getAdminFirstName(), request.getAdminLastName());
-            log.info("✅ Admin user created: {}", request.getAdminEmail());
 
-            String supportEmail = "support@" + (request.getEnableSubdomain() && request.getSubdomainPrefix() != null
+                if (h2Database) {
+                if (tenantDirectoryExists(tenantId)) {
+                    throw new TenantAlreadyExistsException("Tenant '" + tenantId + "' already exists");
+                }
+                log.info("✅ H2 dev mode detected. Using public-schema tenant onboarding path for {}", tenantId);
+                } else {
+                // Step 2: Create schema
+                boolean created = schemaInitializer.createSchemaIfNotExists(tenantId);
+                if (!created) {
+                    throw new TenantAlreadyExistsException("Tenant '" + tenantId + "' already exists");
+                }
+                schemaCreated = true;
+                log.info("✅ Schema created: {}", tenantId);
+
+                // Step 3: Seed admin user & IT Support user (includes user_tenant_mapping sync)
+                schemaInitializer.seedTenantUser(tenantId, request.getAdminEmail(), hashedPassword, "ADMIN",
+                    request.getAdminFirstName(), request.getAdminLastName());
+                log.info("✅ Admin user created: {}", request.getAdminEmail());
+
+                String supportEmail = "support@" + (request.getEnableSubdomain() && request.getSubdomainPrefix() != null
                     ? request.getSubdomainPrefix()
                     : tenantId) + ".thinkerscave.com";
-            String supportRandomPassword = passwordEncoder.encode("Support@123"); // In production, this should be a
-                                                                                  // secure random password sent via
-                                                                                  // email
-            schemaInitializer.seedTenantUser(tenantId, supportEmail, supportRandomPassword, "IT_SUPPORT", "IT",
+                String supportRandomPassword = passwordEncoder.encode("Support@123"); // In production, this should be a
+                                                      // secure random password sent via
+                                                      // email
+                schemaInitializer.seedTenantUser(tenantId, supportEmail, supportRandomPassword, "IT_SUPPORT", "IT",
                     "Support");
-            log.info("✅ IT Support auto-provisioned: {}", supportEmail);
+                log.info("✅ IT Support auto-provisioned: {}", supportEmail);
 
-            // Step 4: Seed default data (roles, privileges, menus)
-            defaultDataSeeder.seedDefaultData(tenantId);
-            log.info("✅ Default data seeded for tenant");
+                // Step 4: Seed default data (roles, privileges, menus)
+                defaultDataSeeder.seedDefaultData(tenantId);
+                log.info("✅ Default data seeded for tenant");
+                }
 
             // Step 5: Configure tenant in tenant_config
             configureTenantSettings(tenantId, request);
@@ -123,6 +132,11 @@ public class TenantOnboardingService {
                 TenantContext.setTenant("public");
                 organizationService.saveOrganization(orgRequest);
                 log.info("✅ Organization record created in public schema");
+
+                if (h2Database) {
+                    completeH2DevOnboarding(tenantId, request, hashedPassword);
+                    log.info("✅ H2 dev admin user linked for tenant: {}", tenantId);
+                }
 
                 // Step 7: Audit log
                 long duration = System.currentTimeMillis() - startTime;
@@ -164,6 +178,75 @@ public class TenantOnboardingService {
             throw new TenantOnboardingException("Failed to onboard tenant: " + e.getMessage(), e);
         }
     }
+
+        private boolean tenantDirectoryExists(String tenantId) {
+        Integer count = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM organisation WHERE tenant_schema = ?",
+            Integer.class,
+            tenantId);
+        return count != null && count > 0;
+        }
+
+        private void completeH2DevOnboarding(String tenantId, TenantOnboardingRequest request, String hashedPassword) {
+        Long userId = jdbcTemplate.queryForObject(
+            "SELECT id FROM users WHERE email = ?",
+            Long.class,
+            request.getAdminEmail());
+        Long orgId = jdbcTemplate.queryForObject(
+            "SELECT org_id FROM organisation WHERE tenant_schema = ?",
+            Long.class,
+            tenantId);
+        Long roleId = jdbcTemplate.queryForObject(
+            "SELECT role_id FROM role_master WHERE role_code = ?",
+            Long.class,
+            "ADMIN");
+
+        jdbcTemplate.update(
+            "UPDATE users SET password = ?, is_first_time_login = false, is_email_verified = true WHERE id = ?",
+            hashedPassword,
+            userId);
+        jdbcTemplate.update(
+            "INSERT INTO user_roles (user_id, role_id) " +
+                "SELECT ?, ? WHERE NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = ? AND role_id = ?)",
+            userId,
+            roleId,
+            userId,
+            roleId);
+        jdbcTemplate.update(
+            "INSERT INTO organization_users (organization_id, user_id, role_name, is_active, joined_at, updated_at) " +
+                "SELECT ?, ?, ?, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP " +
+                "WHERE NOT EXISTS (SELECT 1 FROM organization_users WHERE organization_id = ? AND user_id = ?)",
+            orgId,
+            userId,
+            "ADMIN",
+            orgId,
+            userId);
+        upsertH2TenantConfig(tenantId, request);
+        }
+
+        private void upsertH2TenantConfig(String tenantId, TenantOnboardingRequest request) {
+        String subdomain = request.getEnableSubdomain()
+            ? (request.getSubdomainPrefix() != null ? request.getSubdomainPrefix() : tenantId)
+            : null;
+        String featuresJson;
+        try {
+            featuresJson = objectMapper.writeValueAsString(
+                request.getCustomSettings() != null ? request.getCustomSettings() : new HashMap<>());
+        } catch (Exception e) {
+            featuresJson = "{}";
+        }
+
+        jdbcTemplate.update(
+            "INSERT INTO tenant_config (tenant_id, tenant_name, subdomain, is_active, features, max_users, created_at, updated_at) " +
+                "SELECT ?, ?, ?, true, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP " +
+                "WHERE NOT EXISTS (SELECT 1 FROM tenant_config WHERE tenant_id = ?)",
+            tenantId,
+            request.getDisplayName(),
+            subdomain,
+            featuresJson,
+            request.getMaxUsers() != null ? request.getMaxUsers() : 100,
+            tenantId);
+        }
 
     /**
      * Validates tenant onboarding request.

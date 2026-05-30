@@ -4,8 +4,10 @@ import com.thinkerscave.common.course.dto.CourseRequestDTO;
 import com.thinkerscave.common.course.dto.CourseResponseDTO;
 import com.thinkerscave.common.course.dto.CourseSubjectMappingDTO;
 import com.thinkerscave.common.course.service.CourseSubjectService;
+import com.thinkerscave.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -60,8 +62,8 @@ public class CourseController {
     @PostMapping
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_ADD')")
     @Operation(summary = "Register a new academic program", description = "Creates a new Course entity linked to the organization. Generates a unique business code if not provided.")
-    public ResponseEntity<CourseResponseDTO> createCourse(@RequestBody CourseRequestDTO dto) {
-        return ResponseEntity.ok(courseService.createCourse(dto));
+    public ResponseEntity<ApiResponse<CourseResponseDTO>> createCourse(@Valid @RequestBody CourseRequestDTO dto) {
+        return ResponseEntity.ok(ApiResponse.created("Course created successfully", courseService.createCourse(dto)));
     }
 
     /**
@@ -78,9 +80,9 @@ public class CourseController {
     @PutMapping("/{courseId}")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_EDIT')")
     @Operation(summary = "Update course administrative details", description = "Allows modification of name, description, fees, and eligibility. Use this for curriculum maintenance.")
-    public ResponseEntity<CourseResponseDTO> updateCourse(@PathVariable Long courseId,
-            @RequestBody CourseRequestDTO dto) {
-        return ResponseEntity.ok(courseService.updateCourse(courseId, dto));
+    public ResponseEntity<ApiResponse<CourseResponseDTO>> updateCourse(@PathVariable Long courseId,
+            @Valid @RequestBody CourseRequestDTO dto) {
+        return ResponseEntity.ok(ApiResponse.success("Course updated successfully", courseService.updateCourse(courseId, dto)));
     }
 
     /**
@@ -92,8 +94,8 @@ public class CourseController {
     @GetMapping("/{courseId}")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_VIEW')")
     @Operation(summary = "Fetch course profile", description = "Returns the full descriptive and administrative profile of a specific course.")
-    public ResponseEntity<CourseResponseDTO> getCourse(@PathVariable Long courseId) {
-        return ResponseEntity.ok(courseService.getCourse(courseId));
+    public ResponseEntity<ApiResponse<CourseResponseDTO>> getCourse(@PathVariable Long courseId) {
+        return ResponseEntity.ok(ApiResponse.success("Course fetched successfully", courseService.getCourse(courseId)));
     }
 
     /**
@@ -110,8 +112,8 @@ public class CourseController {
     @GetMapping("/org/{orgId}")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_VIEW')")
     @Operation(summary = "List all institutional offerings", description = "Fetches the complete course catalogue for a specific SaaS tenant (Organization).")
-    public ResponseEntity<List<CourseResponseDTO>> getAllCoursesByOrg(@PathVariable Long orgId) {
-        return ResponseEntity.ok(courseService.getAllCoursesByOrg(orgId));
+    public ResponseEntity<ApiResponse<List<CourseResponseDTO>>> getAllCoursesByOrg(@PathVariable Long orgId) {
+        return ResponseEntity.ok(ApiResponse.success("Courses fetched successfully", courseService.getAllCoursesByOrg(orgId)));
     }
 
     /**
@@ -124,9 +126,9 @@ public class CourseController {
     @DeleteMapping("/{courseId}")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_DELETE')")
     @Operation(summary = "Deactivate an academic program", description = "Performs a soft-delete (isActive=false) on the course. History is preserved but the course is hidden from active enrollment.")
-    public ResponseEntity<Void> deleteCourse(@PathVariable Long courseId) {
+    public ResponseEntity<ApiResponse<Void>> deleteCourse(@PathVariable Long courseId) {
         courseService.deleteCourse(courseId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.noContent("Course deactivated successfully"));
     }
 
     // -------------------------------------------------------------------------
@@ -136,9 +138,9 @@ public class CourseController {
     @PostMapping("/{courseId}/subjects")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_EDIT')")
     @Operation(summary = "Assign a subject to this course", description = "Links an existing subject to this course for a specific semester.")
-    public ResponseEntity<Void> assignSubject(
+    public ResponseEntity<ApiResponse<Void>> assignSubject(
             @PathVariable Long courseId,
-            @RequestBody CourseSubjectMappingDTO mappingDTO) {
+            @Valid @RequestBody CourseSubjectMappingDTO mappingDTO) {
 
         // Ensure path variable integrity
         if (mappingDTO.getCourseId() == null) {
@@ -148,23 +150,23 @@ public class CourseController {
         }
 
         courseService.assignSubjectToCourse(mappingDTO);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.success("Subject assigned to course successfully", null));
     }
 
     @DeleteMapping("/{courseId}/subjects/{subjectId}")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_EDIT')")
     @Operation(summary = "Remove a subject from this course", description = "Unlinks a subject from the course. Does not delete the subject entity.")
-    public ResponseEntity<Void> removeSubject(
+    public ResponseEntity<ApiResponse<Void>> removeSubject(
             @PathVariable Long courseId,
             @PathVariable Long subjectId) {
         courseService.removeSubjectFromCourse(courseId, subjectId);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(ApiResponse.noContent("Subject removed from course successfully"));
     }
 
     @GetMapping("/{courseId}/subjects")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_VIEW')")
     @Operation(summary = "List all subjects in this course", description = "Returns the curriculum structure (subjects) for this course.")
-    public ResponseEntity<List<CourseSubjectMappingDTO>> getSubjects(@PathVariable Long courseId) {
-        return ResponseEntity.ok(courseService.getSubjectsByCourse(courseId));
+    public ResponseEntity<ApiResponse<List<CourseSubjectMappingDTO>>> getSubjects(@PathVariable Long courseId) {
+        return ResponseEntity.ok(ApiResponse.success("Course subjects fetched successfully", courseService.getSubjectsByCourse(courseId)));
     }
 }

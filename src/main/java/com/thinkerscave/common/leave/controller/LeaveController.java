@@ -7,6 +7,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -41,11 +43,25 @@ public class LeaveController {
         return ResponseEntity.ok(leaveService.getAllLeaveRequests());
     }
 
+    @Operation(summary = "Get all leave requests (paginated)")
+    @GetMapping("/all/paged")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+    public ResponseEntity<Page<LeaveResponseDTO>> getAllLeaveRequestsPaged(Pageable pageable) {
+        return ResponseEntity.ok(leaveService.getAllLeaveRequests(pageable));
+    }
+
     @Operation(summary = "Get my own leave requests")
     @GetMapping("/my")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<LeaveResponseDTO>> getMyLeaveRequests(Authentication auth) {
         return ResponseEntity.ok(leaveService.getMyLeaveRequests(auth.getName()));
+    }
+
+    @Operation(summary = "Get my leave requests (paginated)")
+    @GetMapping("/my/paged")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Page<LeaveResponseDTO>> getMyLeaveRequestsPaged(Authentication auth, Pageable pageable) {
+        return ResponseEntity.ok(leaveService.getMyLeaveRequests(auth.getName(), pageable));
     }
 
     @Operation(summary = "Approve a leave request")

@@ -1,6 +1,8 @@
 package com.thinkerscave.common.dashboard.controller;
 
 import com.thinkerscave.common.dashboard.dto.DashboardSummaryDTO;
+import com.thinkerscave.common.dashboard.dto.DashboardSearchDTO;
+import com.thinkerscave.common.dashboard.dto.DashboardWorkspaceDTO;
 import com.thinkerscave.common.dashboard.service.DashboardService;
 import com.thinkerscave.common.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/dashboard")
-@Tag(name = "Dashboard", description = "KPI summary for the organization dashboard")
+@Tag(name = "Dashboard", description = "Role-aware workspace for the organization dashboard")
 @RequiredArgsConstructor
 @Slf4j
 public class DashboardController {
@@ -29,5 +31,19 @@ public class DashboardController {
     public ResponseEntity<ApiResponse<DashboardSummaryDTO>> summary(
             @RequestParam(required = false) Long academicYearId) {
         return ResponseEntity.ok(ApiResponse.success(dashboardService.summary(academicYearId)));
+    }
+
+    @GetMapping("/workspace")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Role-aware dashboard workspace for the signed-in user")
+    public ResponseEntity<ApiResponse<DashboardWorkspaceDTO>> workspace() {
+        return ResponseEntity.ok(ApiResponse.success(dashboardService.workspace()));
+    }
+
+    @GetMapping("/search")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Global dashboard search across school records")
+    public ResponseEntity<ApiResponse<DashboardSearchDTO>> search(@RequestParam("query") String query) {
+        return ResponseEntity.ok(ApiResponse.success(dashboardService.search(query)));
     }
 }

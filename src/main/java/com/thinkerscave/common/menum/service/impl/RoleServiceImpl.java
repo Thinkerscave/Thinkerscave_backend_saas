@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.thinkerscave.common.menum.domain.Role;
@@ -24,6 +26,7 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"roles", "activeRoles"}, allEntries = true)
     public RoleDTO saveOrUpdateRole(RoleDTO dto) {
         log.info("Saving or updating role: {}", dto);
 
@@ -54,6 +57,7 @@ public class RoleServiceImpl implements RoleService {
     }
 
     @Override
+    @Cacheable(value = "roles")
     public List<RoleDTO> getAllRoles() {
         log.info("Fetching all roles");
         return roleRepository.findAll()
@@ -72,6 +76,7 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {"roles", "activeRoles"}, allEntries = true)
     public void updateRoleStatus(Long roleId, Boolean status) {
         log.info("Updating role status - roleId: {}, status: {}", roleId, status);
 
@@ -105,6 +110,7 @@ public class RoleServiceImpl implements RoleService {
     }
 
     @Override
+    @Cacheable(value = "activeRoles")
     public List<RoleLookupDTO> getActiveRoles() {
         log.info("Fetching active roles for dropdown");
         return roleRepository.findByIsActiveTrue()

@@ -232,6 +232,13 @@ public class StudentServiceImpl implements StudentService {
 	}
 
 	@Override
+	public org.springframework.data.domain.Page<com.thinkerscave.common.student.dto.StudentResponseDTO> getAllStudents(org.springframework.data.domain.Pageable pageable) {
+		Long orgId = com.thinkerscave.common.context.OrganizationContext.getOrganizationId();
+		return studentRepository.findByOrganizationIdAndIsActive(orgId, true, pageable)
+				.map(this::mapToResponseDTO);
+	}
+
+	@Override
 	public com.thinkerscave.common.student.dto.StudentResponseDTO getStudentById(Long id) {
 		Long orgId = com.thinkerscave.common.context.OrganizationContext.getOrganizationId();
 		Student student = studentRepository.findByStudentIdAndOrganizationId(id, orgId)

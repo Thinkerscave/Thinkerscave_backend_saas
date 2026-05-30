@@ -10,6 +10,7 @@ import com.thinkerscave.common.fee.domain.FeeStructure;
 import com.thinkerscave.common.fee.domain.FeeStructureItem;
 import com.thinkerscave.common.fee.dto.FeeStructureDTO;
 import com.thinkerscave.common.fee.dto.FeeStructureItemDTO;
+import com.thinkerscave.common.fee.mapper.FeeMapper;
 import com.thinkerscave.common.fee.repository.FeeStructureItemRepository;
 import com.thinkerscave.common.fee.repository.FeeStructureRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -36,6 +36,7 @@ public class FeeStructureService {
     private final FeeStructureRepository feeStructureRepository;
     private final FeeStructureItemRepository feeStructureItemRepository;
     private final AuditPublisher auditPublisher;
+    private final FeeMapper feeMapper;
 
     public List<FeeStructureDTO> listByYear(Long academicYearId) {
         return feeStructureRepository
@@ -140,31 +141,8 @@ public class FeeStructureService {
 
     private FeeStructureDTO toDtoWithItems(FeeStructure e) {
         List<FeeStructureItem> items = feeStructureItemRepository.findByFeeStructureId(e.getId());
-        List<FeeStructureItemDTO> itemDtos = new ArrayList<>();
-        for (FeeStructureItem i : items) {
-            itemDtos.add(FeeStructureItemDTO.builder()
-                    .id(i.getId())
-                    .feeHeadId(i.getFeeHeadId())
-                    .feeGroupId(i.getFeeGroupId())
-                    .amount(i.getAmount())
-                    .frequency(i.getFrequency())
-                    .dueDayOfMonth(i.getDueDayOfMonth())
-                    .optional(i.isOptional())
-                    .displayOrder(i.getDisplayOrder())
-                    .build());
-        }
-        return FeeStructureDTO.builder()
-                .id(e.getId())
-                .name(e.getName())
-                .academicYearId(e.getAcademicYearId())
-                .classId(e.getClassId())
-                .sectionId(e.getSectionId())
-                .feePolicyId(e.getFeePolicyId())
-                .effectiveFrom(e.getEffectiveFrom())
-                .effectiveTo(e.getEffectiveTo())
-                .status(e.getStatus())
-                .notes(e.getNotes())
-                .items(itemDtos)
-                .build();
+        FeeStructureDTO dto = feeMapper.toFeeStructureDto(e);
+        dto.setItems(feeMapper.toItemDtoList(items));
+        return dto;
     }
 }

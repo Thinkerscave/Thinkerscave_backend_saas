@@ -1,5 +1,7 @@
 package com.thinkerscave.common.menum.service.impl;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,6 +43,7 @@ public class MenuMappingServiceImpl implements MenuMappingService {
         private final PrivilegeRepository privilegeRepository;
 
         @Override
+        @Cacheable(value = "sideMenu", key = "#roleId")
         public List<SideMenuDTO> getRoleBasedSideMenu(Long roleId) {
                 List<RoleMenuPrivilegeMapping> mappings = roleMenuPrivilegeMappingRepository.findByRoleId(roleId)
                                 .stream()
@@ -166,6 +169,8 @@ public class MenuMappingServiceImpl implements MenuMappingService {
         }
 
         @Override
+        @Transactional
+        @CacheEvict(value = "sideMenu", allEntries = true)
         public void assignRoleMenuPrivileges(RoleMenuMappingRequest request) {
                 Long roleId = request.getRoleId();
                 Role role = roleRepository.findById(roleId).get();

@@ -7,6 +7,7 @@ import com.thinkerscave.common.context.OrganizationContext;
 import com.thinkerscave.common.enrollment.domain.AcademicEnrollment;
 import com.thinkerscave.common.enrollment.domain.EnrollmentStatus;
 import com.thinkerscave.common.enrollment.dto.AcademicEnrollmentDTO;
+import com.thinkerscave.common.enrollment.mapper.EnrollmentMapper;
 import com.thinkerscave.common.enrollment.repository.AcademicEnrollmentRepository;
 import com.thinkerscave.common.exception.BadRequestException;
 import com.thinkerscave.common.exception.ConflictException;
@@ -40,22 +41,23 @@ public class EnrollmentService {
     private final AcademicEnrollmentRepository enrollmentRepository;
     private final SequenceGeneratorService sequenceGenerator;
     private final AuditPublisher auditPublisher;
+    private final EnrollmentMapper enrollmentMapper;
 
     public Page<AcademicEnrollmentDTO> listByYear(Long academicYearId, Pageable pageable) {
         return enrollmentRepository
                 .findByOrganizationIdAndAcademicYearId(currentOrgId(), academicYearId, pageable)
-                .map(this::toDto);
+                .map(enrollmentMapper::toDto);
     }
 
     public List<AcademicEnrollmentDTO> listActiveByClass(Long academicYearId, Long classId) {
         return enrollmentRepository
                 .findByOrganizationIdAndAcademicYearIdAndClassIdAndStatus(
                         currentOrgId(), academicYearId, classId, EnrollmentStatus.ACTIVE)
-                .stream().map(this::toDto).toList();
+                .stream().map(enrollmentMapper::toDto).toList();
     }
 
     public AcademicEnrollmentDTO get(Long id) {
-        return toDto(load(id));
+        return enrollmentMapper.toDto(load(id));
     }
 
     @Transactional
@@ -90,7 +92,7 @@ public class EnrollmentService {
         e = enrollmentRepository.save(e);
         auditPublisher.publish(AuditEventType.CREATE, "ENROLLMENT_CREATE", "AcademicEnrollment",
                 e.getId(), "Enrollment " + e.getEnrollmentNumber() + " created");
-        return toDto(e);
+        return enrollmentMapper.toDto(e);
     }
 
     @Transactional
@@ -107,14 +109,14 @@ public class EnrollmentService {
         e = enrollmentRepository.save(e);
         auditPublisher.publish(AuditEventType.UPDATE, "ENROLLMENT_UPDATE", "AcademicEnrollment",
                 e.getId(), "Enrollment " + e.getEnrollmentNumber() + " updated");
-        return toDto(e);
+        return enrollmentMapper.toDto(e);
     }
 
     @Transactional
     public AcademicEnrollmentDTO transitionStatus(Long id, EnrollmentStatus target, String remarks) {
         if (target == null) throw new BadRequestException("Target status is required");
         AcademicEnrollment e = load(id);
-        if (e.getStatus() == target) return toDto(e);
+        if (e.getStatus() == target) return enrollmentMapper.toDto(e);
         if (TERMINAL_STATES.contains(e.getStatus())) {
             throw new BadRequestException("Enrollment is already in a terminal state: " + e.getStatus());
         }
@@ -127,7 +129,7 @@ public class EnrollmentService {
         e = enrollmentRepository.save(e);
         auditPublisher.publish(AuditEventType.STATE_CHANGE, "ENROLLMENT_TRANSITION", "AcademicEnrollment",
                 e.getId(), "Enrollment " + e.getEnrollmentNumber() + " transitioned " + previous + " -> " + target);
-        return toDto(e);
+        return enrollmentMapper.toDto(e);
     }
 
     public long activeCount(Long academicYearId) {
@@ -143,23 +145,6 @@ public class EnrollmentService {
             throw new ResourceNotFoundException("Enrollment not found: " + id);
         }
         return e;
-    }
-
-    private AcademicEnrollmentDTO toDto(AcademicEnrollment e) {
-        return AcademicEnrollmentDTO.builder()
-                .id(e.getId())
-                .enrollmentNumber(e.getEnrollmentNumber())
-                .studentId(e.getStudentId())
-                .academicYearId(e.getAcademicYearId())
-                .classId(e.getClassId())
-                .sectionId(e.getSectionId())
-                .rollNumber(e.getRollNumber())
-                .house(e.getHouse())
-                .enrollmentDate(e.getEnrollmentDate())
-                .exitDate(e.getExitDate())
-                .status(e.getStatus())
-                .remarks(e.getRemarks())
-                .build();
     }
 
     private Long currentOrgId() {

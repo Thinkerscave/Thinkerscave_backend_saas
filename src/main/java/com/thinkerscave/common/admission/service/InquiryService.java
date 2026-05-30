@@ -6,6 +6,8 @@ import com.thinkerscave.common.admission.dto.InquiryRequest;
 import com.thinkerscave.common.admission.dto.InquiryResponse;
 import com.thinkerscave.common.admission.dto.PublicInquiryRequestDTO;
 import com.thinkerscave.common.admission.dto.InquirySummaryResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import jakarta.validation.Valid;
 
@@ -14,6 +16,8 @@ public interface InquiryService {
 	InquiryResponse saveOrUpdate(InquiryRequest request);
 
 	List<InquiryResponse> getAll();
+
+	Page<InquiryResponse> getAll(Pageable pageable);
 
 	void delete(Long id);
 

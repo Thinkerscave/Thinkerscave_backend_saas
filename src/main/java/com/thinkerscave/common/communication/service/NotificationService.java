@@ -8,6 +8,7 @@ import com.thinkerscave.common.communication.domain.NotificationRecipient;
 import com.thinkerscave.common.communication.domain.NotificationStatus;
 import com.thinkerscave.common.communication.dto.NotificationDTO;
 import com.thinkerscave.common.communication.dto.NotificationRecipientDTO;
+import com.thinkerscave.common.communication.mapper.CommunicationMapper;
 import com.thinkerscave.common.communication.repository.NotificationRecipientRepository;
 import com.thinkerscave.common.communication.repository.NotificationRepository;
 import com.thinkerscave.common.context.OrganizationContext;
@@ -37,22 +38,23 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final NotificationRecipientRepository recipientRepository;
     private final AuditPublisher auditPublisher;
+    private final CommunicationMapper communicationMapper;
 
     public Page<NotificationDTO> list(Pageable pageable) {
-        return notificationRepository.findByOrganizationId(currentOrgId(), pageable).map(this::toDto);
+        return notificationRepository.findByOrganizationId(currentOrgId(), pageable).map(communicationMapper::toNotificationDto);
     }
 
     public NotificationDTO get(Long id) {
-        return toDto(load(id));
+        return communicationMapper.toNotificationDto(load(id));
     }
 
     public List<NotificationRecipientDTO> recipientsOf(Long notificationId) {
-        return recipientRepository.findByNotificationId(notificationId).stream().map(this::toDto).toList();
+        return recipientRepository.findByNotificationId(notificationId).stream().map(communicationMapper::toRecipientDto).toList();
     }
 
     public Page<NotificationRecipientDTO> inbox(Long userId, NotificationStatus status, Pageable pageable) {
         NotificationStatus effective = status != null ? status : NotificationStatus.DELIVERED;
-        return recipientRepository.findByUserIdAndStatus(userId, effective, pageable).map(this::toDto);
+        return recipientRepository.findByUserIdAndStatus(userId, effective, pageable).map(communicationMapper::toRecipientDto);
     }
 
     public long unreadCount(Long userId) {
@@ -95,7 +97,7 @@ public class NotificationService {
         auditPublisher.publish(AuditEventType.CREATE, "notification.create",
                 "Notification", saved.getId(),
                 "Notification '" + saved.getSubject() + "' for " + recipients.size() + " recipients");
-        return toDto(saved);
+        return communicationMapper.toNotificationDto(saved);
     }
 
     @Transactional
@@ -105,7 +107,7 @@ public class NotificationService {
         r.setSentAt(Instant.now());
         r.setProviderMessageId(providerMessageId);
         r.setAttemptCount((r.getAttemptCount() == null ? 0 : r.getAttemptCount()) + 1);
-        return toDto(recipientRepository.save(r));
+        return communicationMapper.toRecipientDto(recipientRepository.save(r));
     }
 
     @Transactional
@@ -114,7 +116,7 @@ public class NotificationService {
         r.setStatus(NotificationStatus.DELIVERED);
         r.setDeliveredAt(Instant.now());
         incrementParent(r.getNotificationId(), true);
-        return toDto(recipientRepository.save(r));
+        return communicationMapper.toRecipientDto(recipientRepository.save(r));
     }
 
     @Transactional
@@ -122,7 +124,7 @@ public class NotificationService {
         NotificationRecipient r = loadRecipient(recipientId);
         r.setStatus(NotificationStatus.READ);
         r.setReadAt(Instant.now());
-        return toDto(recipientRepository.save(r));
+        return communicationMapper.toRecipientDto(recipientRepository.save(r));
     }
 
     @Transactional
@@ -132,7 +134,7 @@ public class NotificationService {
         r.setFailureReason(reason);
         r.setAttemptCount((r.getAttemptCount() == null ? 0 : r.getAttemptCount()) + 1);
         incrementParent(r.getNotificationId(), false);
-        return toDto(recipientRepository.save(r));
+        return communicationMapper.toRecipientDto(recipientRepository.save(r));
     }
 
     @Transactional
@@ -145,7 +147,7 @@ public class NotificationService {
         Notification saved = notificationRepository.save(n);
         auditPublisher.publish(AuditEventType.STATE_CHANGE, "notification.cancel",
                 "Notification", id, "Notification cancelled");
-        return toDto(saved);
+        return communicationMapper.toNotificationDto(saved);
     }
 
     private void incrementParent(Long notificationId, boolean delivered) {
@@ -172,42 +174,6 @@ public class NotificationService {
     private NotificationRecipient loadRecipient(Long id) {
         return recipientRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("NotificationRecipient not found: " + id));
-    }
-
-    private NotificationDTO toDto(Notification n) {
-        return NotificationDTO.builder()
-                .id(n.getId())
-                .subject(n.getSubject())
-                .body(n.getBody())
-                .channelsCsv(n.getChannelsCsv())
-                .category(n.getCategory())
-                .severity(n.getSeverity())
-                .scheduledAt(n.getScheduledAt())
-                .sentAt(n.getSentAt())
-                .status(n.getStatus())
-                .triggeredByUserId(n.getTriggeredByUserId())
-                .sourceRef(n.getSourceRef())
-                .totalRecipients(n.getTotalRecipients())
-                .deliveredCount(n.getDeliveredCount())
-                .failedCount(n.getFailedCount())
-                .build();
-    }
-
-    private NotificationRecipientDTO toDto(NotificationRecipient r) {
-        return NotificationRecipientDTO.builder()
-                .id(r.getId())
-                .notificationId(r.getNotificationId())
-                .userId(r.getUserId())
-                .address(r.getAddress())
-                .channel(r.getChannel())
-                .status(r.getStatus())
-                .sentAt(r.getSentAt())
-                .deliveredAt(r.getDeliveredAt())
-                .readAt(r.getReadAt())
-                .failureReason(r.getFailureReason())
-                .attemptCount(r.getAttemptCount())
-                .providerMessageId(r.getProviderMessageId())
-                .build();
     }
 
     private Long currentOrgId() {

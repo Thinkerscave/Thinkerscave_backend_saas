@@ -106,10 +106,24 @@ public class LeaveServiceImpl implements LeaveService {
 
     @Override
     @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<LeaveResponseDTO> getAllLeaveRequests(org.springframework.data.domain.Pageable pageable) {
+        Long orgId = requireOrgId();
+        return leaveRepository.findByOrganizationId(orgId, pageable).map(this::toDTO);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<LeaveResponseDTO> getMyLeaveRequests(String username) {
         Long orgId = requireOrgId();
         return leaveRepository.findByOrganizationIdAndAppliedByOrderByCreatedDateDesc(orgId, username)
                 .stream().map(this::toDTO).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<LeaveResponseDTO> getMyLeaveRequests(String username, org.springframework.data.domain.Pageable pageable) {
+        Long orgId = requireOrgId();
+        return leaveRepository.findByOrganizationIdAndAppliedBy(orgId, username, pageable).map(this::toDTO);
     }
 
     private LeaveRequest findOrThrow(Long id) {
@@ -140,7 +154,7 @@ public class LeaveServiceImpl implements LeaveService {
                 .approvedBy(l.getApprovedBy())
                 .rejectionReason(l.getRejectionReason())
                 .createdAt(l.getCreatedDate() != null
-                        ? l.getCreatedDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()
+                        ? l.getCreatedDate().atZone(ZoneId.systemDefault()).toLocalDateTime()
                         : null)
                 .build();
     }

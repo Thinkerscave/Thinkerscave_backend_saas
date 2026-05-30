@@ -11,10 +11,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.List;
 
 @Component
@@ -90,7 +90,7 @@ public class DataSeeder implements CommandLineRunner {
                                 .nextFollowUpDate(nextDate)
                                 .build();
 
-                inquiry.setCreatedDate(new Date());
+                inquiry.setCreatedDate(Instant.now());
                 inquiry.setCreatedBy("admin");
 
                 if (lastType != null) {

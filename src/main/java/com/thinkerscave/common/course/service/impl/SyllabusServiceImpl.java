@@ -143,7 +143,7 @@ public class SyllabusServiceImpl implements SyllabusService {
 
         // Versioning Logic: Defaults to 1.0 for new creations to start a clean version
         // chain.
-        syllabus.setVersion(dto.getVersion() != null ? dto.getVersion() : "1.0");
+        syllabus.setSyllabusVersion(dto.getVersion() != null ? dto.getVersion() : "1.0");
         syllabus.setSubject(subject);
 
         // Security/Workflow: New syllabi are ALWAYS DRAFT to ensure mandatory
@@ -197,7 +197,7 @@ public class SyllabusServiceImpl implements SyllabusService {
 
         syllabus.setTitle(dto.getTitle());
         syllabus.setDescription(dto.getDescription());
-        syllabus.setVersion(dto.getVersion());
+        syllabus.setSyllabusVersion(dto.getVersion());
 
         // Hierarchy Refresh Strategy:
         // For simplicity and to avoid complex 'dirty check' logic for nested lists,
@@ -351,7 +351,7 @@ public class SyllabusServiceImpl implements SyllabusService {
         newSyllabus.setSyllabusCode(generateCode("SYL"));
         newSyllabus.setTitle(oldSyllabus.getTitle());
         newSyllabus.setDescription(oldSyllabus.getDescription());
-        newSyllabus.setVersion(newVersion);
+        newSyllabus.setSyllabusVersion(newVersion);
         newSyllabus.setSubject(oldSyllabus.getSubject());
         newSyllabus.setStatus(SyllabusStatus.DRAFT); // Clones are ALWAYS drafts initially
         newSyllabus.setPreviousVersion(oldSyllabus); // Link the history chain
@@ -451,7 +451,7 @@ public class SyllabusServiceImpl implements SyllabusService {
                 .syllabusCode(syllabus.getSyllabusCode())
                 .title(syllabus.getTitle())
                 .description(syllabus.getDescription())
-                .version(syllabus.getVersion())
+                .version(syllabus.getSyllabusVersion())
                 .status(syllabus.getStatus())
                 .subjectName(syllabus.getSubject().getSubjectName())
                 .approvedDate(syllabus.getApprovedDate())

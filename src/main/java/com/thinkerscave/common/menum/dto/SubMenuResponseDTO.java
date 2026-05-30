@@ -1,7 +1,7 @@
 package com.thinkerscave.common.menum.dto;
 
 import java.io.Serializable;
-import java.util.Date;
+import java.time.Instant;
 import java.util.List;
 
 import com.thinkerscave.common.menum.domain.Privilege;
@@ -26,6 +26,6 @@ public class SubMenuResponseDTO implements Serializable {
     private String menuName;
     private String menuCode;
     private String createdBy;
-    private Date lastUpdatedOn;
+    private Instant lastUpdatedOn;
     private List<Privilege> privileges;
 }

@@ -141,8 +141,8 @@ public class Syllabus extends Auditable {
      * Human-readable version number (e.g., "1.0", "2024.1").
      * Essential for tracking curriculum evolution over several years.
      */
-    @Column(name = "version", length = 20)
-    private String version;
+    @Column(name = "syllabus_version", length = 20)
+    private String syllabusVersion;
 
     /**
      * Current workflow state (DRAFT, APPROVED, PUBLISHED).

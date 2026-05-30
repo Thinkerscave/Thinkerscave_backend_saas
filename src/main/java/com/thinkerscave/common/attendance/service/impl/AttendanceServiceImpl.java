@@ -137,7 +137,7 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .remarks(a.getRemarks())
                 .markedBy(a.getMarkedBy())
                 .createdAt(a.getCreatedDate() != null
-                        ? a.getCreatedDate().toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()
+                        ? a.getCreatedDate().atZone(ZoneId.systemDefault()).toLocalDateTime()
                         : null)
                 .build();
     }

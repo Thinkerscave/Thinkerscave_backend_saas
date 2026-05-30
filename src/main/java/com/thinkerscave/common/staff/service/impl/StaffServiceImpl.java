@@ -19,9 +19,11 @@ import java.util.Optional;
 
 import com.thinkerscave.common.usrm.domain.User;
 import com.thinkerscave.common.usrm.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,105 +39,100 @@ public class StaffServiceImpl implements StaffService {
     private final BranchRepository branchRepository;
     private final DepartmentRepository departmentRepository;
     private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
     public Map<String, Object> saveOrUpdateStaff(StaffRequestDTO staffRequestDTO) {
         Map<String, Object> data = new HashMap<>();
 
-        Branch branch = null;
-        Department department = null;
-        Role userRole = null;
-
         try {
-            if (staffRequestDTO != null) {
-
-                // Check email uniqueness
-                Optional<User> existingUserByEmail = userRepository.findByEmailIgnoreCase(staffRequestDTO.getEmail());
-
-                // If email belongs to another user
-                if (existingUserByEmail.isPresent()
-                        && existingUserByEmail.get().getEmail().equalsIgnoreCase(staffRequestDTO.getEmail())) {
-                    data.put("isOutcome", false);
-                    data.put("message", "Email already Exist");
-                    return data;
-                }
-
-                userRole = roleRepository.findByRoleName("USER")
-                        .orElseThrow(() -> new IllegalStateException("Role 'USER' not found"));
-                branch = branchRepository.findByBranchCode(staffRequestDTO.getBranchCode())
-                        .orElseThrow(() -> new IllegalStateException("Branch not found"));
-                department = departmentRepository.findByDepartmentCode(staffRequestDTO.getDepartmentCode())
-                        .orElseThrow(() -> new IllegalStateException("Department not found"));
-
-                if (staffRequestDTO.getStaffCode() != null) {
-                    // Update case
-                    Staff presentStaff = staffRepository.findByStaffCode(staffRequestDTO.getStaffCode())
-                            .orElseThrow(() -> new IllegalStateException(
-                                    "Current Staff not found with code" + staffRequestDTO.getStaffCode()));
-
-                    User existingUser = presentStaff.getUser();
-
-                    // Update the Existing User
-                    BeanUtils.copyProperties(staffRequestDTO, existingUser, "userName", "id", "userCode");
-                    existingUser = userRepository.save(existingUser);
-
-                    // Update the Existing Staff
-                    BeanUtils.copyProperties(staffRequestDTO, presentStaff, "hireDate", "id", "staffCode",
-                            "organizationId");
-                    presentStaff.setUser(existingUser);
-                    presentStaff.setBranch(branch);
-                    presentStaff.setDepartment(department);
-
-                    presentStaff = staffRepository.save(presentStaff);
-                    if (presentStaff.getId() != null) {
-                        data.put("isOutcome", true);
-                        data.put("message", "Staff Record Updated ");
-                        data.put("data", toResponse(presentStaff));
-                    } else {
-                        data.put("isOutcome", false);
-                        data.put("message", "Unable To Update Staff Record ");
-                    }
-
-                } else {
-                    User newUser = new User();
-                    Staff newStaff = new Staff();
-
-                    // Saving the New User
-                    BeanUtils.copyProperties(staffRequestDTO, newUser, "id");
-                    newUser.setRoles(List.of(userRole));
-
-                    newUser = userRepository.save(newUser);
-
-                    BeanUtils.copyProperties(staffRequestDTO, newStaff, "id");
-                    newStaff.setUser(newUser);
-                    newStaff.setBranch(branch);
-                    newStaff.setDepartment(department);
-
-                    // ─── Set organization scope from context (multi-tenant isolation) ───
-                    Long orgId = com.thinkerscave.common.context.OrganizationContext.getOrganizationId();
-                    if (orgId != null) {
-                        newStaff.setOrganizationId(orgId);
-                    } else {
-                        log.warn("OrganizationContext is null when saving new Staff — tenant isolation may be broken");
-                    }
-
-                    newStaff = staffRepository.save(newStaff);
-
-                    if (newStaff.getId() != null) {
-                        data.put("isOutcome", true);
-                        data.put("message", "Staff Record Saved ");
-                        data.put("data", toResponse(newStaff));
-                    } else {
-                        data.put("isOutcome", false);
-                        data.put("message", "Unable To Save Staff Record ");
-                    }
-                }
-
-            } else {
+            if (staffRequestDTO == null) {
                 data.put("isOutcome", false);
                 data.put("data", null);
+                data.put("message", "Staff payload is required");
+                return data;
             }
+
+            Long orgId = com.thinkerscave.common.context.OrganizationContext.getOrganizationId();
+            Branch branch = branchRepository.findByBranchCode(staffRequestDTO.getBranchCode())
+                    .orElseThrow(() -> new IllegalStateException("Branch not found"));
+            Department department = departmentRepository.findByDepartmentCode(staffRequestDTO.getDepartmentCode())
+                    .orElseThrow(() -> new IllegalStateException("Department not found"));
+            Role userRole = roleRepository.findByRoleCode("TEACHER")
+                    .or(() -> roleRepository.findByRoleName("Teacher"))
+                    .orElseThrow(() -> new IllegalStateException("Role 'TEACHER' not found"));
+
+            String requestedStaffCode = StringUtils.hasText(staffRequestDTO.getStaffCode())
+                    ? staffRequestDTO.getStaffCode().trim()
+                    : null;
+            Optional<Staff> existingStaff = requestedStaffCode == null
+                    ? Optional.empty()
+                    : orgId != null
+                            ? staffRepository.findByStaffCodeAndOrganizationId(requestedStaffCode, orgId)
+                            : staffRepository.findByStaffCode(requestedStaffCode);
+
+            Optional<User> existingUserByEmail = StringUtils.hasText(staffRequestDTO.getEmail())
+                    ? userRepository.findByEmailIgnoreCase(staffRequestDTO.getEmail())
+                    : Optional.empty();
+            if (existingUserByEmail.isPresent()
+                    && (existingStaff.isEmpty()
+                            || existingStaff.get().getUser() == null
+                            || !existingUserByEmail.get().getId().equals(existingStaff.get().getUser().getId()))) {
+                data.put("isOutcome", false);
+                data.put("message", "Email already exists");
+                return data;
+            }
+
+            if (existingStaff.isPresent()) {
+                Staff presentStaff = existingStaff.get();
+                User existingUser = presentStaff.getUser();
+
+                BeanUtils.copyProperties(staffRequestDTO, existingUser, "id", "userCode", "password", "roles", "organizations");
+                if (StringUtils.hasText(staffRequestDTO.getUserName())) {
+                    existingUser.setUserName(resolveUniqueUserName(staffRequestDTO.getUserName(), existingUser.getId()));
+                }
+                existingUser = userRepository.save(existingUser);
+
+                BeanUtils.copyProperties(staffRequestDTO, presentStaff, "id", "staffCode", "organizationId", "user", "branch", "department");
+                presentStaff.setUser(existingUser);
+                presentStaff.setBranch(branch);
+                presentStaff.setDepartment(department);
+
+                Staff saved = staffRepository.save(presentStaff);
+                data.put("isOutcome", true);
+                data.put("message", "Staff Record Updated");
+                data.put("data", toResponse(saved));
+                return data;
+            }
+
+            String resolvedStaffCode = requestedStaffCode != null ? requestedStaffCode : generateStaffCode(staffRequestDTO);
+            User newUser = new User();
+            BeanUtils.copyProperties(staffRequestDTO, newUser, "id", "userCode", "password", "roles", "organizations");
+            newUser.setUserCode(generateUserCode(resolvedStaffCode));
+            newUser.setUserName(resolveUniqueUserName(resolveBaseUserName(staffRequestDTO), null));
+            newUser.setPassword(passwordEncoder.encode("Password@123"));
+            newUser.setRoles(List.of(userRole));
+            newUser = userRepository.save(newUser);
+
+            Staff newStaff = new Staff();
+            BeanUtils.copyProperties(staffRequestDTO, newStaff, "id", "staffCode", "organizationId", "user", "branch", "department");
+            newStaff.setStaffCode(resolvedStaffCode);
+            newStaff.setUser(newUser);
+            newStaff.setBranch(branch);
+            newStaff.setDepartment(department);
+            newStaff.setIsActive(true);
+
+            if (orgId != null) {
+                newStaff.setOrganizationId(orgId);
+            } else {
+                log.warn("OrganizationContext is null when saving new Staff — tenant isolation may be broken");
+            }
+
+            Staff saved = staffRepository.save(newStaff);
+            data.put("isOutcome", true);
+            data.put("message", "Staff Record Saved");
+            data.put("data", toResponse(saved));
         } catch (Exception e) {
             log.error("Exception occurred while saving/updating staff", e);
             data.put("isOutcome", false);
@@ -237,6 +234,44 @@ public class StaffServiceImpl implements StaffService {
             data.put("message", "Unexpected error occurred: " + e.getMessage());
         }
         return data;
+    }
+
+    private String generateStaffCode(StaffRequestDTO dto) {
+        String source = StringUtils.hasText(dto.getEmail()) ? dto.getEmail().toLowerCase() : String.valueOf(System.nanoTime());
+        return "STF-" + Integer.toUnsignedString(source.hashCode(), 36).toUpperCase();
+    }
+
+    private String generateUserCode(String staffCode) {
+        return "USR-" + staffCode.replaceAll("[^A-Za-z0-9]", "").toUpperCase();
+    }
+
+    private String resolveBaseUserName(StaffRequestDTO dto) {
+        if (StringUtils.hasText(dto.getUserName())) {
+            return sanitizeUserName(dto.getUserName());
+        }
+        if (StringUtils.hasText(dto.getEmail()) && dto.getEmail().contains("@")) {
+            return sanitizeUserName(dto.getEmail().substring(0, dto.getEmail().indexOf('@')));
+        }
+        return sanitizeUserName(dto.getFirstName() + "." + dto.getLastName());
+    }
+
+    private String resolveUniqueUserName(String requested, Long currentUserId) {
+        String base = sanitizeUserName(requested);
+        String candidate = base;
+        int suffix = 1;
+        while (userRepository.findByUserName(candidate)
+                .filter(user -> currentUserId == null || !user.getId().equals(currentUserId))
+                .isPresent()) {
+            candidate = base + suffix;
+            suffix++;
+        }
+        return candidate;
+    }
+
+    private String sanitizeUserName(String value) {
+        String cleaned = value == null ? "staff" : value.trim().toLowerCase().replaceAll("[^a-z0-9._-]", ".");
+        cleaned = cleaned.replaceAll("\\.+", ".").replaceAll("^\\.|\\.$", "");
+        return StringUtils.hasText(cleaned) ? cleaned : "staff";
     }
 
     private StaffResponseDTO toResponse(Staff staff) {

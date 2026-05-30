@@ -1,6 +1,8 @@
 package com.thinkerscave.common.payroll.repository;
 
 import com.thinkerscave.common.payroll.domain.StaffPayroll;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -17,6 +19,8 @@ import java.util.Optional;
 public interface PayrollRepository extends JpaRepository<StaffPayroll, Long> {
 
     List<StaffPayroll> findByOrganizationId(Long organizationId);
+
+    Page<StaffPayroll> findByOrganizationId(Long organizationId, Pageable pageable);
 
     Optional<StaffPayroll> findByOrganizationIdAndStaffId(Long organizationId, Long staffId);
 }

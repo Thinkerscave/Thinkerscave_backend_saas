@@ -1,5 +1,7 @@
 package com.thinkerscave.common.staff.service.impl;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 import com.thinkerscave.common.context.OrganizationContext;
 import com.thinkerscave.common.staff.domain.Department;
@@ -22,6 +24,7 @@ public class DepartmentServiceImpl implements DepartmentService {
     private final DepartmentRepository departmentRepository;
 
     @Override
+    @Cacheable(value = "departments")
     public Map<String, Object> getAllActiveDepartment() {
         Map<String, Object> data = new HashMap<>();
         try {
@@ -46,6 +49,8 @@ public class DepartmentServiceImpl implements DepartmentService {
     }
 
     @Override
+    @Transactional
+    @CacheEvict(value = "departments", allEntries = true)
     public Map<String, Object> saveOrUpdate(Department department) {
         Map<String, Object> data = new HashMap<>();
         try {

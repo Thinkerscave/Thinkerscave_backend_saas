@@ -6,6 +6,8 @@ import com.thinkerscave.common.student.service.StudentService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -56,6 +58,13 @@ public class StudentController {
     public ResponseEntity<ApiResponse<List<com.thinkerscave.common.student.dto.StudentResponseDTO>>> getAllStudents() {
         log.info("Received request to get all students");
         return ResponseEntity.ok(ApiResponse.success(studentService.getAllStudents()));
+    }
+
+    @io.swagger.v3.oas.annotations.Operation(summary = "Get students (paginated)")
+    @GetMapping("/paged")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF')")
+    public ResponseEntity<ApiResponse<Page<StudentResponseDTO>>> getAllStudentsPaged(Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(studentService.getAllStudents(pageable)));
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Get a student by ID")

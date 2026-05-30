@@ -61,7 +61,7 @@ public class SyllabusServiceTest {
         syllabus.setSyllabusId(1L);
         syllabus.setSubject(subject);
         syllabus.setStatus(SyllabusStatus.DRAFT);
-        syllabus.setVersion("1.0");
+        syllabus.setSyllabusVersion("1.0");
     }
 
     @Test

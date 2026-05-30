@@ -35,9 +35,9 @@ CREATE TABLE IF NOT EXISTS tenant_config (
 -- ============================================
 -- 1. ORGANISATION
 -- ============================================
-INSERT INTO organisation (org_id, org_code, org_name, brand_name, org_url, type, city, state, country, zip_code, email, phone_number, website, establishment_date, subscription_type, registration_number, affiliation, tenant_schema, description) VALUES
-(1, 'ORG001', 'ThinkersCave Academy', 'ThinkersCave', '/app', 'SCHOOL', 'Bangalore', 'Karnataka', 'India', '560001', 'admin@thinkerscave.com', '9876543210', 'https://thinkerscave.com', '2020-06-15', 'PREMIUM', 'REG-2020-BLR-001', 'CBSE', 'public', 'Premier educational institution'),
-(2, 'ORG002', 'ThinkersCave Engineering College', 'TC Engineering', '/app', 'COLLEGE', 'Mumbai', 'Maharashtra', 'India', '400001', 'engineering@thinkerscave.com', '9876543211', 'https://engineering.thinkerscave.com', '2018-08-01', 'ENTERPRISE', 'REG-2018-MUM-002', 'AICTE', 'public', 'Engineering college');
+INSERT INTO organisation (org_id, org_code, org_name, brand_name, org_url, type, city, state, country, zip_code, email, phone_number, website, establishment_date, subscription_type, registration_number, affiliation, tenant_schema, description, is_active, is_group) VALUES
+(1, 'ORG001', 'ThinkersCave Academy', 'ThinkersCave', '/app', 'SCHOOL', 'Bangalore', 'Karnataka', 'India', '560001', 'admin@thinkerscave.com', '9876543210', 'https://thinkerscave.com', '2020-06-15', 'PREMIUM', 'REG-2020-BLR-001', 'CBSE', 'public', 'Premier educational institution', TRUE, FALSE),
+(2, 'ORG002', 'ThinkersCave Engineering College', 'TC Engineering', '/app', 'COLLEGE', 'Mumbai', 'Maharashtra', 'India', '400001', 'engineering@thinkerscave.com', '9876543211', 'https://engineering.thinkerscave.com', '2018-08-01', 'ENTERPRISE', 'REG-2018-MUM-002', 'AICTE', 'public', 'Engineering college', TRUE, FALSE);
 
 -- ============================================
 -- 2. ROLES
@@ -50,7 +50,10 @@ INSERT INTO role_master (role_id, role_name, role_code, description, is_active, 
 (5, 'Parent', 'PARENT', 'Parent/Guardian access', TRUE, 'SCHOOL', 1),
 (6, 'Counsellor', 'COUNSELLOR', 'Admission counsellor', TRUE, 'SCHOOL', 1),
 (7, 'Accountant', 'ACCOUNTANT', 'Finance team', TRUE, 'SCHOOL', 1),
-(8, 'IT Support', 'IT_SUPPORT', 'Technical support', TRUE, 'ADMIN', 1);
+(8, 'IT Support', 'IT_SUPPORT', 'Technical support', TRUE, 'ADMIN', 1),
+(9, 'Principal', 'PRINCIPAL', 'Academic and school leadership', TRUE, 'SCHOOL', 1),
+(10, 'HR Manager', 'HR_MANAGER', 'Staff operations and leave approvals', TRUE, 'SCHOOL', 1),
+(11, 'Receptionist', 'RECEPTIONIST', 'Front office and parent support', TRUE, 'SCHOOL', 1);
 
 -- ============================================
 -- 3. USERS (Password: Password@123)
@@ -121,12 +124,12 @@ INSERT INTO privilege_master (privilege_id, privilege_name) VALUES
 INSERT INTO menu_master (menu_id, menu_code, name, description, url, icon, menu_order, is_active) VALUES
 (1, 'MENU_DASHBOARD', 'Dashboard', 'Main dashboard', '/app', 'pi pi-home', 1, TRUE),
 (2, 'MENU_STUDENT', 'Student Management', 'Manage students', '/app/managestudent', 'pi pi-users', 2, TRUE),
-(3, 'MENU_STAFF', 'Staff Management', 'Manage staff', '/app/staff', 'pi pi-id-card', 3, TRUE),
+(3, 'MENU_STAFF', 'Staff Management', 'Manage staff', '/app/staff/dashboard', 'pi pi-id-card', 3, TRUE),
 (4, 'MENU_ACADEMICS', 'Academics', 'Academic management', '/app/academics', 'pi pi-book', 4, TRUE),
-(5, 'MENU_ATTENDANCE', 'Attendance', 'Attendance tracking', '/app/attendance', 'pi pi-calendar', 5, TRUE),
+(5, 'MENU_ATTENDANCE', 'Attendance', 'Attendance tracking', '/app/attendance/dashboard', 'pi pi-calendar', 5, TRUE),
 (6, 'MENU_INQUIRY', 'Inquiry & Admissions', 'Inquiry management', '/app/inquiry', 'pi pi-phone', 6, TRUE),
 (7, 'MENU_FEES', 'Fee Management', 'Fee and payments', '/app/fees', 'pi pi-wallet', 7, TRUE),
-(8, 'MENU_ADMIN', 'Administration', 'System admin', '/app/admin', 'pi pi-cog', 8, TRUE),
+(8, 'MENU_ADMIN', 'Administration', 'ERP control tower', '/app/admin/dashboard', 'pi pi-shield', 8, TRUE),
 (9, 'MENU_REPORTS', 'Reports', 'Reports and analytics', '/app/reports', 'pi pi-chart-bar', 9, TRUE);
 
 -- ============================================
@@ -134,30 +137,29 @@ INSERT INTO menu_master (menu_id, menu_code, name, description, url, icon, menu_
 -- ============================================
 INSERT INTO sub_menu_master (sub_menu_id, sub_menu_name, sub_menu_code, sub_menu_description, sub_menu_url, sub_menu_icon, sub_menu_order, is_active, menu_id) VALUES
 (1, 'Overview', 'DASHBOARD_OVERVIEW', 'Dashboard overview', '/app', 'pi pi-home', 1, TRUE, 1),
-(2, 'Manage Students', 'STUDENT_MANAGE', 'Student CRUD', '/app/managestudent', 'pi pi-users', 1, TRUE, 2),
-(3, 'Manage Class', 'STUDENT_CLASS', 'Class management', '/app/manage-class', 'pi pi-th-large', 2, TRUE, 2),
-(4, 'Manage Section', 'STUDENT_SECTION', 'Section management', '/app/manage-section', 'pi pi-table', 3, TRUE, 2),
-(5, 'Manage Staff', 'STAFF_MANAGE', 'Staff CRUD', '/app/staff', 'pi pi-id-card', 1, TRUE, 3),
-(6, 'Departments', 'STAFF_DEPT', 'Department management', '/app/manage-department', 'pi pi-sitemap', 2, TRUE, 3),
-(7, 'Branches', 'STAFF_BRANCH', 'Branch management', '/app/manage-branch', 'pi pi-building', 3, TRUE, 3),
-(8, 'Salary', 'STAFF_SALARY', 'Payroll management', '/app/salary', 'pi pi-money-bill', 4, TRUE, 3),
-(9, 'Leave', 'STAFF_LEAVE', 'Leave management', '/app/leave', 'pi pi-calendar-minus', 5, TRUE, 3),
+(2, 'Student Dashboard', 'STUDENT_DASHBOARD', 'Student lifecycle dashboard', '/app/students/dashboard', 'pi pi-th-large', 1, TRUE, 2),
+(3, 'Student Directory', 'STUDENT_DIRECTORY', 'Search and manage students', '/app/students/directory', 'pi pi-users', 2, TRUE, 2),
+(4, 'Student Profiles', 'STUDENT_PROFILES', '360 degree student profiles', '/app/students/profiles', 'pi pi-id-card', 3, TRUE, 2),
+(5, 'Staff Dashboard', 'STAFF_DASHBOARD', 'Workforce command dashboard', '/app/staff/dashboard', 'pi pi-chart-line', 1, TRUE, 3),
+(6, 'Staff Directory', 'STAFF_DIRECTORY', 'Search, preview and manage staff', '/app/staff/directory', 'pi pi-id-card', 2, TRUE, 3),
+(7, 'Workforce Operations', 'STAFF_OPERATIONS', 'Departments, branches, leave and payroll', '/app/staff/operations', 'pi pi-briefcase', 3, TRUE, 3),
+(8, 'Salary', 'STAFF_SALARY', 'Legacy payroll entry retained inactive for migration safety', '/app/staff/operations', 'pi pi-money-bill', 4, FALSE, 3),
+(9, 'Leave', 'STAFF_LEAVE', 'Legacy leave entry retained inactive for migration safety', '/app/staff/operations', 'pi pi-calendar-minus', 5, FALSE, 3),
 (10, 'Academic Dashboard', 'ACAD_DASHBOARD', 'Academic workspace overview', '/app/academics/dashboard', 'pi pi-chart-line', 1, TRUE, 4),
 (11, 'Academic Years', 'ACAD_YEARS', 'Academic year lifecycle', '/app/academics/years', 'pi pi-calendar-clock', 2, TRUE, 4),
 (12, 'Classes & Sections', 'ACAD_CLASSES_SECTIONS', 'Class and section workspace', '/app/academics/classes', 'pi pi-sitemap', 3, TRUE, 4),
 (13, 'Subjects', 'ACAD_SUBJECTS', 'Subject workspace', '/app/academics/subjects', 'pi pi-book', 4, TRUE, 4),
 (14, 'Curriculum Planner', 'ACAD_CURRICULUM', 'Curriculum planning workspace', '/app/academics/curriculum', 'pi pi-sliders-h', 5, TRUE, 4),
-(15, 'Class Attendance', 'ATT_CLASS', 'Student attendance', '/app/attendance/class', 'pi pi-check-square', 1, TRUE, 5),
-(16, 'Staff Attendance', 'ATT_STAFF', 'Staff attendance', '/app/attendance/staff', 'pi pi-user-edit', 2, TRUE, 5),
-(17, 'Hostel Attendance', 'ATT_HOSTEL', 'Hostel attendance', '/app/attendance/hostel', 'pi pi-building', 3, TRUE, 5),
-(18, 'Manage Inquiry', 'INQ_MANAGE', 'Inquiry CRUD', '/app/inquiry/manage', 'pi pi-phone', 1, TRUE, 6),
-(19, 'Follow-ups', 'INQ_FOLLOWUP', 'Inquiry follow-ups', '/app/inquiry/followup', 'pi pi-reply', 2, TRUE, 6),
-(20, 'Navigation & Access', 'ADMIN_NAV_ACCESS', 'Menu structure, roles, and permissions', '/app/navigation-access', 'pi pi-lock', 1, TRUE, 8),
-(21, 'Organization Management', 'ADMIN_ORG', 'Organization settings', '/app/organization-registration', 'pi pi-building', 2, TRUE, 8),
-(22, 'System Settings', 'ADMIN_SYSTEM_SETTINGS', 'Workspace preferences and system configuration', '/app/system-settings', 'pi pi-sliders-h', 3, TRUE, 8),
-(23, 'Audit & Activity', 'ADMIN_AUDIT_ACTIVITY', 'Administration activity and change history', '/app/audit-activity', 'pi pi-history', 4, TRUE, 8),
-(24, 'Role Management', 'ADMIN_ROLE', 'Legacy role management entry retained inactive for migration safety', '/app/role/manage', 'pi pi-shield', 5, FALSE, 8),
-(25, 'Role Menu Mapping', 'ADMIN_ROLE_MENU_MAPPING', 'Legacy role-menu mapping entry retained inactive for migration safety', '/app/role-menu-mapping', 'pi pi-lock', 6, FALSE, 8);
+(15, 'Attendance Dashboard', 'ATT_DASHBOARD', 'Attendance command dashboard', '/app/attendance/dashboard', 'pi pi-chart-line', 1, TRUE, 5),
+(16, 'Student Attendance', 'ATT_STUDENTS', 'Bulk student roster attendance', '/app/attendance/students', 'pi pi-users', 2, TRUE, 5),
+(17, 'Staff Attendance', 'ATT_STAFF', 'Bulk staff attendance', '/app/attendance/staff', 'pi pi-user-edit', 3, TRUE, 5),
+(18, 'Admissions Dashboard', 'INQ_DASHBOARD', 'Admissions command dashboard', '/app/inquiry/dashboard', 'pi pi-chart-line', 1, TRUE, 6),
+(19, 'Inquiry Pipeline', 'INQ_PIPELINE', 'Stage-based inquiry pipeline', '/app/inquiry/pipeline', 'pi pi-sitemap', 2, TRUE, 6),
+(20, 'Dashboard', 'ADMIN_DASHBOARD', 'Administration control tower overview', '/app/admin/dashboard', 'pi pi-chart-line', 1, TRUE, 8),
+(21, 'Organization Management', 'ADMIN_ORGANIZATIONS', 'Organizations, branches, subscriptions and branding', '/app/admin/organizations', 'pi pi-building', 2, TRUE, 8),
+(22, 'Access & Permissions', 'ADMIN_ACCESS_PERMISSIONS', 'Roles, users and permission governance', '/app/admin/access', 'pi pi-lock', 3, TRUE, 8),
+(23, 'System Monitoring', 'ADMIN_SYSTEM_MONITORING', 'Tenant health, jobs, notifications and diagnostics', '/app/admin/monitoring', 'pi pi-server', 4, TRUE, 8),
+(24, 'Audit Center', 'ADMIN_AUDIT_CENTER', 'Audit logs, security events and administrative activity', '/app/admin/audit', 'pi pi-history', 5, TRUE, 8);
 
 INSERT INTO sub_menu_master (sub_menu_id, sub_menu_name, sub_menu_code, sub_menu_description, sub_menu_url, sub_menu_icon, sub_menu_order, is_active, menu_id) VALUES
 (26, 'Syllabus Delivery', 'ACAD_SYLLABUS', 'Syllabus planning and delivery tracking', '/app/academics/syllabus', 'pi pi-list-check', 6, TRUE, 4),
@@ -167,6 +169,24 @@ INSERT INTO sub_menu_master (sub_menu_id, sub_menu_name, sub_menu_code, sub_menu
 (30, 'Academic Calendar', 'ACAD_CALENDAR', 'Academic calendar events and milestones', '/app/academics/calendar', 'pi pi-calendar', 10, TRUE, 4),
 (31, 'Academic Hierarchy', 'ACAD_HIERARCHY', 'Academic hierarchy and capacity view', '/app/academics/hierarchy', 'pi pi-sitemap', 11, TRUE, 4),
 (32, 'Academic Settings', 'ACAD_SETTINGS', 'Academic operating rules and preferences', '/app/academics/settings', 'pi pi-cog', 12, TRUE, 4);
+
+INSERT INTO sub_menu_master (sub_menu_id, sub_menu_name, sub_menu_code, sub_menu_description, sub_menu_url, sub_menu_icon, sub_menu_order, is_active, menu_id) VALUES
+(33, 'Inquiry Management', 'INQ_MANAGEMENT', 'Guided inquiry capture', '/app/inquiry/management', 'pi pi-user-plus', 3, TRUE, 6),
+(34, 'Follow-Up Center', 'INQ_FOLLOWUP_CENTER', 'Admissions follow-up desk', '/app/inquiry/follow-ups', 'pi pi-phone', 4, TRUE, 6),
+(35, 'Counseling Sessions', 'INQ_COUNSELING', 'Counseling and walk-in sessions', '/app/inquiry/counseling', 'pi pi-comments', 5, TRUE, 6),
+(36, 'Admission Applications', 'INQ_APPLICATIONS', 'Admission application review', '/app/inquiry/applications', 'pi pi-file-edit', 6, TRUE, 6),
+(37, 'Document Collection', 'INQ_DOCUMENTS', 'Admission document readiness', '/app/inquiry/documents', 'pi pi-folder-open', 7, TRUE, 6),
+(38, 'Communication Center', 'INQ_COMMUNICATION', 'Admissions communication timeline', '/app/inquiry/communication', 'pi pi-send', 8, TRUE, 6),
+(39, 'Analytics & Reports', 'INQ_ANALYTICS', 'Admissions analytics and reports', '/app/inquiry/analytics', 'pi pi-chart-bar', 9, TRUE, 6),
+(40, 'Admissions', 'STUDENT_ADMISSIONS', 'Student admission bridge', '/app/students/admissions', 'pi pi-user-plus', 4, TRUE, 2),
+(41, 'Classes', 'STUDENT_CLASSES', 'Class strength workspace', '/app/students/classes', 'pi pi-building', 5, TRUE, 2),
+(42, 'Sections', 'STUDENT_SECTIONS', 'Section allocation workspace', '/app/students/sections', 'pi pi-table', 6, TRUE, 2),
+(43, 'Promotion Center', 'STUDENT_PROMOTION', 'Promotion workflow', '/app/students/promotion', 'pi pi-arrow-up-right', 7, TRUE, 2),
+(44, 'Transfer Center', 'STUDENT_TRANSFER', 'Transfer workflow', '/app/students/transfer', 'pi pi-send', 8, TRUE, 2),
+(45, 'Documents', 'STUDENT_DOCUMENTS', 'Student document vault', '/app/students/documents', 'pi pi-folder', 9, TRUE, 2),
+(46, 'Parent Directory', 'STUDENT_PARENTS', 'Guardian and child links', '/app/students/parents', 'pi pi-address-book', 10, TRUE, 2),
+(47, 'ID Cards', 'STUDENT_ID_CARDS', 'Student ID card previews', '/app/students/id-cards', 'pi pi-qrcode', 11, TRUE, 2),
+(48, 'Alumni', 'STUDENT_ALUMNI', 'Alumni lifecycle records', '/app/students/alumni', 'pi pi-verified', 12, TRUE, 2);
 
 -- ============================================
 -- 11. SUBMENU-PRIVILEGE MAPPING
@@ -182,10 +202,9 @@ INSERT INTO submenu_privilege_mapping (mapping_id, sub_menu_id, privilege_id) VA
 (55,16,1),(56,16,2),(57,16,3),(58,17,1),(59,17,2),(60,17,3),
 (61,18,1),(62,18,2),(63,18,3),(64,18,4),(65,19,1),(66,19,2),(67,19,3),
 (68,20,1),(69,20,2),(70,20,3),(71,20,4),(72,21,1),(73,21,2),(74,21,3),(75,21,4),
-(76,22,1),(77,22,2),(78,22,3),
-(79,23,1),(80,23,2),(81,23,3),(82,23,4),
-(83,24,1),(84,24,2),(85,24,3),(86,24,4),
-(87,25,1),(88,25,2),(89,25,3),(90,25,4);
+(76,22,1),(77,22,2),(78,22,3),(79,22,4),
+(80,23,1),(81,23,2),(82,23,3),(83,23,4),
+(84,24,1),(85,24,2),(86,24,3),(87,24,4);
 
 INSERT INTO submenu_privilege_mapping (mapping_id, sub_menu_id, privilege_id) VALUES
 (91,26,1),(92,26,2),(93,26,3),(94,26,4),
@@ -195,6 +214,10 @@ INSERT INTO submenu_privilege_mapping (mapping_id, sub_menu_id, privilege_id) VA
 (107,30,1),(108,30,2),(109,30,3),(110,30,4),
 (111,31,1),(112,31,2),(113,31,3),(114,31,4),
 (115,32,1),(116,32,2),(117,32,3),(118,32,4);
+
+INSERT INTO submenu_privilege_mapping (mapping_id, sub_menu_id, privilege_id) VALUES
+(119,33,1),(120,34,1),(121,35,1),(122,36,1),(123,37,1),(124,38,1),(125,39,1),
+(126,40,1),(127,41,1),(128,42,1),(129,43,1),(130,44,1),(131,45,1),(132,46,1),(133,47,1),(134,48,1);
 
 -- ============================================
 -- 12. ROLE-SUBMENU-PRIVILEGE MAPPING
@@ -212,7 +235,7 @@ INSERT INTO role_submenu_privilege_mapping (mapping_id, role_id, sub_menu_id, pr
 (52,1,15,1),(53,1,15,2),(54,1,15,3),(55,1,16,1),(56,1,16,2),(57,1,16,3),
 (58,1,17,1),(59,1,17,2),(60,1,17,3),(61,1,18,1),(62,1,18,2),(63,1,18,3),(64,1,18,4),
 (65,1,19,1),(66,1,19,2),(67,1,19,3),(68,1,20,1),(69,1,20,2),(70,1,20,3),(71,1,20,4),
-(72,1,21,1),(73,1,21,2),(74,1,21,3),(75,1,21,4),(76,1,22,1),(77,1,22,2),(78,1,22,3),
+(72,1,21,1),(73,1,21,2),(74,1,21,3),(75,1,21,4),(76,1,22,1),(77,1,22,2),(78,1,22,3),(110,1,22,4),
 -- ADMIN
 (79,2,1,1),(80,2,2,1),(81,2,2,2),(82,2,2,3),(83,2,2,4),
 (84,2,3,1),(85,2,3,2),(86,2,3,3),(87,2,5,1),(88,2,5,2),(89,2,5,3),(90,2,5,4),
@@ -221,11 +244,10 @@ INSERT INTO role_submenu_privilege_mapping (mapping_id, role_id, sub_menu_id, pr
 -- TEACHER
 (103,3,1,1),(104,3,10,1),(105,3,11,1),(106,3,12,1),(107,3,15,1),(108,3,15,2),(109,3,2,1),
 -- SUPER_ADMIN: menu administration pages
-(110,1,23,1),(111,1,23,2),(112,1,23,3),(113,1,23,4),
-(114,1,24,1),(115,1,24,2),(116,1,24,3),(117,1,24,4),
-(118,1,25,1),(119,1,25,2),(120,1,25,3),(121,1,25,4),
+(111,1,23,1),(112,1,23,2),(113,1,23,3),(114,1,23,4),
+(115,1,24,1),(116,1,24,2),(117,1,24,3),(118,1,24,4),
 -- ADMIN: simplified administration pages
-(122,2,20,1),(123,2,20,3),(124,2,22,1),(125,2,22,3),(126,2,23,1),(127,2,23,3);
+(122,2,20,1),(123,2,21,1),(124,2,22,1),(125,2,22,3),(126,2,23,1),(127,2,24,1);
 
 INSERT INTO role_submenu_privilege_mapping (mapping_id, role_id, sub_menu_id, privilege_id) VALUES
 -- SUPER_ADMIN: complete academic workspace
@@ -247,6 +269,18 @@ INSERT INTO role_submenu_privilege_mapping (mapping_id, role_id, sub_menu_id, pr
 -- TEACHER: academic workspace visibility
 (177,3,26,1),(178,3,27,1),(179,3,28,1),(180,3,29,1),(181,3,30,1),(182,3,31,1);
 
+INSERT INTO role_submenu_privilege_mapping (mapping_id, role_id, sub_menu_id, privilege_id) VALUES
+-- SUPER_ADMIN: inquiry/admissions and student workspace visibility
+(183,1,33,1),(184,1,34,1),(185,1,35,1),(186,1,36,1),(187,1,37,1),(188,1,38,1),(189,1,39,1),
+(190,1,40,1),(191,1,41,1),(192,1,42,1),(193,1,43,1),(194,1,44,1),(195,1,45,1),(196,1,46,1),(197,1,47,1),(198,1,48,1),
+-- ADMIN: operate redesigned admissions and student modules
+(199,2,19,1),(200,2,33,1),(201,2,34,1),(202,2,35,1),(203,2,36,1),(204,2,37,1),(205,2,38,1),(206,2,39,1),
+(207,2,40,1),(208,2,41,1),(209,2,42,1),(210,2,43,1),(211,2,44,1),(212,2,45,1),(213,2,46,1),(214,2,47,1),(215,2,48,1),
+-- COUNSELLOR: admissions workspace visibility
+(216,6,18,1),(217,6,19,1),(218,6,33,1),(219,6,34,1),(220,6,35,1),(221,6,36,1),(222,6,37,1),(223,6,38,1),(224,6,39,1),
+-- TEACHER: student workspace visibility
+(225,3,3,1),(226,3,4,1),(227,3,40,1),(228,3,41,1),(229,3,42,1),(230,3,43,1),(231,3,45,1),(232,3,46,1),(233,3,47,1),(234,3,48,1);
+
 -- ============================================
 -- 13. DEPARTMENTS
 -- ============================================
@@ -255,61 +289,89 @@ INSERT INTO department (department_id, department_name, description, department_
 (2, 'Science', 'Science and Laboratory Department', 'DEPT-SCI', TRUE, 1),
 (3, 'English', 'English Language and Literature', 'DEPT-ENG', TRUE, 1),
 (4, 'Computer Science', 'Computer Science and IT', 'DEPT-CS', TRUE, 1),
-(5, 'Administration', 'Administrative Department', 'DEPT-ADMIN', TRUE, 1);
+(5, 'Administration', 'Administrative Department', 'DEPT-ADMIN', TRUE, 1),
+(6, 'Finance', 'Payroll, fee operations and vendor control', 'DEPT-FIN', TRUE, 1),
+(7, 'Student Services', 'Front office, parent support and student helpdesk', 'DEPT-SS', TRUE, 1),
+(8, 'Sports', 'Sports coaching and co-curricular operations', 'DEPT-SPORTS', TRUE, 1);
 
 -- ============================================
 -- 14. BRANCHES
 -- ============================================
 INSERT INTO branch (branch_id, branch_name, location, branch_code, is_active, organization_id) VALUES
 (1, 'Main Campus', 'Bangalore, MG Road', 'BR-MAIN', TRUE, 1),
-(2, 'Whitefield Campus', 'Bangalore, Whitefield', 'BR-WF', TRUE, 1);
+(2, 'Whitefield Campus', 'Bangalore, Whitefield', 'BR-WF', TRUE, 1),
+(3, 'Electronic City Campus', 'Bangalore, Electronic City', 'BR-EC', TRUE, 1);
 
 -- ============================================
 -- 14A. ADDITIONAL ACADEMIC STAFF USERS
 -- ============================================
 INSERT INTO users (id, user_code, first_name, middle_name, last_name, email, mobile_number, user_name, password, address, city, state, country, zip_code, gender, is_blocked, is_2fa_enabled, attempts, is_first_time_login, is_email_verified, is_mobile_verified, date_of_birth, last_login_date) VALUES
 (11, 'USR011', 'Nisha', NULL, 'Iyer', 'nisha.iyer@thinkerscave.com', 9876543222, 'teacher3', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '18 Basavanagudi', 'Bangalore', 'Karnataka', 'India', '560004', 'Female', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1993-02-14', '2026-05-20'),
-(12, 'USR012', 'Farhan', NULL, 'Khan', 'farhan.khan@thinkerscave.com', 9876543223, 'teacher4', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '91 Richmond Town', 'Bangalore', 'Karnataka', 'India', '560025', 'Male', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1987-09-21', '2026-05-20');
+(12, 'USR012', 'Farhan', NULL, 'Khan', 'farhan.khan@thinkerscave.com', 9876543223, 'teacher4', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '91 Richmond Town', 'Bangalore', 'Karnataka', 'India', '560025', 'Male', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1987-09-21', '2026-05-20'),
+(13, 'USR013', 'Neel', NULL, 'George', 'neel.george@thinkerscave.com', 9876543224, 'opslead1', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '44 Indiranagar', 'Bangalore', 'Karnataka', 'India', '560038', 'Male', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1986-12-02', '2026-05-20'),
+(14, 'USR014', 'Pooja', NULL, 'Sethi', 'pooja.sethi@thinkerscave.com', 9876543225, 'frontoffice1', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '71 HSR Layout', 'Bangalore', 'Karnataka', 'India', '560102', 'Female', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1994-06-11', '2026-05-20'),
+(15, 'USR015', 'Raghav', NULL, 'Rao', 'raghav.rao@thinkerscave.com', 9876543226, 'sports1', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '16 JP Nagar', 'Bangalore', 'Karnataka', 'India', '560078', 'Male', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1989-01-18', '2026-05-20'),
+(16, 'USR016', 'Asha', NULL, 'Nair', 'asha.nair@thinkerscave.com', 9876543227, 'labadmin1', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '23 Bellandur', 'Bangalore', 'Karnataka', 'India', '560103', 'Female', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1991-03-25', '2026-05-20'),
+(17, 'USR017', 'Megha', NULL, 'Kapoor', 'megha.kapoor@thinkerscave.com', 9876543228, 'principal1', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '10 Indiranagar', 'Bangalore', 'Karnataka', 'India', '560038', 'Female', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1981-08-19', '2026-05-20'),
+(18, 'USR018', 'Arvind', NULL, 'Iyer', 'arvind.iyer@thinkerscave.com', 9876543229, 'hrmanager1', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '52 Jayanagar', 'Bangalore', 'Karnataka', 'India', '560041', 'Male', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1984-02-07', '2026-05-20'),
+(19, 'USR019', 'Leena', NULL, 'D Souza', 'leena.dsouza@thinkerscave.com', 9876543230, 'reception1', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '8 HSR Layout', 'Bangalore', 'Karnataka', 'India', '560102', 'Female', FALSE, FALSE, 0, FALSE, TRUE, TRUE, '1995-04-18', '2026-05-20');
 
 INSERT INTO user_roles (user_id, role_id) VALUES
-(11, 3), (12, 3);
+(11, 3), (12, 3), (13, 2), (14, 2), (15, 3), (16, 3), (17, 9), (18, 10), (19, 11);
 
 INSERT INTO organization_users (id, organization_id, user_id, role_name, is_active, joined_at, updated_at) VALUES
 (11, 1, 11, 'TEACHER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(12, 1, 12, 'TEACHER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+(12, 1, 12, 'TEACHER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(13, 1, 13, 'ADMIN', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(14, 1, 14, 'ADMIN', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(15, 1, 15, 'TEACHER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(16, 1, 16, 'TEACHER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(17, 1, 17, 'PRINCIPAL', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(18, 1, 18, 'HR_MANAGER', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(19, 1, 19, 'RECEPTIONIST', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 INSERT INTO user_tenant_mapping (email, username, tenant_id, is_active) VALUES
 ('nisha.iyer@thinkerscave.com', 'teacher3', 'public', TRUE),
-('farhan.khan@thinkerscave.com', 'teacher4', 'public', TRUE);
+('farhan.khan@thinkerscave.com', 'teacher4', 'public', TRUE),
+('neel.george@thinkerscave.com', 'opslead1', 'public', TRUE),
+('pooja.sethi@thinkerscave.com', 'frontoffice1', 'public', TRUE),
+('raghav.rao@thinkerscave.com', 'sports1', 'public', TRUE),
+('asha.nair@thinkerscave.com', 'labadmin1', 'public', TRUE),
+('megha.kapoor@thinkerscave.com', 'principal1', 'public', TRUE),
+('arvind.iyer@thinkerscave.com', 'hrmanager1', 'public', TRUE),
+('leena.dsouza@thinkerscave.com', 'reception1', 'public', TRUE);
 
 -- ============================================
 -- 15. STAFF
 -- ============================================
 INSERT INTO staff (staff_id, staff_code, first_name, middle_name, last_name, email, mobile_number, gender, date_of_birth, hire_date, address, city, state, remarks, is_active, organization_id, user_id, branch_id, department_id) VALUES
 (1, 'STF001', 'Amit', 'K', 'Verma', 'amit.verma@thinkerscave.com', 9876543212, 'Male', '1990-11-10', '2021-06-01', '78 Residency Road', 'Bangalore', 'Karnataka', 'Senior Math Teacher', TRUE, 1, 3, 1, 1),
-(2, 'STF002', 'Sunita', NULL, 'Patel', 'sunita.patel@thinkerscave.com', 9876543213, 'Female', '1992-04-05', '2022-01-15', '22 Brigade Road', 'Bangalore', 'Karnataka', 'Science Teacher', TRUE, 1, 4, 1, 2);
-
-INSERT INTO staff (staff_id, staff_code, first_name, middle_name, last_name, email, mobile_number, gender, date_of_birth, hire_date, address, city, state, remarks, is_active, organization_id, user_id, branch_id, department_id) VALUES
+(2, 'STF002', 'Sunita', NULL, 'Patel', 'sunita.patel@thinkerscave.com', 9876543213, 'Female', '1992-04-05', '2022-01-15', '22 Brigade Road', 'Bangalore', 'Karnataka', 'Science Teacher', TRUE, 1, 4, 1, 2),
 (3, 'STF003', 'Nisha', NULL, 'Iyer', 'nisha.iyer@thinkerscave.com', 9876543222, 'Female', '1993-02-14', '2023-04-10', '18 Basavanagudi', 'Bangalore', 'Karnataka', 'English and Humanities Faculty', TRUE, 1, 11, 1, 3),
-(4, 'STF004', 'Farhan', NULL, 'Khan', 'farhan.khan@thinkerscave.com', 9876543223, 'Male', '1987-09-21', '2020-07-12', '91 Richmond Town', 'Bangalore', 'Karnataka', 'Computer Science and STEM Faculty', TRUE, 1, 12, 1, 4);
+(4, 'STF004', 'Farhan', NULL, 'Khan', 'farhan.khan@thinkerscave.com', 9876543223, 'Male', '1987-09-21', '2020-07-12', '91 Richmond Town', 'Bangalore', 'Karnataka', 'Computer Science and STEM Faculty', TRUE, 1, 12, 1, 4),
+(5, 'STF005', 'Kavitha', NULL, 'Menon', 'kavitha.menon@thinkerscave.com', 9876543219, 'Female', '1989-05-30', '2019-04-01', '67 Jayanagar', 'Bangalore', 'Karnataka', 'Finance and Payroll Officer', TRUE, 1, 10, 1, 6),
+(6, 'STF006', 'Neel', NULL, 'George', 'neel.george@thinkerscave.com', 9876543224, 'Male', '1986-12-02', '2018-07-01', '44 Indiranagar', 'Bangalore', 'Karnataka', 'Campus Operations Lead', TRUE, 1, 13, 2, 5),
+(7, 'STF007', 'Pooja', NULL, 'Sethi', 'pooja.sethi@thinkerscave.com', 9876543225, 'Female', '1994-06-11', '2024-02-12', '71 HSR Layout', 'Bangalore', 'Karnataka', 'Front Office Executive', TRUE, 1, 14, 2, 7),
+(8, 'STF008', 'Raghav', NULL, 'Rao', 'raghav.rao@thinkerscave.com', 9876543226, 'Male', '1989-01-18', '2021-11-08', '16 JP Nagar', 'Bangalore', 'Karnataka', 'Sports Faculty', TRUE, 1, 15, 3, 8),
+(9, 'STF009', 'Asha', NULL, 'Nair', 'asha.nair@thinkerscave.com', 9876543227, 'Female', '1991-03-25', '2020-10-05', '23 Bellandur', 'Bangalore', 'Karnataka', 'Science Lab Coordinator', TRUE, 1, 16, 3, 2);
 
 -- ============================================
 -- 16. CLASSES
 -- ============================================
-INSERT INTO "CLASS" (class_id, class_name, organization_id) VALUES
-(1, 'Class 8', 1), (2, 'Class 9', 1), (3, 'Class 10', 1),
-(4, 'Class 11 - Science', 1), (5, 'Class 11 - Commerce', 1),
-(6, 'Class 12 - Science', 1), (7, 'Class 12 - Commerce', 1);
+INSERT INTO "CLASS" (class_id, class_name, organization_id, is_active) VALUES
+(1, 'Class 8', 1, TRUE), (2, 'Class 9', 1, TRUE), (3, 'Class 10', 1, TRUE),
+(4, 'Class 11 - Science', 1, TRUE), (5, 'Class 11 - Commerce', 1, TRUE),
+(6, 'Class 12 - Science', 1, TRUE), (7, 'Class 12 - Commerce', 1, TRUE);
 
 -- ============================================
 -- 17. SECTIONS
 -- ============================================
-INSERT INTO section (section_id, section_name, class_entity_class_id) VALUES
-(1, 'Section A', 1), (2, 'Section B', 1),
-(3, 'Section A', 2), (4, 'Section B', 2),
-(5, 'Section A', 3), (6, 'Section B', 3),
-(7, 'Section A', 4), (8, 'Section A', 5),
-(9, 'Section A', 6), (10, 'Section A', 7);
+INSERT INTO section (section_id, section_name, class_entity_class_id, organization_id, is_active) VALUES
+(1, 'Section A', 1, 1, TRUE), (2, 'Section B', 1, 1, TRUE),
+(3, 'Section A', 2, 1, TRUE), (4, 'Section B', 2, 1, TRUE),
+(5, 'Section A', 3, 1, TRUE), (6, 'Section B', 3, 1, TRUE),
+(7, 'Section A', 4, 1, TRUE), (8, 'Section A', 5, 1, TRUE),
+(9, 'Section A', 6, 1, TRUE), (10, 'Section A', 7, 1, TRUE);
 
 -- ============================================
 -- 18. GUARDIANS (has own created_at/updated_at, NOT Auditable)
@@ -317,7 +379,16 @@ INSERT INTO section (section_id, section_name, class_entity_class_id) VALUES
 INSERT INTO guardian (guardian_id, first_name, middle_name, last_name, relation, email, mobile_number, address, created_at, updated_at) VALUES
 (1, 'Meera', NULL, 'Nair', 'Mother', 'meera.nair@thinkerscave.com', 9876543217, '56 Koramangala, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
 (2, 'Suresh', NULL, 'Reddy', 'Father', 'suresh.reddy@gmail.com', 9876543220, '34 Whitefield, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(3, 'Arun', NULL, 'Malhotra', 'Father', 'arun.malhotra@gmail.com', 9876543221, '89 Indiranagar, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+(3, 'Arun', NULL, 'Malhotra', 'Father', 'arun.malhotra@gmail.com', 9876543221, '89 Indiranagar, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(4, 'Pooja', NULL, 'Shah', 'Mother', 'pooja.shah@gmail.com', 9876543301, '14 JP Nagar, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(5, 'Sandeep', NULL, 'Bose', 'Father', 'sandeep.bose@gmail.com', 9876543302, '21 Malleshwaram, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(6, 'Latha', NULL, 'Krishnan', 'Mother', 'latha.krishnan@gmail.com', 9876543303, '7 Hebbal, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(7, 'Harish', NULL, 'Varma', 'Father', 'harish.varma@gmail.com', 9876543304, '35 Banashankari, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(8, 'Ritu', NULL, 'Agarwal', 'Mother', 'ritu.agarwal@gmail.com', 9876543305, '5 Bellandur, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(9, 'Naveen', NULL, 'Rao', 'Father', 'naveen.rao@gmail.com', 9876543306, '74 Yelahanka, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(10, 'Anita', NULL, 'Desai', 'Mother', 'anita.desai@gmail.com', 9876543307, '9 Sarjapur Road, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(11, 'Raghav', NULL, 'Menon', 'Father', 'raghav.menon@gmail.com', 9876543308, '62 Marathahalli, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(12, 'Neha', NULL, 'Kulkarni', 'Mother', 'neha.kulkarni@gmail.com', 9876543309, '18 Electronic City, Bangalore', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- ============================================
 -- 19. ADDRESSES (for students)
@@ -328,7 +399,25 @@ INSERT INTO address (id, country, state, city, zip_code, address_line) VALUES
 (3, 'India', 'Karnataka', 'Bangalore', '560066', '34 Whitefield Main Road'),
 (4, 'India', 'Karnataka', 'Bangalore', '560066', '34 Whitefield Main Road'),
 (5, 'India', 'Karnataka', 'Bangalore', '560038', '89 Indiranagar, 3rd Stage'),
-(6, 'India', 'Karnataka', 'Bangalore', '560038', '89 Indiranagar, 3rd Stage');
+(6, 'India', 'Karnataka', 'Bangalore', '560038', '89 Indiranagar, 3rd Stage'),
+(7, 'India', 'Karnataka', 'Bangalore', '560078', '14 JP Nagar 5th Phase'),
+(8, 'India', 'Karnataka', 'Bangalore', '560078', '14 JP Nagar 5th Phase'),
+(9, 'India', 'Karnataka', 'Bangalore', '560003', '21 Malleshwaram 8th Cross'),
+(10, 'India', 'Karnataka', 'Bangalore', '560003', '21 Malleshwaram 8th Cross'),
+(11, 'India', 'Karnataka', 'Bangalore', '560024', '7 Hebbal Kempapura'),
+(12, 'India', 'Karnataka', 'Bangalore', '560024', '7 Hebbal Kempapura'),
+(13, 'India', 'Karnataka', 'Bangalore', '560085', '35 Banashankari 2nd Stage'),
+(14, 'India', 'Karnataka', 'Bangalore', '560085', '35 Banashankari 2nd Stage'),
+(15, 'India', 'Karnataka', 'Bangalore', '560103', '5 Bellandur Outer Ring Road'),
+(16, 'India', 'Karnataka', 'Bangalore', '560103', '5 Bellandur Outer Ring Road'),
+(17, 'India', 'Karnataka', 'Bangalore', '560064', '74 Yelahanka New Town'),
+(18, 'India', 'Karnataka', 'Bangalore', '560064', '74 Yelahanka New Town'),
+(19, 'India', 'Karnataka', 'Bangalore', '562125', '9 Sarjapur Road'),
+(20, 'India', 'Karnataka', 'Bangalore', '562125', '9 Sarjapur Road'),
+(21, 'India', 'Karnataka', 'Bangalore', '560037', '62 Marathahalli'),
+(22, 'India', 'Karnataka', 'Bangalore', '560037', '62 Marathahalli'),
+(23, 'India', 'Karnataka', 'Bangalore', '560100', '18 Electronic City Phase 1'),
+(24, 'India', 'Karnataka', 'Bangalore', '560100', '18 Electronic City Phase 1');
 
 -- ============================================
 -- 20. STUDENTS
@@ -336,7 +425,31 @@ INSERT INTO address (id, country, state, city, zip_code, address_line) VALUES
 INSERT INTO student (student_id, first_name, last_name, email, mobile_number, gender, age, is_same_address, date_of_birth, enrollment_date, roll_number, remarks, is_active, organization_id, current_address_id, permanent_address_id, class_id, section_id, user_id, guardian_id) VALUES
 (1, 'Rahul', 'Singh', 'rahul.singh@thinkerscave.com', 9876543214, 'Male', 17, TRUE, '2008-09-12', '2024-06-15', 'TC-2024-001', 'Good at math', TRUE, 1, 1, 2, 3, 5, 5, 1),
 (2, 'Ananya', 'Reddy', 'ananya.reddy@thinkerscave.com', 9876543215, 'Female', 16, FALSE, '2009-01-25', '2024-06-16', 'TC-2024-002', 'Science enthusiast', TRUE, 1, 3, 4, 2, 3, 6, 2),
-(3, 'Vikram', 'Malhotra', 'vikram.malhotra@thinkerscave.com', 9876543216, 'Male', 17, NULL, '2008-06-18', '2024-06-17', 'TC-2024-003', 'Sports captain', TRUE, 1, 5, 6, 3, 5, 7, 3);
+(3, 'Vikram', 'Malhotra', 'vikram.malhotra@thinkerscave.com', 9876543216, 'Male', 17, NULL, '2008-06-18', '2024-06-17', 'TC-2024-003', 'Sports captain', TRUE, 1, 5, 6, 3, 5, 7, 3),
+(4, 'Ishaan', 'Shah', 'ishaan.shah@student.thinkerscave.com', 9988800001, 'Male', 13, TRUE, '2012-04-10', '2025-04-05', 'TC-2025-004', 'Robotics club member', TRUE, 1, 7, 8, 1, 1, NULL, 4),
+(5, 'Maya', 'Bose', 'maya.bose@student.thinkerscave.com', 9988800002, 'Female', 14, TRUE, '2011-11-21', '2025-04-05', 'TC-2025-005', 'Strong language skills', TRUE, 1, 9, 10, 1, 2, NULL, 5),
+(6, 'Aditya', 'Krishnan', 'aditya.krishnan@student.thinkerscave.com', 9988800003, 'Male', 15, TRUE, '2010-02-18', '2025-04-06', 'TC-2025-006', 'Needs attendance monitoring', TRUE, 1, 11, 12, 2, 4, NULL, 6),
+(7, 'Tara', 'Varma', 'tara.varma@student.thinkerscave.com', 9988800004, 'Female', 15, TRUE, '2010-07-07', '2025-04-06', 'TC-2025-007', 'Prefers visual learning', TRUE, 1, 13, 14, 3, 6, NULL, 7),
+(8, 'Kabir', 'Agarwal', 'kabir.agarwal@student.thinkerscave.com', 9988800005, 'Male', 16, TRUE, '2009-03-29', '2025-04-07', 'TC-2025-008', 'Commerce stream applicant converted', TRUE, 1, 15, 16, 5, 8, NULL, 8),
+(9, 'Sara', 'Rao', 'sara.rao@student.thinkerscave.com', 9988800006, 'Female', 17, TRUE, '2008-12-12', '2025-04-07', 'TC-2025-009', 'Board exam mentoring enabled', TRUE, 1, 17, 18, 6, 9, NULL, 9),
+(10, 'Neil', 'Desai', 'neil.desai@student.thinkerscave.com', 9988800007, 'Male', 17, TRUE, '2008-08-03', '2025-04-08', 'TC-2025-010', 'Final year commerce cohort', TRUE, 1, 19, 20, 7, 10, NULL, 10),
+(11, 'Diya', 'Menon', 'diya.menon@student.thinkerscave.com', 9988800008, 'Female', 16, TRUE, '2009-10-15', '2025-04-08', 'TC-2025-011', 'Scholarship review pending', TRUE, 1, 21, 22, 4, 7, NULL, 11),
+(12, 'Rhea', 'Kulkarni', 'rhea.kulkarni@student.thinkerscave.com', 9988800009, 'Female', 14, TRUE, '2011-05-20', '2025-04-09', 'TC-2025-012', 'New campus transfer', TRUE, 1, 23, 24, 2, 3, NULL, 12);
+
+INSERT INTO student_document (document_id, document_name, document_type, document_path, student_id, organization_id) VALUES
+(1, 'rahul_birth_certificate.pdf', 'Birth Certificate', 'uploads/dev/students/1/rahul_birth_certificate.pdf', 1, 1),
+(2, 'rahul_previous_marksheet.pdf', 'Previous Marksheet', 'uploads/dev/students/1/rahul_previous_marksheet.pdf', 1, 1),
+(3, 'ananya_birth_certificate.pdf', 'Birth Certificate', 'uploads/dev/students/2/ananya_birth_certificate.pdf', 2, 1),
+(4, 'vikram_transfer_certificate.pdf', 'Transfer Certificate', 'uploads/dev/students/3/vikram_transfer_certificate.pdf', 3, 1),
+(5, 'ishaan_address_proof.pdf', 'Address Proof', 'uploads/dev/students/4/ishaan_address_proof.pdf', 4, 1),
+(6, 'maya_photo.jpg', 'Photo', 'uploads/dev/students/5/maya_photo.jpg', 5, 1),
+(7, 'aditya_previous_marksheet.pdf', 'Previous Marksheet', 'uploads/dev/students/6/aditya_previous_marksheet.pdf', 6, 1),
+(8, 'tara_birth_certificate.pdf', 'Birth Certificate', 'uploads/dev/students/7/tara_birth_certificate.pdf', 7, 1),
+(9, 'kabir_transfer_certificate.pdf', 'Transfer Certificate', 'uploads/dev/students/8/kabir_transfer_certificate.pdf', 8, 1),
+(10, 'sara_board_registration.pdf', 'Board Registration', 'uploads/dev/students/9/sara_board_registration.pdf', 9, 1),
+(11, 'neil_parent_id.pdf', 'Parent ID Proof', 'uploads/dev/students/10/neil_parent_id.pdf', 10, 1),
+(12, 'diya_scholarship_form.pdf', 'Scholarship Form', 'uploads/dev/students/11/diya_scholarship_form.pdf', 11, 1),
+(13, 'rhea_transfer_certificate.pdf', 'Transfer Certificate', 'uploads/dev/students/12/rhea_transfer_certificate.pdf', 12, 1);
 
 -- ============================================
 -- 21. COURSES
@@ -464,12 +577,12 @@ INSERT INTO academic_setting (setting_id, organization_id, setting_key, setting_
 -- ============================================
 -- 26. SYLLABUS
 -- ============================================
-INSERT INTO syllabus (syllabus_id, syllabus_code, title, description, total_hours, version, status, is_active, subject_id, academic_year_id, organization_id) VALUES
+INSERT INTO syllabus (syllabus_id, syllabus_code, title, description, total_hours, syllabus_version, status, is_active, subject_id, academic_year_id, organization_id) VALUES
 (1, 'SYL-MATH-10-2025', 'Mathematics Class 10', 'Complete CBSE Math syllabus', 180, '1.0', 'PUBLISHED', TRUE, 1, 1, 1),
 (2, 'SYL-SCI-10-2025', 'Science Class 10', 'Complete CBSE Science syllabus', 200, '1.0', 'PUBLISHED', TRUE, 2, 1, 1),
 (3, 'SYL-ENG-10-2025', 'English Class 10', 'CBSE English syllabus', 160, '1.0', 'APPROVED', TRUE, 3, 1, 1);
 
-INSERT INTO syllabus (syllabus_id, syllabus_code, title, description, total_hours, version, status, is_active, subject_id, academic_year_id, organization_id) VALUES
+INSERT INTO syllabus (syllabus_id, syllabus_code, title, description, total_hours, syllabus_version, status, is_active, subject_id, academic_year_id, organization_id) VALUES
 (4, 'SYL-SST-10-2025', 'Social Science Class 10', 'Integrated history, civics, geography and economics plan', 150, '1.0', 'PUBLISHED', TRUE, 4, 1, 1),
 (5, 'SYL-HIN-10-2025', 'Hindi Class 10', 'Hindi language and literature delivery plan', 140, '1.0', 'APPROVED', TRUE, 5, 1, 1),
 (6, 'SYL-CS-10-2025', 'Computer Science Class 10', 'Programming fundamentals and digital literacy plan', 120, '1.0', 'PUBLISHED', TRUE, 6, 1, 1),
@@ -527,50 +640,137 @@ INSERT INTO topics (topic_id, topic_name, topic_number, description, estimated_h
 -- 29. ATTENDANCE
 -- ============================================
 INSERT INTO attendance (id, organization_id, attendance_type, reference_id, reference_name, attendance_date, status, class_id, class_name, section_name, shift, department, room_number, remarks, marked_by) VALUES
-(1, 1, 'CLASS', 1, 'Rahul Singh', '2026-05-20', 'PRESENT', 3, 'Class 10', 'Section A', 'Morning', NULL, 'A-101', NULL, 'teacher1'),
-(2, 1, 'CLASS', 2, 'Ananya Reddy', '2026-05-20', 'PRESENT', 2, 'Class 9', 'Section A', 'Morning', NULL, 'A-102', NULL, 'teacher1'),
-(3, 1, 'CLASS', 3, 'Vikram Malhotra', '2026-05-20', 'ABSENT', 3, 'Class 10', 'Section A', 'Morning', NULL, 'A-101', 'Medical leave', 'teacher1'),
-(4, 1, 'CLASS', 1, 'Rahul Singh', '2026-05-19', 'PRESENT', 3, 'Class 10', 'Section A', 'Morning', NULL, 'A-101', NULL, 'teacher1'),
-(5, 1, 'CLASS', 2, 'Ananya Reddy', '2026-05-19', 'LATE', 2, 'Class 9', 'Section A', 'Morning', NULL, 'A-102', 'Arrived 10 min late', 'teacher1'),
-(6, 1, 'CLASS', 3, 'Vikram Malhotra', '2026-05-19', 'PRESENT', 3, 'Class 10', 'Section A', 'Morning', NULL, 'A-101', NULL, 'teacher1'),
-(7, 1, 'STAFF', 1, 'Amit K Verma', '2026-05-20', 'PRESENT', NULL, NULL, NULL, 'Morning', 'Mathematics', NULL, NULL, 'admin'),
-(8, 1, 'STAFF', 2, 'Sunita Patel', '2026-05-20', 'PRESENT', NULL, NULL, NULL, 'Morning', 'Science', NULL, NULL, 'admin'),
-(9, 1, 'STAFF', 1, 'Amit K Verma', '2026-05-19', 'PRESENT', NULL, NULL, NULL, 'Morning', 'Mathematics', NULL, NULL, 'admin'),
-(10, 1, 'STAFF', 2, 'Sunita Patel', '2026-05-19', 'WFH', NULL, NULL, NULL, 'Morning', 'Science', NULL, 'Working from home', 'admin');
+(1, 1, 'CLASS', 1, 'Rahul Singh', CURRENT_DATE, 'PRESENT', 3, 'Class 10', 'Section A', 'Morning', NULL, 'A-101', NULL, 'teacher1'),
+(2, 1, 'CLASS', 2, 'Ananya Reddy', CURRENT_DATE, 'PRESENT', 2, 'Class 9', 'Section A', 'Morning', NULL, 'A-102', NULL, 'teacher1'),
+(3, 1, 'CLASS', 3, 'Vikram Malhotra', CURRENT_DATE, 'ABSENT', 3, 'Class 10', 'Section A', 'Morning', NULL, 'A-101', 'Medical leave', 'teacher1'),
+(4, 1, 'CLASS', 4, 'Ishaan Shah', CURRENT_DATE, 'PRESENT', 1, 'Class 8', 'Section A', 'Morning', NULL, 'A-103', NULL, 'teacher3'),
+(5, 1, 'CLASS', 5, 'Maya Bose', CURRENT_DATE, 'LATE', 1, 'Class 8', 'Section B', 'Morning', NULL, 'A-104', 'Arrived after assembly', 'teacher3'),
+(6, 1, 'CLASS', 6, 'Aditya Krishnan', CURRENT_DATE, 'EXCUSED', 2, 'Class 9', 'Section B', 'Morning', NULL, 'A-105', 'Parent-approved leave', 'teacher2'),
+(7, 1, 'CLASS', 7, 'Tara Varma', CURRENT_DATE, 'PRESENT', 3, 'Class 10', 'Section B', 'Morning', NULL, 'A-106', NULL, 'teacher4'),
+(8, 1, 'CLASS', 8, 'Kabir Agarwal', CURRENT_DATE, 'PRESENT', 5, 'Class 11 - Commerce', 'Section A', 'Morning', NULL, 'B-201', NULL, 'teacher1'),
+(9, 1, 'CLASS', 9, 'Sara Rao', CURRENT_DATE, 'ABSENT', 6, 'Class 12 - Science', 'Section A', 'Morning', NULL, 'B-202', 'Parent informed', 'teacher2'),
+(10, 1, 'CLASS', 10, 'Neil Desai', CURRENT_DATE, 'PRESENT', 7, 'Class 12 - Commerce', 'Section A', 'Morning', NULL, 'B-203', NULL, 'teacher1'),
+(11, 1, 'CLASS', 11, 'Diya Menon', CURRENT_DATE, 'PRESENT', 4, 'Class 11 - Science', 'Section A', 'Morning', NULL, 'B-204', NULL, 'teacher2'),
+(12, 1, 'CLASS', 12, 'Rhea Kulkarni', CURRENT_DATE, 'PRESENT', 2, 'Class 9', 'Section A', 'Morning', NULL, 'A-102', NULL, 'teacher2'),
+(13, 1, 'CLASS', 1, 'Rahul Singh', DATEADD('DAY', -1, CURRENT_DATE), 'PRESENT', 3, 'Class 10', 'Section A', 'Morning', NULL, 'A-101', NULL, 'teacher1'),
+(14, 1, 'CLASS', 2, 'Ananya Reddy', DATEADD('DAY', -1, CURRENT_DATE), 'LATE', 2, 'Class 9', 'Section A', 'Morning', NULL, 'A-102', 'Arrived 10 min late', 'teacher1'),
+(15, 1, 'CLASS', 3, 'Vikram Malhotra', DATEADD('DAY', -1, CURRENT_DATE), 'PRESENT', 3, 'Class 10', 'Section A', 'Morning', NULL, 'A-101', NULL, 'teacher1'),
+(16, 1, 'CLASS', 4, 'Ishaan Shah', DATEADD('DAY', -2, CURRENT_DATE), 'PRESENT', 1, 'Class 8', 'Section A', 'Morning', NULL, 'A-103', NULL, 'teacher3'),
+(17, 1, 'CLASS', 5, 'Maya Bose', DATEADD('DAY', -2, CURRENT_DATE), 'PRESENT', 1, 'Class 8', 'Section B', 'Morning', NULL, 'A-104', NULL, 'teacher3'),
+(18, 1, 'CLASS', 6, 'Aditya Krishnan', DATEADD('DAY', -2, CURRENT_DATE), 'ABSENT', 2, 'Class 9', 'Section B', 'Morning', NULL, 'A-105', 'Follow-up required', 'teacher2'),
+(19, 1, 'CLASS', 7, 'Tara Varma', DATEADD('DAY', -3, CURRENT_DATE), 'PRESENT', 3, 'Class 10', 'Section B', 'Morning', NULL, 'A-106', NULL, 'teacher4'),
+(20, 1, 'CLASS', 8, 'Kabir Agarwal', DATEADD('DAY', -3, CURRENT_DATE), 'PRESENT', 5, 'Class 11 - Commerce', 'Section A', 'Morning', NULL, 'B-201', NULL, 'teacher1'),
+(21, 1, 'CLASS', 9, 'Sara Rao', DATEADD('DAY', -3, CURRENT_DATE), 'LATE', 6, 'Class 12 - Science', 'Section A', 'Morning', NULL, 'B-202', 'Traffic delay', 'teacher2'),
+(22, 1, 'CLASS', 10, 'Neil Desai', DATEADD('DAY', -4, CURRENT_DATE), 'PRESENT', 7, 'Class 12 - Commerce', 'Section A', 'Morning', NULL, 'B-203', NULL, 'teacher1'),
+(23, 1, 'CLASS', 11, 'Diya Menon', DATEADD('DAY', -4, CURRENT_DATE), 'PRESENT', 4, 'Class 11 - Science', 'Section A', 'Morning', NULL, 'B-204', NULL, 'teacher2'),
+(24, 1, 'CLASS', 12, 'Rhea Kulkarni', DATEADD('DAY', -4, CURRENT_DATE), 'ABSENT', 2, 'Class 9', 'Section A', 'Morning', NULL, 'A-102', 'Transport issue', 'teacher2'),
+(25, 1, 'CLASS', 1, 'Rahul Singh', DATEADD('DAY', -5, CURRENT_DATE), 'PRESENT', 3, 'Class 10', 'Section A', 'Morning', NULL, 'A-101', NULL, 'teacher1'),
+(26, 1, 'CLASS', 4, 'Ishaan Shah', DATEADD('DAY', -5, CURRENT_DATE), 'PRESENT', 1, 'Class 8', 'Section A', 'Morning', NULL, 'A-103', NULL, 'teacher3'),
+(27, 1, 'CLASS', 8, 'Kabir Agarwal', DATEADD('DAY', -6, CURRENT_DATE), 'PRESENT', 5, 'Class 11 - Commerce', 'Section A', 'Morning', NULL, 'B-201', NULL, 'teacher1'),
+(28, 1, 'CLASS', 11, 'Diya Menon', DATEADD('DAY', -6, CURRENT_DATE), 'PRESENT', 4, 'Class 11 - Science', 'Section A', 'Morning', NULL, 'B-204', NULL, 'teacher2'),
+(29, 1, 'STAFF', 1, 'Amit K Verma', CURRENT_DATE, 'PRESENT', NULL, NULL, NULL, 'Morning', 'Mathematics', NULL, NULL, 'admin'),
+(30, 1, 'STAFF', 2, 'Sunita Patel', CURRENT_DATE, 'PRESENT', NULL, NULL, NULL, 'Morning', 'Science', NULL, NULL, 'admin'),
+(31, 1, 'STAFF', 3, 'Nisha Iyer', CURRENT_DATE, 'PRESENT', NULL, NULL, NULL, 'Morning', 'English', NULL, NULL, 'admin'),
+(32, 1, 'STAFF', 4, 'Farhan Khan', CURRENT_DATE, 'WFH', NULL, NULL, NULL, 'Morning', 'Computer Science', NULL, 'Remote coding lab support', 'admin'),
+(33, 1, 'STAFF', 5, 'Kavitha Menon', CURRENT_DATE, 'PRESENT', NULL, NULL, NULL, 'Morning', 'Finance', NULL, NULL, 'admin'),
+(34, 1, 'STAFF', 6, 'Neel George', CURRENT_DATE, 'PRESENT', NULL, NULL, NULL, 'Morning', 'Administration', NULL, NULL, 'admin'),
+(35, 1, 'STAFF', 7, 'Pooja Sethi', CURRENT_DATE, 'ON_LEAVE', NULL, NULL, NULL, 'Morning', 'Student Services', NULL, 'Approved personal leave', 'admin'),
+(36, 1, 'STAFF', 8, 'Raghav Rao', CURRENT_DATE, 'HALF_DAY', NULL, NULL, NULL, 'Morning', 'Sports', NULL, 'Inter-school event duty', 'admin'),
+(37, 1, 'STAFF', 9, 'Asha Nair', CURRENT_DATE, 'PRESENT', NULL, NULL, NULL, 'Morning', 'Science', NULL, NULL, 'admin'),
+(38, 1, 'STAFF', 1, 'Amit K Verma', DATEADD('DAY', -1, CURRENT_DATE), 'PRESENT', NULL, NULL, NULL, 'Morning', 'Mathematics', NULL, NULL, 'admin'),
+(39, 1, 'STAFF', 2, 'Sunita Patel', DATEADD('DAY', -1, CURRENT_DATE), 'WFH', NULL, NULL, NULL, 'Morning', 'Science', NULL, 'Working from home', 'admin'),
+(40, 1, 'STAFF', 3, 'Nisha Iyer', DATEADD('DAY', -2, CURRENT_DATE), 'PRESENT', NULL, NULL, NULL, 'Morning', 'English', NULL, NULL, 'admin'),
+(41, 1, 'STAFF', 4, 'Farhan Khan', DATEADD('DAY', -2, CURRENT_DATE), 'PRESENT', NULL, NULL, NULL, 'Morning', 'Computer Science', NULL, NULL, 'admin'),
+(42, 1, 'STAFF', 5, 'Kavitha Menon', DATEADD('DAY', -3, CURRENT_DATE), 'PRESENT', NULL, NULL, NULL, 'Morning', 'Finance', NULL, NULL, 'admin'),
+(43, 1, 'STAFF', 6, 'Neel George', DATEADD('DAY', -3, CURRENT_DATE), 'ABSENT', NULL, NULL, NULL, 'Morning', 'Administration', NULL, 'Emergency leave', 'admin'),
+(44, 1, 'STAFF', 7, 'Pooja Sethi', DATEADD('DAY', -4, CURRENT_DATE), 'PRESENT', NULL, NULL, NULL, 'Morning', 'Student Services', NULL, NULL, 'admin'),
+(45, 1, 'STAFF', 8, 'Raghav Rao', DATEADD('DAY', -5, CURRENT_DATE), 'PRESENT', NULL, NULL, NULL, 'Morning', 'Sports', NULL, NULL, 'admin'),
+(46, 1, 'STAFF', 9, 'Asha Nair', DATEADD('DAY', -6, CURRENT_DATE), 'LATE', NULL, NULL, NULL, 'Morning', 'Science', NULL, 'Lab opening delayed', 'admin');
 
 -- ============================================
 -- 30. INQUIRIES
 -- ============================================
-INSERT INTO inquiry (inquiry_id, name, mobile_number, email, class_interested_in, address, inquiry_source, referred_by, comments, assigned_counselor_id, status, is_deleted, last_follow_up_date) VALUES
-(1, 'Arjun Kapoor', '9988776601', 'arjun.kapoor@gmail.com', 'Class 10', '23 MG Road, Bangalore', 'WEBSITE', NULL, 'Interested in CBSE curriculum', 9, 'NEW', FALSE, NULL),
-(2, 'Sneha Gupta', '9988776602', 'sneha.gupta@gmail.com', 'Class 9', '45 HSR Layout', 'WALK_IN', 'Mr. Rajan', 'Visited campus', 9, 'CONTACTED', FALSE, '2026-05-18 10:30:00'),
-(3, 'Karthik Iyer', '9988776603', 'karthik.i@gmail.com', 'Class 11 - Science', '67 Jayanagar', 'PHONE', NULL, 'Asking about science stream', 9, 'FOLLOW_UP_REQUIRED', FALSE, '2026-05-19 14:00:00'),
-(4, 'Preethi Nair', '9988776604', 'preethi.nair@gmail.com', 'Class 8', '12 Indiranagar', 'SOCIAL_MEDIA', NULL, 'Wants brochure', 9, 'READY_FOR_ADMISSION', FALSE, '2026-05-20 11:00:00'),
-(5, 'Rohan Mehta', '9988776605', 'rohan.mehta@gmail.com', 'Class 10', '88 Koramangala', 'WEBSITE', NULL, 'Online inquiry, wants callback', NULL, 'NEW', FALSE, NULL);
+INSERT INTO inquiry (inquiry_id, name, mobile_number, email, class_interested_in, address, inquiry_source, referred_by, comments, assigned_counselor_id, status, is_deleted, last_follow_up_date, next_follow_up_date) VALUES
+(1, 'Arjun Kapoor', '9988776601', 'arjun.kapoor@gmail.com', 'Class 10', '23 MG Road, Bangalore', 'WEBSITE', NULL, 'Interested in CBSE curriculum', 9, 'NEW', FALSE, NULL, '2026-05-29'),
+(2, 'Sneha Gupta', '9988776602', 'sneha.gupta@gmail.com', 'Class 9', '45 HSR Layout', 'WALK_IN', 'Mr. Rajan', 'Visited campus', 9, 'CONTACTED', FALSE, '2026-05-18 10:30:00', '2026-05-28'),
+(3, 'Karthik Iyer', '9988776603', 'karthik.i@gmail.com', 'Class 11 - Science', '67 Jayanagar', 'PHONE', NULL, 'Asking about science stream', 9, 'INTERESTED', FALSE, '2026-05-19 14:00:00', '2026-05-30'),
+(4, 'Preethi Nair', '9988776604', 'preethi.nair@gmail.com', 'Class 8', '12 Indiranagar', 'SOCIAL_MEDIA', NULL, 'Wants brochure', 9, 'READY_FOR_ADMISSION', FALSE, '2026-05-20 11:00:00', NULL),
+(5, 'Rohan Mehta', '9988776605', 'rohan.mehta@gmail.com', 'Class 10', '88 Koramangala', 'WEBSITE', NULL, 'Online inquiry, wants callback', NULL, 'NEW', FALSE, NULL, '2026-05-31'),
+(6, 'Aarav Sharma', '9988776606', 'aarav.sharma@gmail.com', 'Class 8', '11 Basavanagudi, Bangalore', 'CAMPAIGN', 'Digital ad', 'Parent requested campus tour', 9, 'CONTACTED', FALSE, '2026-05-24 09:20:00', '2026-05-29'),
+(7, 'Megha Rao', '9988776607', 'megha.rao@gmail.com', 'Class 12 - Science', '33 Whitefield, Bangalore', 'REFERRAL', 'Sunita Patel', 'Medical entrance coaching expectations', 9, 'COUNSELING', FALSE, '2026-05-25 15:10:00', '2026-05-30'),
+(8, 'Dev Mehta', '9988776608', 'dev.mehta@gmail.com', 'Class 11 - Commerce', '55 JP Nagar, Bangalore', 'WALK_IN', NULL, 'Fees and transport discussion pending', 9, 'DOCUMENTS_PENDING', FALSE, '2026-05-26 11:00:00', '2026-06-01'),
+(9, 'Naina Das', '9988776609', 'naina.das@gmail.com', 'Class 9', '18 Malleshwaram, Bangalore', 'WEBSITE', NULL, 'Asked for scholarship details', 9, 'INTERESTED', FALSE, '2026-05-27 12:45:00', '2026-05-29'),
+(10, 'Vihaan Patel', '9988776610', 'vihaan.patel@gmail.com', 'Class 10', '41 Hebbal, Bangalore', 'PHONE', NULL, 'Parent wants board result history', 9, 'COUNSELING', FALSE, '2026-05-27 16:30:00', '2026-06-02'),
+(11, 'Aisha Khan', '9988776611', 'aisha.khan@gmail.com', 'Class 8', '72 Banashankari, Bangalore', 'SOCIAL_MEDIA', NULL, 'Requested admission form', 9, 'DOCUMENTS_PENDING', FALSE, '2026-05-28 10:00:00', '2026-06-03'),
+(12, 'Kabir Sethi', '9988776612', 'kabir.sethi@gmail.com', 'Class 11 - Science', '26 Bellandur, Bangalore', 'REFERRAL', 'Amit Verma', 'Application almost complete', 9, 'READY_FOR_ADMISSION', FALSE, '2026-05-28 14:10:00', NULL),
+(13, 'Riya Chatterjee', '9988776613', 'riya.chatterjee@gmail.com', 'Class 12 - Commerce', '92 Yelahanka, Bangalore', 'CAMPAIGN', NULL, 'Family chose another school', 9, 'LOST', FALSE, '2026-05-21 10:00:00', NULL),
+(14, 'Omar Siddiqui', '9988776614', 'omar.siddiqui@gmail.com', 'Class 9', '3 Sarjapur Road, Bangalore', 'WEBSITE', NULL, 'Admission converted after campus visit', 9, 'CONVERTED', FALSE, '2026-05-23 13:00:00', NULL),
+(15, 'Saanvi Iyer', '9988776615', 'saanvi.iyer@gmail.com', 'Class 8', '77 Marathahalli, Bangalore', 'WALK_IN', NULL, 'First interaction pending', NULL, 'NEW', FALSE, NULL, '2026-05-29'),
+(16, 'Yash Nambiar', '9988776616', 'yash.nambiar@gmail.com', 'Class 11 - Commerce', '24 Electronic City, Bangalore', 'PHONE', NULL, 'Needs counseling with commerce coordinator', 9, 'CONTACTED', FALSE, '2026-05-27 09:00:00', '2026-05-28'),
+(17, 'Zara Thomas', '9988776617', 'zara.thomas@gmail.com', 'Class 10', '44 Hennur, Bangalore', 'REFERRAL', 'Meera Nair', 'Interested in residential support', 9, 'INTERESTED', FALSE, '2026-05-28 17:40:00', '2026-06-04'),
+(18, 'Ira Banerjee', '9988776618', 'ira.banerjee@gmail.com', 'Class 12 - Science', '61 Rajajinagar, Bangalore', 'WEBSITE', NULL, 'Waiting for transfer certificate', 9, 'DOCUMENTS_PENDING', FALSE, '2026-05-28 18:15:00', '2026-06-05');
 
 -- ============================================
 -- 31. FOLLOW-UPS
 -- ============================================
 INSERT INTO follow_up (id, follow_up_type, remarks, status_after_follow_up, follow_up_date, next_follow_up_date, inquiry_id) VALUES
 (1, 'CALL', 'Called parent, discussed admission process', 'CONTACTED', '2026-05-18 10:30:00', '2026-05-22', 2),
-(2, 'CALL', 'Explained science stream prerequisites', 'FOLLOW_UP_REQUIRED', '2026-05-19 14:00:00', '2026-05-23', 3),
-(3, 'WHATSAPP', 'Sent brochure and fee structure', 'FOLLOW_UP_REQUIRED', '2026-05-19 16:00:00', '2026-05-25', 3),
-(4, 'WALK_IN', 'Parent visited, ready to submit application', 'READY_FOR_ADMISSION', '2026-05-20 11:00:00', NULL, 4);
+(2, 'CALL', 'Explained science stream prerequisites', 'INTERESTED', '2026-05-19 14:00:00', '2026-05-30', 3),
+(3, 'WHATSAPP', 'Sent brochure and fee structure', 'INTERESTED', '2026-05-19 16:00:00', '2026-05-30', 3),
+(4, 'WALK_IN', 'Parent visited, ready to submit application', 'READY_FOR_ADMISSION', '2026-05-20 11:00:00', NULL, 4),
+(5, 'CALL', 'Campaign inquiry qualified and tour requested', 'CONTACTED', '2026-05-24 09:20:00', '2026-05-29', 6),
+(6, 'WALK_IN', 'Counseling session held with science coordinator', 'COUNSELING', '2026-05-25 15:10:00', '2026-05-30', 7),
+(7, 'EMAIL', 'Shared fee structure and document checklist', 'DOCUMENTS_PENDING', '2026-05-26 11:00:00', '2026-06-01', 8),
+(8, 'CALL', 'Scholarship policy explained to parent', 'INTERESTED', '2026-05-27 12:45:00', '2026-05-29', 9),
+(9, 'WALK_IN', 'Campus visit booked for board result discussion', 'COUNSELING', '2026-05-27 16:30:00', '2026-06-02', 10),
+(10, 'WHATSAPP', 'Admission form sent, documents requested', 'DOCUMENTS_PENDING', '2026-05-28 10:00:00', '2026-06-03', 11),
+(11, 'EMAIL', 'Application ready for admin review', 'READY_FOR_ADMISSION', '2026-05-28 14:10:00', NULL, 12),
+(12, 'CALL', 'Marked lost after parent confirmed alternate school', 'LOST', '2026-05-21 10:00:00', NULL, 13),
+(13, 'WALK_IN', 'Application converted after payment confirmation', 'CONVERTED', '2026-05-23 13:00:00', NULL, 14),
+(14, 'CALL', 'Initial callback completed for commerce inquiry', 'CONTACTED', '2026-05-27 09:00:00', '2026-05-28', 16),
+(15, 'WHATSAPP', 'Hostel details shared with guardian', 'INTERESTED', '2026-05-28 17:40:00', '2026-06-04', 17),
+(16, 'EMAIL', 'Transfer certificate pending from previous school', 'DOCUMENTS_PENDING', '2026-05-28 18:15:00', '2026-06-05', 18);
+
+INSERT INTO application_admission (application_id, applicant_name, date_of_birth, gender, applying_for_school_or_college, parent_name, guardian_name, contact_number, email, street_address, city, state, pincode, emergency_contact_name, emergency_contact_number, status, internal_comments, organization_id) VALUES
+('APP-2026-001', 'Preethi Nair', '2012-08-14 00:00:00', 'Female', 'Class 8', 'Ramesh Nair', 'Lakshmi Nair', '9988776604', 'preethi.nair@gmail.com', '12 Indiranagar', 'Bangalore', 'Karnataka', '560038', 'Lakshmi Nair', '9988776604', 'PENDING', 'Ready for admin review after campus visit.', 1),
+('APP-2026-002', 'Kabir Sethi', '2009-01-19 00:00:00', 'Male', 'Class 11 - Science', 'Manish Sethi', 'Pallavi Sethi', '9988776612', 'kabir.sethi@gmail.com', '26 Bellandur', 'Bangalore', 'Karnataka', '560103', 'Pallavi Sethi', '9988776612', 'UNDER_REVIEW', 'Science stream eligibility being verified.', 1),
+('APP-2026-003', 'Omar Siddiqui', '2011-04-04 00:00:00', 'Male', 'Class 9', 'Faisal Siddiqui', 'Nadia Siddiqui', '9988776614', 'omar.siddiqui@gmail.com', '3 Sarjapur Road', 'Bangalore', 'Karnataka', '562125', 'Nadia Siddiqui', '9988776614', 'APPROVED', 'Converted admission and fee receipt verified.', 1),
+('APP-2026-004', 'Aisha Khan', '2012-12-09 00:00:00', 'Female', 'Class 8', 'Imran Khan', 'Sara Khan', '9988776611', 'aisha.khan@gmail.com', '72 Banashankari', 'Bangalore', 'Karnataka', '560085', 'Sara Khan', '9988776611', 'DRAFT', 'Parent is completing document upload.', 1),
+('APP-2026-005', 'Dev Mehta', '2009-09-30 00:00:00', 'Male', 'Class 11 - Commerce', 'Nitin Mehta', 'Priya Mehta', '9988776608', 'dev.mehta@gmail.com', '55 JP Nagar', 'Bangalore', 'Karnataka', '560078', 'Priya Mehta', '9988776608', 'PENDING', 'Transport availability requested before approval.', 1),
+('APP-2026-006', 'Riya Chatterjee', '2008-05-28 00:00:00', 'Female', 'Class 12 - Commerce', 'Subho Chatterjee', 'Mitali Chatterjee', '9988776613', 'riya.chatterjee@gmail.com', '92 Yelahanka', 'Bangalore', 'Karnataka', '560064', 'Mitali Chatterjee', '9988776613', 'REJECTED', 'Family selected alternate school.', 1);
+
+INSERT INTO application_documents (application_admission_id, document_url) VALUES
+('APP-2026-001', 'Birth Certificate'), ('APP-2026-001', 'Photo'), ('APP-2026-001', 'Address Proof'),
+('APP-2026-002', 'Birth Certificate'), ('APP-2026-002', 'Previous Marksheet'), ('APP-2026-002', 'Photo'), ('APP-2026-002', 'Parent ID Proof'),
+('APP-2026-003', 'Birth Certificate'), ('APP-2026-003', 'Previous Marksheet'), ('APP-2026-003', 'Transfer Certificate'), ('APP-2026-003', 'Address Proof'), ('APP-2026-003', 'Photo'),
+('APP-2026-004', 'Birth Certificate'),
+('APP-2026-005', 'Birth Certificate'), ('APP-2026-005', 'Address Proof'), ('APP-2026-005', 'Photo'),
+('APP-2026-006', 'Birth Certificate'), ('APP-2026-006', 'Previous Marksheet');
 
 -- ============================================
 -- 32. LEAVE REQUESTS
 -- ============================================
 INSERT INTO leave_requests (id, organization_id, staff_id, staff_name, department, leave_type, start_date, end_date, days, reason, status, applied_by, approved_by) VALUES
-(1, 1, 1, 'Amit K Verma', 'Mathematics', 'SICK', '2026-05-25', '2026-05-26', 2, 'Fever and cold', 'PENDING', 'teacher1', NULL),
-(2, 1, 2, 'Sunita Patel', 'Science', 'VACATION', '2026-06-01', '2026-06-05', 5, 'Family vacation', 'APPROVED', 'teacher2', 'admin'),
-(3, 1, 1, 'Amit K Verma', 'Mathematics', 'PERSONAL', '2026-04-15', '2026-04-15', 1, 'Personal work', 'APPROVED', 'teacher1', 'admin');
+(1, 1, 1, 'Amit K Verma', 'Mathematics', 'SICK', DATEADD('DAY', 1, CURRENT_DATE), DATEADD('DAY', 2, CURRENT_DATE), 2, 'Fever and cold', 'PENDING', 'teacher1', NULL),
+(2, 1, 2, 'Sunita Patel', 'Science', 'VACATION', DATEADD('DAY', 7, CURRENT_DATE), DATEADD('DAY', 11, CURRENT_DATE), 5, 'Family vacation', 'APPROVED', 'teacher2', 'admin'),
+(3, 1, 3, 'Nisha Iyer', 'English', 'PERSONAL', DATEADD('DAY', -14, CURRENT_DATE), DATEADD('DAY', -14, CURRENT_DATE), 1, 'Personal work', 'APPROVED', 'teacher3', 'admin'),
+(4, 1, 5, 'Kavitha Menon', 'Finance', 'CASUAL', DATEADD('DAY', 3, CURRENT_DATE), DATEADD('DAY', 3, CURRENT_DATE), 1, 'Bank audit appointment', 'PENDING', 'accountant1', NULL),
+(5, 1, 7, 'Pooja Sethi', 'Student Services', 'PERSONAL', CURRENT_DATE, CURRENT_DATE, 1, 'Family emergency', 'APPROVED', 'frontoffice1', 'admin'),
+(6, 1, 8, 'Raghav Rao', 'Sports', 'COMPENSATORY', DATEADD('DAY', 5, CURRENT_DATE), DATEADD('DAY', 5, CURRENT_DATE), 1, 'Weekend sports meet duty adjustment', 'PENDING', 'sports1', NULL);
 
 -- ============================================
 -- 33. STAFF PAYROLL
 -- ============================================
 INSERT INTO staff_payroll (id, organization_id, staff_id, staff_name, department, designation, basic, hra, special_allowance, academic_allowance, medical_allowance, travel_allowance, dearness_allowance, other_allowance, professional_tax, income_tax, provident_fund, effective_from) VALUES
 (1, 1, 1, 'Amit K Verma', 'Mathematics', 'Senior Teacher', 45000.00, 18000.00, 5000.00, 3000.00, 2000.00, 3000.00, 2000.00, 0.00, 200.00, 5000.00, 5400.00, '2025-04-01'),
-(2, 1, 2, 'Sunita Patel', 'Science', 'Teacher', 38000.00, 15200.00, 4000.00, 2500.00, 2000.00, 2500.00, 1500.00, 0.00, 200.00, 3500.00, 4560.00, '2025-04-01');
+(2, 1, 2, 'Sunita Patel', 'Science', 'Teacher', 38000.00, 15200.00, 4000.00, 2500.00, 2000.00, 2500.00, 1500.00, 0.00, 200.00, 3500.00, 4560.00, '2025-04-01'),
+(3, 1, 3, 'Nisha Iyer', 'English', 'Humanities Faculty', 36000.00, 14400.00, 3500.00, 2200.00, 1800.00, 2200.00, 1500.00, 0.00, 200.00, 3000.00, 4320.00, '2025-04-01'),
+(4, 1, 4, 'Farhan Khan', 'Computer Science', 'STEM Faculty', 47000.00, 18800.00, 6500.00, 3500.00, 2000.00, 3000.00, 2200.00, 0.00, 200.00, 6000.00, 5640.00, '2025-04-01'),
+(5, 1, 5, 'Kavitha Menon', 'Finance', 'Payroll Officer', 42000.00, 16800.00, 4500.00, 0.00, 1800.00, 2400.00, 1800.00, 1000.00, 200.00, 4200.00, 5040.00, '2025-04-01'),
+(6, 1, 6, 'Neel George', 'Administration', 'Campus Operations Lead', 50000.00, 20000.00, 7000.00, 0.00, 2500.00, 3500.00, 2500.00, 2000.00, 200.00, 6500.00, 6000.00, '2025-04-01'),
+(7, 1, 7, 'Pooja Sethi', 'Student Services', 'Front Office Executive', 28000.00, 11200.00, 2500.00, 0.00, 1200.00, 1800.00, 1200.00, 0.00, 200.00, 1500.00, 3360.00, '2025-04-01'),
+(8, 1, 8, 'Raghav Rao', 'Sports', 'Sports Faculty', 34000.00, 13600.00, 3000.00, 1800.00, 1500.00, 2200.00, 1400.00, 0.00, 200.00, 2500.00, 4080.00, '2025-04-01'),
+(9, 1, 9, 'Asha Nair', 'Science', 'Lab Coordinator', 32000.00, 12800.00, 3000.00, 1000.00, 1500.00, 2000.00, 1400.00, 0.00, 200.00, 2200.00, 3840.00, '2025-04-01');
 
 -- ============================================
 -- 34. ADMISSION FORM TEMPLATE
@@ -585,12 +785,161 @@ INSERT INTO owner_details (owner_id, owner_code, owner_name, gender, owner_email
 (1, 'OWN001', 'Rajesh Kumar', 'Male', 'admin@thinkerscave.com', '9876543210', 1, 1);
 
 -- ============================================
+-- 35A. ADMINISTRATION CONTROL CENTER DATA
+-- ============================================
+UPDATE users SET last_login_date = CURRENT_DATE WHERE id IN (1, 2, 9, 10, 11, 13, 14);
+UPDATE users SET is_first_time_login = TRUE, is_email_verified = FALSE WHERE id IN (14, 16);
+
+INSERT INTO audit_log (id, version, created_at, updated_at, organization_id, tenant_code, correlation_id, event_type, action, entity_type, entity_id, actor_user_id, actor_username, source_ip, user_agent, changes, summary, occurred_at) VALUES
+(1, 0, CURRENT_TIMESTAMP, NULL, 1, 'public', 'adm-seed-001', 'CONFIG_CHANGE', 'Administration menu restructured', 'SUB_MENU', 'ADMIN_DASHBOARD', 1, 'superadmin', '127.0.0.1', 'ThinkersCave Dev Seed', '{"route":"/app/admin/dashboard"}', 'Administration menu consolidated into five control center workspaces', DATEADD('HOUR', -8, CURRENT_TIMESTAMP)),
+(2, 0, CURRENT_TIMESTAMP, NULL, 1, 'public', 'adm-seed-002', 'UPDATE', 'Role permissions reviewed', 'ROLE', 'ADMIN', 1, 'superadmin', '127.0.0.1', 'ThinkersCave Dev Seed', '{"role":"ADMIN","scope":"Administration"}', 'Admin role granted access to dashboard, organizations, monitoring and audit center', DATEADD('HOUR', -6, CURRENT_TIMESTAMP)),
+(3, 0, CURRENT_TIMESTAMP, NULL, 1, 'public', 'adm-seed-003', 'SYSTEM_EVENT', 'Tenant diagnostics completed', 'SYSTEM_EVENT', 'DIAGNOSTIC_RUN', 2, 'admin', '127.0.0.1', 'ThinkersCave Dev Seed', '{"healthScore":92}', 'Scheduled tenant health diagnostics completed successfully', DATEADD('HOUR', -3, CURRENT_TIMESTAMP)),
+(4, 0, CURRENT_TIMESTAMP, NULL, 1, 'public', 'adm-seed-004', 'CREATE', 'Branch capacity audit recorded', 'BRANCH', 'BR-WF', 13, 'opslead1', '127.0.0.1', 'ThinkersCave Dev Seed', '{"branch":"Whitefield Campus"}', 'Whitefield Campus capacity profile refreshed for operations review', DATEADD('HOUR', -2, CURRENT_TIMESTAMP)),
+(5, 0, CURRENT_TIMESTAMP, NULL, 1, 'public', 'adm-seed-005', 'APPROVAL', 'Invitation policy approved', 'USER', 'USR014', 2, 'admin', '127.0.0.1', 'ThinkersCave Dev Seed', '{"user":"frontoffice1","status":"PENDING_FIRST_LOGIN"}', 'Front office administrator invitation is waiting for first login', DATEADD('MINUTE', -70, CURRENT_TIMESTAMP));
+
+INSERT INTO security_audit_log (id, version, created_at, updated_at, event_code, username, tenant_code, source_ip, user_agent, success, severity, message, correlation_id, occurred_at) VALUES
+(1, 0, CURRENT_TIMESTAMP, NULL, 'LOGIN_SUCCESS', 'superadmin', 'public', '127.0.0.1', 'ThinkersCave Dev Seed', TRUE, 'INFO', 'Super administrator signed in from trusted localhost session.', 'sec-seed-001', DATEADD('HOUR', -4, CURRENT_TIMESTAMP)),
+(2, 0, CURRENT_TIMESTAMP, NULL, 'LOGIN_SUCCESS', 'admin', 'public', '127.0.0.1', 'ThinkersCave Dev Seed', TRUE, 'INFO', 'Organization administrator signed in successfully.', 'sec-seed-002', DATEADD('HOUR', -3, CURRENT_TIMESTAMP)),
+(3, 0, CURRENT_TIMESTAMP, NULL, 'LOGIN_FAILURE', 'unknown.admin', 'public', '10.0.0.45', 'ThinkersCave Dev Seed', FALSE, 'MEDIUM', 'Rejected login attempt for unknown administrative account.', 'sec-seed-003', DATEADD('HOUR', -2, CURRENT_TIMESTAMP)),
+(4, 0, CURRENT_TIMESTAMP, NULL, 'PERMISSION_REVIEW', 'opslead1', 'public', '127.0.0.1', 'ThinkersCave Dev Seed', TRUE, 'LOW', 'Operations lead permissions reviewed after role update.', 'sec-seed-004', DATEADD('MINUTE', -50, CURRENT_TIMESTAMP));
+
+INSERT INTO system_event (id, version, created_at, updated_at, organization_id, tenant_code, category, component, event_code, title, message, severity, status, metric_name, metric_value, metric_unit, resolved, occurred_at) VALUES
+(1, 0, CURRENT_TIMESTAMP, NULL, 1, 'public', 'HEALTH', 'Administration Center', 'TENANT_HEALTH_GREEN', 'Tenant health profile updated', 'Primary tenant database, authentication and menu services are healthy.', 'INFO', 'HEALTHY', 'healthScore', 94, 'percent', TRUE, DATEADD('HOUR', -5, CURRENT_TIMESTAMP)),
+(2, 0, CURRENT_TIMESTAMP, NULL, 1, 'public', 'JOB', 'Attendance Sync', 'ATTENDANCE_ROLLUP', 'Attendance rollup completed', 'Daily student and staff attendance rollup processed successfully.', 'INFO', 'COMPLETED', 'duration', 18, 'seconds', TRUE, DATEADD('HOUR', -4, CURRENT_TIMESTAMP)),
+(3, 0, CURRENT_TIMESTAMP, NULL, 1, 'public', 'NOTIFICATION', 'Notification Gateway', 'SMS_QUEUE_DELAY', 'Notification queue delay detected', 'Two parent SMS notifications are pending gateway retry.', 'MEDIUM', 'WATCH', 'pendingMessages', 2, 'count', FALSE, DATEADD('HOUR', -2, CURRENT_TIMESTAMP)),
+(4, 0, CURRENT_TIMESTAMP, NULL, 1, 'public', 'DATA_INTEGRITY', 'Student Records', 'DOCUMENT_RECONCILIATION', 'Document reconciliation completed', 'Admission documents and student profiles were reconciled without blocking issues.', 'LOW', 'COMPLETED', 'recordsChecked', 48, 'count', TRUE, DATEADD('MINUTE', -95, CURRENT_TIMESTAMP)),
+(5, 0, CURRENT_TIMESTAMP, NULL, 1, 'public', 'SECURITY', 'Access Governance', 'PENDING_INVITATIONS', 'Pending invitations require review', 'Two user invitations are pending first login or email verification.', 'MEDIUM', 'OPEN', 'pendingInvitations', 2, 'count', FALSE, DATEADD('MINUTE', -35, CURRENT_TIMESTAMP));
+
+INSERT INTO dashboard_widget_config (id, role_code, widget_key, widget_type, title, subtitle, icon, route, section_key, display_order, max_items, enabled) VALUES
+(1, 'DEFAULT', 'total_students', 'KPI', 'Students', 'Active learner population', 'pi pi-user', NULL, 'KPI', 10, 1, TRUE),
+(2, 'DEFAULT', 'attendance_today', 'KPI', 'Attendance Today', 'Daily attendance completion', 'pi pi-calendar-check', NULL, 'KPI', 20, 1, TRUE),
+(3, 'DEFAULT', 'open_alerts', 'KPI', 'Smart Alerts', 'Open operational alerts', 'pi pi-bell', NULL, 'KPI', 30, 1, TRUE),
+(4, 'DEFAULT', 'students', 'ACTION', 'Student Directory', 'Find student profiles and records', 'pi pi-users', '/app/students/directory', 'QUICK_ACTION', 40, 1, TRUE),
+(5, 'DEFAULT', 'attendance', 'ACTION', 'Attendance', 'Open attendance workspace', 'pi pi-calendar', '/app/attendance/dashboard', 'QUICK_ACTION', 50, 1, TRUE),
+(6, 'DEFAULT', 'inquiries', 'ACTION', 'Inquiry Pipeline', 'Review active admission inquiries', 'pi pi-comments', '/app/inquiry/pipeline', 'QUICK_ACTION', 60, 1, TRUE),
+(7, 'DEFAULT', 'students', 'SHORTCUT', 'Students', 'Student lifecycle workspace', 'pi pi-users', '/app/students/dashboard', 'SHORTCUT', 70, 1, TRUE),
+(8, 'DEFAULT', 'attendance', 'SHORTCUT', 'Attendance', 'Student and staff attendance', 'pi pi-calendar-check', '/app/attendance/dashboard', 'SHORTCUT', 80, 1, TRUE),
+(9, 'DEFAULT', 'inquiries', 'SHORTCUT', 'Admissions', 'Inquiry and admission operations', 'pi pi-user-plus', '/app/inquiry/dashboard', 'SHORTCUT', 90, 1, TRUE),
+(10, 'SUPER_ADMIN', 'school_health', 'KPI', 'School Health', 'Tenant and operating health', 'pi pi-shield', NULL, 'KPI', 1, 1, TRUE),
+(11, 'SUPER_ADMIN', 'active_users', 'KPI', 'Active Users', 'Signed-in organization users', 'pi pi-users', NULL, 'KPI', 2, 1, TRUE),
+(12, 'SUPER_ADMIN', 'open_alerts', 'KPI', 'Smart Alerts', 'Unresolved platform alerts', 'pi pi-bell', NULL, 'KPI', 3, 1, TRUE),
+(13, 'SUPER_ADMIN', 'pending_admissions', 'KPI', 'Admission Queue', 'Files needing leadership visibility', 'pi pi-user-plus', NULL, 'KPI', 4, 1, TRUE),
+(14, 'SUPER_ADMIN', 'admin_dashboard', 'ACTION', 'Admin Dashboard', 'Open control tower summary', 'pi pi-th-large', '/app/admin/dashboard', 'QUICK_ACTION', 5, 1, TRUE),
+(15, 'SUPER_ADMIN', 'organizations', 'ACTION', 'Organizations', 'Manage school and tenant structure', 'pi pi-building', '/app/admin/organizations', 'QUICK_ACTION', 6, 1, TRUE),
+(16, 'SUPER_ADMIN', 'access', 'ACTION', 'Access Control', 'Review roles and permissions', 'pi pi-lock', '/app/admin/access', 'QUICK_ACTION', 7, 1, TRUE),
+(17, 'SUPER_ADMIN', 'monitoring', 'ACTION', 'Monitoring', 'Check jobs and system events', 'pi pi-desktop', '/app/admin/monitoring', 'QUICK_ACTION', 8, 1, TRUE),
+(18, 'SUPER_ADMIN', 'audit', 'ACTION', 'Audit Center', 'Inspect recent system activity', 'pi pi-history', '/app/admin/audit', 'QUICK_ACTION', 9, 1, TRUE),
+(19, 'SUPER_ADMIN', 'monitoring', 'SHORTCUT', 'System Monitoring', 'Health, alerts and diagnostics', 'pi pi-desktop', '/app/admin/monitoring', 'SHORTCUT', 10, 1, TRUE),
+(20, 'SUPER_ADMIN', 'organizations', 'SHORTCUT', 'Organizations', 'Tenant and branch control', 'pi pi-sitemap', '/app/admin/organizations', 'SHORTCUT', 11, 1, TRUE),
+(21, 'ADMIN', 'total_students', 'KPI', 'Students', 'Active learner records', 'pi pi-user', NULL, 'KPI', 1, 1, TRUE),
+(22, 'ADMIN', 'attendance_today', 'KPI', 'Attendance Today', 'Daily attendance health', 'pi pi-calendar-check', NULL, 'KPI', 2, 1, TRUE),
+(23, 'ADMIN', 'pending_admissions', 'KPI', 'Admission Queue', 'Applications needing action', 'pi pi-user-plus', NULL, 'KPI', 3, 1, TRUE),
+(24, 'ADMIN', 'pending_leaves', 'KPI', 'Leave Requests', 'Staff leave approvals', 'pi pi-calendar-times', NULL, 'KPI', 4, 1, TRUE),
+(25, 'ADMIN', 'unpaid_invoices', 'KPI', 'Unpaid Invoices', 'Fee follow-up workload', 'pi pi-receipt', NULL, 'KPI', 5, 1, TRUE),
+(26, 'ADMIN', 'attendance', 'ACTION', 'Mark Attendance', 'Open daily attendance workspace', 'pi pi-calendar-plus', '/app/attendance/students', 'QUICK_ACTION', 6, 1, TRUE),
+(27, 'ADMIN', 'student_profiles', 'ACTION', 'Student Directory', 'Review students and guardians', 'pi pi-users', '/app/students/directory', 'QUICK_ACTION', 7, 1, TRUE),
+(28, 'ADMIN', 'admissions', 'ACTION', 'Admissions', 'Process inquiries and applications', 'pi pi-user-plus', '/app/inquiry/applications', 'QUICK_ACTION', 8, 1, TRUE),
+(29, 'ADMIN', 'staff', 'ACTION', 'Staff Operations', 'Manage staff, leave and payroll', 'pi pi-briefcase', '/app/staff/operations', 'QUICK_ACTION', 9, 1, TRUE),
+(30, 'ADMIN', 'access', 'ACTION', 'Permissions', 'Review user access coverage', 'pi pi-lock', '/app/admin/access', 'QUICK_ACTION', 10, 1, TRUE),
+(31, 'ADMIN', 'students', 'SHORTCUT', 'Students', 'Directory and profiles', 'pi pi-users', '/app/students/dashboard', 'SHORTCUT', 11, 1, TRUE),
+(32, 'ADMIN', 'approvals', 'SHORTCUT', 'Approvals', 'Leaves and admissions', 'pi pi-check-square', '/app/staff/operations', 'SHORTCUT', 12, 1, TRUE),
+(33, 'ADMIN', 'staff', 'SHORTCUT', 'Staff', 'People operations', 'pi pi-briefcase', '/app/staff/dashboard', 'SHORTCUT', 13, 1, TRUE),
+(34, 'PRINCIPAL', 'school_health', 'KPI', 'School Health', 'Leadership operating status', 'pi pi-shield', NULL, 'KPI', 1, 1, TRUE),
+(35, 'PRINCIPAL', 'attendance_today', 'KPI', 'Attendance Today', 'Student presence trend', 'pi pi-calendar-check', NULL, 'KPI', 2, 1, TRUE),
+(36, 'PRINCIPAL', 'class_absences', 'KPI', 'Absences', 'Attendance exceptions', 'pi pi-exclamation-circle', NULL, 'KPI', 3, 1, TRUE),
+(37, 'PRINCIPAL', 'pending_admissions', 'KPI', 'Admissions', 'Enrollment decisions pending', 'pi pi-user-plus', NULL, 'KPI', 4, 1, TRUE),
+(38, 'PRINCIPAL', 'active_staff', 'KPI', 'Staff', 'Active team members', 'pi pi-briefcase', NULL, 'KPI', 5, 1, TRUE),
+(39, 'PRINCIPAL', 'attendance', 'ACTION', 'Attendance Review', 'Open student attendance exceptions', 'pi pi-calendar-check', '/app/attendance/students', 'QUICK_ACTION', 6, 1, TRUE),
+(40, 'PRINCIPAL', 'admissions', 'ACTION', 'Admission Decisions', 'Review pending applications', 'pi pi-user-plus', '/app/inquiry/applications', 'QUICK_ACTION', 7, 1, TRUE),
+(41, 'PRINCIPAL', 'staff', 'ACTION', 'Staff Overview', 'Review departments and leave', 'pi pi-briefcase', '/app/staff/dashboard', 'QUICK_ACTION', 8, 1, TRUE),
+(42, 'PRINCIPAL', 'students', 'ACTION', 'Student Directory', 'Open student lifecycle records', 'pi pi-users', '/app/students/directory', 'QUICK_ACTION', 9, 1, TRUE),
+(43, 'PRINCIPAL', 'academics', 'ACTION', 'Academics', 'Review classes and syllabus', 'pi pi-book', '/app/academics/dashboard', 'QUICK_ACTION', 10, 1, TRUE),
+(44, 'PRINCIPAL', 'alerts', 'SHORTCUT', 'Alerts', 'Operational exceptions', 'pi pi-bell', NULL, 'SHORTCUT', 11, 1, TRUE),
+(45, 'TEACHER', 'attendance_today', 'KPI', 'Attendance Today', 'Class attendance progress', 'pi pi-calendar-check', NULL, 'KPI', 1, 1, TRUE),
+(46, 'TEACHER', 'class_absences', 'KPI', 'Class Exceptions', 'Students absent or late', 'pi pi-exclamation-circle', NULL, 'KPI', 2, 1, TRUE),
+(47, 'TEACHER', 'total_students', 'KPI', 'Students', 'Students in current organization', 'pi pi-users', NULL, 'KPI', 3, 1, TRUE),
+(48, 'TEACHER', 'due_followups', 'KPI', 'Follow-ups', 'Student and parent callbacks', 'pi pi-phone', NULL, 'KPI', 4, 1, TRUE),
+(49, 'TEACHER', 'teacher_attendance', 'ACTION', 'Mark Attendance', 'Open class attendance', 'pi pi-calendar-plus', '/app/attendance/students', 'QUICK_ACTION', 5, 1, TRUE),
+(50, 'TEACHER', 'student_profiles', 'ACTION', 'Student Profiles', 'Review student records', 'pi pi-id-card', '/app/students/profiles', 'QUICK_ACTION', 6, 1, TRUE),
+(51, 'TEACHER', 'syllabus', 'ACTION', 'Syllabus Tracker', 'Continue curriculum progress', 'pi pi-book', '/app/academics/syllabus', 'QUICK_ACTION', 7, 1, TRUE),
+(52, 'TEACHER', 'class_teacher', 'ACTION', 'Class Ownership', 'Review class teacher allocation', 'pi pi-id-card', '/app/academics/class-teacher-allocation', 'QUICK_ACTION', 8, 1, TRUE),
+(53, 'TEACHER', 'teacher_attendance', 'SHORTCUT', 'Attendance', 'Class attendance roster', 'pi pi-calendar-check', '/app/attendance/students', 'SHORTCUT', 9, 1, TRUE),
+(54, 'TEACHER', 'student_profiles', 'SHORTCUT', 'Students', 'Profiles and documents', 'pi pi-users', '/app/students/profiles', 'SHORTCUT', 10, 1, TRUE),
+(55, 'HR_MANAGER', 'active_staff', 'KPI', 'Active Staff', 'Current staff profiles', 'pi pi-briefcase', NULL, 'KPI', 1, 1, TRUE),
+(56, 'HR_MANAGER', 'staff_attendance', 'KPI', 'Staff Attendance', 'Today staff attendance', 'pi pi-id-card', NULL, 'KPI', 2, 1, TRUE),
+(57, 'HR_MANAGER', 'pending_leaves', 'KPI', 'Leave Requests', 'Pending approvals', 'pi pi-calendar-times', NULL, 'KPI', 3, 1, TRUE),
+(58, 'HR_MANAGER', 'payroll_profiles', 'KPI', 'Payroll Profiles', 'Salary records ready', 'pi pi-wallet', NULL, 'KPI', 4, 1, TRUE),
+(59, 'HR_MANAGER', 'hr_staff', 'ACTION', 'Staff Directory', 'Review staff profiles', 'pi pi-briefcase', '/app/staff/directory', 'QUICK_ACTION', 5, 1, TRUE),
+(60, 'HR_MANAGER', 'hr_leave', 'ACTION', 'Leave Approvals', 'Process pending leave requests', 'pi pi-calendar-times', '/app/staff/operations', 'QUICK_ACTION', 6, 1, TRUE),
+(61, 'HR_MANAGER', 'staff_attendance_action', 'ACTION', 'Staff Attendance', 'Open staff attendance', 'pi pi-calendar-check', '/app/attendance/staff', 'QUICK_ACTION', 7, 1, TRUE),
+(62, 'HR_MANAGER', 'payroll', 'ACTION', 'Payroll', 'Review payroll profiles', 'pi pi-wallet', '/app/staff/operations', 'QUICK_ACTION', 8, 1, TRUE),
+(63, 'HR_MANAGER', 'hr_staff', 'SHORTCUT', 'Staff', 'People operations', 'pi pi-briefcase', '/app/staff/dashboard', 'SHORTCUT', 9, 1, TRUE),
+(64, 'HR_MANAGER', 'hr_leave', 'SHORTCUT', 'Leave', 'Pending leave requests', 'pi pi-calendar-times', '/app/staff/operations', 'SHORTCUT', 10, 1, TRUE),
+(65, 'ACCOUNTANT', 'unpaid_invoices', 'KPI', 'Unpaid Invoices', 'Receivable workload', 'pi pi-receipt', NULL, 'KPI', 1, 1, TRUE),
+(66, 'ACCOUNTANT', 'overdue_invoices', 'KPI', 'Overdue Fees', 'Payment follow-up queue', 'pi pi-wallet', NULL, 'KPI', 2, 1, TRUE),
+(67, 'ACCOUNTANT', 'payroll_profiles', 'KPI', 'Payroll Profiles', 'Salary records', 'pi pi-briefcase', NULL, 'KPI', 3, 1, TRUE),
+(68, 'ACCOUNTANT', 'active_staff', 'KPI', 'Staff Count', 'Payroll coverage base', 'pi pi-users', NULL, 'KPI', 4, 1, TRUE),
+(69, 'ACCOUNTANT', 'finance_invoices', 'ACTION', 'Invoices', 'Review fee invoice queue', 'pi pi-receipt', NULL, 'QUICK_ACTION', 5, 1, TRUE),
+(70, 'ACCOUNTANT', 'payroll', 'ACTION', 'Payroll', 'Open staff payroll operations', 'pi pi-wallet', '/app/staff/operations', 'QUICK_ACTION', 6, 1, TRUE),
+(71, 'ACCOUNTANT', 'fee_reminders', 'ACTION', 'Fee Reminders', 'Review overdue payment follow-ups', 'pi pi-send', NULL, 'QUICK_ACTION', 7, 1, TRUE),
+(72, 'ACCOUNTANT', 'finance_invoices', 'SHORTCUT', 'Invoices', 'Fee invoice status', 'pi pi-receipt', NULL, 'SHORTCUT', 8, 1, TRUE),
+(73, 'ACCOUNTANT', 'payroll', 'SHORTCUT', 'Payroll', 'Salary operations', 'pi pi-wallet', '/app/staff/operations', 'SHORTCUT', 9, 1, TRUE),
+(74, 'RECEPTIONIST', 'open_inquiries', 'KPI', 'Open Inquiries', 'Families in admission pipeline', 'pi pi-comments', NULL, 'KPI', 1, 1, TRUE),
+(75, 'RECEPTIONIST', 'due_followups', 'KPI', 'Due Follow-ups', 'Calls due today', 'pi pi-phone', NULL, 'KPI', 2, 1, TRUE),
+(76, 'RECEPTIONIST', 'pending_admissions', 'KPI', 'Applications', 'Admission files in progress', 'pi pi-user-plus', NULL, 'KPI', 3, 1, TRUE),
+(77, 'RECEPTIONIST', 'attendance_today', 'KPI', 'Attendance Today', 'Front office awareness', 'pi pi-calendar-check', NULL, 'KPI', 4, 1, TRUE),
+(78, 'RECEPTIONIST', 'frontdesk_inquiries', 'ACTION', 'Inquiry Pipeline', 'Open inquiry pipeline', 'pi pi-comments', '/app/inquiry/pipeline', 'QUICK_ACTION', 5, 1, TRUE),
+(79, 'RECEPTIONIST', 'frontdesk_followups', 'ACTION', 'Follow-ups', 'Call families due today', 'pi pi-phone', '/app/inquiry/follow-ups', 'QUICK_ACTION', 6, 1, TRUE),
+(80, 'RECEPTIONIST', 'frontdesk_admissions', 'ACTION', 'Applications', 'Review admission applications', 'pi pi-user-plus', '/app/inquiry/applications', 'QUICK_ACTION', 7, 1, TRUE),
+(81, 'RECEPTIONIST', 'student_profiles', 'ACTION', 'Student Lookup', 'Find student and parent records', 'pi pi-search', '/app/students/directory', 'QUICK_ACTION', 8, 1, TRUE),
+(82, 'RECEPTIONIST', 'frontdesk_inquiries', 'SHORTCUT', 'Inquiries', 'Admission inquiry queue', 'pi pi-comments', '/app/inquiry/pipeline', 'SHORTCUT', 9, 1, TRUE),
+(83, 'RECEPTIONIST', 'frontdesk_admissions', 'SHORTCUT', 'Applications', 'Admission files', 'pi pi-user-plus', '/app/inquiry/applications', 'SHORTCUT', 10, 1, TRUE),
+(84, 'COUNSELLOR', 'open_inquiries', 'KPI', 'Open Inquiries', 'Assigned inquiry pipeline', 'pi pi-comments', NULL, 'KPI', 1, 1, TRUE),
+(85, 'COUNSELLOR', 'due_followups', 'KPI', 'Due Follow-ups', 'Counselling callbacks', 'pi pi-phone', NULL, 'KPI', 2, 1, TRUE),
+(86, 'COUNSELLOR', 'pending_admissions', 'KPI', 'Admissions', 'Applications in progress', 'pi pi-user-plus', NULL, 'KPI', 3, 1, TRUE),
+(87, 'COUNSELLOR', 'frontdesk_inquiries', 'ACTION', 'Inquiry Pipeline', 'Work admission leads', 'pi pi-comments', '/app/inquiry/pipeline', 'QUICK_ACTION', 4, 1, TRUE),
+(88, 'COUNSELLOR', 'frontdesk_followups', 'ACTION', 'Follow-ups', 'Call due families', 'pi pi-phone', '/app/inquiry/follow-ups', 'QUICK_ACTION', 5, 1, TRUE),
+(89, 'COUNSELLOR', 'frontdesk_admissions', 'ACTION', 'Applications', 'Continue application files', 'pi pi-user-plus', '/app/inquiry/applications', 'QUICK_ACTION', 6, 1, TRUE),
+(90, 'PARENT', 'attendance_today', 'KPI', 'Attendance Today', 'Latest school attendance status', 'pi pi-calendar-check', NULL, 'KPI', 1, 1, TRUE),
+(91, 'PARENT', 'unpaid_invoices', 'KPI', 'Fee Status', 'Outstanding school fee items', 'pi pi-wallet', NULL, 'KPI', 2, 1, TRUE),
+(92, 'PARENT', 'open_alerts', 'KPI', 'School Alerts', 'Important updates', 'pi pi-bell', NULL, 'KPI', 3, 1, TRUE),
+(93, 'PARENT', 'children', 'ACTION', 'Child Profile', 'Review child record snapshot', 'pi pi-user', NULL, 'QUICK_ACTION', 4, 1, TRUE),
+(94, 'PARENT', 'parent_attendance', 'ACTION', 'Attendance', 'Check today attendance update', 'pi pi-calendar-check', NULL, 'QUICK_ACTION', 5, 1, TRUE),
+(95, 'PARENT', 'parent_fees', 'ACTION', 'Fees', 'Review fee status summary', 'pi pi-wallet', NULL, 'QUICK_ACTION', 6, 1, TRUE),
+(96, 'PARENT', 'children', 'SHORTCUT', 'Child Profile', 'Student and guardian information', 'pi pi-user', NULL, 'SHORTCUT', 7, 1, TRUE),
+(97, 'STUDENT', 'attendance_today', 'KPI', 'Attendance Today', 'Class attendance status', 'pi pi-calendar-check', NULL, 'KPI', 1, 1, TRUE),
+(98, 'STUDENT', 'class_absences', 'KPI', 'Exceptions', 'Absence or late marks', 'pi pi-exclamation-circle', NULL, 'KPI', 2, 1, TRUE),
+(99, 'STUDENT', 'open_alerts', 'KPI', 'Updates', 'School alerts and notices', 'pi pi-bell', NULL, 'KPI', 3, 1, TRUE),
+(100, 'STUDENT', 'student_profile', 'ACTION', 'My Profile', 'Review profile summary', 'pi pi-id-card', NULL, 'QUICK_ACTION', 4, 1, TRUE),
+(101, 'STUDENT', 'student_attendance', 'ACTION', 'Attendance', 'Check attendance snapshot', 'pi pi-calendar-check', NULL, 'QUICK_ACTION', 5, 1, TRUE),
+(102, 'STUDENT', 'student_documents', 'ACTION', 'Documents', 'Review document readiness', 'pi pi-folder', NULL, 'QUICK_ACTION', 6, 1, TRUE),
+(103, 'STUDENT', 'student_profile', 'SHORTCUT', 'Profile', 'Student record snapshot', 'pi pi-id-card', NULL, 'SHORTCUT', 7, 1, TRUE);
+
+-- ============================================
 -- 36. H2 IDENTITY RESTARTS FOR SEEDED DEV DATA
 -- ============================================
 ALTER TABLE users ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE organisation ALTER COLUMN org_id RESTART WITH 100;
+ALTER TABLE owner_details ALTER COLUMN owner_id RESTART WITH 100;
+ALTER TABLE organization_users ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE role_master ALTER COLUMN role_id RESTART WITH 100;
+ALTER TABLE privilege_master ALTER COLUMN privilege_id RESTART WITH 100;
+ALTER TABLE menu_master ALTER COLUMN menu_id RESTART WITH 100;
+ALTER TABLE sub_menu_master ALTER COLUMN sub_menu_id RESTART WITH 100;
+ALTER TABLE submenu_privilege_mapping ALTER COLUMN mapping_id RESTART WITH 1000;
+ALTER TABLE role_submenu_privilege_mapping ALTER COLUMN mapping_id RESTART WITH 1000;
+ALTER TABLE guardian ALTER COLUMN guardian_id RESTART WITH 100;
+ALTER TABLE address ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE student ALTER COLUMN student_id RESTART WITH 100;
+ALTER TABLE student_document ALTER COLUMN document_id RESTART WITH 100;
+ALTER TABLE inquiry ALTER COLUMN inquiry_id RESTART WITH 100;
+ALTER TABLE follow_up ALTER COLUMN id RESTART WITH 100;
 ALTER TABLE department ALTER COLUMN department_id RESTART WITH 100;
 ALTER TABLE branch ALTER COLUMN branch_id RESTART WITH 100;
 ALTER TABLE staff ALTER COLUMN staff_id RESTART WITH 100;
+ALTER TABLE attendance ALTER COLUMN id RESTART WITH 200;
+ALTER TABLE leave_requests ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE staff_payroll ALTER COLUMN id RESTART WITH 100;
 ALTER TABLE "CLASS" ALTER COLUMN class_id RESTART WITH 100;
 ALTER TABLE section ALTER COLUMN section_id RESTART WITH 100;
 ALTER TABLE courses ALTER COLUMN course_id RESTART WITH 100;
@@ -605,3 +954,35 @@ ALTER TABLE class_teacher_assignment ALTER COLUMN assignment_id RESTART WITH 100
 ALTER TABLE timetable_slot ALTER COLUMN slot_id RESTART WITH 100;
 ALTER TABLE academic_calendar_event ALTER COLUMN event_id RESTART WITH 100;
 ALTER TABLE academic_setting ALTER COLUMN setting_id RESTART WITH 100;
+ALTER TABLE audit_log ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE security_audit_log ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE system_event ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE dashboard_widget_config ALTER COLUMN id RESTART WITH 200;
+
+-- ============================================================================
+-- ACTIVITY LOG (Dashboard activity feed)
+-- ============================================================================
+INSERT INTO activity_log (organization_id, entity_type, entity_id, action,
+    description, performed_by, performed_at, created_at, updated_at, version, deleted) VALUES
+(1, 'STUDENT',    1,    'Student Enrolled',     'Aarav Sharma enrolled in Class 8-A for 2025-26',        'admin',     DATEADD('DAY', -6, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'STUDENT',    2,    'Student Enrolled',     'Priya Patel enrolled in Class 8-A for 2025-26',         'admin',     DATEADD('DAY', -6, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'STUDENT',    3,    'Student Enrolled',     'Rohit Kumar enrolled in Class 8-B for 2025-26',         'admin',     DATEADD('DAY', -6, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'INQUIRY',    1,    'New Inquiry',          'Walk-in inquiry from Vikram Singh for Class 8',         'reception', DATEADD('DAY', -5, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'INQUIRY',    2,    'Inquiry Contacted',    'Phone follow-up with Anjali Verma about Class 9',       'counselor', DATEADD('DAY', -5, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'ATTENDANCE', NULL, 'Attendance Marked',    'Class 8-A attendance marked: 28 present, 2 absent',     'teacher1',  DATEADD('DAY', -4, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'ATTENDANCE', NULL, 'Attendance Marked',    'Class 9-A attendance marked: 30 present, 0 absent',     'teacher2',  DATEADD('DAY', -4, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'ADMISSION',  1,    'Application Received', 'New admission application from Neha Gupta for Class 8', 'reception', DATEADD('DAY', -3, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'ADMISSION',  2,    'Application Approved', 'Admission approved for Siddharth Joshi, Class 10',      'admin',     DATEADD('DAY', -3, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'STAFF',      1,    'Staff Updated',        'Dr. Rajesh Kumar profile updated',                      'hr',        DATEADD('DAY', -2, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'LEAVE',      1,    'Leave Approved',       'Sick leave approved for Priya Sharma (May 25-26)',       'principal', DATEADD('DAY', -2, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'INQUIRY',    5,    'Inquiry Converted',    'Arjun Mehta inquiry converted to admission',            'counselor', DATEADD('DAY', -1, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'STUDENT',    5,    'Document Uploaded',    'Transfer certificate uploaded for Kavita Nair',          'admin',     DATEADD('DAY', -1, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'ATTENDANCE', NULL, 'Staff Attendance',     'Staff attendance: 15 present, 1 WFH, 1 on leave',       'hr',        DATEADD('HOUR', -12, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'STUDENT',    7,    'Student Created',      'New student Aditya Verma added to Class 10-A',          'admin',     DATEADD('HOUR', -6, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'PAYROLL',    NULL, 'Payroll Processed',    'May 2026 payroll processed for 15 staff members',       'accountant',DATEADD('HOUR', -3, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'INQUIRY',    8,    'Follow-up Scheduled',  'WhatsApp follow-up scheduled with Ramesh Iyer',         'counselor', DATEADD('HOUR', -2, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'ADMISSION',  3,    'Documents Pending',    'Waiting for birth certificate from Sneha Reddy',        'reception', DATEADD('HOUR', -1, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'ATTENDANCE', NULL, 'Attendance Marked',    'Class 10-A attendance marked for today',                'teacher3',  DATEADD('MINUTE', -30, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false),
+(1, 'STUDENT',    10,   'Fee Reminder Sent',    'Fee reminder sent to parent of Manish Tiwari',          'accountant',DATEADD('MINUTE', -15, CURRENT_TIMESTAMP), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, false);
+
+ALTER TABLE activity_log ALTER COLUMN id RESTART WITH 100;

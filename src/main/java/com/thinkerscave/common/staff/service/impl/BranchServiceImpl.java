@@ -1,5 +1,7 @@
 package com.thinkerscave.common.staff.service.impl;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.annotation.Transactional;
 import com.thinkerscave.common.context.OrganizationContext;
 import com.thinkerscave.common.staff.domain.Branch;
@@ -22,6 +24,7 @@ public class BranchServiceImpl implements BranchService {
     private final BranchRepository branchRepository;
 
     @Override
+    @Cacheable(value = "branches")
     public Map<String, Object> getAllActiveBranch() {
         Map<String, Object> data = new HashMap<>();
         try {
@@ -46,6 +49,8 @@ public class BranchServiceImpl implements BranchService {
     }
 
     @Override
+    @Transactional
+    @CacheEvict(value = "branches", allEntries = true)
     public Map<String, Object> saveOrUpdate(Branch branch) {
         Map<String, Object> data = new HashMap<>();
         try {

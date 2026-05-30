@@ -2,16 +2,22 @@ package com.thinkerscave.common.exception;
 
 import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import com.thinkerscave.common.orgm.service.TenantOnboardingService.TenantAlreadyExistsException;
 import com.thinkerscave.common.orgm.service.TenantOnboardingService.TenantOnboardingException;
@@ -262,6 +268,120 @@ public class GlobalExceptionHandler {
                                                 .status(400)
                                                 .code("INVALID_ARGUMENT")
                                                 .message(ex.getMessage())
+                                                .path(request.getRequestURI())
+                                                .correlationId(correlationId)
+                                                .build());
+        }
+
+        // ==================== Data & Type Errors ====================
+
+        @ExceptionHandler(ConstraintViolationException.class)
+        public ResponseEntity<ApiError> handleConstraintViolation(ConstraintViolationException ex,
+                        HttpServletRequest request) {
+                String correlationId = generateCorrelationId();
+
+                List<ApiError.FieldError> fieldErrors = ex.getConstraintViolations().stream()
+                                .map(v -> ApiError.FieldError.builder()
+                                                .field(v.getPropertyPath().toString())
+                                                .message(v.getMessage())
+                                                .rejectedValue(v.getInvalidValue())
+                                                .build())
+                                .collect(Collectors.toList());
+
+                log.info("[{}] Constraint violation with {} errors", correlationId, fieldErrors.size());
+
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                .body(ApiError.builder()
+                                                .status(400)
+                                                .code("CONSTRAINT_VIOLATION")
+                                                .message("Validation constraint violation")
+                                                .errors(fieldErrors)
+                                                .path(request.getRequestURI())
+                                                .correlationId(correlationId)
+                                                .build());
+        }
+
+        @ExceptionHandler(DataIntegrityViolationException.class)
+        public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException ex,
+                        HttpServletRequest request) {
+                String correlationId = generateCorrelationId();
+                log.warn("[{}] Data integrity violation: {}", correlationId, ex.getMostSpecificCause().getMessage());
+
+                return ResponseEntity.status(HttpStatus.CONFLICT)
+                                .body(ApiError.builder()
+                                                .status(409)
+                                                .code("DATA_INTEGRITY_VIOLATION")
+                                                .message("A data conflict occurred. The record may already exist or references invalid data.")
+                                                .path(request.getRequestURI())
+                                                .correlationId(correlationId)
+                                                .build());
+        }
+
+        @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+        public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex,
+                        HttpServletRequest request) {
+                String correlationId = generateCorrelationId();
+                String expectedType = ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown";
+                log.info("[{}] Type mismatch for parameter '{}': expected {}", correlationId, ex.getName(), expectedType);
+
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                .body(ApiError.builder()
+                                                .status(400)
+                                                .code("TYPE_MISMATCH")
+                                                .message(String.format("Parameter '%s' should be of type '%s'",
+                                                                ex.getName(), expectedType))
+                                                .path(request.getRequestURI())
+                                                .correlationId(correlationId)
+                                                .build());
+        }
+
+        @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+        public ResponseEntity<ApiError> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex,
+                        HttpServletRequest request) {
+                String correlationId = generateCorrelationId();
+                log.info("[{}] Method not supported: {} for {}", correlationId, ex.getMethod(),
+                                request.getRequestURI());
+
+                return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
+                                .body(ApiError.builder()
+                                                .status(405)
+                                                .code("METHOD_NOT_ALLOWED")
+                                                .message(String.format("HTTP method '%s' is not supported for this endpoint",
+                                                                ex.getMethod()))
+                                                .path(request.getRequestURI())
+                                                .correlationId(correlationId)
+                                                .build());
+        }
+
+        @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+        public ResponseEntity<ApiError> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex,
+                        HttpServletRequest request) {
+                String correlationId = generateCorrelationId();
+                log.info("[{}] Media type not supported: {}", correlationId, ex.getContentType());
+
+                return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                                .body(ApiError.builder()
+                                                .status(415)
+                                                .code("UNSUPPORTED_MEDIA_TYPE")
+                                                .message(String.format("Content type '%s' is not supported",
+                                                                ex.getContentType()))
+                                                .path(request.getRequestURI())
+                                                .correlationId(correlationId)
+                                                .build());
+        }
+
+        @ExceptionHandler(MissingServletRequestParameterException.class)
+        public ResponseEntity<ApiError> handleMissingParam(MissingServletRequestParameterException ex,
+                        HttpServletRequest request) {
+                String correlationId = generateCorrelationId();
+                log.info("[{}] Missing required parameter: '{}'", correlationId, ex.getParameterName());
+
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                .body(ApiError.builder()
+                                                .status(400)
+                                                .code("MISSING_PARAMETER")
+                                                .message(String.format("Required parameter '%s' of type '%s' is missing",
+                                                                ex.getParameterName(), ex.getParameterType()))
                                                 .path(request.getRequestURI())
                                                 .correlationId(correlationId)
                                                 .build());

@@ -1,11 +1,13 @@
 package com.thinkerscave.common.orgm.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 
 /**
@@ -14,11 +16,14 @@ import java.util.List;
  *
  * @author Sandeep
  */
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class SchemaService {
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private final JdbcTemplate jdbcTemplate;
+
+    private static final Pattern VALID_SCHEMA_NAME = Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]{0,62}$");
 
     private static final List<String> REQUIRED_TABLES = List.of(
             "menu", "organisation", "users", "owner_details",
@@ -27,13 +32,17 @@ public class SchemaService {
 
     /** Creates a schema if it does not already exist. */
     public void createSchema(String schemaName) {
-        jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + schemaName);
+        validateSchemaName(schemaName);
+        String safeName = "\"" + schemaName.replace("\"", "") + "\"";
+        jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS " + safeName);
+        log.info("Schema created or already exists: {}", schemaName);
     }
 
     /** Checks if the specified schema exists in the database. */
     public boolean schemaExists(String schemaName) {
+        validateSchemaName(schemaName);
         String sql = "SELECT schema_name FROM information_schema.schemata WHERE schema_name = ?";
-        return jdbcTemplate.queryForList(sql, schemaName).size() > 0;
+        return !jdbcTemplate.queryForList(sql, schemaName).isEmpty();
     }
 
     /** Returns a list of required tables that are missing in the given schema. */
@@ -54,5 +63,11 @@ public class SchemaService {
         }
 
         return missingTables;
+    }
+
+    private void validateSchemaName(String schemaName) {
+        if (schemaName == null || !VALID_SCHEMA_NAME.matcher(schemaName).matches()) {
+            throw new IllegalArgumentException("Invalid schema name: " + schemaName);
+        }
     }
 }

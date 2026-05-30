@@ -5,6 +5,8 @@ import com.thinkerscave.common.menum.domain.Role;
 import com.thinkerscave.common.usrm.dto.UserCreationContext;
 import com.thinkerscave.common.usrm.dto.UserRequestDTO;
 import com.thinkerscave.common.usrm.dto.UserResponseDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +21,8 @@ public interface UserService {
 	UserResponseDTO registerUser(UserRequestDTO dto);
 
 	List<UserResponseDTO> listUsers();
+
+	Page<UserResponseDTO> listUsers(Pageable pageable);
 
 	Optional<UserResponseDTO> getUserById(Long id);
 

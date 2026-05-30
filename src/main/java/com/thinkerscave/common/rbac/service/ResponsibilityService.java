@@ -12,6 +12,7 @@ import com.thinkerscave.common.rbac.domain.ResponsibilityPrivilege;
 import com.thinkerscave.common.rbac.domain.UserResponsibility;
 import com.thinkerscave.common.rbac.dto.ResponsibilityDTO;
 import com.thinkerscave.common.rbac.dto.UserResponsibilityDTO;
+import com.thinkerscave.common.rbac.mapper.RbacMapper;
 import com.thinkerscave.common.rbac.repository.ResponsibilityPrivilegeRepository;
 import com.thinkerscave.common.rbac.repository.ResponsibilityRepository;
 import com.thinkerscave.common.rbac.repository.UserResponsibilityRepository;
@@ -36,6 +37,7 @@ public class ResponsibilityService {
     private final ResponsibilityPrivilegeRepository privilegeRepository;
     private final UserResponsibilityRepository userResponsibilityRepository;
     private final AuditPublisher auditPublisher;
+    private final RbacMapper rbacMapper;
 
     public List<ResponsibilityDTO> list() {
         return responsibilityRepository.findByOrganizationId(currentOrgId())
@@ -114,7 +116,7 @@ public class ResponsibilityService {
     public List<UserResponsibilityDTO> listForUser(Long userId) {
         return userResponsibilityRepository
                 .findByUserIdAndOrganizationIdAndActive(userId, currentOrgId(), true)
-                .stream().map(this::toDto).toList();
+                .stream().map(rbacMapper::toDto).toList();
     }
 
     @Transactional
@@ -137,7 +139,7 @@ public class ResponsibilityService {
         ur = userResponsibilityRepository.save(ur);
         auditPublisher.publish(AuditEventType.CREATE, "USER_RESPONSIBILITY_ASSIGN", "UserResponsibility",
                 ur.getId(), "User " + dto.getUserId() + " assigned responsibility " + dto.getResponsibilityId());
-        return toDto(ur);
+        return rbacMapper.toDto(ur);
     }
 
     @Transactional
@@ -179,19 +181,6 @@ public class ResponsibilityService {
                 .scopeType(r.getScopeType())
                 .status(r.getStatus())
                 .privilegeIds(privIds)
-                .build();
-    }
-
-    private UserResponsibilityDTO toDto(UserResponsibility ur) {
-        return UserResponsibilityDTO.builder()
-                .id(ur.getId())
-                .userId(ur.getUserId())
-                .responsibilityId(ur.getResponsibilityId())
-                .scopeRefId(ur.getScopeRefId())
-                .academicYearId(ur.getAcademicYearId())
-                .validFrom(ur.getValidFrom())
-                .validTo(ur.getValidTo())
-                .active(ur.isActive())
                 .build();
     }
 

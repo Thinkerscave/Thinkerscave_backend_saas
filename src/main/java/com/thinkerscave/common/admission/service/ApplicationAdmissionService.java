@@ -147,6 +147,14 @@ public class ApplicationAdmissionService {
         return repository.findById(id).map(this::toResponse);
     }
 
+    @Transactional(readOnly = true)
+    public List<ApplicationAdmissionResponse> getAll(Long organizationId) {
+        return repository.findAll().stream()
+                .filter(application -> organizationId == null || organizationId.equals(application.getOrganizationId()))
+                .map(this::toResponse)
+                .toList();
+    }
+
     /**
      * Converts an ApplicationAdmission entity to a response DTO.
      *
@@ -156,18 +164,16 @@ public class ApplicationAdmissionService {
      * @since 2025-08-05
      */
     private ApplicationAdmissionResponse toResponse(ApplicationAdmission entity) {
-        // --- MODIFICATION START ---
-        // Assuming ApplicationAdmissionResponse also has nested DTOs for Address and EmergencyContact
-        AddressDto addressDto = new AddressDto(
-                entity.getAddress().getStreet(),
-                entity.getAddress().getCity(),
-                entity.getAddress().getState(),
-                entity.getAddress().getPincode()
+        AddressDto addressDto = entity.getAddress() == null ? null : new AddressDto(
+            entity.getAddress().getStreet(),
+            entity.getAddress().getCity(),
+            entity.getAddress().getState(),
+            entity.getAddress().getPincode()
         );
 
-        EmergencyContactDto emergencyContactDto = new EmergencyContactDto(
-                entity.getEmergencyContact().getName(),
-                entity.getEmergencyContact().getNumber()
+        EmergencyContactDto emergencyContactDto = entity.getEmergencyContact() == null ? null : new EmergencyContactDto(
+            entity.getEmergencyContact().getName(),
+            entity.getEmergencyContact().getNumber()
         );
 
         return ApplicationAdmissionResponse.builder()
@@ -186,7 +192,6 @@ public class ApplicationAdmissionService {
                 .status(entity.getStatus())
                 .internalComments(entity.getInternalComments())
                 .build();
-        // --- MODIFICATION END ---
     }
 
     @Transactional
@@ -392,7 +397,7 @@ public class ApplicationAdmissionService {
 
         // Audit fields
         student.setCreatedBy("System");
-        student.setCreatedDate(new Date());
+        student.setCreatedDate(Instant.now());
 
         return student;
     }

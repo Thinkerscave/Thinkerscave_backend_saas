@@ -6,7 +6,13 @@ import lombok.*;
 import java.time.LocalDate;
 
 @Entity
-@Table(name = "attendance")
+@Table(name = "attendance", indexes = {
+    @Index(name = "idx_attendance_org_date", columnList = "organization_id, attendance_date"),
+    @Index(name = "idx_attendance_ref_type", columnList = "reference_id, attendance_type"),
+    @Index(name = "idx_attendance_class_date", columnList = "class_id, attendance_date"),
+    @Index(name = "idx_attendance_type", columnList = "attendance_type"),
+    @Index(name = "idx_attendance_status", columnList = "status")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -53,6 +59,9 @@ public class Attendance extends Auditable {
     @Column(name = "section_name", length = 50)
     private String sectionName;
 
+    @Column(name = "section_id")
+    private Long sectionId;
+
     /** For staff attendance */
     @Column(name = "shift", length = 20)
     private String shift;
@@ -75,6 +84,6 @@ public class Attendance extends Auditable {
     }
 
     public enum AttendanceStatus {
-        PRESENT, ABSENT, LATE, EXCUSED, WFH, ON_LEAVE, NIGHT_OUT
+        PRESENT, ABSENT, LATE, EXCUSED, WFH, ON_LEAVE, NIGHT_OUT, HALF_DAY
     }
 }

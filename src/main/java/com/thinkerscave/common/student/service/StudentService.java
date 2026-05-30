@@ -2,6 +2,8 @@ package com.thinkerscave.common.student.service;
 
 import com.thinkerscave.common.student.domain.Student;
 import com.thinkerscave.common.student.dto.StudentRequestDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -14,6 +16,8 @@ public interface StudentService {
             List<String> types);
 
     public List<com.thinkerscave.common.student.dto.StudentResponseDTO> getAllStudents();
+
+    Page<com.thinkerscave.common.student.dto.StudentResponseDTO> getAllStudents(Pageable pageable);
 
     public com.thinkerscave.common.student.dto.StudentResponseDTO getStudentById(Long id);
 

@@ -1,6 +1,6 @@
 package com.thinkerscave.common.menum.dto;
 
-import java.util.Date;
+import java.time.Instant;
 
 import com.thinkerscave.common.enums.RoleType;
 
@@ -16,5 +16,5 @@ public class RoleDTO {
     private RoleType roleType;
     private Long organizationId;
     private String createdBy;
-    private Date lastModifiedDate; 
+    private Instant lastModifiedDate; 
 }
