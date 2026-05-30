@@ -13,6 +13,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class TopicDTO {
+    private Long topicId;
     private Integer topicNumber;
     private String topicName;
     private String description;

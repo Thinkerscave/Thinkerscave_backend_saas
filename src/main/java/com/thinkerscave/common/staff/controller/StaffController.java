@@ -42,7 +42,7 @@ public class StaffController {
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Get all staff members")
     @GetMapping("/getAllStaff")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'IT_SUPPORT') or hasAuthority('STAFF_DIRECTORY_VIEW')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'IT_SUPPORT', 'TEACHER') or hasAuthority('STAFF_DIRECTORY_VIEW')")
     public ResponseEntity<Map<String, Object>> getAllStaffDetails() {
         log.info("Fetching all staff details");
         Map<String, Object> result = staffService.getAllStaff();
@@ -56,7 +56,7 @@ public class StaffController {
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Get staff by code")
     @GetMapping("/getStaffByCode/{staffCode}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'IT_SUPPORT') or hasAuthority('STAFF_DIRECTORY_VIEW')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'IT_SUPPORT', 'TEACHER') or hasAuthority('STAFF_DIRECTORY_VIEW')")
     public ResponseEntity<Map<String, Object>> getStaffByCode(@PathVariable String staffCode) {
         log.info("Fetching staff by code: {}", staffCode);
         Map<String, Object> result = staffService.getByStaffCode(staffCode);

@@ -92,7 +92,7 @@ public class CourseController {
      * 🏛️ Business Rationale: Used in course detail pages and enrollment forms.
      */
     @GetMapping("/{courseId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_VIEW')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','TEACHER','STUDENT','PARENT') or hasAuthority('MANAGE_COURSES_VIEW')")
     @Operation(summary = "Fetch course profile", description = "Returns the full descriptive and administrative profile of a specific course.")
     public ResponseEntity<ApiResponse<CourseResponseDTO>> getCourse(@PathVariable Long courseId) {
         return ResponseEntity.ok(ApiResponse.success("Course fetched successfully", courseService.getCourse(courseId)));
@@ -110,7 +110,7 @@ public class CourseController {
      * @return List of all courses belonging to the organisation.
      */
     @GetMapping("/org/{orgId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_COURSES_VIEW')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','TEACHER','STUDENT','PARENT') or hasAuthority('MANAGE_COURSES_VIEW')")
     @Operation(summary = "List all institutional offerings", description = "Fetches the complete course catalogue for a specific SaaS tenant (Organization).")
     public ResponseEntity<ApiResponse<List<CourseResponseDTO>>> getAllCoursesByOrg(@PathVariable Long orgId) {
         return ResponseEntity.ok(ApiResponse.success("Courses fetched successfully", courseService.getAllCoursesByOrg(orgId)));

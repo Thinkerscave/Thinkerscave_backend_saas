@@ -54,7 +54,7 @@ public class StudentController {
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Get all students by organization")
     @GetMapping("/getStudents")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF', 'TEACHER')")
     public ResponseEntity<ApiResponse<List<com.thinkerscave.common.student.dto.StudentResponseDTO>>> getAllStudents() {
         log.info("Received request to get all students");
         return ResponseEntity.ok(ApiResponse.success(studentService.getAllStudents()));
@@ -62,14 +62,14 @@ public class StudentController {
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Get students (paginated)")
     @GetMapping("/paged")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF', 'TEACHER')")
     public ResponseEntity<ApiResponse<Page<StudentResponseDTO>>> getAllStudentsPaged(Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success(studentService.getAllStudents(pageable)));
     }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Get a student by ID")
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF', 'TEACHER')")
     public ResponseEntity<ApiResponse<com.thinkerscave.common.student.dto.StudentResponseDTO>> getStudentById(
             @PathVariable Long id) {
         log.info("Received request to get student by id: {}", id);
@@ -97,7 +97,7 @@ public class StudentController {
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Get student documents")
     @GetMapping("/{id}/documents")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF', 'TEACHER') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
     public ResponseEntity<ApiResponse<List<com.thinkerscave.common.student.dto.StudentDocumentDTO>>> getStudentDocuments(
             @PathVariable Long id) {
         log.info("Received request to get documents for student id: {}", id);
@@ -106,7 +106,7 @@ public class StudentController {
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Download a student document")
     @GetMapping("/document/{docId}/download")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF', 'TEACHER') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
     public ResponseEntity<Resource> downloadDocument(@PathVariable Long docId) {
         log.info("Received request to download document id: {}", docId);
         Resource file = studentService.downloadDocument(docId);

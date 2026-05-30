@@ -41,7 +41,7 @@ public class AcademicStructureController {
 	}
 
 	@GetMapping("/years/{orgId}")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('ACADEMIC_STRUCTURE_VIEW')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','TEACHER') or hasAuthority('ACADEMIC_STRUCTURE_VIEW')")
 	@Operation(summary = "Fetch institutional calendar history")
 	public ResponseEntity<ApiResponse<List<AcademicYearDTO>>> getAcademicYears(@PathVariable Long orgId) {
 		log.info("API Request - Get All Academic Years for Org: {}", orgId);
@@ -50,7 +50,7 @@ public class AcademicStructureController {
 	}
 
 	@GetMapping("/years/{orgId}/current")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('ACADEMIC_STRUCTURE_VIEW')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','TEACHER') or hasAuthority('ACADEMIC_STRUCTURE_VIEW')")
 	@Operation(summary = "Identify currently active session")
 	public ResponseEntity<ApiResponse<AcademicYearDTO>> getCurrentYear(@PathVariable Long orgId) {
 		log.info("API Request - Get Current Academic Year for Org: {}", orgId);
@@ -87,7 +87,7 @@ public class AcademicStructureController {
 	}
 
 	@GetMapping("/containers/{containerId}")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('ACADEMIC_STRUCTURE_VIEW')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','TEACHER') or hasAuthority('ACADEMIC_STRUCTURE_VIEW')")
 	@Operation(summary = "Fetch container profile")
 	public ResponseEntity<ApiResponse<AcademicContainerDTO>> getContainer(@PathVariable Long containerId) {
 		log.info("API Request - Get Container Profile: {}", containerId);
@@ -96,7 +96,7 @@ public class AcademicStructureController {
 	}
 
 	@GetMapping("/containers/org/{orgId}/year/{yearId}")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('ACADEMIC_STRUCTURE_VIEW')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','TEACHER') or hasAuthority('ACADEMIC_STRUCTURE_VIEW')")
 	@Operation(summary = "List root structural nodes")
 	public ResponseEntity<ApiResponse<List<AcademicContainerDTO>>> getTopLevelContainers(
 			@PathVariable Long orgId,
@@ -107,7 +107,7 @@ public class AcademicStructureController {
 	}
 
 	@GetMapping("/containers/{parentId}/children")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('ACADEMIC_STRUCTURE_VIEW')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','TEACHER') or hasAuthority('ACADEMIC_STRUCTURE_VIEW')")
 	@Operation(summary = "Drill-down into sub-containers")
 	public ResponseEntity<ApiResponse<List<AcademicContainerDTO>>> getChildContainers(@PathVariable Long parentId) {
 		log.info("API Request - Get Child Containers for Parent: {}", parentId);

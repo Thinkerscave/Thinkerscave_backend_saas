@@ -90,7 +90,7 @@ public class SubjectController {
      * portals.
      */
     @GetMapping("/{subjectId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_SUBJECTS_VIEW')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','TEACHER','STUDENT','PARENT') or hasAuthority('MANAGE_SUBJECTS_VIEW')")
     @Operation(summary = "Fetch subject definition", description = "Returns the full academic and administrative definition of a specific subject.", parameters = {
             @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
     })
@@ -106,7 +106,7 @@ public class SubjectController {
      * association wizards.
      */
     @GetMapping("/org/{orgId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_SUBJECTS_VIEW')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','TEACHER','STUDENT','PARENT') or hasAuthority('MANAGE_SUBJECTS_VIEW')")
     @Operation(summary = "List all subjects in an organization", description = "Fetches the master subject catalogue for a specific SaaS tenant.", parameters = {
             @io.swagger.v3.oas.annotations.Parameter(name = "X-Tenant-ID", description = "Tenant/Schema identifier (e.g., mumbai_school, delhi_school)", required = true, example = "mumbai_school", in = io.swagger.v3.oas.annotations.enums.ParameterIn.HEADER)
     })

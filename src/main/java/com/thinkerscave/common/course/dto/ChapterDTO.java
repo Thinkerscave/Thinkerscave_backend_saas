@@ -15,6 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChapterDTO {
+    private Long chapterId;
     private Integer chapterNumber;
     private String chapterName;
     private String description;

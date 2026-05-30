@@ -62,7 +62,7 @@ public class SyllabusController {
          * Detailed retrieval including deep nesting (Chapters -> Topics).
          */
         @GetMapping("/{syllabusId}")
-        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_SYLLABUS_VIEW')")
+        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','TEACHER','STUDENT','PARENT') or hasAuthority('MANAGE_SYLLABUS_VIEW')")
         @Operation(summary = "Get syllabus details", description = "Returns the full hierarchy of a specific syllabus version.")
         public ResponseEntity<SyllabusResponseDTO> getSyllabus(@PathVariable Long syllabusId) {
                 return ResponseEntity.ok(syllabusService.getSyllabus(syllabusId));
@@ -72,7 +72,7 @@ public class SyllabusController {
          * Main endpoint for student/teacher dashboards.
          */
         @GetMapping("/subject/{subjectId}/latest")
-        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('MANAGE_SYLLABUS_VIEW')")
+        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','TEACHER','STUDENT','PARENT') or hasAuthority('MANAGE_SYLLABUS_VIEW')")
         @Operation(summary = "Get latest curriculum for a subject", description = "Fetches the highest version number available for a given subject.")
         public ResponseEntity<SyllabusResponseDTO> getLatestSyllabus(@PathVariable Long subjectId) {
                 try {
@@ -146,7 +146,7 @@ public class SyllabusController {
          * Analytical view of a student's learning journey.
          */
         @GetMapping("/progress/student/{studentId}/syllabus/{syllabusId}")
-        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'TEACHER') or hasAuthority('MANAGE_SYLLABUS_VIEW')")
+        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'TEACHER', 'STUDENT', 'PARENT') or hasAuthority('MANAGE_SYLLABUS_VIEW')")
         @Operation(summary = "Fetch student progress report", description = "Calculates percentage of completion and details per topic.")
         public ResponseEntity<Map<String, Object>> getProgressReport(
                         @PathVariable Long studentId,

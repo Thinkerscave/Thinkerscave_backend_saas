@@ -466,6 +466,7 @@ public class SyllabusServiceImpl implements SyllabusService {
      */
     private ChapterDTO mapToChapterDTO(Chapter chapter) {
         return ChapterDTO.builder()
+            .chapterId(chapter.getChapterId())
                 .chapterNumber(chapter.getChapterNumber())
                 .chapterName(chapter.getChapterName())
                 .description(chapter.getDescription())
@@ -480,6 +481,7 @@ public class SyllabusServiceImpl implements SyllabusService {
      */
     private TopicDTO mapToTopicDTO(Topic topic) {
         return TopicDTO.builder()
+            .topicId(topic.getTopicId())
                 .topicNumber(topic.getTopicNumber())
                 .topicName(topic.getTopicName())
                 .description(topic.getDescription())
