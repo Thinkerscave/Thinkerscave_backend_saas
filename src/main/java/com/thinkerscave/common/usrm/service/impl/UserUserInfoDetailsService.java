@@ -29,15 +29,17 @@ public class UserUserInfoDetailsService implements UserDetailsService {
 	@Override
 	@Transactional(readOnly = true)
 	public UserInfoUserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+		String normalizedUsername = username != null ? username.trim() : null;
+
 		// First try to find by username
-		Optional<User> userObj = userRepository.findByUserName(username);
+		Optional<User> userObj = userRepository.findByUserNameIgnoreCase(normalizedUsername);
 
 		// If not found, try to find by email
 		if (userObj.isEmpty()) {
-			userObj = userRepository.findByEmail(username);
+			userObj = userRepository.findByEmailIgnoreCase(normalizedUsername);
 		}
 
-		User user = userObj.orElseThrow(() -> new UsernameNotFoundException("User Not Found :" + username));
+		User user = userObj.orElseThrow(() -> new UsernameNotFoundException("User Not Found :" + normalizedUsername));
 
 		List<RoleMenuPrivilegeMapping> matrixMappings = new ArrayList<>();
 		if (user.getRoles() != null && !user.getRoles().isEmpty()) {

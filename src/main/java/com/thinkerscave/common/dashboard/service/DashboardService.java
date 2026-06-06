@@ -172,7 +172,10 @@ public class DashboardService {
                                 activities(snapshot),
                                 alerts(snapshot),
                                 shortcuts(visibleConfig, snapshot),
-                                new DashboardWorkspaceDTO.SearchMeta("Search students, staff, parents, classes, invoices", SEARCH_CATEGORIES));
+                                new DashboardWorkspaceDTO.SearchMeta("Search students, staff, parents, classes, invoices", SEARCH_CATEGORIES),
+                                charts(context, snapshot),
+                                profileCard(context, snapshot),
+                                financialSummary(context, snapshot));
         }
 
         public DashboardSearchDTO search(String query) {
@@ -883,6 +886,444 @@ public class DashboardService {
                 long score = 100 - (unresolved * 6) - Math.min(20, overdueInvoices * 2) - Math.min(15, absences);
                 return Math.max(65, Math.min(100, score));
         }
+
+        // -----------------------------------------------------------------------
+        // Role-aware dashboard sections (charts, profile card, finance summary)
+        // -----------------------------------------------------------------------
+
+        /**
+         * Collapses every supported role code (legacy + ERP spec naming) into
+         * a stable canonical bucket used to drive role-specific dashboard sections.
+         */
+        private String canonicalRole(String role) {
+                String normalized = nullToEmpty(role).trim().toUpperCase(Locale.ROOT);
+                return switch (normalized) {
+                        case "SUPERADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN" -> "SUPERADMIN";
+                        case "ORGANIZATION_OWNER", "OWNER", "PRINCIPAL", "DIRECTOR" -> "OWNER";
+                        case "ORGANIZATION_ADMIN", "ADMIN", "HEADMASTER", "VICE_PRINCIPAL" -> "ADMIN";
+                        case "STUDENT" -> "STUDENT";
+                        case "PARENT", "GUARDIAN" -> "PARENT";
+                        default -> "STAFF";
+                };
+        }
+
+        private List<DashboardWorkspaceDTO.ChartSection> charts(DashboardContext context, DashboardSnapshot snapshot) {
+                String role = canonicalRole(context.primaryRoleCode());
+                return switch (role) {
+                        case "SUPERADMIN" -> List.of(
+                                        admissionsFunnelChart(snapshot),
+                                        studentDistributionChart(snapshot),
+                                        attendanceTrendChart(snapshot, 30));
+                        case "OWNER" -> List.of(
+                                        enrollmentTrendChart(snapshot, 6),
+                                        revenueTrendChart(snapshot, 6),
+                                        admissionsFunnelChart(snapshot));
+                        case "ADMIN" -> List.of(
+                                        attendanceTrendChart(snapshot, 30),
+                                        studentDistributionChart(snapshot),
+                                        staffStatusChart(snapshot));
+                        case "STAFF" -> List.of(
+                                        attendanceTrendChart(snapshot, 14),
+                                        myClassDistributionChart(context, snapshot));
+                        case "STUDENT" -> {
+                                Optional<Student> me = studentForUser(snapshot.students(), context.user());
+                                yield List.of(
+                                                personalAttendanceChart(me, snapshot),
+                                                personalFeeStatusChart(me, snapshot));
+                        }
+                        case "PARENT" -> {
+                                List<Student> kids = childrenForUser(snapshot.students(), context.user());
+                                Optional<Student> firstChild = kids.stream().findFirst();
+                                yield List.of(
+                                                personalAttendanceChart(firstChild, snapshot),
+                                                personalFeeStatusChart(firstChild, snapshot));
+                        }
+                        default -> List.of();
+                };
+        }
+
+        private DashboardWorkspaceDTO.ChartSection admissionsFunnelChart(DashboardSnapshot snapshot) {
+                long totalInquiries = snapshot.inquiries().size();
+                long interested = snapshot.inquiries().stream()
+                                .filter(i -> i.getStatus() == InquiryStatus.INTERESTED
+                                                || i.getStatus() == InquiryStatus.FOLLOW_UP_REQUIRED
+                                                || i.getStatus() == InquiryStatus.READY_FOR_ADMISSION).count();
+                long applications = snapshot.applications().size();
+                long underReview = snapshot.applications().stream()
+                                .filter(a -> a.getStatus() == ApplicationStatus.UNDER_REVIEW).count();
+                long approved = snapshot.applications().stream()
+                                .filter(a -> a.getStatus() == ApplicationStatus.APPROVED).count();
+
+                List<String> labels = List.of("Inquiries", "Interested", "Applications", "Under Review", "Approved");
+                List<Number> data = List.of(totalInquiries, interested, applications, underReview, approved);
+                return new DashboardWorkspaceDTO.ChartSection(
+                                "admissions_funnel",
+                                "Admissions Funnel",
+                                "End-to-end conversion across the admission pipeline",
+                                "bar",
+                                labels,
+                                List.of(new DashboardWorkspaceDTO.ChartDataset("Applicants", data, "info")),
+                                totalInquiries == 0 ? "neutral" : "info",
+                                totalInquiries == 0 ? "No admissions activity yet" : null);
+        }
+
+        private DashboardWorkspaceDTO.ChartSection studentDistributionChart(DashboardSnapshot snapshot) {
+                Map<String, Long> byClass = snapshot.students().stream()
+                                .filter(s -> Boolean.TRUE.equals(s.getIsActive()))
+                                .collect(Collectors.groupingBy(
+                                                s -> s.getClassEntity() == null ? "Unassigned" : s.getClassEntity().getClassName(),
+                                                LinkedHashMap::new,
+                                                Collectors.counting()));
+                List<String> labels = new ArrayList<>(byClass.keySet());
+                List<Number> data = byClass.values().stream().map(v -> (Number) v).toList();
+                return new DashboardWorkspaceDTO.ChartSection(
+                                "student_distribution",
+                                "Student Distribution",
+                                "Active students grouped by class",
+                                "doughnut",
+                                labels,
+                                List.of(new DashboardWorkspaceDTO.ChartDataset("Students", data, "info")),
+                                data.isEmpty() ? "neutral" : "info",
+                                data.isEmpty() ? "No active students yet" : null);
+        }
+
+        private DashboardWorkspaceDTO.ChartSection attendanceTrendChart(DashboardSnapshot snapshot, int days) {
+                LocalDate today = LocalDate.now();
+                LocalDate from = today.minusDays(days - 1L);
+                Long orgId = snapshot.organizationId();
+                List<Attendance> range = orgId == null ? List.of()
+                                : attendanceRepository
+                                                .findByOrganizationIdAndAttendanceDateBetween(orgId, from, today)
+                                                .stream()
+                                                .filter(a -> a.getAttendanceType() == AttendanceType.CLASS)
+                                                .toList();
+
+                Map<LocalDate, long[]> byDay = new LinkedHashMap<>();
+                for (int offset = 0; offset < days; offset++) {
+                        byDay.put(from.plusDays(offset), new long[]{0L, 0L}); // [present, total]
+                }
+                for (Attendance a : range) {
+                        long[] bucket = byDay.get(a.getAttendanceDate());
+                        if (bucket == null) continue;
+                        bucket[1]++;
+                        if (a.getStatus() == AttendanceStatus.PRESENT || a.getStatus() == AttendanceStatus.LATE) {
+                                bucket[0]++;
+                        }
+                }
+
+                List<String> labels = byDay.keySet().stream()
+                                .map(d -> d.getMonth().name().substring(0, 3) + " " + d.getDayOfMonth())
+                                .toList();
+                List<Number> data = byDay.values().stream()
+                                .map(arr -> arr[1] == 0 ? 0 : Math.round((arr[0] * 100.0) / arr[1]))
+                                .map(v -> (Number) v)
+                                .toList();
+                boolean hasData = range.size() > 0;
+                return new DashboardWorkspaceDTO.ChartSection(
+                                "attendance_trend",
+                                "Attendance Trend",
+                                "Daily attendance % for the last " + days + " days",
+                                "line",
+                                labels,
+                                List.of(new DashboardWorkspaceDTO.ChartDataset("Attendance %", data, "success")),
+                                hasData ? "success" : "neutral",
+                                hasData ? null : "No attendance recorded in this period");
+        }
+
+        private DashboardWorkspaceDTO.ChartSection enrollmentTrendChart(DashboardSnapshot snapshot, int months) {
+                LocalDate today = LocalDate.now();
+                Map<String, Long> byMonth = new LinkedHashMap<>();
+                for (int offset = months - 1; offset >= 0; offset--) {
+                        LocalDate month = today.minusMonths(offset);
+                        byMonth.put(month.getMonth().name().substring(0, 3) + " " + month.getYear(), 0L);
+                }
+                snapshot.students().stream()
+                                .map(Student::getCreatedDate)
+                                .filter(Objects::nonNull)
+                                .map(instant -> instant.atZone(java.time.ZoneId.systemDefault()).toLocalDate())
+                                .filter(d -> !d.isBefore(today.minusMonths(months)))
+                                .forEach(d -> {
+                                        String key = d.getMonth().name().substring(0, 3) + " " + d.getYear();
+                                        byMonth.computeIfPresent(key, (k, v) -> v + 1);
+                                });
+                List<String> labels = new ArrayList<>(byMonth.keySet());
+                List<Number> data = byMonth.values().stream().map(v -> (Number) v).toList();
+                long total = data.stream().mapToLong(Number::longValue).sum();
+                return new DashboardWorkspaceDTO.ChartSection(
+                                "enrollment_trend",
+                                "Enrollment Trend",
+                                "New student enrollments over the last " + months + " months",
+                                "line",
+                                labels,
+                                List.of(new DashboardWorkspaceDTO.ChartDataset("New Students", data, "info")),
+                                total > 0 ? "info" : "neutral",
+                                total > 0 ? null : "No enrollments recorded yet");
+        }
+
+        private DashboardWorkspaceDTO.ChartSection revenueTrendChart(DashboardSnapshot snapshot, int months) {
+                LocalDate today = LocalDate.now();
+                Map<String, BigDecimal> byMonth = new LinkedHashMap<>();
+                for (int offset = months - 1; offset >= 0; offset--) {
+                        LocalDate month = today.minusMonths(offset);
+                        byMonth.put(month.getMonth().name().substring(0, 3) + " " + month.getYear(), BigDecimal.ZERO);
+                }
+                snapshot.invoices().forEach(invoice -> {
+                        LocalDate issued = invoice.getIssueDate();
+                        if (issued == null || issued.isBefore(today.minusMonths(months))) return;
+                        String key = issued.getMonth().name().substring(0, 3) + " " + issued.getYear();
+                        BigDecimal amount = Optional.ofNullable(invoice.getPaidAmount()).orElse(BigDecimal.ZERO);
+                        byMonth.computeIfPresent(key, (k, v) -> v.add(amount));
+                });
+                List<String> labels = new ArrayList<>(byMonth.keySet());
+                List<Number> data = byMonth.values().stream()
+                                .map(v -> (Number) v.setScale(0, java.math.RoundingMode.HALF_UP))
+                                .toList();
+                BigDecimal total = byMonth.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+                return new DashboardWorkspaceDTO.ChartSection(
+                                "revenue_trend",
+                                "Revenue Trend",
+                                "Collected fee revenue over the last " + months + " months",
+                                "line",
+                                labels,
+                                List.of(new DashboardWorkspaceDTO.ChartDataset("Revenue", data, "success")),
+                                total.signum() > 0 ? "success" : "neutral",
+                                total.signum() > 0 ? null : "No revenue recorded yet");
+        }
+
+        private DashboardWorkspaceDTO.ChartSection staffStatusChart(DashboardSnapshot snapshot) {
+                long active = snapshot.staff().stream().filter(s -> Boolean.TRUE.equals(s.getIsActive())).count();
+                long onLeaveToday = snapshot.leaves().stream()
+                                .filter(leave -> leave.getStatus() == LeaveStatus.APPROVED)
+                                .filter(leave -> leave.getStartDate() != null && leave.getEndDate() != null)
+                                .filter(leave -> !LocalDate.now().isBefore(leave.getStartDate())
+                                                && !LocalDate.now().isAfter(leave.getEndDate()))
+                                .count();
+                long pendingLeaves = snapshot.leaves().stream()
+                                .filter(leave -> leave.getStatus() == LeaveStatus.PENDING).count();
+                long inactive = Math.max(0L, snapshot.staff().size() - active);
+                return new DashboardWorkspaceDTO.ChartSection(
+                                "staff_status",
+                                "Staff Status",
+                                "Today's staff availability snapshot",
+                                "doughnut",
+                                List.of("Active", "On Leave", "Pending Leave", "Inactive"),
+                                List.of(new DashboardWorkspaceDTO.ChartDataset(
+                                                "Staff",
+                                                List.of(active, onLeaveToday, pendingLeaves, inactive),
+                                                "info")),
+                                snapshot.staff().isEmpty() ? "neutral" : "info",
+                                snapshot.staff().isEmpty() ? "No staff profiles yet" : null);
+        }
+
+        private DashboardWorkspaceDTO.ChartSection myClassDistributionChart(DashboardContext context, DashboardSnapshot snapshot) {
+                List<Attendance> mine = snapshot.todayClassAttendance().stream()
+                                .filter(a -> context.username().equalsIgnoreCase(nullToEmpty(a.getMarkedBy())))
+                                .toList();
+                long present = mine.stream().filter(a -> a.getStatus() == AttendanceStatus.PRESENT || a.getStatus() == AttendanceStatus.LATE).count();
+                long absent = mine.stream().filter(a -> a.getStatus() == AttendanceStatus.ABSENT).count();
+                long leave = mine.stream().filter(a -> a.getStatus() == AttendanceStatus.ON_LEAVE || a.getStatus() == AttendanceStatus.EXCUSED).count();
+                return new DashboardWorkspaceDTO.ChartSection(
+                                "my_class_attendance",
+                                "My Class Attendance",
+                                "Today's attendance you've marked",
+                                "doughnut",
+                                List.of("Present", "Absent", "On Leave"),
+                                List.of(new DashboardWorkspaceDTO.ChartDataset(
+                                                "Students",
+                                                List.of(present, absent, leave),
+                                                "success")),
+                                mine.isEmpty() ? "neutral" : "success",
+                                mine.isEmpty() ? "You haven't marked attendance today" : null);
+        }
+
+        private DashboardWorkspaceDTO.ChartSection personalAttendanceChart(Optional<Student> student, DashboardSnapshot snapshot) {
+                long present = 0;
+                long absent = 0;
+                long leave = 0;
+                if (student.isPresent()) {
+                        Long sid = student.get().getStudentId();
+                        Long orgId = snapshot.organizationId();
+                        LocalDate today = LocalDate.now();
+                        LocalDate from = today.minusDays(29);
+                        List<Attendance> personal = orgId == null ? List.of()
+                                        : attendanceRepository
+                                                        .findByOrganizationIdAndAttendanceDateBetween(orgId, from, today)
+                                                        .stream()
+                                                        .filter(a -> a.getAttendanceType() == AttendanceType.CLASS)
+                                                        .filter(a -> Objects.equals(a.getReferenceId(), sid))
+                                                        .toList();
+                        present = personal.stream().filter(a -> a.getStatus() == AttendanceStatus.PRESENT || a.getStatus() == AttendanceStatus.LATE).count();
+                        absent = personal.stream().filter(a -> a.getStatus() == AttendanceStatus.ABSENT).count();
+                        leave = personal.stream().filter(a -> a.getStatus() == AttendanceStatus.ON_LEAVE || a.getStatus() == AttendanceStatus.EXCUSED).count();
+                }
+                long total = present + absent + leave;
+                return new DashboardWorkspaceDTO.ChartSection(
+                                "personal_attendance",
+                                "Attendance · Last 30 Days",
+                                total == 0 ? "No attendance recorded yet" : present + " of " + total + " days present",
+                                "doughnut",
+                                List.of("Present", "Absent", "Leave"),
+                                List.of(new DashboardWorkspaceDTO.ChartDataset(
+                                                "Days",
+                                                List.of(present, absent, leave),
+                                                "success")),
+                                total == 0 ? "neutral" : "success",
+                                total == 0 ? "Attendance will appear here once recorded" : null);
+        }
+
+        private DashboardWorkspaceDTO.ChartSection personalFeeStatusChart(Optional<Student> student, DashboardSnapshot snapshot) {
+                long paid = 0;
+                long pending = 0;
+                long overdue = 0;
+                if (student.isPresent()) {
+                        Long sid = student.get().getStudentId();
+                        List<FeeInvoice> mine = snapshot.invoices().stream()
+                                        .filter(inv -> Objects.equals(inv.getStudentId(), sid))
+                                        .toList();
+                        paid = mine.stream().filter(inv -> inv.getStatus() == InvoiceStatus.PAID).count();
+                        pending = mine.stream().filter(this::isUnpaidInvoice).filter(inv -> !isOverdueInvoice(inv)).count();
+                        overdue = mine.stream().filter(this::isOverdueInvoice).count();
+                }
+                long total = paid + pending + overdue;
+                return new DashboardWorkspaceDTO.ChartSection(
+                                "personal_fees",
+                                "Fee Status",
+                                total == 0 ? "No invoices issued yet" : total + " invoice" + plural(total),
+                                "doughnut",
+                                List.of("Paid", "Pending", "Overdue"),
+                                List.of(new DashboardWorkspaceDTO.ChartDataset(
+                                                "Invoices",
+                                                List.of(paid, pending, overdue),
+                                                "info")),
+                                overdue > 0 ? "danger" : total > 0 ? "info" : "neutral",
+                                total == 0 ? "Fee invoices will appear once generated" : null);
+        }
+
+        private DashboardWorkspaceDTO.ProfileCard profileCard(DashboardContext context, DashboardSnapshot snapshot) {
+                String role = canonicalRole(context.primaryRoleCode());
+                if ("STUDENT".equals(role)) {
+                        Optional<Student> studentOpt = studentForUser(snapshot.students(), context.user());
+                        if (studentOpt.isEmpty()) return null;
+                        Student s = studentOpt.get();
+                        Map<String, Long> counts = personalAttendanceCounts(s, snapshot);
+                        long total = counts.values().stream().mapToLong(Long::longValue).sum();
+                        long present = counts.getOrDefault("present", 0L);
+                        Integer rate = total == 0 ? null : (int) Math.round((present * 100.0) / total);
+                        Guardian parent = s.getParent();
+                        return new DashboardWorkspaceDTO.ProfileCard(
+                                        fullName(s.getFirstName(), s.getMiddleName(), s.getLastName()),
+                                        "Student",
+                                        s.getClassEntity() == null ? "Class not assigned" : s.getClassEntity().getClassName(),
+                                        s.getSection() == null ? null : s.getSection().getSectionName(),
+                                        s.getRollNumber(),
+                                        initials(s.getFirstName(), s.getLastName()),
+                                        s.getMobileNumber() == null ? null : String.valueOf(s.getMobileNumber()),
+                                        s.getEmail(),
+                                        rate,
+                                        present,
+                                        counts.getOrDefault("absent", 0L),
+                                        total,
+                                        parent == null ? null : fullName(parent.getFirstName(), parent.getMiddleName(), parent.getLastName()),
+                                        null);
+                }
+                if ("PARENT".equals(role)) {
+                        List<Student> kids = childrenForUser(snapshot.students(), context.user());
+                        if (kids.isEmpty()) return null;
+                        Student child = kids.get(0);
+                        Map<String, Long> counts = personalAttendanceCounts(child, snapshot);
+                        long total = counts.values().stream().mapToLong(Long::longValue).sum();
+                        long present = counts.getOrDefault("present", 0L);
+                        Integer rate = total == 0 ? null : (int) Math.round((present * 100.0) / total);
+                        return new DashboardWorkspaceDTO.ProfileCard(
+                                        fullName(child.getFirstName(), child.getMiddleName(), child.getLastName()),
+                                        kids.size() > 1 ? "Child · " + kids.size() + " linked" : "Child",
+                                        child.getClassEntity() == null ? "Class not assigned" : child.getClassEntity().getClassName(),
+                                        child.getSection() == null ? null : child.getSection().getSectionName(),
+                                        child.getRollNumber(),
+                                        initials(child.getFirstName(), child.getLastName()),
+                                        child.getMobileNumber() == null ? null : String.valueOf(child.getMobileNumber()),
+                                        child.getEmail(),
+                                        rate,
+                                        present,
+                                        counts.getOrDefault("absent", 0L),
+                                        total,
+                                        context.displayName(),
+                                        null);
+                }
+                return null;
+        }
+
+        private Map<String, Long> personalAttendanceCounts(Student student, DashboardSnapshot snapshot) {
+                Long orgId = snapshot.organizationId();
+                if (orgId == null || student == null) {
+                        return Map.of();
+                }
+                LocalDate today = LocalDate.now();
+                LocalDate from = today.minusDays(29);
+                List<Attendance> rows = attendanceRepository
+                                .findByOrganizationIdAndAttendanceDateBetween(orgId, from, today)
+                                .stream()
+                                .filter(a -> a.getAttendanceType() == AttendanceType.CLASS)
+                                .filter(a -> Objects.equals(a.getReferenceId(), student.getStudentId()))
+                                .toList();
+                long present = rows.stream().filter(a -> a.getStatus() == AttendanceStatus.PRESENT || a.getStatus() == AttendanceStatus.LATE).count();
+                long absent = rows.stream().filter(a -> a.getStatus() == AttendanceStatus.ABSENT).count();
+                long leave = rows.stream().filter(a -> a.getStatus() == AttendanceStatus.ON_LEAVE || a.getStatus() == AttendanceStatus.EXCUSED).count();
+                Map<String, Long> out = new LinkedHashMap<>();
+                out.put("present", present);
+                out.put("absent", absent);
+                out.put("leave", leave);
+                return out;
+        }
+
+        private DashboardWorkspaceDTO.FinancialSummary financialSummary(DashboardContext context, DashboardSnapshot snapshot) {
+                String role = canonicalRole(context.primaryRoleCode());
+                if (!isAny(role, "SUPERADMIN", "OWNER", "ADMIN")) {
+                        return null;
+                }
+                BigDecimal totalRevenue = snapshot.invoices().stream()
+                                .map(inv -> Optional.ofNullable(inv.getTotalAmount()).orElse(BigDecimal.ZERO))
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal paid = snapshot.invoices().stream()
+                                .map(inv -> Optional.ofNullable(inv.getPaidAmount()).orElse(BigDecimal.ZERO))
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal pending = snapshot.invoices().stream()
+                                .filter(this::isUnpaidInvoice)
+                                .filter(inv -> !isOverdueInvoice(inv))
+                                .map(inv -> Optional.ofNullable(inv.getBalanceAmount()).orElse(BigDecimal.ZERO))
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                BigDecimal overdueAmount = snapshot.invoices().stream()
+                                .filter(this::isOverdueInvoice)
+                                .map(inv -> Optional.ofNullable(inv.getBalanceAmount()).orElse(BigDecimal.ZERO))
+                                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                long invoicesPaid = snapshot.invoices().stream().filter(inv -> inv.getStatus() == InvoiceStatus.PAID).count();
+                long invoicesPending = snapshot.invoices().stream().filter(this::isUnpaidInvoice).filter(inv -> !isOverdueInvoice(inv)).count();
+                long invoicesOverdue = snapshot.invoices().stream().filter(this::isOverdueInvoice).count();
+                String helper = snapshot.invoices().isEmpty()
+                                ? "No invoices generated yet"
+                                : invoicesOverdue + " invoice" + plural(invoicesOverdue) + " overdue";
+                return new DashboardWorkspaceDTO.FinancialSummary(
+                                "₹",
+                                money(totalRevenue),
+                                money(paid),
+                                money(pending),
+                                money(overdueAmount),
+                                invoicesPaid,
+                                invoicesPending,
+                                invoicesOverdue,
+                                helper);
+        }
+
+        private String initials(String first, String last) {
+                String f = nullToEmpty(first).trim();
+                String l = nullToEmpty(last).trim();
+                String fi = f.isEmpty() ? "" : f.substring(0, 1).toUpperCase(Locale.ROOT);
+                String li = l.isEmpty() ? "" : l.substring(0, 1).toUpperCase(Locale.ROOT);
+                String out = fi + li;
+                return out.isEmpty() ? "??" : out;
+        }
+
+        // -----------------------------------------------------------------------
 
         private Long countForShortcut(String key, DashboardSnapshot snapshot) {
                 return switch (key) {

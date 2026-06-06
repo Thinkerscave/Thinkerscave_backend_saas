@@ -9,4 +9,6 @@ public interface ClassRepository extends JpaRepository<ClassEntity, Long> {
 
     // Multi-tenant: always scope class lookups to the caller's organization
     List<ClassEntity> findByOrganizationId(Long organizationId);
+
+    long countByOrganizationId(Long organizationId);
 }

@@ -14,7 +14,10 @@ public record DashboardWorkspaceDTO(
         List<Activity> recentActivities,
         List<Alert> smartAlerts,
         List<Shortcut> moduleShortcuts,
-        SearchMeta search) {
+        SearchMeta search,
+        List<ChartSection> charts,
+        ProfileCard profileCard,
+        FinancialSummary financialSummary) {
 
     public record UserContext(
             Long userId,
@@ -121,5 +124,51 @@ public record DashboardWorkspaceDTO(
     public record SearchMeta(
             String placeholder,
             List<String> categories) {
+    }
+
+    public record ChartSection(
+            String key,
+            String title,
+            String subtitle,
+            String type,            // "line" | "bar" | "doughnut" | "pie"
+            List<String> labels,
+            List<ChartDataset> datasets,
+            String tone,
+            String emptyMessage) {
+    }
+
+    public record ChartDataset(
+            String label,
+            List<Number> data,
+            String tone) {
+    }
+
+    public record ProfileCard(
+            String displayName,
+            String roleLabel,
+            String classLabel,
+            String sectionLabel,
+            String rollNumber,
+            String avatarInitials,
+            String contactPhone,
+            String contactEmail,
+            Integer attendanceRate,
+            Long presentDays,
+            Long absentDays,
+            Long totalDays,
+            String childOf,
+            String classTeacherName) {
+    }
+
+    public record FinancialSummary(
+            String currencySymbol,
+            String totalRevenue,
+            String paid,
+            String pending,
+            String overdue,
+            Long invoicesPaid,
+            Long invoicesPending,
+            Long invoicesOverdue,
+            String helper) {
     }
 }

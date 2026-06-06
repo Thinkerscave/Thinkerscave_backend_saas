@@ -8,6 +8,9 @@ import com.thinkerscave.common.admission.enums.InquiryStatus;
 import com.thinkerscave.common.admission.repository.FollowUpRepository;
 import com.thinkerscave.common.admission.repository.InquiryRepository;
 import com.thinkerscave.common.admission.service.FollowUpService;
+import com.thinkerscave.common.audit.service.ActivityLogService;
+import com.thinkerscave.common.context.OrganizationContext;
+import com.thinkerscave.common.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,8 +24,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class FollowUpServiceImpl implements FollowUpService {
 
+    private static final String INQUIRY_ENTITY = "INQUIRY";
+
     private final FollowUpRepository followUpRepository;
     private final InquiryRepository inquiryRepository;
+    private final ActivityLogService activityLogService;
 
     @Override
     @Transactional
@@ -58,6 +64,19 @@ public class FollowUpServiceImpl implements FollowUpService {
              inquiry.setNextFollowUpDate(null);
         }
         inquiryRepository.save(inquiry);
+
+        try {
+            Long orgId = OrganizationContext.getOrganizationId() != null
+                    ? OrganizationContext.getOrganizationId()
+                    : inquiry.getOrganizationId();
+            String user = SecurityUtil.getCurrentUsername();
+            activityLogService.record(orgId, INQUIRY_ENTITY, inquiry.getInquiryId(),
+                    "FOLLOW_UP_ADDED",
+                    request.getFollowUpType() + " follow-up recorded for " + inquiry.getName(),
+                    user == null ? "system" : user);
+        } catch (Exception ignored) {
+            // best-effort
+        }
 
         return mapToResponse(savedFollowUp);
     }

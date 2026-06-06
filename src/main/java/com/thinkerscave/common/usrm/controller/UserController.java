@@ -158,7 +158,7 @@ public class UserController {
 	@PostMapping("/login")
 	public ResponseEntity<ApiResponse<JwtResponse>> authenticationAndGetToken(@Valid @RequestBody AuthRequest authRequest) {
 
-		String username = authRequest.getUsername();
+		String username = authRequest.getUsername() != null ? authRequest.getUsername().trim() : null;
 		String tenantId = tenantLookupService.findTenantByEmailOrUsername(username);
 		TenantContext.setTenant(tenantId);
 

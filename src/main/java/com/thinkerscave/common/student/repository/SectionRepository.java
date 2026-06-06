@@ -9,4 +9,8 @@ import java.util.List;
 public interface SectionRepository extends JpaRepository<Section,Long> {
 	
 	List<Section> findByClassEntity_ClassId(Long classId);
+
+	List<Section> findByOrganizationId(Long organizationId);
+
+	long countByOrganizationId(Long organizationId);
 }

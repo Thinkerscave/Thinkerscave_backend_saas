@@ -12,6 +12,8 @@ import com.thinkerscave.common.admission.dto.InquiryResponse;
 import com.thinkerscave.common.admission.dto.PublicInquiryRequestDTO;
 import com.thinkerscave.common.admission.repository.InquiryRepository;
 import com.thinkerscave.common.admission.service.InquiryService;
+import com.thinkerscave.common.audit.service.ActivityLogService;
+import com.thinkerscave.common.context.OrganizationContext;
 import com.thinkerscave.common.exception.BadRequestException;
 import com.thinkerscave.common.exception.ResourceNotFoundException;
 import com.thinkerscave.common.security.SecurityUtil;
@@ -29,7 +31,10 @@ import java.util.stream.Collectors;
 @Transactional
 public class InquiryServiceImpl implements InquiryService {
 
+    private static final String INQUIRY_ENTITY = "INQUIRY";
+
     private final InquiryRepository inquiryRepository;
+    private final ActivityLogService activityLogService;
 
     // ================= SAVE / UPDATE =================
     
@@ -52,6 +57,7 @@ public class InquiryServiceImpl implements InquiryService {
 
         Inquiry inquiry;
         String userName=SecurityUtil.getCurrentUsername();
+        boolean isCreate = request.getInquiryId() == null;
 
         // ---------- UPDATE ----------
         if (request.getInquiryId() != null) {
@@ -67,6 +73,7 @@ public class InquiryServiceImpl implements InquiryService {
             inquiry.setIsDeleted(false);
             inquiry.setCreatedDate(Instant.now());
             inquiry.setCreatedBy(userName);
+            inquiry.setOrganizationId(OrganizationContext.getOrganizationId());
         }
 
         mapRequestToEntity(request, inquiry);
@@ -74,7 +81,22 @@ public class InquiryServiceImpl implements InquiryService {
         inquiry.setLastModifiedBy(userName);
 
         Inquiry saved = inquiryRepository.save(inquiry);
+        recordActivity(saved, isCreate ? "INQUIRY_CREATED" : "INQUIRY_UPDATED",
+                isCreate ? "New inquiry from " + saved.getName() : "Inquiry updated: " + saved.getName());
         return mapToResponse(saved);
+    }
+
+    private void recordActivity(Inquiry inquiry, String action, String description) {
+        try {
+            Long orgId = OrganizationContext.getOrganizationId() != null
+                    ? OrganizationContext.getOrganizationId()
+                    : inquiry.getOrganizationId();
+            String user = SecurityUtil.getCurrentUsername();
+            activityLogService.record(orgId, INQUIRY_ENTITY, inquiry.getInquiryId(), action, description,
+                    user == null ? "system" : user);
+        } catch (Exception ignored) {
+            // activity logging is fire-and-forget; never fail the business txn
+        }
     }
 
     // ================= GET ALL =================
@@ -206,6 +228,7 @@ public class InquiryServiceImpl implements InquiryService {
         inquiry.setStatus(InquiryStatus.READY_FOR_ADMISSION);
         inquiry.setNextFollowUpDate(null); // Lock follow-ups usually implies no future follow ups? Or just explicit status.
         inquiryRepository.save(inquiry);
+        recordActivity(inquiry, "ADMISSION_STARTED", "Inquiry promoted to ready-for-admission");
     }
 
     @Override
@@ -216,6 +239,7 @@ public class InquiryServiceImpl implements InquiryService {
         inquiry.setStatus(InquiryStatus.LOST);
         inquiry.setNextFollowUpDate(null);
         inquiryRepository.save(inquiry);
+        recordActivity(inquiry, "MARKED_LOST", "Inquiry marked as lost");
     }
 
     @Override
