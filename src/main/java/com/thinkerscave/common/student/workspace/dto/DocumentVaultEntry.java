@@ -13,7 +13,12 @@ public class DocumentVaultEntry {
     private String studentName;
     private String documentType;
     private String fileName;
+    private String fileUrl;
     private String status;          // "VERIFIED" | "PENDING" | "MISSING"
     private String category;        // "PERSONAL" | "ACADEMIC" | "MEDICAL" | "OTHER"
     private LocalDate uploadedOn;
+    private String verifiedBy;
+    private LocalDate verifiedOn;
+    private LocalDate expiresOn;
+    private String remarks;
 }

@@ -52,6 +52,16 @@ public class StudentController {
         return ResponseEntity.ok(ApiResponse.success("Student registered successfully", studentSaved));
     }
 
+    @io.swagger.v3.oas.annotations.Operation(summary = "Register a new student without file uploads")
+    @PostMapping
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF') or hasAuthority('STUDENT_ADMISSIONS_ADD')")
+    public ResponseEntity<ApiResponse<StudentResponseDTO>> createStudent(@Valid @RequestBody StudentRequestDTO student)
+            throws IOException {
+        log.info("Received JSON request to register student: {} {}", student.getFirstName(), student.getLastName());
+        StudentResponseDTO studentSaved = studentService.saveStudentWithDocuments(student, null, null, null);
+        return ResponseEntity.ok(ApiResponse.success("Student registered successfully", studentSaved));
+    }
+
     @io.swagger.v3.oas.annotations.Operation(summary = "Get all students by organization")
     @GetMapping("/getStudents")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN', 'STAFF', 'TEACHER')")

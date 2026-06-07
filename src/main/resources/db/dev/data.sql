@@ -484,18 +484,18 @@ INSERT INTO address (id, country, state, city, zip_code, address_line) VALUES
 -- 20. STUDENTS
 -- ============================================
 INSERT INTO student (student_id, first_name, last_name, email, mobile_number, gender, age, is_same_address, date_of_birth, enrollment_date, roll_number, remarks, is_active, organization_id, current_address_id, permanent_address_id, class_id, section_id, user_id, guardian_id) VALUES
-(1, 'Rahul', 'Singh', 'rahul.singh@thinkerscave.com', 9876543214, 'Male', 17, TRUE, '2008-09-12', '2024-06-15', 'TC-2024-001', 'Good at math', TRUE, 1, 1, 2, 3, 5, 5, 1),
-(2, 'Ananya', 'Reddy', 'ananya.reddy@thinkerscave.com', 9876543215, 'Female', 16, FALSE, '2009-01-25', '2024-06-16', 'TC-2024-002', 'Science enthusiast', TRUE, 1, 3, 4, 2, 3, 6, 2),
-(3, 'Vikram', 'Malhotra', 'vikram.malhotra@thinkerscave.com', 9876543216, 'Male', 17, NULL, '2008-06-18', '2024-06-17', 'TC-2024-003', 'Sports captain', TRUE, 1, 5, 6, 3, 5, 7, 3),
-(4, 'Ishaan', 'Shah', 'ishaan.shah@student.thinkerscave.com', 9988800001, 'Male', 13, TRUE, '2012-04-10', '2025-04-05', 'TC-2025-004', 'Robotics club member', TRUE, 1, 7, 8, 1, 1, NULL, 4),
-(5, 'Maya', 'Bose', 'maya.bose@student.thinkerscave.com', 9988800002, 'Female', 14, TRUE, '2011-11-21', '2025-04-05', 'TC-2025-005', 'Strong language skills', TRUE, 1, 9, 10, 1, 2, NULL, 5),
-(6, 'Aditya', 'Krishnan', 'aditya.krishnan@student.thinkerscave.com', 9988800003, 'Male', 15, TRUE, '2010-02-18', '2025-04-06', 'TC-2025-006', 'Needs attendance monitoring', TRUE, 1, 11, 12, 2, 4, NULL, 6),
-(7, 'Tara', 'Varma', 'tara.varma@student.thinkerscave.com', 9988800004, 'Female', 15, TRUE, '2010-07-07', '2025-04-06', 'TC-2025-007', 'Prefers visual learning', TRUE, 1, 13, 14, 3, 6, NULL, 7),
-(8, 'Kabir', 'Agarwal', 'kabir.agarwal@student.thinkerscave.com', 9988800005, 'Male', 16, TRUE, '2009-03-29', '2025-04-07', 'TC-2025-008', 'Commerce stream applicant converted', TRUE, 1, 15, 16, 5, 8, NULL, 8),
-(9, 'Sara', 'Rao', 'sara.rao@student.thinkerscave.com', 9988800006, 'Female', 17, TRUE, '2008-12-12', '2025-04-07', 'TC-2025-009', 'Board exam mentoring enabled', TRUE, 1, 17, 18, 6, 9, NULL, 9),
-(10, 'Neil', 'Desai', 'neil.desai@student.thinkerscave.com', 9988800007, 'Male', 17, TRUE, '2008-08-03', '2025-04-08', 'TC-2025-010', 'Final year commerce cohort', TRUE, 1, 19, 20, 7, 10, NULL, 10),
-(11, 'Diya', 'Menon', 'diya.menon@student.thinkerscave.com', 9988800008, 'Female', 16, TRUE, '2009-10-15', '2025-04-08', 'TC-2025-011', 'Scholarship review pending', TRUE, 1, 21, 22, 4, 7, NULL, 11),
-(12, 'Rhea', 'Kulkarni', 'rhea.kulkarni@student.thinkerscave.com', 9988800009, 'Female', 14, TRUE, '2011-05-20', '2025-04-09', 'TC-2025-012', 'New campus transfer', TRUE, 1, 23, 24, 2, 3, NULL, 12);
+(1, 'Rahul', 'Singh', 'rahul.singh@thinkerscave.com', 9876543214, 'Male', 17, TRUE, '2008-09-12', '2024-06-15', '18', 'Good at math', TRUE, 1, 1, 2, 3, 5, 5, 1),
+(2, 'Ananya', 'Reddy', 'ananya.reddy@thinkerscave.com', 9876543215, 'Female', 16, FALSE, '2009-01-25', '2024-06-16', '07', 'Science enthusiast', TRUE, 1, 3, 4, 2, 3, 6, 2),
+(3, 'Vikram', 'Malhotra', 'vikram.malhotra@thinkerscave.com', 9876543216, 'Male', 17, NULL, '2008-06-18', '2024-06-17', '21', 'Sports captain', TRUE, 1, 5, 6, 3, 5, 7, 3),
+(4, 'Ishaan', 'Shah', 'ishaan.shah@student.thinkerscave.com', 9988800001, 'Male', 13, TRUE, '2012-04-10', '2025-04-05', '03', 'Robotics club member', TRUE, 1, 7, 8, 1, 1, NULL, 4),
+(5, 'Maya', 'Bose', 'maya.bose@student.thinkerscave.com', 9988800002, 'Female', 14, TRUE, '2011-11-21', '2025-04-05', '11', 'Strong language skills', TRUE, 1, 9, 10, 1, 2, NULL, 5),
+(6, 'Aditya', 'Krishnan', 'aditya.krishnan@student.thinkerscave.com', 9988800003, 'Male', 15, TRUE, '2010-02-18', '2025-04-06', '15', 'Needs attendance monitoring', TRUE, 1, 11, 12, 2, 4, NULL, 6),
+(7, 'Tara', 'Varma', 'tara.varma@student.thinkerscave.com', 9988800004, 'Female', 15, TRUE, '2010-07-07', '2025-04-06', '09', 'Prefers visual learning', TRUE, 1, 13, 14, 3, 6, NULL, 7),
+(8, 'Kabir', 'Agarwal', 'kabir.agarwal@student.thinkerscave.com', 9988800005, 'Male', 16, TRUE, '2009-03-29', '2025-04-07', '12', 'Commerce stream applicant converted', TRUE, 1, 15, 16, 5, 8, NULL, 8),
+(9, 'Sara', 'Rao', 'sara.rao@student.thinkerscave.com', 9988800006, 'Female', 17, TRUE, '2008-12-12', '2025-04-07', '04', 'Board exam mentoring enabled', TRUE, 1, 17, 18, 6, 9, NULL, 9),
+(10, 'Neil', 'Desai', 'neil.desai@student.thinkerscave.com', 9988800007, 'Male', 17, TRUE, '2008-08-03', '2025-04-08', '08', 'Final year commerce cohort', TRUE, 1, 19, 20, 7, 10, NULL, 10),
+(11, 'Diya', 'Menon', 'diya.menon@student.thinkerscave.com', 9988800008, 'Female', 16, TRUE, '2009-10-15', '2025-04-08', '14', 'Scholarship review pending', TRUE, 1, 21, 22, 4, 7, NULL, 11),
+(12, 'Rhea', 'Kulkarni', 'rhea.kulkarni@student.thinkerscave.com', 9988800009, 'Female', 14, TRUE, '2011-05-20', '2025-04-09', '19', 'New campus transfer', TRUE, 1, 23, 24, 2, 3, NULL, 12);
 
 INSERT INTO student_document (document_id, document_name, document_type, document_path, student_id, organization_id) VALUES
 (1, 'rahul_birth_certificate.pdf', 'Birth Certificate', 'uploads/dev/students/1/rahul_birth_certificate.pdf', 1, 1),
@@ -511,6 +511,34 @@ INSERT INTO student_document (document_id, document_name, document_type, documen
 (11, 'neil_parent_id.pdf', 'Parent ID Proof', 'uploads/dev/students/10/neil_parent_id.pdf', 10, 1),
 (12, 'diya_scholarship_form.pdf', 'Scholarship Form', 'uploads/dev/students/11/diya_scholarship_form.pdf', 11, 1),
 (13, 'rhea_transfer_certificate.pdf', 'Transfer Certificate', 'uploads/dev/students/12/rhea_transfer_certificate.pdf', 12, 1);
+
+-- ============================================
+-- 20A. ACTIVE ACADEMIC ENROLLMENTS
+-- ============================================
+INSERT INTO academic_enrollment (id, organization_id, enrollment_number, student_id, academic_year_id, class_id, section_id, roll_number, house, enrollment_date, exit_date, status, remarks, created_by, created_at, updated_by, updated_at, version, deleted) VALUES
+(1,  1, 'ENR-2025-001', 1,  1, 3, 5,  '18', 'Tagore', '2025-04-01', NULL, 'ACTIVE', 'Current Class 10 enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(2,  1, 'ENR-2025-002', 2,  1, 2, 3,  '07', 'Gandhi', '2025-04-01', NULL, 'ACTIVE', 'Current Class 9 enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(3,  1, 'ENR-2025-003', 3,  1, 3, 5,  '21', 'Tagore', '2025-04-01', NULL, 'ACTIVE', 'Current Class 10 enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(4,  1, 'ENR-2025-004', 4,  1, 1, 1,  '03', 'Nehru',  '2025-04-01', NULL, 'ACTIVE', 'Current Class 8 enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(5,  1, 'ENR-2025-005', 5,  1, 1, 2,  '11', 'Nehru',  '2025-04-01', NULL, 'ACTIVE', 'Current Class 8 enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(6,  1, 'ENR-2025-006', 6,  1, 2, 4,  '15', 'Gandhi', '2025-04-01', NULL, 'ACTIVE', 'Current Class 9 enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(7,  1, 'ENR-2025-007', 7,  1, 3, 6,  '09', 'Tagore', '2025-04-01', NULL, 'ACTIVE', 'Current Class 10 enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(8,  1, 'ENR-2025-008', 8,  1, 5, 8,  '12', 'Raman',  '2025-04-01', NULL, 'ACTIVE', 'Current commerce enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(9,  1, 'ENR-2025-009', 9,  1, 6, 9,  '04', 'Raman',  '2025-04-01', NULL, 'ACTIVE', 'Current science enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(10, 1, 'ENR-2025-010', 10, 1, 7, 10, '08', 'Raman',  '2025-04-01', NULL, 'ACTIVE', 'Current final-year commerce enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(11, 1, 'ENR-2025-011', 11, 1, 4, 7,  '14', 'Gandhi', '2025-04-01', NULL, 'ACTIVE', 'Current science enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(12, 1, 'ENR-2025-012', 12, 1, 2, 3,  '19', 'Nehru',  '2025-04-01', NULL, 'ACTIVE', 'Current Class 9 enrollment', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false);
+
+-- ============================================
+-- 20B. MOVEMENT WORKFLOW DEMO DATA
+-- ============================================
+INSERT INTO promotion_batch (id, organization_id, batch_code, from_academic_year_id, to_academic_year_id, from_class_id, to_class_id, status, planned_count, processed_count, executed_on, remarks, created_by, created_at, updated_by, updated_at, version, deleted) VALUES
+(1, 1, 'PROMO-2025-26-C8', 1, 3, 1, 2, 'DRAFT', 0, 0, NULL, 'Class 8 to Class 9 promotion planning', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false);
+
+INSERT INTO transfer_request (id, organization_id, request_number, student_id, enrollment_id, requested_on, reason, destination_school, status, approved_by_user_id, approved_on, certificate_number, certificate_issued_on, remarks, created_by, created_at, updated_by, updated_at, version, deleted) VALUES
+(1, 1, 'TRF-2025-001', 1, 1, DATEADD('DAY', -8, CURRENT_DATE), 'Parent relocation', 'National Public School, Pune', 'UNDER_REVIEW', NULL, NULL, NULL, NULL, 'Fee clearance completed', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(2, 1, 'TRF-2025-002', 2, 2, DATEADD('DAY', -5, CURRENT_DATE), 'Change of school board', 'Green Valley International', 'APPROVED', 2, DATEADD('DAY', -2, CURRENT_DATE), NULL, NULL, 'Ready for certificate generation', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false),
+(3, 1, 'TRF-2025-003', 6, 6, DATEADD('DAY', -3, CURRENT_DATE), 'Family business transfer', 'St. Marys High School', 'REQUESTED', NULL, NULL, NULL, NULL, 'Documents under review', 'system', CURRENT_TIMESTAMP, 'system', CURRENT_TIMESTAMP, 0, false);
 
 -- ============================================
 -- 21. COURSES
@@ -538,7 +566,8 @@ INSERT INTO subjects (subject_id, subject_code, subject_name, description, credi
 -- ============================================
 INSERT INTO academic_years (academic_year_id, year_code, year_name, start_date, end_date, is_current, is_active, description, organization_id) VALUES
 (1, 'AY-2025-26', 'Academic Year 2025-26', '2025-04-01', '2026-03-31', TRUE, TRUE, 'Current academic year', 1),
-(2, 'AY-2024-25', 'Academic Year 2024-25', '2024-04-01', '2025-03-31', FALSE, TRUE, 'Previous academic year', 1);
+(2, 'AY-2024-25', 'Academic Year 2024-25', '2024-04-01', '2025-03-31', FALSE, TRUE, 'Previous academic year', 1),
+(3, 'AY-2026-27', 'Academic Year 2026-27', '2026-04-01', '2027-03-31', FALSE, TRUE, 'Next academic year for promotion planning', 1);
 
 -- ============================================
 -- 23A. ACADEMIC CONTAINERS
@@ -836,49 +865,49 @@ INSERT INTO staff_payroll (id, organization_id, staff_id, staff_name, department
 -- ============================================
 -- 33A. STAFF TEACHING PROFILES
 -- ============================================
-INSERT INTO staff_teaching_profile (profile_id, staff_id, organization_id, subjects_can_teach, preferred_subjects, teaching_levels, can_substitute_for, cannot_substitute_for, qualification, experience_years, remarks, created_date, last_modified_date, version, deleted) VALUES
-(1, 1, 1, 'Mathematics, Statistics', 'Mathematics', 'Class 9-10, Class 11-12', 'Mathematics, Physics', NULL, 'M.Sc Mathematics, B.Ed', 8, 'Math Olympiad coach.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(2, 2, 1, 'Physics, Chemistry, Biology', 'Physics', 'Class 9-10, Class 11-12', 'Physics, Chemistry', 'Biology', 'M.Sc Physics, B.Ed', 6, 'Lab safety lead.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(3, 3, 1, 'English, Hindi, Literature', 'English Literature', 'Class 6-8, Class 9-10', 'English, Hindi', NULL, 'M.A English, B.Ed', 5, 'Reading club mentor.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(4, 4, 1, 'Computer Science, Information Technology', 'Computer Science', 'Class 9-10, Class 11-12', 'Computer Science', NULL, 'M.Tech Computer Science', 9, 'STEM club lead, Robotics.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(5, 8, 1, 'Physical Education, Sports', 'Sports', 'LKG-Class 5, Class 6-8', 'Physical Education', NULL, 'M.P.Ed', 7, 'Athletics and team sports.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE);
+INSERT INTO staff_teaching_profile (profile_id, staff_id, organization_id, subjects_can_teach, preferred_subjects, teaching_levels, can_substitute_for, cannot_substitute_for, qualification, experience_years, remarks, created_date, last_modified_date, version) VALUES
+(1, 1, 1, 'Mathematics, Statistics', 'Mathematics', 'Class 9-10, Class 11-12', 'Mathematics, Physics', NULL, 'M.Sc Mathematics, B.Ed', 8, 'Math Olympiad coach.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 2, 1, 'Physics, Chemistry, Biology', 'Physics', 'Class 9-10, Class 11-12', 'Physics, Chemistry', 'Biology', 'M.Sc Physics, B.Ed', 6, 'Lab safety lead.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 3, 1, 'English, Hindi, Literature', 'English Literature', 'Class 6-8, Class 9-10', 'English, Hindi', NULL, 'M.A English, B.Ed', 5, 'Reading club mentor.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(4, 4, 1, 'Computer Science, Information Technology', 'Computer Science', 'Class 9-10, Class 11-12', 'Computer Science', NULL, 'M.Tech Computer Science', 9, 'STEM club lead, Robotics.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(5, 8, 1, 'Physical Education, Sports', 'Sports', 'LKG-Class 5, Class 6-8', 'Physical Education', NULL, 'M.P.Ed', 7, 'Athletics and team sports.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ============================================
 -- 33B. STAFF RESPONSIBILITIES
 -- ============================================
-INSERT INTO staff_responsibility (responsibility_id, organization_id, staff_id, responsibility_name, responsibility_type, scope, effective_from, effective_to, status, remarks, created_date, last_modified_date, version, deleted) VALUES
-(1, 1, 1, 'Class Teacher - 8-A', 'CLASS_TEACHER', 'Class 8 / Section A', DATEADD('MONTH', -8, CURRENT_DATE), NULL, 'ASSIGNED', 'Primary class teacher.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(2, 1, 2, 'Science Lab Incharge', 'LAB_INCHARGE', 'Science Department', DATEADD('MONTH', -6, CURRENT_DATE), NULL, 'ASSIGNED', 'Oversee science labs.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(3, 1, 4, 'Exam Coordinator', 'COORDINATOR', 'School-wide', DATEADD('MONTH', -4, CURRENT_DATE), NULL, 'ASSIGNED', 'Annual examination scheduling.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(4, 1, 8, 'Sports Coordinator', 'COORDINATOR', 'Sports Department', DATEADD('MONTH', -10, CURRENT_DATE), NULL, 'ASSIGNED', 'All inter-school sports.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(5, 1, 6, 'Discipline Officer', 'COMMITTEE', 'School-wide', DATEADD('MONTH', -12, CURRENT_DATE), NULL, 'ASSIGNED', 'Discipline committee chair.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(6, 1, 3, 'Cultural Secretary', 'COMMITTEE', 'School-wide', DATEADD('MONTH', -3, CURRENT_DATE), NULL, 'ASSIGNED', 'Cultural events programme lead.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(7, 1, 9, 'Library Coordinator', 'COORDINATOR', 'Library', DATEADD('MONTH', -5, CURRENT_DATE), NULL, 'ASSIGNED', 'Library catalog and reading club.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(8, 1, 4, 'IT Coordinator', 'COORDINATOR', 'Technology', DATEADD('MONTH', -2, CURRENT_DATE), NULL, 'ASSIGNED', 'Manage classroom IT and devices.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(9, 1, NULL, 'Annual Day Committee Lead', 'COMMITTEE', 'School-wide', NULL, NULL, 'UNASSIGNED', 'Open responsibility for next academic year.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(10, 1, NULL, 'House Coordinator - Blue', 'COMMITTEE', 'House Blue', NULL, NULL, 'UNASSIGNED', 'Open for nomination.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE);
+INSERT INTO staff_responsibility (responsibility_id, organization_id, staff_id, responsibility_name, responsibility_type, scope, effective_from, effective_to, status, remarks, created_date, last_modified_date, version) VALUES
+(1, 1, 1, 'Class Teacher - 8-A', 'CLASS_TEACHER', 'Class 8 / Section A', DATEADD('MONTH', -8, CURRENT_DATE), NULL, 'ASSIGNED', 'Primary class teacher.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 1, 2, 'Science Lab Incharge', 'LAB_INCHARGE', 'Science Department', DATEADD('MONTH', -6, CURRENT_DATE), NULL, 'ASSIGNED', 'Oversee science labs.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 1, 4, 'Exam Coordinator', 'COORDINATOR', 'School-wide', DATEADD('MONTH', -4, CURRENT_DATE), NULL, 'ASSIGNED', 'Annual examination scheduling.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(4, 1, 8, 'Sports Coordinator', 'COORDINATOR', 'Sports Department', DATEADD('MONTH', -10, CURRENT_DATE), NULL, 'ASSIGNED', 'All inter-school sports.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(5, 1, 6, 'Discipline Officer', 'COMMITTEE', 'School-wide', DATEADD('MONTH', -12, CURRENT_DATE), NULL, 'ASSIGNED', 'Discipline committee chair.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(6, 1, 3, 'Cultural Secretary', 'COMMITTEE', 'School-wide', DATEADD('MONTH', -3, CURRENT_DATE), NULL, 'ASSIGNED', 'Cultural events programme lead.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(7, 1, 9, 'Library Coordinator', 'COORDINATOR', 'Library', DATEADD('MONTH', -5, CURRENT_DATE), NULL, 'ASSIGNED', 'Library catalog and reading club.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(8, 1, 4, 'IT Coordinator', 'COORDINATOR', 'Technology', DATEADD('MONTH', -2, CURRENT_DATE), NULL, 'ASSIGNED', 'Manage classroom IT and devices.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(9, 1, NULL, 'Annual Day Committee Lead', 'COMMITTEE', 'School-wide', NULL, NULL, 'UNASSIGNED', 'Open responsibility for next academic year.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(10, 1, NULL, 'House Coordinator - Blue', 'COMMITTEE', 'House Blue', NULL, NULL, 'UNASSIGNED', 'Open for nomination.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ============================================
 -- 33C. STAFF DOCUMENTS
 -- ============================================
-INSERT INTO staff_document (document_id, staff_id, organization_id, category, document_type, file_name, file_url, file_size, status, verified_by, verified_on, expires_on, remarks, created_date, last_modified_date, version, deleted) VALUES
-(1, 1, 1, 'IDENTITY', 'Aadhaar Card', 'amit-aadhaar.pdf', '/uploads/staff/1/amit-aadhaar.pdf', 256000, 'VERIFIED', 'admin', DATEADD('DAY', -10, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(2, 1, 1, 'EDUCATION', 'Post-Graduate Degree', 'amit-msc.pdf', '/uploads/staff/1/amit-msc.pdf', 512000, 'VERIFIED', 'admin', DATEADD('DAY', -10, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(3, 1, 1, 'EMPLOYMENT', 'Appointment Letter', 'amit-offer.pdf', '/uploads/staff/1/amit-offer.pdf', 128000, 'VERIFIED', 'admin', DATEADD('DAY', -10, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(4, 2, 1, 'IDENTITY', 'Aadhaar Card', 'sunita-aadhaar.pdf', '/uploads/staff/2/sunita-aadhaar.pdf', 240000, 'VERIFIED', 'admin', DATEADD('DAY', -7, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(5, 2, 1, 'EDUCATION', 'Post-Graduate Degree', 'sunita-msc.pdf', '/uploads/staff/2/sunita-msc.pdf', 480000, 'PENDING', NULL, NULL, NULL, 'Awaiting verification by HR.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(6, 3, 1, 'IDENTITY', 'PAN Card', 'nisha-pan.pdf', '/uploads/staff/3/nisha-pan.pdf', 96000, 'VERIFIED', 'admin', DATEADD('DAY', -20, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(7, 4, 1, 'EDUCATION', 'Master Degree', 'farhan-mtech.pdf', '/uploads/staff/4/farhan-mtech.pdf', 600000, 'VERIFIED', 'admin', DATEADD('DAY', -30, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(8, 6, 1, 'OTHER', 'Driving License', 'neel-dl.pdf', '/uploads/staff/6/neel-dl.pdf', 180000, 'PENDING', NULL, NULL, DATEADD('YEAR', 5, CURRENT_DATE), 'Personal vehicle pickup permit.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(9, 8, 1, 'EMPLOYMENT', 'Coaching Certificate', 'raghav-coach.pdf', '/uploads/staff/8/raghav-coach.pdf', 320000, 'VERIFIED', 'admin', DATEADD('DAY', -15, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE);
+INSERT INTO staff_document (document_id, staff_id, organization_id, category, document_type, file_name, file_url, file_size, status, verified_by, verified_on, expires_on, remarks, created_date, last_modified_date, version) VALUES
+(1, 1, 1, 'IDENTITY', 'Aadhaar Card', 'amit-aadhaar.pdf', '/uploads/staff/1/amit-aadhaar.pdf', 256000, 'VERIFIED', 'admin', DATEADD('DAY', -10, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 1, 1, 'EDUCATION', 'Post-Graduate Degree', 'amit-msc.pdf', '/uploads/staff/1/amit-msc.pdf', 512000, 'VERIFIED', 'admin', DATEADD('DAY', -10, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 1, 1, 'EMPLOYMENT', 'Appointment Letter', 'amit-offer.pdf', '/uploads/staff/1/amit-offer.pdf', 128000, 'VERIFIED', 'admin', DATEADD('DAY', -10, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(4, 2, 1, 'IDENTITY', 'Aadhaar Card', 'sunita-aadhaar.pdf', '/uploads/staff/2/sunita-aadhaar.pdf', 240000, 'VERIFIED', 'admin', DATEADD('DAY', -7, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(5, 2, 1, 'EDUCATION', 'Post-Graduate Degree', 'sunita-msc.pdf', '/uploads/staff/2/sunita-msc.pdf', 480000, 'PENDING', NULL, NULL, NULL, 'Awaiting verification by HR.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(6, 3, 1, 'IDENTITY', 'PAN Card', 'nisha-pan.pdf', '/uploads/staff/3/nisha-pan.pdf', 96000, 'VERIFIED', 'admin', DATEADD('DAY', -20, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(7, 4, 1, 'EDUCATION', 'Master Degree', 'farhan-mtech.pdf', '/uploads/staff/4/farhan-mtech.pdf', 600000, 'VERIFIED', 'admin', DATEADD('DAY', -30, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(8, 6, 1, 'OTHER', 'Driving License', 'neel-dl.pdf', '/uploads/staff/6/neel-dl.pdf', 180000, 'PENDING', NULL, NULL, DATEADD('YEAR', 5, CURRENT_DATE), 'Personal vehicle pickup permit.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(9, 8, 1, 'EMPLOYMENT', 'Coaching Certificate', 'raghav-coach.pdf', '/uploads/staff/8/raghav-coach.pdf', 320000, 'VERIFIED', 'admin', DATEADD('DAY', -15, CURRENT_DATE), NULL, NULL, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ============================================
 -- 33D. ALUMNI STAFF
 -- ============================================
-INSERT INTO staff_alumni (alumni_staff_id, organization_id, staff_id, full_name, staff_code, last_designation, department, exit_type, exit_date, joined_date, years_of_service, email, contact, remarks, created_date, last_modified_date, version, deleted) VALUES
-(1, 1, NULL, 'Rajesh Kumar', 'STF-A001', 'Vice Principal', 'Administration', 'RETIRED', DATEADD('YEAR', -1, CURRENT_DATE), DATEADD('YEAR', -22, CURRENT_DATE), 21.0, 'rajesh.kumar@alumni.thinkerscave.com', '9988774411', 'Retired with honors. Available for mentorship.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(2, 1, NULL, 'Priya Saxena', 'STF-A002', 'English Faculty', 'English', 'RESIGNED', DATEADD('MONTH', -8, CURRENT_DATE), DATEADD('YEAR', -5, CURRENT_DATE), 4.7, 'priya.saxena@gmail.com', '9988774422', 'Relocated to Pune.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE),
-(3, 1, NULL, 'Vinay Joshi', 'STF-A003', 'Contract Counsellor', 'Student Services', 'CONTRACT_COMPLETED', DATEADD('MONTH', -3, CURRENT_DATE), DATEADD('YEAR', -1, CURRENT_DATE), 0.9, 'vinay.joshi@example.com', '9988774433', 'Contract concluded as scheduled.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0, FALSE);
+INSERT INTO staff_alumni (alumni_staff_id, organization_id, staff_id, full_name, staff_code, last_designation, department, exit_type, exit_date, joined_date, years_of_service, email, contact, remarks, created_date, last_modified_date, version) VALUES
+(1, 1, NULL, 'Rajesh Kumar', 'STF-A001', 'Vice Principal', 'Administration', 'RETIRED', DATEADD('YEAR', -1, CURRENT_DATE), DATEADD('YEAR', -22, CURRENT_DATE), 21.0, 'rajesh.kumar@alumni.thinkerscave.com', '9988774411', 'Retired with honors. Available for mentorship.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(2, 1, NULL, 'Priya Saxena', 'STF-A002', 'English Faculty', 'English', 'RESIGNED', DATEADD('MONTH', -8, CURRENT_DATE), DATEADD('YEAR', -5, CURRENT_DATE), 4.7, 'priya.saxena@gmail.com', '9988774422', 'Relocated to Pune.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0),
+(3, 1, NULL, 'Vinay Joshi', 'STF-A003', 'Contract Counsellor', 'Student Services', 'CONTRACT_COMPLETED', DATEADD('MONTH', -3, CURRENT_DATE), DATEADD('YEAR', -1, CURRENT_DATE), 0.9, 'vinay.joshi@example.com', '9988774433', 'Contract concluded as scheduled.', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0);
 
 -- ============================================
 -- 34. ADMISSION FORM TEMPLATE
@@ -1129,6 +1158,10 @@ ALTER TABLE class_teacher_assignment ALTER COLUMN assignment_id RESTART WITH 100
 ALTER TABLE timetable_slot ALTER COLUMN slot_id RESTART WITH 100;
 ALTER TABLE academic_calendar_event ALTER COLUMN event_id RESTART WITH 100;
 ALTER TABLE academic_setting ALTER COLUMN setting_id RESTART WITH 100;
+ALTER TABLE academic_enrollment ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE promotion_batch ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE promotion_record ALTER COLUMN id RESTART WITH 100;
+ALTER TABLE transfer_request ALTER COLUMN id RESTART WITH 100;
 ALTER TABLE audit_log ALTER COLUMN id RESTART WITH 100;
 ALTER TABLE security_audit_log ALTER COLUMN id RESTART WITH 100;
 ALTER TABLE system_event ALTER COLUMN id RESTART WITH 100;

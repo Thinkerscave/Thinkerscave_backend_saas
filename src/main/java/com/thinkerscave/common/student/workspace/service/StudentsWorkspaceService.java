@@ -5,6 +5,9 @@ import com.thinkerscave.common.attendance.repository.AttendanceRepository;
 import com.thinkerscave.common.audit.service.ActivityLogService;
 import com.thinkerscave.common.audit.domain.ActivityLog;
 import com.thinkerscave.common.context.OrganizationContext;
+import com.thinkerscave.common.enrollment.domain.AcademicEnrollment;
+import com.thinkerscave.common.enrollment.domain.EnrollmentStatus;
+import com.thinkerscave.common.enrollment.repository.AcademicEnrollmentRepository;
 import com.thinkerscave.common.security.SecurityUtil;
 import com.thinkerscave.common.student.domain.AlumniRecord;
 import com.thinkerscave.common.student.domain.Guardian;
@@ -38,6 +41,7 @@ public class StudentsWorkspaceService {
     private final AttendanceRepository attendanceRepository;
     private final StudentAchievementRepository achievementRepository;
     private final AlumniRecordRepository alumniRepository;
+    private final AcademicEnrollmentRepository enrollmentRepository;
     private final ActivityLogService activityLogService;
 
     // ============================================================
@@ -231,10 +235,10 @@ public class StudentsWorkspaceService {
     public DocumentVaultKpi documentVaultKpi() {
         Long orgId = OrganizationContext.getOrganizationId();
         List<Student> students = studentRepository.findByOrganizationId(orgId);
-        Map<Long, Long> docCounts = countDocsByStudent(orgId);
-        long total = docCounts.values().stream().mapToLong(Long::longValue).sum();
-        long verified = Math.round(total * 0.88);                  // pragmatic — all docs assumed verified by default
-        long pending = total - verified;
+        List<StudentDocument> docs = documentRepository.findByOrganizationId(orgId);
+        long total = docs.size();
+        long verified = docs.stream().filter(d -> "VERIFIED".equals(statusOrDefault(d))).count();
+        long pending = docs.stream().filter(d -> "PENDING".equals(statusOrDefault(d))).count();
         long required = students.size() * 6L;                       // 6 required docs per student
         long missing = Math.max(0, required - total);
         return DocumentVaultKpi.builder()
@@ -256,24 +260,67 @@ public class StudentsWorkspaceService {
         for (Student s : students) {
             List<StudentDocument> docs = documentRepository.findByStudentStudentIdAndOrganizationId(s.getStudentId(), orgId);
             for (StudentDocument d : docs) {
-                String cat = inferCategory(d.getDocumentType());
+                String cat = categoryOrDefault(d);
                 if (category != null && !category.isBlank() && !category.equalsIgnoreCase("ALL")
                     && !category.equalsIgnoreCase(cat)) {
                     continue;
                 }
-                all.add(DocumentVaultEntry.builder()
-                    .documentId(d.getDocumentId())
-                    .studentId(s.getStudentId())
-                    .studentName(nameByStudent.get(s.getStudentId()))
-                    .documentType(d.getDocumentType())
-                    .fileName(d.getDocumentName())
-                    .status("VERIFIED")
-                    .category(cat)
-                    .uploadedOn(LocalDate.now())
-                    .build());
+                all.add(toDocumentVaultEntry(d, nameByStudent.get(s.getStudentId())));
             }
         }
         return all;
+    }
+
+    @Transactional
+    public DocumentVaultEntry addDocument(DocumentVaultRequest req) {
+        Long orgId = OrganizationContext.getOrganizationId();
+        Student student = studentRepository.findByStudentIdAndOrganizationId(req.getStudentId(), orgId)
+            .orElseThrow(() -> new IllegalArgumentException("Student not found: " + req.getStudentId()));
+
+        StudentDocument d = new StudentDocument();
+        d.setStudent(student);
+        d.setOrganizationId(orgId);
+        d.setDocumentName(req.getFileName());
+        d.setDocumentType(req.getDocumentType());
+        d.setDocumentPath(pathOrDefault(req.getFileUrl(), req.getStudentId(), req.getFileName()));
+        d.setCategory(req.getCategory());
+        d.setFileUrl(req.getFileUrl());
+        d.setFileSize(req.getFileSize());
+        d.setStatus(req.getStatus() == null || req.getStatus().isBlank() ? "PENDING" : req.getStatus());
+        d.setExpiresOn(req.getExpiresOn());
+        d.setRemarks(req.getRemarks());
+
+        StudentDocument saved = documentRepository.save(d);
+        activityLogService.record(orgId, STUDENT_ENTITY, req.getStudentId(), "DOCUMENT_UPLOADED",
+            req.getDocumentType() + " uploaded", SecurityUtil.getCurrentUsername());
+
+        return toDocumentVaultEntry(saved, fullName(student));
+    }
+
+    @Transactional
+    public DocumentVaultEntry verifyDocument(Long documentId, String verifier) {
+        Long orgId = OrganizationContext.getOrganizationId();
+        StudentDocument d = documentRepository.findByDocumentIdAndOrganizationId(documentId, orgId)
+            .orElseThrow(() -> new IllegalArgumentException("Document not found: " + documentId));
+        d.setStatus("VERIFIED");
+        d.setVerifiedBy(verifier == null || verifier.isBlank() ? "SYSTEM" : verifier);
+        d.setVerifiedOn(LocalDate.now());
+        StudentDocument saved = documentRepository.save(d);
+        activityLogService.record(orgId, STUDENT_ENTITY, saved.getStudent().getStudentId(), "DOCUMENT_VERIFIED",
+            saved.getDocumentType() + " verified", SecurityUtil.getCurrentUsername());
+        return toDocumentVaultEntry(saved, fullName(saved.getStudent()));
+    }
+
+    @Transactional
+    public void deleteDocument(Long documentId) {
+        Long orgId = OrganizationContext.getOrganizationId();
+        StudentDocument d = documentRepository.findByDocumentIdAndOrganizationId(documentId, orgId)
+            .orElseThrow(() -> new IllegalArgumentException("Document not found: " + documentId));
+        Long studentId = d.getStudent().getStudentId();
+        String documentType = d.getDocumentType();
+        documentRepository.delete(d);
+        activityLogService.record(orgId, STUDENT_ENTITY, studentId, "DOCUMENT_DELETED",
+            documentType + " deleted", SecurityUtil.getCurrentUsername());
     }
 
     // ============================================================
@@ -291,13 +338,21 @@ public class StudentsWorkspaceService {
 
     private StudentDirectoryCard toDirectoryCard(Student s, Long orgId, LocalDate today) {
         String attendance = computeTodayAttendance(s, orgId, today);
+        Long activeEnrollmentId = enrollmentRepository
+            .findFirstByOrganizationIdAndStudentIdAndStatusOrderByEnrollmentDateDesc(
+                orgId, s.getStudentId(), EnrollmentStatus.ACTIVE)
+            .map(AcademicEnrollment::getId)
+            .orElse(null);
         return StudentDirectoryCard.builder()
             .studentId(s.getStudentId())
             .admissionNumber("ADM-" + (s.getEnrollmentDate() == null ? "0000" : s.getEnrollmentDate().getYear()) + "-" + pad(s.getStudentId()))
             .fullName(fullName(s))
             .rollNumber(s.getRollNumber())
+            .classId(s.getClassEntity() == null ? null : s.getClassEntity().getClassId())
             .className(s.getClassEntity() == null ? null : s.getClassEntity().getClassName())
+            .sectionId(s.getSection() == null ? null : s.getSection().getSectionId())
             .sectionName(s.getSection() == null ? null : s.getSection().getSectionName())
+            .activeEnrollmentId(activeEnrollmentId)
             .mobile(s.getMobileNumber() == null ? null : s.getMobileNumber().toString())
             .email(s.getEmail())
             .gender(s.getGender())
@@ -310,6 +365,40 @@ public class StudentsWorkspaceService {
             .guardianMobile(s.getParent() == null || s.getParent().getMobileNumber() == null ? null
                 : s.getParent().getMobileNumber().toString())
             .build();
+    }
+
+    private DocumentVaultEntry toDocumentVaultEntry(StudentDocument d, String studentName) {
+        return DocumentVaultEntry.builder()
+            .documentId(d.getDocumentId())
+            .studentId(d.getStudent().getStudentId())
+            .studentName(studentName)
+            .documentType(d.getDocumentType())
+            .fileName(d.getDocumentName())
+            .fileUrl(d.getFileUrl() != null && !d.getFileUrl().isBlank() ? d.getFileUrl() : d.getDocumentPath())
+            .status(statusOrDefault(d))
+            .category(categoryOrDefault(d))
+            .uploadedOn(d.getCreatedDate() == null ? LocalDate.now()
+                : d.getCreatedDate().atZone(java.time.ZoneId.systemDefault()).toLocalDate())
+            .verifiedBy(d.getVerifiedBy())
+            .verifiedOn(d.getVerifiedOn())
+            .expiresOn(d.getExpiresOn())
+            .remarks(d.getRemarks())
+            .build();
+    }
+
+    private String statusOrDefault(StudentDocument d) {
+        return d.getStatus() == null || d.getStatus().isBlank() ? "VERIFIED" : d.getStatus();
+    }
+
+    private String categoryOrDefault(StudentDocument d) {
+        return d.getCategory() == null || d.getCategory().isBlank() ? inferCategory(d.getDocumentType()) : d.getCategory();
+    }
+
+    private String pathOrDefault(String fileUrl, Long studentId, String fileName) {
+        if (fileUrl != null && !fileUrl.isBlank()) {
+            return fileUrl;
+        }
+        return "uploads/dev/students/" + studentId + "/" + fileName;
     }
 
     private String computeTodayAttendance(Student s, Long orgId, LocalDate today) {

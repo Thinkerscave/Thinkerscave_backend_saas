@@ -2,6 +2,11 @@ package com.thinkerscave.common.student.service.impl;
 
 import org.springframework.transaction.annotation.Transactional;
 import com.thinkerscave.common.commonModel.Address;
+import com.thinkerscave.common.course.domain.AcademicYear;
+import com.thinkerscave.common.course.repository.AcademicYearRepository;
+import com.thinkerscave.common.enrollment.domain.AcademicEnrollment;
+import com.thinkerscave.common.enrollment.domain.EnrollmentStatus;
+import com.thinkerscave.common.enrollment.repository.AcademicEnrollmentRepository;
 import com.thinkerscave.common.menum.domain.Role;
 import com.thinkerscave.common.menum.repository.RoleRepository;
 import com.thinkerscave.common.student.domain.Guardian;
@@ -38,7 +43,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class StudentServiceImpl implements StudentService {
 
-	private static final String ROLE_USER = "USER";
+	private static final String ROLE_STUDENT = "STUDENT";
+	private static final String ROLE_PARENT = "PARENT";
 	private static final String TYPE_STUDENT = "student";
 	private static final String TYPE_GUARDIAN = "guardian";
 
@@ -51,6 +57,8 @@ public class StudentServiceImpl implements StudentService {
 	private final ClassRepository classRepository;
 	private final SectionRepository sectionRepository;
 	private final StudentDocumentRepository studentDocumentRepository;
+	private final AcademicYearRepository academicYearRepository;
+	private final AcademicEnrollmentRepository academicEnrollmentRepository;
 
 	@PostConstruct
 	public void init() {
@@ -70,8 +78,8 @@ public class StudentServiceImpl implements StudentService {
 			List<String> types) {
 		try {
 			// --- Step 1: Fetch Role ---
-			Role userRole = roleRepository.findByRoleName(ROLE_USER)
-					.orElseThrow(() -> new IllegalStateException("Role '" + ROLE_USER + "' not found"));
+			Role studentRole = findRole(ROLE_STUDENT);
+			Role parentRole = findRole(ROLE_PARENT);
 
 			// --- Step 2: Create and Save Student User ---
 			UserCreationContext studentContext = new UserCreationContext(
@@ -79,7 +87,7 @@ public class StudentServiceImpl implements StudentService {
 					dto.getEmail(), dto.getMobileNumber(),
 					dto.getPermanentAddressLine(), dto.getPermanentState(), dto.getPermanentCity(),
 					TYPE_STUDENT);
-			User studentUser = userService.createUser(studentContext, userRole);
+			User studentUser = userService.createUser(studentContext, studentRole);
 
 			// --- Step 3: Create and Save Guardian User ---
 			UserCreationContext guardianContext = new UserCreationContext(
@@ -87,7 +95,7 @@ public class StudentServiceImpl implements StudentService {
 					dto.getGuardianEmail(), dto.getGuardianPhoneNumber(),
 					dto.getGuardianAddress(), dto.getPermanentState(), dto.getPermanentCity(),
 					TYPE_GUARDIAN);
-			User guardianUser = userService.createUser(guardianContext, userRole);
+			User guardianUser = userService.createUser(guardianContext, parentRole);
 
 			// --- Step 4: Save Guardian Entity ---
 			Guardian guardian;
@@ -171,6 +179,7 @@ public class StudentServiceImpl implements StudentService {
 				}
 
 				student = studentRepository.save(student);
+				createActiveEnrollment(dto, student, orgId);
 
 				if (documents != null) {
 					log.debug("Processing {} documents", documents.size());
@@ -201,6 +210,44 @@ public class StudentServiceImpl implements StudentService {
 			log.error("Transaction failed: {}", e.getMessage(), e);
 			throw e; // This will trigger rollback
 		}
+	}
+
+	private Role findRole(String roleCode) {
+		return roleRepository.findByRoleCode(roleCode)
+				.or(() -> roleRepository.findByRoleName(roleCode))
+				.orElseThrow(() -> new IllegalStateException("Role '" + roleCode + "' not found"));
+	}
+
+	private void createActiveEnrollment(StudentRequestDTO dto, Student student, Long orgId) {
+		if (orgId == null || dto.getClassId() == null) {
+			return;
+		}
+		AcademicYear currentYear = academicYearRepository.findAll().stream()
+				.filter(year -> Boolean.TRUE.equals(year.getIsCurrent()))
+				.filter(year -> year.getOrganization() != null && orgId.equals(year.getOrganization().getOrgId()))
+				.findFirst()
+				.orElse(null);
+		if (currentYear == null || currentYear.getAcademicYearId() == null) {
+			return;
+		}
+		if (academicEnrollmentRepository
+				.findByStudentIdAndAcademicYearId(student.getStudentId(), currentYear.getAcademicYearId())
+				.isPresent()) {
+			return;
+		}
+		AcademicEnrollment enrollment = AcademicEnrollment.builder()
+				.enrollmentNumber("ENR-" + currentYear.getYearCode().replace("AY-", "") + "-" + student.getStudentId())
+				.studentId(student.getStudentId())
+				.academicYearId(currentYear.getAcademicYearId())
+				.classId(dto.getClassId())
+				.sectionId(dto.getSectionId())
+				.rollNumber(dto.getRollNumber())
+				.enrollmentDate(dto.getEnrollmentDate() != null ? dto.getEnrollmentDate() : java.time.LocalDate.now())
+				.status(EnrollmentStatus.ACTIVE)
+				.remarks("Created from student registration")
+				.build();
+		enrollment.setOrganizationId(orgId);
+		academicEnrollmentRepository.save(enrollment);
 	}
 
 	private String saveFile(MultipartFile file, String prefix) throws IOException {

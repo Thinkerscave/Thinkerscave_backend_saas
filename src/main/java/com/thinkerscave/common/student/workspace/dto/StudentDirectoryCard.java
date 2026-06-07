@@ -12,8 +12,11 @@ public class StudentDirectoryCard {
     private String admissionNumber;
     private String fullName;
     private String rollNumber;
+    private Long classId;
     private String className;
+    private Long sectionId;
     private String sectionName;
+    private Long activeEnrollmentId;
     private String mobile;
     private String email;
     private String gender;

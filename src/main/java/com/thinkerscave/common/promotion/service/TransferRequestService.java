@@ -4,6 +4,7 @@ import com.thinkerscave.common.audit.domain.AuditEventType;
 import com.thinkerscave.common.audit.service.AuditPublisher;
 import com.thinkerscave.common.common.sequence.SequenceGeneratorService;
 import com.thinkerscave.common.context.OrganizationContext;
+import com.thinkerscave.common.enrollment.domain.AcademicEnrollment;
 import com.thinkerscave.common.enrollment.domain.EnrollmentStatus;
 import com.thinkerscave.common.enrollment.repository.AcademicEnrollmentRepository;
 import com.thinkerscave.common.exception.BadRequestException;
@@ -56,13 +57,14 @@ public class TransferRequestService {
 
     @Transactional
     public TransferRequestDTO create(TransferRequestDTO dto) {
-        if (dto.getStudentId() == null || dto.getEnrollmentId() == null) {
-            throw new BadRequestException("studentId and enrollmentId are required");
+        if (dto.getStudentId() == null) {
+            throw new BadRequestException("studentId is required");
         }
         if (dto.getReason() == null || dto.getReason().isBlank()) {
             throw new BadRequestException("reason is required");
         }
         Long orgId = currentOrgId();
+        Long enrollmentId = resolveEnrollmentId(dto, orgId);
         String number = dto.getRequestNumber();
         if (number == null || number.isBlank()) {
             number = sequenceGenerator.nextNumber(orgId, "TRANSFER", null);
@@ -70,7 +72,7 @@ public class TransferRequestService {
         TransferRequest t = TransferRequest.builder()
                 .requestNumber(number)
                 .studentId(dto.getStudentId())
-                .enrollmentId(dto.getEnrollmentId())
+                .enrollmentId(enrollmentId)
                 .requestedOn(dto.getRequestedOn() != null ? dto.getRequestedOn() : LocalDate.now())
                 .reason(dto.getReason())
                 .destinationSchool(dto.getDestinationSchool())
@@ -82,6 +84,23 @@ public class TransferRequestService {
         auditPublisher.publish(AuditEventType.CREATE, "TRANSFER_REQUEST_CREATE", "TransferRequest",
                 t.getId(), "Transfer request " + t.getRequestNumber() + " created");
         return toDto(t);
+    }
+
+    private Long resolveEnrollmentId(TransferRequestDTO dto, Long orgId) {
+        if (dto.getEnrollmentId() != null) {
+            AcademicEnrollment enrollment = enrollmentRepository.findById(dto.getEnrollmentId())
+                    .orElseThrow(() -> new BadRequestException("enrollmentId is invalid"));
+            if (!dto.getStudentId().equals(enrollment.getStudentId())
+                    || (orgId != null && !orgId.equals(enrollment.getOrganizationId()))) {
+                throw new BadRequestException("enrollmentId does not belong to the selected student");
+            }
+            return enrollment.getId();
+        }
+        return enrollmentRepository
+                .findFirstByOrganizationIdAndStudentIdAndStatusOrderByEnrollmentDateDesc(
+                        orgId, dto.getStudentId(), EnrollmentStatus.ACTIVE)
+                .map(AcademicEnrollment::getId)
+                .orElseThrow(() -> new BadRequestException("No active enrollment found for selected student"));
     }
 
     @Transactional

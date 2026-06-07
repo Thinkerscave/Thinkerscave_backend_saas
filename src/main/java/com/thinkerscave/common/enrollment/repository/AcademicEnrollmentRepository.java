@@ -23,6 +23,9 @@ public interface AcademicEnrollmentRepository
     List<AcademicEnrollment> findByOrganizationIdAndAcademicYearIdAndClassIdAndStatus(
             Long organizationId, Long academicYearId, Long classId, EnrollmentStatus status);
 
+    Optional<AcademicEnrollment> findFirstByOrganizationIdAndStudentIdAndStatusOrderByEnrollmentDateDesc(
+            Long organizationId, Long studentId, EnrollmentStatus status);
+
     long countByOrganizationIdAndAcademicYearIdAndStatus(
             Long organizationId, Long academicYearId, EnrollmentStatus status);
 

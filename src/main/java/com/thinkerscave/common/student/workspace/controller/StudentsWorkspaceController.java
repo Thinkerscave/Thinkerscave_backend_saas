@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -74,5 +75,22 @@ public class StudentsWorkspaceController {
     @GetMapping("/documents")
     public ResponseEntity<ApiResponse<List<DocumentVaultEntry>>> documents(@RequestParam(required = false) String category) {
         return ResponseEntity.ok(ApiResponse.success(service.documentVaultList(category)));
+    }
+
+    @PostMapping("/documents")
+    public ResponseEntity<ApiResponse<DocumentVaultEntry>> addDocument(@Valid @RequestBody DocumentVaultRequest req) {
+        return ResponseEntity.ok(ApiResponse.success("Document uploaded", service.addDocument(req)));
+    }
+
+    @PostMapping("/documents/{id}/verify")
+    public ResponseEntity<ApiResponse<DocumentVaultEntry>> verifyDocument(@PathVariable Long id, Authentication auth) {
+        String verifier = auth != null ? auth.getName() : "SYSTEM";
+        return ResponseEntity.ok(ApiResponse.success("Document verified", service.verifyDocument(id, verifier)));
+    }
+
+    @DeleteMapping("/documents/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteDocument(@PathVariable Long id) {
+        service.deleteDocument(id);
+        return ResponseEntity.ok(ApiResponse.success("Document deleted", null));
     }
 }
