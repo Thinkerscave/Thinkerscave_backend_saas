@@ -1,4 +1,4 @@
-package com.thinkerscave.common.student.controller;
+package com.thinkerscave.student.controller;
 
 import com.thinkerscave.common.student.dto.StudentRequestDTO;
 import com.thinkerscave.common.student.dto.StudentResponseDTO;
