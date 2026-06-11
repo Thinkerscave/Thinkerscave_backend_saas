@@ -12,18 +12,21 @@ import com.thinkerscave.common.security.SecurityUtil;
 import com.thinkerscave.common.student.domain.AlumniRecord;
 import com.thinkerscave.common.student.domain.Guardian;
 import com.thinkerscave.common.student.domain.Student;
-import com.thinkerscave.common.student.domain.StudentAchievement;
 import com.thinkerscave.common.student.domain.StudentDocument;
 import com.thinkerscave.common.student.repository.AlumniRecordRepository;
-import com.thinkerscave.common.student.repository.StudentAchievementRepository;
 import com.thinkerscave.common.student.repository.StudentDocumentRepository;
 import com.thinkerscave.common.student.repository.StudentRepository;
 import com.thinkerscave.common.student.workspace.dto.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.*;
@@ -39,7 +42,6 @@ public class StudentsWorkspaceService {
     private final StudentRepository studentRepository;
     private final StudentDocumentRepository documentRepository;
     private final AttendanceRepository attendanceRepository;
-    private final StudentAchievementRepository achievementRepository;
     private final AlumniRecordRepository alumniRepository;
     private final AcademicEnrollmentRepository enrollmentRepository;
     private final ActivityLogService activityLogService;
@@ -78,46 +80,49 @@ public class StudentsWorkspaceService {
     // ============================================================
 
     @Transactional(readOnly = true)
-    public List<StudentDirectoryCard> directorySearch(StudentSearchRequest req) {
+    public Page<StudentDirectoryCard> directorySearch(StudentSearchRequest req, Pageable pageable) {
         Long orgId = OrganizationContext.getOrganizationId();
-        List<Student> source = studentRepository.findByOrganizationId(orgId);
+        
+        Specification<Student> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("organizationId"), orgId));
+            
+            if (req != null) {
+                if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
+                    String pattern = "%" + req.getKeyword().trim().toLowerCase() + "%";
+                    predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("firstName")), pattern),
+                        cb.like(cb.lower(root.get("lastName")), pattern),
+                        cb.like(cb.lower(root.get("email")), pattern),
+                        cb.like(cb.lower(root.get("rollNumber")), pattern)
+                    ));
+                }
+                if (req.getClassId() != null && !req.getClassId().isBlank()) {
+                    predicates.add(cb.equal(root.join("classEntity", JoinType.LEFT).get("classId"), Long.valueOf(req.getClassId())));
+                }
+                if (req.getSectionId() != null && !req.getSectionId().isBlank()) {
+                    predicates.add(cb.equal(root.join("section", JoinType.LEFT).get("sectionId"), Long.valueOf(req.getSectionId())));
+                }
+                if (req.getStatus() != null && !req.getStatus().isBlank()) {
+                    boolean wantActive = "ACTIVE".equalsIgnoreCase(req.getStatus());
+                    predicates.add(cb.equal(root.get("isActive"), wantActive));
+                }
+                if (req.getParentName() != null && !req.getParentName().isBlank()) {
+                    String pattern = "%" + req.getParentName().trim().toLowerCase() + "%";
+                    var parentJoin = root.join("parent", JoinType.LEFT);
+                    predicates.add(cb.or(
+                        cb.like(cb.lower(parentJoin.get("firstName")), pattern),
+                        cb.like(cb.lower(parentJoin.get("lastName")), pattern)
+                    ));
+                }
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
 
-        String keyword = req == null || req.getKeyword() == null ? "" : req.getKeyword().trim().toLowerCase();
-        String classId = req == null ? null : req.getClassId();
-        String sectionId = req == null ? null : req.getSectionId();
-        String status = req == null ? null : req.getStatus();
-        String parentName = req == null || req.getParentName() == null ? "" : req.getParentName().trim().toLowerCase();
-
-        List<Student> filtered = source.stream()
-            .filter(s -> {
-                if (!keyword.isEmpty()) {
-                    String hay = (safe(s.getFirstName()) + " " + safe(s.getLastName()) + " "
-                        + safe(s.getRollNumber()) + " " + safe(s.getEmail())
-                        + " " + (s.getMobileNumber() == null ? "" : s.getMobileNumber().toString())).toLowerCase();
-                    if (!hay.contains(keyword)) return false;
-                }
-                if (classId != null && !classId.isBlank() && s.getClassEntity() != null) {
-                    if (!String.valueOf(s.getClassEntity().getClassId()).equals(classId)) return false;
-                }
-                if (sectionId != null && !sectionId.isBlank() && s.getSection() != null) {
-                    if (!String.valueOf(s.getSection().getSectionId()).equals(sectionId)) return false;
-                }
-                if (status != null && !status.isBlank()) {
-                    boolean wantActive = "ACTIVE".equalsIgnoreCase(status);
-                    if (Boolean.TRUE.equals(s.getIsActive()) != wantActive) return false;
-                }
-                if (!parentName.isEmpty() && s.getParent() != null) {
-                    String guardian = (safe(s.getParent().getFirstName()) + " " + safe(s.getParent().getLastName())).toLowerCase();
-                    if (!guardian.contains(parentName)) return false;
-                }
-                return true;
-            })
-            .collect(Collectors.toList());
-
+        Page<Student> page = studentRepository.findAll(spec, pageable);
         LocalDate today = LocalDate.now();
-        return filtered.stream()
-            .map(s -> toDirectoryCard(s, orgId, today))
-            .collect(Collectors.toList());
+        
+        return page.map(s -> toDirectoryCard(s, orgId, today));
     }
 
     // ============================================================
@@ -161,42 +166,6 @@ public class StudentsWorkspaceService {
     }
 
     // ============================================================
-    // Achievements
-    // ============================================================
-
-    @Transactional(readOnly = true)
-    public List<AchievementResponse> achievements(Long studentId) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        return achievementRepository
-            .findByStudentIdAndOrganizationIdOrderByAchievementDateDesc(studentId, orgId)
-            .stream().map(this::toAchievementResponse).collect(Collectors.toList());
-    }
-
-    @Transactional
-    public AchievementResponse addAchievement(Long studentId, AchievementRequest req) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        studentRepository.findByStudentIdAndOrganizationId(studentId, orgId)
-            .orElseThrow(() -> new IllegalArgumentException("Student not found: " + studentId));
-
-        StudentAchievement a = new StudentAchievement();
-        a.setStudentId(studentId);
-        a.setCategory(req.getCategory());
-        a.setTitle(req.getTitle());
-        a.setDescription(req.getDescription());
-        a.setAchievementDate(req.getAchievementDate());
-        a.setLocation(req.getLocation());
-        a.setAwardedBy(req.getAwardedBy());
-        a.setIcon(req.getIcon());
-        a.setOrganizationId(orgId);
-        StudentAchievement saved = achievementRepository.save(a);
-
-        activityLogService.record(orgId, STUDENT_ENTITY, studentId, "ACHIEVEMENT_ADDED",
-            "New achievement: " + req.getTitle(), SecurityUtil.getCurrentUsername());
-
-        return toAchievementResponse(saved);
-    }
-
-    // ============================================================
     // Alumni
     // ============================================================
 
@@ -205,26 +174,6 @@ public class StudentsWorkspaceService {
         Long orgId = OrganizationContext.getOrganizationId();
         return alumniRepository.findByOrganizationIdOrderByGraduationDateDesc(orgId)
             .stream().map(this::toAlumniResponse).collect(Collectors.toList());
-    }
-
-    @Transactional
-    public AlumniResponse addAlumni(AlumniRequest req) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        AlumniRecord r = new AlumniRecord();
-        r.setStudentId(req.getStudentId());
-        r.setFullName(req.getFullName());
-        r.setBatchYear(req.getBatchYear());
-        r.setYearPassed(req.getYearPassed());
-        r.setCourse(req.getCourse());
-        r.setOccupation(req.getOccupation());
-        r.setEmployer(req.getEmployer());
-        r.setContact(req.getContact());
-        r.setEmail(req.getEmail());
-        r.setCity(req.getCity());
-        r.setGraduationDate(req.getGraduationDate());
-        r.setLinkedIn(req.getLinkedIn());
-        r.setOrganizationId(orgId);
-        return toAlumniResponse(alumniRepository.save(r));
     }
 
     // ============================================================
@@ -239,7 +188,7 @@ public class StudentsWorkspaceService {
         long total = docs.size();
         long verified = docs.stream().filter(d -> "VERIFIED".equals(statusOrDefault(d))).count();
         long pending = docs.stream().filter(d -> "PENDING".equals(statusOrDefault(d))).count();
-        long required = students.size() * 6L;                       // 6 required docs per student
+        long required = students.size() * 6L;
         long missing = Math.max(0, required - total);
         return DocumentVaultKpi.builder()
             .totalDocuments(total)
@@ -326,15 +275,6 @@ public class StudentsWorkspaceService {
     // ============================================================
     // Helpers
     // ============================================================
-
-    private Map<Long, Long> countDocsByStudent(Long orgId) {
-        Map<Long, Long> out = new HashMap<>();
-        for (Student s : studentRepository.findByOrganizationId(orgId)) {
-            long count = documentRepository.findByStudentStudentIdAndOrganizationId(s.getStudentId(), orgId).size();
-            out.put(s.getStudentId(), count);
-        }
-        return out;
-    }
 
     private StudentDirectoryCard toDirectoryCard(Student s, Long orgId, LocalDate today) {
         String attendance = computeTodayAttendance(s, orgId, today);
@@ -466,7 +406,6 @@ public class StudentsWorkspaceService {
             primary = guardianInfo(g);
             guardians.add(primary);
         }
-        // siblings: any other student that shares this guardian
         List<StudentProfile360Response.SiblingInfo> siblings = new ArrayList<>();
         if (s.getParent() != null && s.getParent().getGuardianId() != null) {
             for (Student other : studentRepository.findByOrganizationId(orgId)) {
@@ -534,7 +473,6 @@ public class StudentsWorkspaceService {
     }
 
     private StudentProfile360Response.FeeSnapshot buildFeeSnapshot(Student s) {
-        // Pragmatic placeholder — real fee module integration later
         return StudentProfile360Response.FeeSnapshot.builder()
             .totalFee(45000)
             .paid(30000)
@@ -563,21 +501,6 @@ public class StudentsWorkspaceService {
             .email(g.getEmail())
             .mobile(g.getMobileNumber() == null ? null : g.getMobileNumber().toString())
             .address(g.getAddress())
-            .occupation(null)
-            .build();
-    }
-
-    private AchievementResponse toAchievementResponse(StudentAchievement a) {
-        return AchievementResponse.builder()
-            .achievementId(a.getAchievementId())
-            .studentId(a.getStudentId())
-            .category(a.getCategory())
-            .title(a.getTitle())
-            .description(a.getDescription())
-            .achievementDate(a.getAchievementDate())
-            .location(a.getLocation())
-            .awardedBy(a.getAwardedBy())
-            .icon(a.getIcon())
             .build();
     }
 
@@ -662,7 +585,6 @@ public class StudentsWorkspaceService {
         return "neutral";
     }
 
-    // tiny helper to avoid pulling in another import line
     private static class Stream {
         @SafeVarargs
         static <T> java.util.stream.Stream<T> of(T... items) {

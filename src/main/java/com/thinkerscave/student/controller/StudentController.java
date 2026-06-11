@@ -3,6 +3,9 @@ package com.thinkerscave.student.controller;
 import com.thinkerscave.common.student.dto.StudentRequestDTO;
 import com.thinkerscave.common.student.dto.StudentResponseDTO;
 import com.thinkerscave.common.student.service.StudentService;
+import com.thinkerscave.student.service.StudentExcelService;
+
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ContentDisposition;
 import jakarta.validation.Valid;
 import com.thinkerscave.common.dto.ApiResponse;
@@ -29,6 +33,23 @@ import java.util.List;
 public class StudentController {
 
     private final StudentService studentService;
+    
+    private final StudentExcelService studentExcelService;
+    
+    @GetMapping("/import/template")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','STAFF')")
+    @Operation(summary = "Download Student Import Template")
+    public ResponseEntity<Resource> downloadStudentImportTemplate() {
+
+        Resource resource = studentExcelService.generateStudentImportTemplate();
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=student_import_template.xlsx")
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(resource);
+    }
 
     @io.swagger.v3.oas.annotations.Operation(summary = "Register a new student with documents")
     @PostMapping(value = "/registerStudent")

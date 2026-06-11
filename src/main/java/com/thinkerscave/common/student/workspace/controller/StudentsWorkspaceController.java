@@ -28,8 +28,10 @@ public class StudentsWorkspaceController {
 
     // ---------- Directory ----------
     @PostMapping("/directory/search")
-    public ResponseEntity<ApiResponse<List<StudentDirectoryCard>>> directorySearch(@RequestBody(required = false) StudentSearchRequest req) {
-        return ResponseEntity.ok(ApiResponse.success(service.directorySearch(req)));
+    public ResponseEntity<ApiResponse<org.springframework.data.domain.Page<StudentDirectoryCard>>> directorySearch(
+            @RequestBody(required = false) StudentSearchRequest req,
+            org.springframework.data.domain.Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(service.directorySearch(req, pageable)));
     }
 
     // ---------- Profile 360 ----------
@@ -43,27 +45,10 @@ public class StudentsWorkspaceController {
         return ResponseEntity.ok(ApiResponse.success(service.timeline(studentId)));
     }
 
-    // ---------- Achievements ----------
-    @GetMapping("/students/{studentId}/achievements")
-    public ResponseEntity<ApiResponse<List<AchievementResponse>>> listAchievements(@PathVariable Long studentId) {
-        return ResponseEntity.ok(ApiResponse.success(service.achievements(studentId)));
-    }
-
-    @PostMapping("/students/{studentId}/achievements")
-    public ResponseEntity<ApiResponse<AchievementResponse>> addAchievement(@PathVariable Long studentId,
-                                                                           @Valid @RequestBody AchievementRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Achievement added", service.addAchievement(studentId, req)));
-    }
-
     // ---------- Alumni ----------
     @GetMapping("/alumni")
     public ResponseEntity<ApiResponse<List<AlumniResponse>>> alumni() {
         return ResponseEntity.ok(ApiResponse.success(service.alumniList()));
-    }
-
-    @PostMapping("/alumni")
-    public ResponseEntity<ApiResponse<AlumniResponse>> addAlumni(@Valid @RequestBody AlumniRequest req) {
-        return ResponseEntity.ok(ApiResponse.success("Alumni record added", service.addAlumni(req)));
     }
 
     // ---------- Document Vault ----------
