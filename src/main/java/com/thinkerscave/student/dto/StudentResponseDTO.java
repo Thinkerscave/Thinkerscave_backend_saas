@@ -1,26 +1,31 @@
 package com.thinkerscave.student.dto;
 
-import lombok.Data;
-import java.time.LocalDate;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class StudentResponseDTO {
-    private Long studentId;
-    private String firstName;
-    private String middleName;
-    private String lastName;
-    private String email;
-    private Long mobileNumber;
-    private String gender;
-    private LocalDate dateOfBirth;
-    private LocalDate enrollmentDate;
-    private String rollNumber;
-    private String remarks;
-    private boolean isActive;
 
-    private Long classId;
+    private Long studentId;
+
+    private String studentCode;
+
+    private String admissionNumber;
+
+    private String fullName;
+
+    private String mobileNumber;
+
+    private String email;
+
+    private String status;
+
     private String className;
-    private Long sectionId;
+
     private String sectionName;
+
     private String parentName;
+
+    private String parentMobileNumber;
 }

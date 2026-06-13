@@ -3,7 +3,7 @@ package com.thinkerscave.student.entity;
 import com.thinkerscave.academics.entity.AcademicYear;
 import com.thinkerscave.academics.entity.ClassEntity;
 import com.thinkerscave.academics.entity.Section;
-import com.thinkerscave.common.enrollment.domain.EnrollmentStatus;
+import com.thinkerscave.student.enums.EnrollmentStatus;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;

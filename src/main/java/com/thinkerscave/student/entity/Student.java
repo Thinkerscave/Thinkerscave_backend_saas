@@ -66,9 +66,6 @@ public class Student extends Auditable {
     @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
-    @Column(name = "blood_group", length = 10)
-    private String bloodGroup;
-
     @Column(name = "religion", length = 50)
     private String religion;
 

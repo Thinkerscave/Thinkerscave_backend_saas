@@ -1,32 +1,21 @@
 package com.thinkerscave.student.service;
 
-import com.thinkerscave.common.student.domain.Student;
-import com.thinkerscave.common.student.dto.StudentRequestDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
+import com.thinkerscave.student.dto.StudentCreateRequest;
+import com.thinkerscave.student.dto.StudentResponseDTO;
 
 public interface StudentService {
 
-    public com.thinkerscave.common.student.dto.StudentResponseDTO saveStudentWithDocuments(StudentRequestDTO dto,
-            MultipartFile photo,
-            List<MultipartFile> documents,
-            List<String> types);
+	StudentResponseDTO createStudent(StudentCreateRequest request);
 
-    public List<com.thinkerscave.common.student.dto.StudentResponseDTO> getAllStudents();
+	StudentResponseDTO updateStudent(Long studentId, StudentCreateRequest request);
 
-    Page<com.thinkerscave.common.student.dto.StudentResponseDTO> getAllStudents(Pageable pageable);
+	StudentResponseDTO getStudentById(Long studentId);
 
-    public com.thinkerscave.common.student.dto.StudentResponseDTO getStudentById(Long id);
+	Page<StudentResponseDTO> getStudents(Pageable pageable);
 
-    public com.thinkerscave.common.student.dto.StudentResponseDTO updateStudent(Long id, StudentRequestDTO dto);
-
-    public void deleteStudent(Long id);
-
-    public List<com.thinkerscave.common.student.dto.StudentDocumentDTO> getStudentDocuments(Long studentId);
-
-    public org.springframework.core.io.Resource downloadDocument(Long documentId);
+	void deleteStudent(Long studentId);
 
 }
