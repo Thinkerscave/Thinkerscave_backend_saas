@@ -9,6 +9,5 @@ public interface StudentExcelService {
 
 	ByteArrayInputStream downloadTemplate();
 
-    StudentImportResponse importStudents(
-            MultipartFile file);
+	Resource importStudents(MultipartFile file);
 }

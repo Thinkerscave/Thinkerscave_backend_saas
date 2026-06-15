@@ -1,6 +1,9 @@
-package com.thinkerscave.common.promotion.domain;
+package com.thinkerscave.student.entity;
 
 import com.thinkerscave.common.common.entity.OrganizationScopedEntity;
+import com.thinkerscave.student.entity.Student;
+import com.thinkerscave.student.entity.StudentEnrollment;
+import com.thinkerscave.student.enums.TransferStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -29,8 +32,9 @@ public class TransferRequest extends OrganizationScopedEntity {
     @Column(name = "student_id", nullable = false)
     private Long studentId;
 
-    @Column(name = "enrollment_id", nullable = false)
-    private Long enrollmentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "enrollment_id", nullable = false)
+    private StudentEnrollment enrollment;
 
     @Column(name = "requested_on", nullable = false)
     private LocalDate requestedOn;

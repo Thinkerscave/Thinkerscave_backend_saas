@@ -26,45 +26,45 @@ public class TransferRequestController {
 
     private final TransferRequestService transferService;
 
-    @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','STAFF') or hasAuthority('TRANSFER_VIEW')")
-    public ResponseEntity<ApiResponse<PageResponse<TransferRequestDTO>>> list(
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) String sort) {
-        return ResponseEntity.ok(ApiResponse.success(PageResponse.of(
-                transferService.list(PageRequestUtil.of(page, size, sort)))));
-    }
-
-    @GetMapping("/student/{studentId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','STAFF') or hasAuthority('TRANSFER_VIEW')")
-    public ResponseEntity<ApiResponse<List<TransferRequestDTO>>> forStudent(@PathVariable Long studentId) {
-        return ResponseEntity.ok(ApiResponse.success(transferService.listForStudent(studentId)));
-    }
-
-    @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','STAFF') or hasAuthority('TRANSFER_VIEW')")
-    public ResponseEntity<ApiResponse<TransferRequestDTO>> get(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(transferService.get(id)));
-    }
-
-    @PostMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','STAFF') or hasAuthority('TRANSFER_EDIT')")
-    public ResponseEntity<ApiResponse<TransferRequestDTO>> create(
-            @Valid @RequestBody TransferRequestDTO dto) {
-        return ResponseEntity.ok(ApiResponse.created("Transfer request created",
-                transferService.create(dto)));
-    }
-
-    @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('TRANSFER_APPROVE')")
-    @Operation(summary = "Transition transfer request status")
-    public ResponseEntity<ApiResponse<TransferRequestDTO>> transition(
-            @PathVariable Long id,
-            @RequestParam TransferStatus target,
-            @RequestParam(required = false) Long actorUserId,
-            @RequestParam(required = false) String remarks) {
-        return ResponseEntity.ok(ApiResponse.success("Status updated",
-                transferService.transition(id, target, actorUserId, remarks)));
-    }
+//    @GetMapping
+//    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','STAFF') or hasAuthority('TRANSFER_VIEW')")
+//    public ResponseEntity<ApiResponse<PageResponse<TransferRequestDTO>>> list(
+//            @RequestParam(required = false) Integer page,
+//            @RequestParam(required = false) Integer size,
+//            @RequestParam(required = false) String sort) {
+//        return ResponseEntity.ok(ApiResponse.success(PageResponse.of(
+//                transferService.list(PageRequestUtil.of(page, size, sort)))));
+//    }
+//
+//    @GetMapping("/student/{studentId}")
+//    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','STAFF') or hasAuthority('TRANSFER_VIEW')")
+//    public ResponseEntity<ApiResponse<List<TransferRequestDTO>>> forStudent(@PathVariable Long studentId) {
+//        return ResponseEntity.ok(ApiResponse.success(transferService.listForStudent(studentId)));
+//    }
+//
+//    @GetMapping("/{id}")
+//    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','STAFF') or hasAuthority('TRANSFER_VIEW')")
+//    public ResponseEntity<ApiResponse<TransferRequestDTO>> get(@PathVariable Long id) {
+//        return ResponseEntity.ok(ApiResponse.success(transferService.get(id)));
+//    }
+//
+//    @PostMapping
+//    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','STAFF') or hasAuthority('TRANSFER_EDIT')")
+//    public ResponseEntity<ApiResponse<TransferRequestDTO>> create(
+//            @Valid @RequestBody TransferRequestDTO dto) {
+//        return ResponseEntity.ok(ApiResponse.created("Transfer request created",
+//                transferService.create(dto)));
+//    }
+//
+//    @PatchMapping("/{id}/status")
+//    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN') or hasAuthority('TRANSFER_APPROVE')")
+//    @Operation(summary = "Transition transfer request status")
+//    public ResponseEntity<ApiResponse<TransferRequestDTO>> transition(
+//            @PathVariable Long id,
+//            @RequestParam TransferStatus target,
+//            @RequestParam(required = false) Long actorUserId,
+//            @RequestParam(required = false) String remarks) {
+//        return ResponseEntity.ok(ApiResponse.success("Status updated",
+//                transferService.transition(id, target, actorUserId, remarks)));
+//    }
 }

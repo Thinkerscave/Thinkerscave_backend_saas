@@ -1,6 +1,6 @@
 package com.thinkerscave.student.repository;
 
-import com.thinkerscave.common.student.domain.Student;
+import com.thinkerscave.student.entity.Student;
 import com.thinkerscave.student.enums.StudentStatus;
 
 import org.springframework.data.domain.Page;
