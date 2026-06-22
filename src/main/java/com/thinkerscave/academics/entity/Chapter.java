@@ -2,6 +2,7 @@ package com.thinkerscave.academics.entity;
 
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,25 +11,28 @@ import lombok.Setter;
 @Getter
 @Setter
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@Table(
-        name = "class",
-        indexes = {
-                @Index(name = "idx_class_code", columnList = "class_code")
-        }
-)
-public class ClassEntity extends Auditable {
+@Table(name = "syllabus_chapter")
+public class Chapter extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "class_id")
+    @Column(name = "chapter_id")
     @EqualsAndHashCode.Include
-    private Long classId;
+    private Long chapterId;
 
-    @Column(name = "class_code", nullable = false, unique = true, length = 30)
-    private String classCode;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "unit_id", nullable = false)
+    private Unit unit;
 
-    @Column(name = "class_name", nullable = false, length = 100)
-    private String className;
+    @Column(name = "chapter_number")
+    private Integer chapterNumber;
+
+    @NotBlank
+    @Column(name = "chapter_name", nullable = false, length = 150)
+    private String chapterName;
+
+    @Column(name = "estimated_hours")
+    private Integer estimatedHours;
 
     @Column(name = "display_order")
     private Integer displayOrder;

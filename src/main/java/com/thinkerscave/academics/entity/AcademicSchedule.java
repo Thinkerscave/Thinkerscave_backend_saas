@@ -16,29 +16,28 @@ import java.time.LocalDate;
 @Setter
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Table(
-        name = "academic_year",
+        name = "academic_schedule",
         indexes = {
-                @Index(name = "idx_academic_year_code", columnList = "year_code"),
-                @Index(name = "idx_academic_year_current", columnList = "current_year")
+                @Index(name = "idx_schedule_start", columnList = "start_date"),
+                @Index(name = "idx_schedule_end", columnList = "end_date")
         }
 )
-public class AcademicYear extends Auditable {
+public class AcademicSchedule extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "academic_year_id")
+    @Column(name = "schedule_id")
     @EqualsAndHashCode.Include
-    private Long academicYearId;
+    private Long scheduleId;
 
-    @NotBlank
-    @Size(max = 20)
-    @Column(name = "year_code", nullable = false, unique = true, length = 20)
-    private String yearCode;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "academic_year_id", nullable = false)
+    private AcademicYear academicYear;
 
     @NotBlank
     @Size(max = 100)
-    @Column(name = "year_name", nullable = false, length = 100)
-    private String yearName;
+    @Column(name = "schedule_name", nullable = false)
+    private String scheduleName;
 
     @NotNull
     @Column(name = "start_date", nullable = false)
@@ -48,10 +47,7 @@ public class AcademicYear extends Auditable {
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
-    @Column(name = "current_year", nullable = false)
-    private Boolean currentYear = false;
-
-    @Column(name = "active", nullable = false)
+    @Column(name = "active")
     private Boolean active = true;
 
     @Column(name = "remarks", columnDefinition = "TEXT")

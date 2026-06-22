@@ -1,8 +1,8 @@
 package com.thinkerscave.student.entity;
 
+import com.thinkerscave.academics.entity.AcademicClass;
+import com.thinkerscave.academics.entity.AcademicSection;
 import com.thinkerscave.academics.entity.AcademicYear;
-import com.thinkerscave.academics.entity.ClassEntity;
-import com.thinkerscave.academics.entity.Section;
 import com.thinkerscave.student.enums.EnrollmentStatus;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
@@ -44,11 +44,11 @@ public class StudentEnrollment extends Auditable {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "class_id", nullable = false)
-    private ClassEntity classEntity;
+    private AcademicClass classEntity;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "section_id")
-    private Section section;
+    private AcademicSection section;
 
     @Column(name = "roll_number", length = 50)
     private String rollNumber;

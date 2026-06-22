@@ -2,9 +2,9 @@ package com.thinkerscave.student.entity;
 
 import java.time.LocalDate;
 
+import com.thinkerscave.academics.entity.AcademicClass;
+import com.thinkerscave.academics.entity.AcademicSection;
 import com.thinkerscave.academics.entity.AcademicYear;
-import com.thinkerscave.academics.entity.ClassEntity;
-import com.thinkerscave.academics.entity.Section;
 import com.thinkerscave.shared.entity.Auditable;
 
 import jakarta.persistence.Column;
@@ -43,19 +43,19 @@ public class StudentPromotion extends Auditable {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "from_class_id")
-    private ClassEntity fromClass;
+    private AcademicClass fromClass;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "to_class_id")
-    private ClassEntity toClass;
+    private AcademicClass toClass;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "from_section_id")
-    private Section fromSection;
+    private AcademicSection fromSection;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "to_section_id")
-    private Section toSection;
+    private AcademicSection toSection;
 
     @Column(name = "promotion_date")
     private LocalDate promotionDate;
