@@ -6,7 +6,14 @@ public enum CodeType {
     PARENT("PAR"),
     STAFF("EMP"),
     USER("USR"),
-    DOCUMENT("DOC");
+    DOCUMENT("DOC"),
+    CUSTOMER("CUS"),
+    CONTACT("CON"),
+    ORGANIZATION("ORG"),
+    TENANT("TEN"),
+    PROVISION_JOB("JOB"),
+    PROMOTION("PRO"),
+    TEMPLATE("TPL");
 
     private final String prefix;
 
