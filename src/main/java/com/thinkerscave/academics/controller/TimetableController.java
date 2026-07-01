@@ -24,14 +24,14 @@ public class TimetableController {
     private final TimetableService timetableService;
 
     @PostMapping("/slots")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Create timetable slot")
     public ResponseEntity<ApiResponse<TimetableSlotResponse>> createSlot(@Valid @RequestBody TimetableSlotRequest request) {
         return ResponseEntity.status(201).body(ApiResponse.success("Timetable slot created", timetableService.createSlot(request)));
     }
 
     @PutMapping("/slots/{slotId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update timetable slot")
     public ResponseEntity<ApiResponse<TimetableSlotResponse>> updateSlot(
             @PathVariable Long slotId, @Valid @RequestBody TimetableSlotRequest request) {
@@ -39,7 +39,7 @@ public class TimetableController {
     }
 
     @DeleteMapping("/slots/{slotId}")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Delete timetable slot")
     public ResponseEntity<ApiResponse<Void>> deleteSlot(@PathVariable Long slotId) {
         timetableService.deleteSlot(slotId);
@@ -47,7 +47,7 @@ public class TimetableController {
     }
 
     @GetMapping("/class/{classId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER','STUDENT','PARENT')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
     @Operation(summary = "Get timetable for a class/section")
     public ResponseEntity<ApiResponse<TimetableResponse>> getTimetable(
             @PathVariable Long classId,
@@ -56,7 +56,7 @@ public class TimetableController {
     }
 
     @GetMapping("/teacher/{teacherId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get timetable for a teacher")
     public ResponseEntity<ApiResponse<List<TimetableSlotResponse>>> getTeacherTimetable(
             @PathVariable Long teacherId,

@@ -48,9 +48,8 @@ public class CustomerServiceImpl implements CustomerService {
     public CustomerDetailResponse getCustomerById(Long id) {
         Customer customer = findById(id);
         List<CustomerContactResponse> contacts = contactRepository
-                .findByCustomer_IdAndActiveTrueOrderByPrimaryContactDesc()
+                .findByCustomer_IdAndActiveTrueOrderByPrimaryContactDesc(id)
                 .stream()
-                .filter(c -> c.getCustomer().getId().equals(id))
                 .map(this::toContactResponse)
                 .collect(Collectors.toList());
 
@@ -190,9 +189,8 @@ public class CustomerServiceImpl implements CustomerService {
     @Transactional(readOnly = true)
     public List<CustomerContactResponse> getContacts(Long customerId) {
         findById(customerId); // validate customer exists
-        return contactRepository.findByCustomer_IdAndActiveTrueOrderByPrimaryContactDesc()
+        return contactRepository.findByCustomer_IdAndActiveTrueOrderByPrimaryContactDesc(customerId)
                 .stream()
-                .filter(c -> c.getCustomer().getId().equals(customerId))
                 .map(this::toContactResponse)
                 .collect(Collectors.toList());
     }

@@ -1,6 +1,5 @@
 package com.thinkerscave.staff.controller;
 
-import com.thinkerscave.common.security.SecurityUtil;
 import com.thinkerscave.shared.dto.ApiResponse;
 import com.thinkerscave.staff.dto.request.StaffProfileUpdateRequest;
 import com.thinkerscave.staff.dto.response.PayrollResponse;
@@ -13,6 +12,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,7 +30,7 @@ public class StaffProfileController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get logged-in staff profile")
     public ResponseEntity<ApiResponse<StaffDetailResponse>> getMyProfile() {
-        String username = SecurityUtil.getCurrentUsername();
+        String username = currentUsername();
         return ResponseEntity.ok(ApiResponse.success("Profile retrieved",
                 staffProfileService.getMyProfile(username)));
     }
@@ -39,7 +40,7 @@ public class StaffProfileController {
     @Operation(summary = "Update logged-in staff profile (limited fields)")
     public ResponseEntity<ApiResponse<Void>> updateMyProfile(
             @Valid @RequestBody StaffProfileUpdateRequest request) {
-        String username = SecurityUtil.getCurrentUsername();
+        String username = currentUsername();
         staffProfileService.updateMyProfile(username, request);
         return ResponseEntity.ok(ApiResponse.noContent("Profile updated successfully"));
     }
@@ -48,7 +49,7 @@ public class StaffProfileController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get responsibilities for logged-in staff")
     public ResponseEntity<ApiResponse<List<ResponsibilityAssignmentResponse>>> getMyResponsibilities() {
-        String username = SecurityUtil.getCurrentUsername();
+        String username = currentUsername();
         return ResponseEntity.ok(ApiResponse.success("Responsibilities retrieved",
                 staffProfileService.getMyResponsibilities(username)));
     }
@@ -57,8 +58,16 @@ public class StaffProfileController {
     @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get payroll history for logged-in staff")
     public ResponseEntity<ApiResponse<List<PayrollResponse>>> getMyPayrollHistory() {
-        String username = SecurityUtil.getCurrentUsername();
+        String username = currentUsername();
         return ResponseEntity.ok(ApiResponse.success("Payroll history retrieved",
                 staffProfileService.getMyPayrollHistory(username)));
+    }
+
+    private String currentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null) {
+            throw new IllegalStateException("No authenticated user found");
+        }
+        return authentication.getName();
     }
 }

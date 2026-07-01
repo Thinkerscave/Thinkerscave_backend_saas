@@ -4,7 +4,7 @@ import com.thinkerscave.attendance.dto.response.AttendanceCalendarResponse;
 import com.thinkerscave.attendance.dto.response.AttendanceCalendarResponse.CalendarDayResponse;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceCalendarService;
-import com.thinkerscave.common.context.OrganizationContext;
+import com.thinkerscave.shared.context.OrganizationContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -5,7 +5,7 @@ import com.thinkerscave.attendance.dto.response.AttendanceFreezeResponse;
 import com.thinkerscave.attendance.entity.AttendanceFreeze;
 import com.thinkerscave.attendance.repository.AttendanceFreezeRepository;
 import com.thinkerscave.attendance.service.AttendanceFreezeService;
-import com.thinkerscave.common.context.OrganizationContext;
+import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;

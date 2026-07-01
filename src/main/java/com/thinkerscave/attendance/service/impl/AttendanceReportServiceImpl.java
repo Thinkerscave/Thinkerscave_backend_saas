@@ -12,7 +12,7 @@ import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
 import com.thinkerscave.attendance.repository.StaffAttendanceRepository;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceReportService;
-import com.thinkerscave.common.context.OrganizationContext;
+import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

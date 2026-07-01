@@ -28,14 +28,14 @@ public class AcademicStructureController {
     // ---- Class ----
 
     @PostMapping("/classes")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Create class")
     public ResponseEntity<ApiResponse<AcademicClassResponse>> createClass(@Valid @RequestBody AcademicClassRequest request) {
         return ResponseEntity.status(201).body(ApiResponse.success("Class created", structureService.createClass(request)));
     }
 
     @PutMapping("/classes/{classId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update class")
     public ResponseEntity<ApiResponse<AcademicClassResponse>> updateClass(
             @PathVariable Long classId, @Valid @RequestBody AcademicClassRequest request) {
@@ -43,21 +43,21 @@ public class AcademicStructureController {
     }
 
     @GetMapping("/classes/{classId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get class by ID")
     public ResponseEntity<ApiResponse<AcademicClassResponse>> getClassById(@PathVariable Long classId) {
         return ResponseEntity.ok(ApiResponse.success("Class found", structureService.getClassById(classId)));
     }
 
     @GetMapping("/years/{yearId}/classes")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get classes by academic year")
     public ResponseEntity<ApiResponse<List<AcademicClassResponse>>> getClasses(@PathVariable Long yearId) {
         return ResponseEntity.ok(ApiResponse.success("Classes retrieved", structureService.getClassesByYear(yearId)));
     }
 
     @PatchMapping("/classes/{classId}/deactivate")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Deactivate class")
     public ResponseEntity<ApiResponse<Void>> deactivateClass(@PathVariable Long classId) {
         structureService.deactivateClass(classId);
@@ -67,7 +67,7 @@ public class AcademicStructureController {
     // ---- Section ----
 
     @PostMapping("/classes/{classId}/sections")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Create section")
     public ResponseEntity<ApiResponse<AcademicSectionResponse>> createSection(
             @PathVariable Long classId, @Valid @RequestBody AcademicSectionRequest request) {
@@ -75,7 +75,7 @@ public class AcademicStructureController {
     }
 
     @PutMapping("/sections/{sectionId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update section")
     public ResponseEntity<ApiResponse<AcademicSectionResponse>> updateSection(
             @PathVariable Long sectionId, @Valid @RequestBody AcademicSectionRequest request) {
@@ -83,21 +83,21 @@ public class AcademicStructureController {
     }
 
     @GetMapping("/sections/{sectionId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get section by ID")
     public ResponseEntity<ApiResponse<AcademicSectionResponse>> getSectionById(@PathVariable Long sectionId) {
         return ResponseEntity.ok(ApiResponse.success("Section found", structureService.getSectionById(sectionId)));
     }
 
     @GetMapping("/classes/{classId}/sections")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get sections by class")
     public ResponseEntity<ApiResponse<List<AcademicSectionResponse>>> getSections(@PathVariable Long classId) {
         return ResponseEntity.ok(ApiResponse.success("Sections retrieved", structureService.getSectionsByClass(classId)));
     }
 
     @PatchMapping("/sections/{sectionId}/deactivate")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Deactivate section")
     public ResponseEntity<ApiResponse<Void>> deactivateSection(@PathVariable Long sectionId) {
         structureService.deactivateSection(sectionId);
@@ -107,7 +107,7 @@ public class AcademicStructureController {
     // ---- Tree ----
 
     @GetMapping("/years/{yearId}/structure")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get full academic structure tree for a year")
     public ResponseEntity<ApiResponse<List<AcademicStructureTreeResponse>>> getTree(@PathVariable Long yearId) {
         return ResponseEntity.ok(ApiResponse.success("Structure retrieved", structureService.getStructureTree(yearId)));

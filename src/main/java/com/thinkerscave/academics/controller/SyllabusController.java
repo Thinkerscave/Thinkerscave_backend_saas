@@ -33,21 +33,21 @@ public class SyllabusController {
     // ---- Syllabus ----
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Create syllabus")
     public ResponseEntity<ApiResponse<SyllabusResponse>> create(@Valid @RequestBody SyllabusRequest request) {
         return ResponseEntity.status(201).body(ApiResponse.success("Syllabus created", syllabusService.createSyllabus(request)));
     }
 
     @GetMapping("/{syllabusId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER','STUDENT','PARENT')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
     @Operation(summary = "Get syllabus by ID with full tree")
     public ResponseEntity<ApiResponse<SyllabusResponse>> getById(@PathVariable Long syllabusId) {
         return ResponseEntity.ok(ApiResponse.success("Syllabus found", syllabusService.getSyllabusById(syllabusId)));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER','STUDENT','PARENT')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
     @Operation(summary = "Get syllabus by class and year")
     public ResponseEntity<ApiResponse<List<SyllabusResponse>>> getByClassAndYear(
             @RequestParam Long classId, @RequestParam Long yearId) {
@@ -55,14 +55,14 @@ public class SyllabusController {
     }
 
     @PatchMapping("/{syllabusId}/publish")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Publish syllabus")
     public ResponseEntity<ApiResponse<SyllabusResponse>> publish(@PathVariable Long syllabusId) {
         return ResponseEntity.ok(ApiResponse.success("Syllabus published", syllabusService.publishSyllabus(syllabusId)));
     }
 
     @DeleteMapping("/{syllabusId}")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Delete syllabus")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long syllabusId) {
         syllabusService.deleteSyllabus(syllabusId);
@@ -72,7 +72,7 @@ public class SyllabusController {
     // ---- Unit ----
 
     @PostMapping("/{syllabusId}/units")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Add unit to syllabus")
     public ResponseEntity<ApiResponse<UnitResponse>> addUnit(
             @PathVariable Long syllabusId, @Valid @RequestBody UnitRequest request) {
@@ -80,7 +80,7 @@ public class SyllabusController {
     }
 
     @PutMapping("/units/{unitId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Update unit")
     public ResponseEntity<ApiResponse<UnitResponse>> updateUnit(
             @PathVariable Long unitId, @Valid @RequestBody UnitRequest request) {
@@ -88,14 +88,14 @@ public class SyllabusController {
     }
 
     @GetMapping("/{syllabusId}/units")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER','STUDENT','PARENT')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
     @Operation(summary = "Get units for syllabus")
     public ResponseEntity<ApiResponse<List<UnitResponse>>> getUnits(@PathVariable Long syllabusId) {
         return ResponseEntity.ok(ApiResponse.success("Units retrieved", syllabusService.getUnits(syllabusId)));
     }
 
     @DeleteMapping("/units/{unitId}")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Delete unit")
     public ResponseEntity<ApiResponse<Void>> deleteUnit(@PathVariable Long unitId) {
         syllabusService.deleteUnit(unitId);
@@ -105,7 +105,7 @@ public class SyllabusController {
     // ---- Chapter ----
 
     @PostMapping("/units/{unitId}/chapters")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Add chapter to unit")
     public ResponseEntity<ApiResponse<ChapterResponse>> addChapter(
             @PathVariable Long unitId, @Valid @RequestBody ChapterRequest request) {
@@ -113,7 +113,7 @@ public class SyllabusController {
     }
 
     @PutMapping("/chapters/{chapterId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Update chapter")
     public ResponseEntity<ApiResponse<ChapterResponse>> updateChapter(
             @PathVariable Long chapterId, @Valid @RequestBody ChapterRequest request) {
@@ -121,14 +121,14 @@ public class SyllabusController {
     }
 
     @GetMapping("/units/{unitId}/chapters")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER','STUDENT','PARENT')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
     @Operation(summary = "Get chapters for unit")
     public ResponseEntity<ApiResponse<List<ChapterResponse>>> getChapters(@PathVariable Long unitId) {
         return ResponseEntity.ok(ApiResponse.success("Chapters retrieved", syllabusService.getChapters(unitId)));
     }
 
     @DeleteMapping("/chapters/{chapterId}")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Delete chapter")
     public ResponseEntity<ApiResponse<Void>> deleteChapter(@PathVariable Long chapterId) {
         syllabusService.deleteChapter(chapterId);
@@ -138,7 +138,7 @@ public class SyllabusController {
     // ---- Topic ----
 
     @PostMapping("/chapters/{chapterId}/topics")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Add topic to chapter")
     public ResponseEntity<ApiResponse<TopicResponse>> addTopic(
             @PathVariable Long chapterId, @Valid @RequestBody TopicRequest request) {
@@ -146,7 +146,7 @@ public class SyllabusController {
     }
 
     @PutMapping("/topics/{topicId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Update topic")
     public ResponseEntity<ApiResponse<TopicResponse>> updateTopic(
             @PathVariable Long topicId, @Valid @RequestBody TopicRequest request) {
@@ -154,14 +154,14 @@ public class SyllabusController {
     }
 
     @GetMapping("/chapters/{chapterId}/topics")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER','STUDENT','PARENT')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
     @Operation(summary = "Get topics for chapter")
     public ResponseEntity<ApiResponse<List<TopicResponse>>> getTopics(@PathVariable Long chapterId) {
         return ResponseEntity.ok(ApiResponse.success("Topics retrieved", syllabusService.getTopics(chapterId)));
     }
 
     @DeleteMapping("/topics/{topicId}")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Delete topic")
     public ResponseEntity<ApiResponse<Void>> deleteTopic(@PathVariable Long topicId) {
         syllabusService.deleteTopic(topicId);
@@ -171,7 +171,7 @@ public class SyllabusController {
     // ---- Progress ----
 
     @PatchMapping("/topics/{topicId}/progress")
-    @PreAuthorize("hasAuthority('TEACHER')")
+    @PreAuthorize("hasAnyAuthority('TEACHER','STAFF','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update topic progress (Teacher only)")
     public ResponseEntity<ApiResponse<TopicResponse>> updateProgress(
             @PathVariable Long topicId, @Valid @RequestBody TopicProgressRequest request) {
@@ -179,7 +179,7 @@ public class SyllabusController {
     }
 
     @GetMapping("/{syllabusId}/progress")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get syllabus completion progress")
     public ResponseEntity<ApiResponse<SyllabusProgressResponse>> getProgress(
             @PathVariable Long syllabusId,

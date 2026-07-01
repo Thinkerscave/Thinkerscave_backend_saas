@@ -30,14 +30,14 @@ public class AcademicScheduleController {
     // ---- Schedule ----
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Create academic schedule")
     public ResponseEntity<ApiResponse<AcademicScheduleResponse>> create(@Valid @RequestBody AcademicScheduleRequest request) {
         return ResponseEntity.status(201).body(ApiResponse.success("Schedule created", scheduleService.createSchedule(request)));
     }
 
     @PutMapping("/{scheduleId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update academic schedule")
     public ResponseEntity<ApiResponse<AcademicScheduleResponse>> update(
             @PathVariable Long scheduleId, @Valid @RequestBody AcademicScheduleRequest request) {
@@ -45,21 +45,21 @@ public class AcademicScheduleController {
     }
 
     @GetMapping("/{scheduleId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get schedule by ID")
     public ResponseEntity<ApiResponse<AcademicScheduleResponse>> getById(@PathVariable Long scheduleId) {
         return ResponseEntity.ok(ApiResponse.success("Schedule found", scheduleService.getScheduleById(scheduleId)));
     }
 
     @GetMapping("/year/{yearId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get schedules by academic year")
     public ResponseEntity<ApiResponse<List<AcademicScheduleResponse>>> getByYear(@PathVariable Long yearId) {
         return ResponseEntity.ok(ApiResponse.success("Schedules retrieved", scheduleService.getSchedulesByYear(yearId)));
     }
 
     @PatchMapping("/{scheduleId}/deactivate")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Deactivate schedule")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long scheduleId) {
         scheduleService.deactivateSchedule(scheduleId);
@@ -69,7 +69,7 @@ public class AcademicScheduleController {
     // ---- Template ----
 
     @PostMapping("/{scheduleId}/templates")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Create timetable template")
     public ResponseEntity<ApiResponse<TimetableTemplateResponse>> createTemplate(
             @PathVariable Long scheduleId, @Valid @RequestBody TimetableTemplateRequest request) {
@@ -77,7 +77,7 @@ public class AcademicScheduleController {
     }
 
     @PutMapping("/templates/{templateId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update timetable template")
     public ResponseEntity<ApiResponse<TimetableTemplateResponse>> updateTemplate(
             @PathVariable Long templateId, @Valid @RequestBody TimetableTemplateRequest request) {
@@ -85,14 +85,14 @@ public class AcademicScheduleController {
     }
 
     @GetMapping("/{scheduleId}/templates")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get templates by schedule")
     public ResponseEntity<ApiResponse<List<TimetableTemplateResponse>>> getTemplates(@PathVariable Long scheduleId) {
         return ResponseEntity.ok(ApiResponse.success("Templates retrieved", scheduleService.getTemplatesBySchedule(scheduleId)));
     }
 
     @PatchMapping("/templates/{templateId}/deactivate")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Deactivate timetable template")
     public ResponseEntity<ApiResponse<Void>> deactivateTemplate(@PathVariable Long templateId) {
         scheduleService.deactivateTemplate(templateId);
@@ -102,7 +102,7 @@ public class AcademicScheduleController {
     // ---- Period ----
 
     @PostMapping("/templates/{templateId}/periods")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Add period to template")
     public ResponseEntity<ApiResponse<PeriodTemplateResponse>> addPeriod(
             @PathVariable Long templateId, @Valid @RequestBody PeriodTemplateRequest request) {
@@ -110,7 +110,7 @@ public class AcademicScheduleController {
     }
 
     @PutMapping("/periods/{periodId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update period")
     public ResponseEntity<ApiResponse<PeriodTemplateResponse>> updatePeriod(
             @PathVariable Long periodId, @Valid @RequestBody PeriodTemplateRequest request) {
@@ -118,14 +118,14 @@ public class AcademicScheduleController {
     }
 
     @GetMapping("/templates/{templateId}/periods")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get periods by template")
     public ResponseEntity<ApiResponse<List<PeriodTemplateResponse>>> getPeriods(@PathVariable Long templateId) {
         return ResponseEntity.ok(ApiResponse.success("Periods retrieved", scheduleService.getPeriodsByTemplate(templateId)));
     }
 
     @DeleteMapping("/periods/{periodId}")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Delete period")
     public ResponseEntity<ApiResponse<Void>> deletePeriod(@PathVariable Long periodId) {
         scheduleService.deletePeriod(periodId);
@@ -135,7 +135,7 @@ public class AcademicScheduleController {
     // ---- Class-schedule assignment ----
 
     @PostMapping("/assign-class")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Assign schedule to class")
     public ResponseEntity<ApiResponse<Void>> assignToClass(@Valid @RequestBody ClassScheduleAssignmentRequest request) {
         scheduleService.assignScheduleToClass(request);
@@ -143,7 +143,7 @@ public class AcademicScheduleController {
     }
 
     @DeleteMapping("/class-assignments/{assignmentId}")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Remove schedule from class")
     public ResponseEntity<ApiResponse<Void>> removeFromClass(@PathVariable Long assignmentId) {
         scheduleService.removeScheduleFromClass(assignmentId);

@@ -9,9 +9,9 @@ import com.thinkerscave.attendance.enums.StaffAttendanceStatus;
 import com.thinkerscave.attendance.repository.StaffAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceFreezeService;
 import com.thinkerscave.attendance.service.StaffAttendanceService;
-import com.thinkerscave.common.context.OrganizationContext;
-import com.thinkerscave.common.staff.domain.Staff;
-import com.thinkerscave.common.staff.repository.StaffRepository;
+import com.thinkerscave.shared.context.OrganizationContext;
+import com.thinkerscave.staff.entity.Staff;
+import com.thinkerscave.staff.repository.StaffRepository;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -44,7 +44,7 @@ public class StaffAttendanceServiceImpl implements StaffAttendanceService {
         validateNotFrozen(orgId, request.getAttendanceDate());
 
         Staff staff = staffRepository.findById(request.getStaffId())
-                .filter(s -> orgId.equals(s.getOrganizationId()))
+                .filter(s -> s.getUser() != null && orgId.equals(s.getUser().getOrganizationId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + request.getStaffId()));
 
         StaffAttendance attendance = staffAttendanceRepository
@@ -52,11 +52,11 @@ public class StaffAttendanceServiceImpl implements StaffAttendanceService {
                 .orElseGet(StaffAttendance::new);
 
         attendance.setOrganizationId(orgId);
-        attendance.setStaffId(staff.getId());
+        attendance.setStaffId(staff.getStaffId());
         attendance.setStaffName(staff.getFirstName() + " " + staff.getLastName());
         attendance.setStaffCode(staff.getStaffCode());
-        if (staff.getDepartment() != null) {
-            attendance.setDepartment(staff.getDepartment().getDepartmentName());
+        if (staff.getDesignation() != null) {
+            attendance.setDepartment(staff.getDesignation());
         }
         attendance.setAttendanceDate(request.getAttendanceDate());
         attendance.setStatus(request.getStatus());
@@ -79,7 +79,7 @@ public class StaffAttendanceServiceImpl implements StaffAttendanceService {
         validateNotFrozen(orgId, today);
 
         Staff staff = staffRepository.findById(request.getStaffId())
-                .filter(s -> orgId.equals(s.getOrganizationId()))
+                .filter(s -> s.getUser() != null && orgId.equals(s.getUser().getOrganizationId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + request.getStaffId()));
 
         StaffAttendance attendance = staffAttendanceRepository
@@ -87,11 +87,11 @@ public class StaffAttendanceServiceImpl implements StaffAttendanceService {
                 .orElseGet(StaffAttendance::new);
 
         attendance.setOrganizationId(orgId);
-        attendance.setStaffId(staff.getId());
+        attendance.setStaffId(staff.getStaffId());
         attendance.setStaffName(staff.getFirstName() + " " + staff.getLastName());
         attendance.setStaffCode(staff.getStaffCode());
-        if (staff.getDepartment() != null) {
-            attendance.setDepartment(staff.getDepartment().getDepartmentName());
+        if (staff.getDesignation() != null) {
+            attendance.setDepartment(staff.getDesignation());
         }
         attendance.setAttendanceDate(today);
         attendance.setSignInTime(LocalDateTime.now());

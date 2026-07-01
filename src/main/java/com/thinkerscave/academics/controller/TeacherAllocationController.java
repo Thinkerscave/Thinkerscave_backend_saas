@@ -28,7 +28,7 @@ public class TeacherAllocationController {
     // ---- Class Teacher ----
 
     @PostMapping("/class-teachers")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Assign class teacher")
     public ResponseEntity<ApiResponse<ClassTeacherAssignmentResponse>> assignClassTeacher(
             @Valid @RequestBody ClassTeacherAssignmentRequest request) {
@@ -36,14 +36,14 @@ public class TeacherAllocationController {
     }
 
     @GetMapping("/class-teachers/{assignmentId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Get class teacher assignment by ID")
     public ResponseEntity<ApiResponse<ClassTeacherAssignmentResponse>> getClassTeacher(@PathVariable Long assignmentId) {
         return ResponseEntity.ok(ApiResponse.success("Assignment found", allocationService.getClassTeacherAssignment(assignmentId)));
     }
 
     @GetMapping("/class-teachers")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Get class teacher assignments by year and class")
     public ResponseEntity<ApiResponse<List<ClassTeacherAssignmentResponse>>> getClassTeachers(
             @RequestParam Long yearId,
@@ -53,7 +53,7 @@ public class TeacherAllocationController {
     }
 
     @DeleteMapping("/class-teachers/{assignmentId}")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Remove class teacher assignment")
     public ResponseEntity<ApiResponse<Void>> removeClassTeacher(@PathVariable Long assignmentId) {
         allocationService.removeClassTeacher(assignmentId);
@@ -63,7 +63,7 @@ public class TeacherAllocationController {
     // ---- Subject Assignment ----
 
     @PostMapping("/subjects")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Assign subject to teacher")
     public ResponseEntity<ApiResponse<SubjectAssignmentResponse>> assignSubject(
             @Valid @RequestBody SubjectAssignmentRequest request) {
@@ -71,7 +71,7 @@ public class TeacherAllocationController {
     }
 
     @PutMapping("/subjects/{assignmentId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update subject assignment")
     public ResponseEntity<ApiResponse<SubjectAssignmentResponse>> updateSubject(
             @PathVariable Long assignmentId, @Valid @RequestBody SubjectAssignmentRequest request) {
@@ -79,7 +79,7 @@ public class TeacherAllocationController {
     }
 
     @GetMapping("/subjects")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get subject assignments by year and class")
     public ResponseEntity<ApiResponse<List<SubjectAssignmentResponse>>> getSubjectAssignments(
             @RequestParam Long yearId,
@@ -89,7 +89,7 @@ public class TeacherAllocationController {
     }
 
     @DeleteMapping("/subjects/{assignmentId}")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Remove subject assignment")
     public ResponseEntity<ApiResponse<Void>> removeSubject(@PathVariable Long assignmentId) {
         allocationService.removeSubjectAssignment(assignmentId);
@@ -99,7 +99,7 @@ public class TeacherAllocationController {
     // ---- Workload ----
 
     @GetMapping("/workload")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Get teacher workload")
     public ResponseEntity<ApiResponse<TeacherWorkloadResponse>> getWorkload(
             @RequestParam Long teacherId,

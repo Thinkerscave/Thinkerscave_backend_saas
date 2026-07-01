@@ -5,9 +5,6 @@ import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.HashSet;
-import java.util.Set;
-
 @Entity
 @Getter
 @Setter
@@ -73,19 +70,5 @@ public class Privilege extends Auditable {
     @Builder.Default
     @Column(name = "active", nullable = false)
     private Boolean active = true;
-
-    /**
-     * Role Permission Mapping.
-     */
-    @Builder.Default
-    @OneToMany(mappedBy = "privilege", fetch = FetchType.LAZY)
-    private Set<RolePermission> rolePermissions = new HashSet<>();
-
-    /**
-     * User Permission Mapping.
-     */
-    @Builder.Default
-    @OneToMany(mappedBy = "privilege", fetch = FetchType.LAZY)
-    private Set<UserPermission> userPermissions = new HashSet<>();
 
 }

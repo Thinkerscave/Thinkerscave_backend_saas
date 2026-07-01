@@ -24,14 +24,14 @@ public class AcademicYearController {
     private final AcademicYearService academicYearService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Create academic year")
     public ResponseEntity<ApiResponse<AcademicYearResponse>> create(@Valid @RequestBody AcademicYearRequest request) {
         return ResponseEntity.status(201).body(ApiResponse.success("Academic year created", academicYearService.create(request)));
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update academic year")
     public ResponseEntity<ApiResponse<AcademicYearResponse>> update(
             @PathVariable Long id, @Valid @RequestBody AcademicYearRequest request) {
@@ -39,35 +39,35 @@ public class AcademicYearController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get academic year by ID")
     public ResponseEntity<ApiResponse<AcademicYearResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Academic year found", academicYearService.getById(id)));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get all academic years")
     public ResponseEntity<ApiResponse<List<AcademicYearResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("Academic years retrieved", academicYearService.getAll()));
     }
 
     @PatchMapping("/{id}/set-current")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Set academic year as current")
     public ResponseEntity<ApiResponse<AcademicYearResponse>> setCurrent(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Current academic year set", academicYearService.setCurrentYear(id)));
     }
 
     @PatchMapping("/{id}/deactivate")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Deactivate academic year")
     public ResponseEntity<ApiResponse<AcademicYearResponse>> deactivate(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Academic year deactivated", academicYearService.deactivate(id)));
     }
 
     @PostMapping("/{id}/clone")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Clone academic year")
     public ResponseEntity<ApiResponse<AcademicYearResponse>> clone(
             @PathVariable Long id, @Valid @RequestBody CloneAcademicYearRequest request) {

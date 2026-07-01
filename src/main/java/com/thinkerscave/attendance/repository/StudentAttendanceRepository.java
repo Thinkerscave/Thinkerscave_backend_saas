@@ -86,7 +86,7 @@ public interface StudentAttendanceRepository extends JpaRepository<StudentAttend
     // ─── Dashboard ────────────────────────────────────────────────────────
 
     @Query("""
-            SELECT COUNT(DISTINCT sa.classId)
+            SELECT COUNT(DISTINCT ac.classId)
             FROM AcademicClass ac
             WHERE NOT EXISTS (
                 SELECT 1 FROM StudentAttendance sa2
@@ -124,4 +124,8 @@ public interface StudentAttendanceRepository extends JpaRepository<StudentAttend
     @Query("DELETE FROM StudentAttendance sa WHERE sa.organizationId = :orgId AND sa.classId = :classId AND sa.sectionId = :sectionId AND sa.attendanceDate = :date")
     void deleteByClassSectionDate(@Param("orgId") Long orgId, @Param("classId") Long classId,
             @Param("sectionId") Long sectionId, @Param("date") LocalDate date);
+
+    // ─── Dashboard org-wide counts ────────────────────────────────────────
+
+    long countByOrganizationIdAndAttendanceDateAndStatus(Long orgId, LocalDate date, StudentAttendanceStatus status);
 }

@@ -6,7 +6,7 @@ import com.thinkerscave.attendance.entity.AttendanceSetting;
 import com.thinkerscave.attendance.enums.AttendanceMode;
 import com.thinkerscave.attendance.repository.AttendanceSettingRepository;
 import com.thinkerscave.attendance.service.AttendanceSettingService;
-import com.thinkerscave.common.context.OrganizationContext;
+import com.thinkerscave.shared.context.OrganizationContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

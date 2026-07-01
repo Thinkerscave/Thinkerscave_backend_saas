@@ -1,6 +1,6 @@
 package com.thinkerscave.student.entity;
 
-import com.thinkerscave.common.auditing.Auditable;
+import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;

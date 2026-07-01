@@ -28,7 +28,7 @@ public class TeacherArrangement extends Auditable {
     private Long arrangementId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "slot_id", nullable = false)
+        @JoinColumn(name = "slot_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
     private TimetableSlot timetableSlot;
 
     @Column(name = "absent_teacher_id", nullable = false)

@@ -23,14 +23,14 @@ public class SubjectController {
     private final SubjectService subjectService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Create subject")
     public ResponseEntity<ApiResponse<SubjectResponse>> create(@Valid @RequestBody SubjectRequest request) {
         return ResponseEntity.status(201).body(ApiResponse.success("Subject created", subjectService.create(request)));
     }
 
     @PutMapping("/{subjectId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update subject")
     public ResponseEntity<ApiResponse<SubjectResponse>> update(
             @PathVariable Long subjectId, @Valid @RequestBody SubjectRequest request) {
@@ -38,28 +38,28 @@ public class SubjectController {
     }
 
     @GetMapping("/{subjectId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get subject by ID")
     public ResponseEntity<ApiResponse<SubjectResponse>> getById(@PathVariable Long subjectId) {
         return ResponseEntity.ok(ApiResponse.success("Subject found", subjectService.getById(subjectId)));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get all active subjects")
     public ResponseEntity<ApiResponse<List<SubjectResponse>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("Subjects retrieved", subjectService.getAll()));
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Search subjects")
     public ResponseEntity<ApiResponse<List<SubjectResponse>>> search(@RequestParam String keyword) {
         return ResponseEntity.ok(ApiResponse.success("Search results", subjectService.search(keyword)));
     }
 
     @PatchMapping("/{subjectId}/deactivate")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Deactivate subject")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long subjectId) {
         subjectService.deactivate(subjectId);

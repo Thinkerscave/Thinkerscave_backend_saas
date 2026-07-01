@@ -1,0 +1,41 @@
+package com.thinkerscave.admission.repository;
+
+import com.thinkerscave.admission.entity.Inquiry;
+import com.thinkerscave.admission.enums.InquiryStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
+
+    Optional<Inquiry> findByInquiryIdAndOrganizationIdAndDeletedFalse(Long id, Long orgId);
+
+    Page<Inquiry> findByOrganizationIdAndDeletedFalseOrderByCreatedOnDesc(Long orgId, Pageable pageable);
+
+    List<Inquiry> findByOrganizationIdAndStatusAndDeletedFalseOrderByCreatedOnDesc(Long orgId, InquiryStatus status);
+
+    List<Inquiry> findByOrganizationIdAndDeletedFalseAndNextFollowUpDateLessThanEqualOrderByNextFollowUpDateAsc(
+            Long orgId, LocalDate today);
+
+    boolean existsByMobileNumberAndOrganizationIdAndDeletedFalse(String mobileNumber, Long orgId);
+
+    @Query("""
+            SELECT i.status, COUNT(i)
+            FROM Inquiry i
+            WHERE i.organizationId = :orgId AND i.deleted = false
+            GROUP BY i.status
+            """)
+    List<Object[]> countByStatusForOrg(@Param("orgId") Long orgId);
+
+    long countByOrganizationIdAndDeletedFalse(Long orgId);
+
+    long countByOrganizationIdAndStatusAndDeletedFalse(Long orgId, InquiryStatus status);
+}

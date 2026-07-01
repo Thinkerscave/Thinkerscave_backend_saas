@@ -23,7 +23,7 @@ public class AcademicCalendarController {
     private final AcademicCalendarService calendarService;
 
     @PostMapping("/years/{yearId}/events")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Create calendar event")
     public ResponseEntity<ApiResponse<CalendarEventResponse>> create(
             @PathVariable Long yearId, @Valid @RequestBody CalendarEventRequest request) {
@@ -31,7 +31,7 @@ public class AcademicCalendarController {
     }
 
     @PutMapping("/events/{eventId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update calendar event")
     public ResponseEntity<ApiResponse<CalendarEventResponse>> update(
             @PathVariable Long eventId, @Valid @RequestBody CalendarEventRequest request) {
@@ -64,7 +64,7 @@ public class AcademicCalendarController {
     }
 
     @DeleteMapping("/events/{eventId}")
-    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Delete calendar event")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long eventId) {
         calendarService.deleteEvent(eventId);

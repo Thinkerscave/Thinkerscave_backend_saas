@@ -14,7 +14,7 @@ import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
 import com.thinkerscave.attendance.repository.StudentPeriodAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceFreezeService;
 import com.thinkerscave.attendance.service.StudentAttendanceService;
-import com.thinkerscave.common.context.OrganizationContext;
+import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;

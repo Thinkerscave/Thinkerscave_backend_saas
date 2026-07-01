@@ -10,5 +10,5 @@ import com.thinkerscave.student.entity.StudentTimeline;
 @Repository
 public interface StudentTimelineRepository extends JpaRepository<StudentTimeline, Long> {
 
-	List<StudentTimeline> findByStudentStudentIdOrderByCreatedDateDesc(Long studentId);
+	List<StudentTimeline> findByStudentStudentIdOrderByCreatedOnDesc(Long studentId);
 }

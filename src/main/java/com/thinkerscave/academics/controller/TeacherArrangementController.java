@@ -25,21 +25,21 @@ public class TeacherArrangementController {
     private final TeacherArrangementService arrangementService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Create teacher arrangement")
     public ResponseEntity<ApiResponse<TeacherArrangementResponse>> create(@Valid @RequestBody TeacherArrangementRequest request) {
         return ResponseEntity.status(201).body(ApiResponse.success("Arrangement created", arrangementService.create(request)));
     }
 
     @GetMapping("/{arrangementId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get arrangement by ID")
     public ResponseEntity<ApiResponse<TeacherArrangementResponse>> getById(@PathVariable Long arrangementId) {
         return ResponseEntity.ok(ApiResponse.success("Arrangement found", arrangementService.getById(arrangementId)));
     }
 
     @GetMapping("/by-date")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Get arrangements by date")
     public ResponseEntity<ApiResponse<List<TeacherArrangementResponse>>> getByDate(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -47,14 +47,14 @@ public class TeacherArrangementController {
     }
 
     @GetMapping("/teacher/{teacherId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ACADEMIC_COORDINATOR','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
     @Operation(summary = "Get arrangements by teacher")
     public ResponseEntity<ApiResponse<List<TeacherArrangementResponse>>> getByTeacher(@PathVariable Long teacherId) {
         return ResponseEntity.ok(ApiResponse.success("Arrangements retrieved", arrangementService.getByTeacher(teacherId)));
     }
 
     @PatchMapping("/{arrangementId}/approve")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Approve arrangement")
     public ResponseEntity<ApiResponse<TeacherArrangementResponse>> approve(
             @PathVariable Long arrangementId,
@@ -63,7 +63,7 @@ public class TeacherArrangementController {
     }
 
     @PatchMapping("/{arrangementId}/reject")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Reject arrangement")
     public ResponseEntity<ApiResponse<TeacherArrangementResponse>> reject(@PathVariable Long arrangementId) {
         return ResponseEntity.ok(ApiResponse.success("Arrangement rejected", arrangementService.reject(arrangementId)));

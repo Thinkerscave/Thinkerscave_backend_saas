@@ -1,6 +1,7 @@
 package com.thinkerscave.student.controller;
 
-import com.thinkerscave.common.dto.ApiResponse;
+import com.thinkerscave.shared.context.OrganizationContext;
+import com.thinkerscave.shared.dto.ApiResponse;
 import com.thinkerscave.student.enums.TransferStatus;
 import com.thinkerscave.student.repository.StudentEnrollmentRepository;
 import com.thinkerscave.student.repository.TransferRequestRepository;
@@ -23,7 +24,7 @@ public class StudentMovementController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<java.util.List<com.thinkerscave.student.dto.TransferRequestDTO>>> listTransfers() {
-        Long orgId = com.thinkerscave.common.context.OrganizationContext.getOrganizationId();
+        Long orgId = OrganizationContext.getOrganizationId();
         java.util.List<com.thinkerscave.student.dto.TransferRequestDTO> dtoList = transferRequestRepository.findAll().stream()
             .filter(t -> t.getOrganizationId() != null && t.getOrganizationId().equals(orgId))
             .map(this::mapToDTO)
@@ -34,7 +35,7 @@ public class StudentMovementController {
     @PostMapping
     public ResponseEntity<ApiResponse<com.thinkerscave.student.dto.TransferRequestDTO>> createTransfer(
             @RequestBody com.thinkerscave.student.dto.TransferRequestDTO dto) {
-        Long orgId = com.thinkerscave.common.context.OrganizationContext.getOrganizationId();
+        Long orgId = OrganizationContext.getOrganizationId();
         com.thinkerscave.student.entity.TransferRequest req = new com.thinkerscave.student.entity.TransferRequest();
         req.setRequestNumber("TRF-" + System.currentTimeMillis());
         req.setStudentId(dto.getStudentId());

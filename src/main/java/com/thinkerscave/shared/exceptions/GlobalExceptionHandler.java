@@ -21,8 +21,6 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
-import com.thinkerscave.common.orgm.service.TenantOnboardingService.TenantAlreadyExistsException;
-import com.thinkerscave.common.orgm.service.TenantOnboardingService.TenantOnboardingException;
 import com.thinkerscave.shared.constants.ErrorCodes;
 
 import java.util.List;
@@ -166,41 +164,6 @@ public class GlobalExceptionHandler {
                                                 .status(400)
                                                 .code("BAD_REQUEST")
                                                 .message(ex.getMessage())
-                                                .path(request.getRequestURI())
-                                                .correlationId(correlationId)
-                                                .build());
-        }
-
-        // ==================== Tenant/Organization Errors ====================
-
-        @ExceptionHandler(TenantAlreadyExistsException.class)
-        public ResponseEntity<ApiError> handleTenantAlreadyExists(TenantAlreadyExistsException ex,
-                        HttpServletRequest request) {
-                String correlationId = MDC.get("correlationId");
-                log.warn("[{}] Tenant already exists: {}", correlationId, ex.getMessage());
-
-                return ResponseEntity.status(HttpStatus.CONFLICT)
-                                .body(ApiError.builder()
-                                                .status(409)
-                                                .code("TENANT_ALREADY_EXISTS")
-                                                .message(ex.getMessage())
-                                                .path(request.getRequestURI())
-                                                .correlationId(correlationId)
-                                                .build());
-        }
-
-        @ExceptionHandler(TenantOnboardingException.class)
-        public ResponseEntity<ApiError> handleTenantOnboardingException(TenantOnboardingException ex,
-                        HttpServletRequest request) {
-                String correlationId = MDC.get("correlationId");
-                log.error("[{}] Tenant onboarding failed: {}", correlationId, ex.getMessage(), ex);
-
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                .body(ApiError.builder()
-                                                .status(500)
-                                                .code("TENANT_ONBOARDING_FAILED")
-                                                .message("Failed to onboard tenant. Please contact support.")
-                                                .detail(ex.getMessage())
                                                 .path(request.getRequestURI())
                                                 .correlationId(correlationId)
                                                 .build());

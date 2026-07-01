@@ -22,4 +22,6 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 	Optional<Student> findByStudentCode(String studentCode);
 
 	Page<Student> findByStatus(StudentStatus status, Pageable pageable);
+
+	long countByStatus(StudentStatus status);
 }

@@ -21,7 +21,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ContentDisposition;
 import jakarta.validation.Valid;
-import com.thinkerscave.common.dto.ApiResponse;
+import com.thinkerscave.shared.dto.ApiResponse;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
