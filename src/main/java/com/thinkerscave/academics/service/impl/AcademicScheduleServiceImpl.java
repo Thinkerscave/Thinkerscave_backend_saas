@@ -80,11 +80,13 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public AcademicScheduleResponse getScheduleById(Long scheduleId) {
         return toScheduleResponse(getSchedule(scheduleId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<AcademicScheduleResponse> getSchedulesByYear(Long academicYearId) {
         return scheduleRepository.findByAcademicYear_AcademicYearIdOrderByStartDateAsc(academicYearId)
                 .stream().map(this::toScheduleResponse).collect(Collectors.toList());
@@ -122,6 +124,7 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<TimetableTemplateResponse> getTemplatesBySchedule(Long scheduleId) {
         return templateRepository.findByAcademicSchedule_ScheduleIdOrderByTemplateNameAsc(scheduleId)
                 .stream().map(this::toTemplateResponse).collect(Collectors.toList());
@@ -190,6 +193,7 @@ public class AcademicScheduleServiceImpl implements AcademicScheduleService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<PeriodTemplateResponse> getPeriodsByTemplate(Long templateId) {
         return periodRepository.findByTimetableTemplate_TemplateIdOrderByPeriodNumberAsc(templateId)
                 .stream().map(this::toPeriodResponse).collect(Collectors.toList());

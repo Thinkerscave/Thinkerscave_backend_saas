@@ -46,23 +46,27 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CalendarEventResponse getById(Long eventId) {
         return toResponse(getEvent(eventId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<CalendarEventResponse> getEventsByYear(Long academicYearId) {
         return eventRepository.findByAcademicYear_AcademicYearIdAndActiveOrderByStartDateAsc(academicYearId, true)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<CalendarEventResponse> getEventsByMonth(int year, int month) {
         return eventRepository.findByMonthAndYear(month, year)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<CalendarEventResponse> getUpcomingEvents() {
         return eventRepository.findByStartDateGreaterThanEqualAndActiveOrderByStartDateAsc(LocalDate.now(), true)
                 .stream().map(this::toResponse).collect(Collectors.toList());

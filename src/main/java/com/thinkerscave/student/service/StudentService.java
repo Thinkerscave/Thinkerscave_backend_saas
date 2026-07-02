@@ -6,12 +6,15 @@ import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.io.IOException;
+import com.thinkerscave.student.enums.StudentStatus;
 
 import com.thinkerscave.student.dto.StudentCreateRequest;
 import com.thinkerscave.student.dto.StudentResponseDTO;
 import com.thinkerscave.student.dto.StudentProfileResponse;
 import com.thinkerscave.student.dto.MedicalDTO;
 import com.thinkerscave.student.dto.TimelineDTO;
+import com.thinkerscave.student.dto.StudentSearchRequest;
+import com.thinkerscave.student.dto.StudentDocumentDTO;
 
 public interface StudentService {
 
@@ -32,12 +35,22 @@ public interface StudentService {
     List<TimelineDTO> getTimeline(Long studentId);
 
 	Page<StudentResponseDTO> getAllStudents(Pageable pageable);
+
+    Page<StudentResponseDTO> searchStudents(StudentSearchRequest request, Pageable pageable);
     
     List<StudentResponseDTO> getAllStudents();
 
 	void deleteStudent(Long studentId);
+
+    StudentResponseDTO updateStudentStatus(Long studentId, StudentStatus status);
+
+    TimelineDTO addTimelineEntry(Long studentId, TimelineDTO timelineDTO);
     
-    List<com.thinkerscave.student.dto.StudentDocumentDTO> getStudentDocuments(Long studentId);
+    List<StudentDocumentDTO> getStudentDocuments(Long studentId);
+
+    StudentDocumentDTO uploadStudentDocument(Long studentId, MultipartFile file, String documentType) throws IOException;
+
+    void deleteDocument(Long docId);
     
     Resource downloadDocument(Long docId);
 

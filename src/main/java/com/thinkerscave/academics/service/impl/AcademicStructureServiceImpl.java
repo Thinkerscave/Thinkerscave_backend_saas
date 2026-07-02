@@ -65,13 +65,15 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public AcademicClassResponse getClassById(Long classId) {
         return toClassResponse(findClassById(classId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<AcademicClassResponse> getClassesByYear(Long academicYearId) {
-        return classRepository.findByAcademicYear_AcademicYearIdOrderByDisplayOrderAsc(academicYearId)
+        return classRepository.findWithYearByAcademicYearIdOrderByDisplayOrderAsc(academicYearId)
                 .stream().map(this::toClassResponse).collect(Collectors.toList());
     }
 
@@ -115,13 +117,15 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public AcademicSectionResponse getSectionById(Long sectionId) {
         return toSectionResponse(findSectionById(sectionId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<AcademicSectionResponse> getSectionsByClass(Long classId) {
-        return sectionRepository.findByAcademicClass_ClassIdOrderBySectionNameAsc(classId)
+        return sectionRepository.findWithClassByAcademicClass_ClassIdOrderBySectionNameAsc(classId)
                 .stream().map(this::toSectionResponse).collect(Collectors.toList());
     }
 
@@ -136,8 +140,9 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     // ---- Hierarchy ----
 
     @Override
+    @Transactional(readOnly = true)
     public List<AcademicStructureTreeResponse> getStructureTree(Long academicYearId) {
-        List<AcademicClass> classes = classRepository.findByAcademicYear_AcademicYearIdAndActiveOrderByDisplayOrderAsc(academicYearId, true);
+        List<AcademicClass> classes = classRepository.findWithYearByAcademicYearIdAndActiveOrderByDisplayOrderAsc(academicYearId, true);
         Map<AcademicStage, List<AcademicClass>> byStage = classes.stream()
                 .collect(Collectors.groupingBy(AcademicClass::getAcademicStage));
 
@@ -146,7 +151,7 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
                 .map(stage -> {
                     List<AcademicStructureTreeResponse.ClassNode> classNodes = byStage.get(stage).stream()
                             .map(cls -> {
-                                List<AcademicSection> sections = sectionRepository.findByAcademicClass_ClassIdAndActiveOrderBySectionNameAsc(cls.getClassId(), true);
+                                List<AcademicSection> sections = sectionRepository.findWithClassByAcademicClass_ClassIdAndActiveOrderBySectionNameAsc(cls.getClassId(), true);
                                 List<AcademicStructureTreeResponse.SectionNode> sectionNodes = sections.stream()
                                         .map(s -> AcademicStructureTreeResponse.SectionNode.builder()
                                                 .sectionId(s.getSectionId())
@@ -174,12 +179,12 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     // ---- helpers ----
 
     private AcademicClass findClassById(Long classId) {
-        return classRepository.findById(classId)
+        return classRepository.findByIdWithYear(classId)
                 .orElseThrow(() -> new ResourceNotFoundException("Academic class not found with id: " + classId));
     }
 
     private AcademicSection findSectionById(Long sectionId) {
-        return sectionRepository.findById(sectionId)
+        return sectionRepository.findByIdWithClass(sectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Section not found with id: " + sectionId));
     }
 

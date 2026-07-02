@@ -29,14 +29,14 @@ public class PayrollController {
     private final PayrollService payrollService;
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
     @Operation(summary = "Get payroll dashboard metrics for current month")
     public ResponseEntity<ApiResponse<PayrollDashboardResponse>> getDashboard() {
         return ResponseEntity.ok(ApiResponse.success("Payroll dashboard retrieved", payrollService.getDashboard()));
     }
 
     @PostMapping("/generate")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
     @Operation(summary = "Generate payroll for a given year and month")
     public ResponseEntity<ApiResponse<Map<String, Object>>> generatePayroll(
             @Valid @RequestBody PayrollGenerateRequest request) {
@@ -47,7 +47,7 @@ public class PayrollController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
     @Operation(summary = "Get paginated payroll list with filters")
     public ResponseEntity<ApiResponse<Page<PayrollResponse>>> getPayrollList(
             @RequestParam(required = false) Integer year,
@@ -60,7 +60,7 @@ public class PayrollController {
     }
 
     @GetMapping("/{payrollId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
     @Operation(summary = "Get payroll details by ID")
     public ResponseEntity<ApiResponse<PayrollResponse>> getPayrollDetail(@PathVariable Long payrollId) {
         return ResponseEntity.ok(ApiResponse.success("Payroll details retrieved",
@@ -68,7 +68,7 @@ public class PayrollController {
     }
 
     @PatchMapping("/{payrollId}/mark-paid")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
     @Operation(summary = "Mark a payroll record as paid")
     public ResponseEntity<ApiResponse<Void>> markPaid(@PathVariable Long payrollId) {
         payrollService.markPaid(payrollId);
@@ -76,7 +76,7 @@ public class PayrollController {
     }
 
     @PatchMapping("/mark-paid")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
     @Operation(summary = "Bulk mark payroll records as paid")
     public ResponseEntity<ApiResponse<Void>> bulkMarkPaid(@Valid @RequestBody BulkMarkPaidRequest request) {
         payrollService.bulkMarkPaid(request);
@@ -84,7 +84,7 @@ public class PayrollController {
     }
 
     @GetMapping("/{payrollId}/payslip")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','STAFF')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
     @Operation(summary = "Download payslip for a payroll record")
     public ResponseEntity<ApiResponse<PayrollResponse>> downloadPayslip(@PathVariable Long payrollId) {
         // PDF generation is a future enhancement; returning payroll data for now

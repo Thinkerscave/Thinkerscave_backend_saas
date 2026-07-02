@@ -1,6 +1,7 @@
 package com.thinkerscave.student.entity;
 
 import com.thinkerscave.shared.entity.Auditable;
+import com.thinkerscave.student.entity.converter.TransferStatusConverter;
 import com.thinkerscave.student.enums.TransferStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -53,7 +54,7 @@ public class TransferRequest extends Auditable {
     @Column(name = "destination_school", length = 200)
     private String destinationSchool;
 
-    @Enumerated(EnumType.STRING)
+        @Convert(converter = TransferStatusConverter.class)
     @Column(name = "status", nullable = false, length = 32)
     private TransferStatus status;
 

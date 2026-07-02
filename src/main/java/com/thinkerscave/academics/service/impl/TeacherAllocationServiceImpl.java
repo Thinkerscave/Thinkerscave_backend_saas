@@ -67,6 +67,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ClassTeacherAssignmentResponse getClassTeacherAssignment(Long assignmentId) {
         ClassTeacherAssignment cta = ctaRepository.findById(assignmentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found: " + assignmentId));
@@ -74,6 +75,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<ClassTeacherAssignmentResponse> getClassTeacherAssignments(Long yearId, Long classId, Long sectionId) {
         return ctaRepository.findByAcademicYear_AcademicYearIdAndAcademicClass_ClassIdOrderByCreatedOnDesc(yearId, classId)
                 .stream().map(this::toCtaResponse).collect(Collectors.toList());
@@ -125,6 +127,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<SubjectAssignmentResponse> getSubjectAssignments(Long yearId, Long classId, Long sectionId) {
         return subjectAssignmentRepository.findByAcademicYear_AcademicYearIdAndAcademicClass_ClassIdOrderBySubject_SubjectNameAsc(yearId, classId)
                 .stream().map(this::toSaResponse).collect(Collectors.toList());
@@ -140,6 +143,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public TeacherWorkloadResponse getTeacherWorkload(Long teacherId, Long academicYearId) {
         List<SubjectAssignment> assignments = subjectAssignmentRepository
                 .findByTeacherIdAndAcademicYear_AcademicYearIdAndActiveTrue(teacherId, academicYearId);

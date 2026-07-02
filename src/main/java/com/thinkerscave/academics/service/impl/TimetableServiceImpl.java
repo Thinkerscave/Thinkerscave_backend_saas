@@ -100,6 +100,7 @@ public class TimetableServiceImpl implements TimetableService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public TimetableResponse getTimetableForClass(Long classId, Long sectionId) {
         AcademicClass cls = getClass(classId);
         AcademicSection section = sectionId != null ? getSection(sectionId) : null;
@@ -124,6 +125,7 @@ public class TimetableServiceImpl implements TimetableService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<TimetableSlotResponse> getTeacherTimetable(Long teacherId, Long academicYearId) {
         return subjectAssignmentRepository
                 .findByTeacherIdAndAcademicYear_AcademicYearIdAndActiveTrue(teacherId, academicYearId)

@@ -774,3 +774,635 @@ SET ur.role_id = 6
 WHERE u.username = 'superadmin' AND ur.primary_role = TRUE;
 
 UPDATE promotions SET discount_type = 'FLAT_AMOUNT' WHERE discount_type = 'FLAT';
+
+-- =============================================================================
+-- PHASE 2: COMPREHENSIVE MULTI-ORG ENHANCEMENT
+-- Fixes data bugs + adds rich Odisha-specific demo data for 4 organizations
+-- Run: idempotent INSERT IGNORE + targeted UPDATE statements
+-- =============================================================================
+
+-- =========================================================
+-- STEP 1: FIX USER ORGANIZATION ASSIGNMENTS (CRITICAL BUG FIX)
+-- Users 8-11 belong to ABC School Puri (org 3), not JSC (org 2)
+-- Users 12-15 belong to Kalinga College Cuttack (org 4), not ABC (org 3)
+-- =========================================================
+UPDATE users SET organization_id = 3 WHERE id IN (8, 9, 10, 11);
+UPDATE users SET organization_id = 4 WHERE id IN (12, 13, 14, 15);
+
+-- =========================================================
+-- STEP 2: FIX ATTENDANCE ORGANIZATION IDs
+-- =========================================================
+UPDATE student_attendance SET organization_id = 3 WHERE student_id = 9 AND organization_id = 1;
+UPDATE student_attendance SET organization_id = 4 WHERE student_id = 13 AND organization_id = 3;
+UPDATE staff_attendance   SET organization_id = 3 WHERE staff_id = 3  AND organization_id = 2;
+UPDATE staff_attendance   SET organization_id = 4 WHERE staff_id = 4  AND organization_id = 3;
+
+-- =========================================================
+-- STEP 3: FIX STUDENT ENROLLMENT SECTION ASSIGNMENTS
+-- Students 7,8 (JSC Class II) were wrongly placed in Section 4 (Class III A)
+-- Add Class II Section B first, then fix
+-- =========================================================
+INSERT IGNORE INTO academic_section (section_id, class_id, section_name, capacity, active, remarks, created_by, updated_by, version)
+VALUES (6, 5, 'B', 40, TRUE, 'Class II Section B', 'system', 'system', 0);
+
+UPDATE student_enrollment SET section_id = 6 WHERE enrollment_id IN (7, 8) AND section_id = 4;
+-- Fix student 19 (Tushar, ABC Class II) also wrongly in section 4
+UPDATE student_enrollment SET section_id = 3 WHERE enrollment_id = 19 AND section_id = 4;
+
+-- =========================================================
+-- STEP 4: MORE ACADEMIC CLASSES (IV through XII)
+-- =========================================================
+INSERT IGNORE INTO academic_class (class_id, academic_year_id, class_code, class_name, academic_stage, display_order, active, remarks, created_by, updated_by, version)
+VALUES
+(8,  1, 'IV',      'Class IV',             'PRIMARY',           8,  TRUE, 'Primary class',              'system', 'system', 0),
+(9,  1, 'V',       'Class V',              'PRIMARY',           9,  TRUE, 'Upper primary',              'system', 'system', 0),
+(10, 1, 'VI',      'Class VI',             'MIDDLE',            10, TRUE, 'Middle school',              'system', 'system', 0),
+(11, 1, 'VII',     'Class VII',            'MIDDLE',            11, TRUE, 'Middle school',              'system', 'system', 0),
+(12, 1, 'VIII',    'Class VIII',           'MIDDLE',            12, TRUE, 'Middle school',              'system', 'system', 0),
+(13, 1, 'IX',      'Class IX',             'SECONDARY',         13, TRUE, 'High school',                'system', 'system', 0),
+(14, 1, 'X',       'Class X',              'SECONDARY',         14, TRUE, 'Board class',                'system', 'system', 0),
+(15, 1, 'XI-SCI',  'Class XI Science',     'SENIOR_SECONDARY',  15, TRUE, 'Senior secondary science',   'system', 'system', 0),
+(16, 1, 'XII-COM', 'Class XII Commerce',   'SENIOR_SECONDARY',  16, TRUE, 'Final year commerce',        'system', 'system', 0),
+(17, 1, 'XII-SCI', 'Class XII Science',    'SENIOR_SECONDARY',  17, TRUE, 'Final year science',         'system', 'system', 0);
+
+-- =========================================================
+-- STEP 5: MORE SECTIONS (for Classes IV-X, XII)
+-- =========================================================
+INSERT IGNORE INTO academic_section (section_id, class_id, section_name, capacity, active, remarks, created_by, updated_by, version)
+VALUES
+(7,  8,  'A', 40, TRUE, 'Class IV Section A',          'system', 'system', 0),
+(8,  9,  'A', 40, TRUE, 'Class V Section A',           'system', 'system', 0),
+(9,  10, 'A', 45, TRUE, 'Class VI Section A',          'system', 'system', 0),
+(10, 11, 'A', 45, TRUE, 'Class VII Section A',         'system', 'system', 0),
+(11, 12, 'A', 45, TRUE, 'Class VIII Section A',        'system', 'system', 0),
+(12, 13, 'A', 50, TRUE, 'Class IX Section A',          'system', 'system', 0),
+(13, 14, 'A', 50, TRUE, 'Class X Section A',           'system', 'system', 0),
+(14, 15, 'A', 60, TRUE, 'Class XI Science Section A',  'system', 'system', 0),
+(15, 16, 'A', 60, TRUE, 'Class XII Commerce Section A','system', 'system', 0),
+(16, 3,  'A', 35, TRUE, 'UKG Section A',               'system', 'system', 0),
+(17, 2,  'A', 35, TRUE, 'LKG Section A',               'system', 'system', 0),
+(18, 1,  'A', 30, TRUE, 'Nursery Section A',           'system', 'system', 0);
+
+-- =========================================================
+-- STEP 6: MORE SUBJECTS
+-- =========================================================
+INSERT IGNORE INTO subject (subject_id, subject_code, subject_name, subject_type, active, remarks, created_by, updated_by, version)
+VALUES
+(11, 'PHY', 'Physics',               'CORE',     TRUE, 'Science stream', 'system', 'system', 0),
+(12, 'CHM', 'Chemistry',             'CORE',     TRUE, 'Science stream', 'system', 'system', 0),
+(13, 'BIO', 'Biology',               'CORE',     TRUE, 'Science stream', 'system', 'system', 0),
+(14, 'ECO', 'Economics',             'CORE',     TRUE, 'Commerce stream','system', 'system', 0),
+(15, 'EVS', 'Environmental Science', 'CORE',     TRUE, 'Primary EVS',   'system', 'system', 0),
+(16, 'ART', 'Art & Craft',           'SKILL',    TRUE, 'Creative arts',  'system', 'system', 0),
+(17, 'SPT', 'Sports & PE',           'SKILL',    TRUE, 'Physical education','system','system', 0),
+(18, 'MOR', 'Moral Science',         'SKILL',    TRUE, 'Value education','system', 'system', 0),
+(19, 'SNS', 'Sanskrit',              'LANGUAGE', TRUE, 'Optional lang',  'system', 'system', 0),
+(20, 'GEO', 'Geography',             'CORE',     TRUE, 'Social science', 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 7: JSC USERS (Javier School Cuttack, org_id = 2)
+-- =========================================================
+INSERT IGNORE INTO users (
+    id, organization_id, user_code, username, email, mobile_number, password,
+    first_name, last_name, display_name, profile_image_url, status,
+    email_verified, mobile_verified, first_time_login, failed_login_attempts, account_locked,
+    last_login_at, password_changed_at, locked_at, lock_expiry_at, created_by, updated_by, version)
+VALUES
+(16, 2, 'USR000016', 'jsc.owner',    'owner@jsc.edu.in',    '9777222201', 'PLACEHOLDER', 'Bijaya',    'Patnaik',   'Bijaya Patnaik',   NULL, 'ACTIVE', TRUE, TRUE, FALSE, 0, FALSE, NULL, NULL, NULL, NULL, 'system', 'system', 0),
+(17, 2, 'USR000017', 'jsc.admin',    'admin@jsc.edu.in',    '9777222202', 'PLACEHOLDER', 'Sulochana', 'Babu',      'Sulochana Babu',   NULL, 'ACTIVE', TRUE, TRUE, FALSE, 0, FALSE, NULL, NULL, NULL, NULL, 'system', 'system', 0),
+(18, 2, 'USR000018', 'jsc.teacher1', 'teacher1@jsc.edu.in', '9777222401', 'PLACEHOLDER', 'Debendra',  'Barik',     'Debendra Barik',   NULL, 'ACTIVE', TRUE, TRUE, FALSE, 0, FALSE, NULL, NULL, NULL, NULL, 'system', 'system', 0),
+(19, 2, 'USR000019', 'jsc.teacher2', 'teacher2@jsc.edu.in', '9777222402', 'PLACEHOLDER', 'Geetanjali','Rath',      'Geetanjali Rath',  NULL, 'ACTIVE', TRUE, TRUE, FALSE, 0, FALSE, NULL, NULL, NULL, NULL, 'system', 'system', 0),
+(20, 2, 'USR000020', 'jsc.student1', 'student1@jsc.edu.in', '9777222501', 'PLACEHOLDER', 'Bikash',    'Nanda',     'Bikash Nanda',     NULL, 'ACTIVE', TRUE, TRUE, FALSE, 0, FALSE, NULL, NULL, NULL, NULL, 'system', 'system', 0),
+(21, 2, 'USR000021', 'jsc.parent1',  'parent1@jsc.edu.in',  '9777222601', 'PLACEHOLDER', 'Prasanta',  'Nanda',     'Prasanta Nanda',   NULL, 'ACTIVE', TRUE, TRUE, FALSE, 0, FALSE, NULL, NULL, NULL, NULL, 'system', 'system', 0);
+
+INSERT IGNORE INTO user_roles (id, user_id, role_id, primary_role, active, created_by, updated_by, version)
+VALUES
+(16, 16, 1, TRUE, TRUE, 'system', 'system', 0),
+(17, 17, 2, TRUE, TRUE, 'system', 'system', 0),
+(18, 18, 3, TRUE, TRUE, 'system', 'system', 0),
+(19, 19, 3, TRUE, TRUE, 'system', 'system', 0),
+(20, 20, 4, TRUE, TRUE, 'system', 'system', 0),
+(21, 21, 5, TRUE, TRUE, 'system', 'system', 0);
+
+INSERT IGNORE INTO security_policies (
+    id, organization_id, min_password_length, require_uppercase, require_lowercase, require_numbers,
+    require_special_chars, password_expiry_days, password_history_count, max_failed_attempts,
+    lockout_duration_minutes, session_timeout_minutes, max_concurrent_sessions, allow_remember_me,
+    require_two_factor, active, created_by, updated_by, version)
+VALUES
+(5, 2, 8, TRUE, TRUE, TRUE, FALSE, 90, 5, 5, 30, 60, 3, TRUE, FALSE, TRUE, 'system', 'system', 0);
+
+INSERT IGNORE INTO role_permissions (id, organization_id, role_id, menu_id, can_view, can_manage, can_approve, created_by, updated_by, version)
+VALUES
+-- Org 2 (JSC) - OWNER full access
+(9,  2, 1, 1, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(10, 2, 1, 3, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(11, 2, 1, 4, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(12, 2, 1, 5, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(13, 2, 1, 6, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(14, 2, 1, 7, TRUE, TRUE, TRUE, 'system', 'system', 0),
+-- Org 2 (JSC) - ADMIN manage
+(15, 2, 2, 1, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(16, 2, 2, 3, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(17, 2, 2, 4, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(18, 2, 2, 5, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(19, 2, 2, 6, TRUE, TRUE, FALSE, 'system', 'system', 0),
+-- Org 3 (ABC) - OWNER full access
+(20, 3, 1, 1, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(21, 3, 1, 3, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(22, 3, 1, 5, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(23, 3, 1, 6, TRUE, TRUE, TRUE, 'system', 'system', 0),
+-- Org 3 (ABC) - ADMIN
+(24, 3, 2, 1, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(25, 3, 2, 3, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(26, 3, 2, 5, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(27, 3, 2, 6, TRUE, TRUE, FALSE, 'system', 'system', 0),
+-- Org 4 (Kalinga) - OWNER
+(28, 4, 1, 1, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(29, 4, 1, 3, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(30, 4, 1, 5, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(31, 4, 1, 6, TRUE, TRUE, TRUE, 'system', 'system', 0),
+-- Org 4 (Kalinga) - ADMIN
+(32, 4, 2, 1, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(33, 4, 2, 3, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(34, 4, 2, 5, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(35, 4, 2, 6, TRUE, TRUE, FALSE, 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 8: JSC STAFF (Javier School Cuttack)
+-- =========================================================
+INSERT IGNORE INTO staff (
+    staff_id, user_id, staff_code, first_name, middle_name, last_name, gender, date_of_birth,
+    blood_group, religion, nationality, mobile_number, email, staff_type, designation,
+    employment_category, employment_status, joining_date, contract_start_date, contract_end_date,
+    highest_qualification, experience_years, emergency_contact_name, emergency_contact_relation,
+    emergency_contact_number, photo_url, active, created_by, updated_by, version)
+VALUES
+(7, 18, 'JSC-TCHR-001', 'Debendra',  NULL, 'Barik',  'Male',   '1991-04-12', 'O+', 'Hindu', 'Indian', '9777222401', 'teacher1@jsc.edu.in', 'TEACHING',     'English Teacher',      'PERMANENT', 'ACTIVE', '2022-07-01', NULL, NULL, 'M.A. English, B.Ed.',       7, 'Sushil Barik',   'Father',  '9777000601', NULL, TRUE, 'system', 'system', 0),
+(8, 19, 'JSC-TCHR-002', 'Geetanjali',NULL, 'Rath',   'Female', '1993-08-20', 'A+', 'Hindu', 'Indian', '9777222402', 'teacher2@jsc.edu.in', 'TEACHING',     'Mathematics Teacher',  'PERMANENT', 'ACTIVE', '2023-05-10', NULL, NULL, 'M.Sc. Mathematics, B.Ed.',  5, 'Pradeep Rath',   'Husband', '9777000602', NULL, TRUE, 'system', 'system', 0),
+(9, 17, 'JSC-ADM-001',  'Sulochana', NULL, 'Babu',   'Female', '1986-02-14', 'B+', 'Hindu', 'Indian', '9777222202', 'admin@jsc.edu.in',    'NON_TEACHING', 'Office Administrator', 'PERMANENT', 'ACTIVE', '2021-04-01', NULL, NULL, 'B.Com, MBA',               10, 'Ramesh Babu',    'Brother', '9777000603', NULL, TRUE, 'system', 'system', 0),
+(10,13, 'KCC-ADM-001',  'Sourav',    NULL, 'Swain',  'Male',   '1985-06-18', 'O+', 'Hindu', 'Indian', '9777444402', 'admin@kcc.edu.in',    'NON_TEACHING', 'College Administrator','PERMANENT', 'ACTIVE', '2019-09-01', NULL, NULL, 'MBA, B.Com',               12, 'Bijay Swain',    'Brother', '9777000701', NULL, TRUE, 'system', 'system', 0),
+(11, 8, 'ABCP-ADM-002', 'Dr. Madhumita',NULL,'Das',  'Female', '1975-03-22', 'A+', 'Hindu', 'Indian', '9777333301', 'owner@abcpuri.edu.in','NON_TEACHING', 'Managing Trustee',     'PERMANENT', 'ACTIVE', '2018-06-01', NULL, NULL, 'Ph.D. Education',          18, 'Ramesh Das',     'Husband', '9777000801', NULL, TRUE, 'system', 'system', 0);
+
+INSERT IGNORE INTO staff_salary_structure (
+    salary_structure_id, staff_id, salary_type, basic_pay, hra, da, special_allowance,
+    transport_allowance, other_allowance, gross_salary, bank_name, account_holder_name,
+    account_number, ifsc_code, effective_from, effective_to, active, remarks, created_by, updated_by, version)
+VALUES
+(5, 7,  'MONTHLY', 27000.00, 7500.00, 2800.00, 1900.00, 1200.00, 500.00, 40900.00, 'Bank of India Cuttack',  'Debendra Barik',    '3211002CUTK01', 'BKID0JSC001', '2026-04-01', NULL, TRUE, 'JSC English teacher salary',  'system', 'system', 0),
+(6, 8,  'MONTHLY', 29000.00, 8000.00, 3000.00, 2100.00, 1200.00, 500.00, 43800.00, 'SBI Cuttack Main',       'Geetanjali Rath',   '3211002CUTK02', 'SBIN0CUTAK', '2026-04-01', NULL, TRUE, 'JSC Math teacher salary',     'system', 'system', 0),
+(7, 9,  'MONTHLY', 25000.00, 6500.00, 2400.00, 1600.00, 1000.00, 500.00, 37000.00, 'Axis Bank Cuttack',      'Sulochana Babu',    '3211002CUTK03', 'UTIB0CUTAK', '2026-04-01', NULL, TRUE, 'JSC admin salary',            'system', 'system', 0),
+(8, 10, 'MONTHLY', 32000.00, 9000.00, 3400.00, 2400.00, 1500.00, 700.00, 49000.00, 'Canara Bank Cuttack',    'Sourav Swain',      '3211002CUTK04', 'CNRB0KCC01', '2026-04-01', NULL, TRUE, 'Kalinga college admin salary','system', 'system', 0),
+(9, 4,  'MONTHLY', 38000.00,11000.00, 4000.00, 3000.00, 1500.00, 800.00, 58300.00, 'UCO Bank Cuttack',       'Madhuri Tripathy',  '3211002CUTK05', 'UCBA0KCC01', '2026-04-01', NULL, TRUE, 'Kalinga commerce salary',     'system', 'system', 0);
+
+INSERT IGNORE INTO payroll (
+    payroll_id, staff_id, payroll_year, payroll_month, working_days, present_days, leave_without_pay_days,
+    gross_salary, total_deductions, net_salary, generated_on, paid_on, status, remarks, created_by, updated_by, version)
+VALUES
+(5, 7,  2026, 6, 26, 26, 0, 40900.00, 1100.00, 39800.00, '2026-06-25', '2026-06-30', 'PAID', 'JSC teacher June payroll',          'system', 'system', 0),
+(6, 8,  2026, 6, 26, 25, 1, 43800.00, 1600.00, 42200.00, '2026-06-25', '2026-06-30', 'PAID', 'JSC math teacher June payroll',     'system', 'system', 0),
+(7, 9,  2026, 6, 26, 26, 0, 37000.00,  900.00, 36100.00, '2026-06-25', '2026-06-30', 'PAID', 'JSC admin June payroll',            'system', 'system', 0),
+(8, 3,  2026, 6, 26, 26, 0, 45000.00, 1200.00, 43800.00, '2026-06-25', '2026-06-30', 'PAID', 'ABC science teacher June payroll',  'system', 'system', 0),
+(9, 4,  2026, 6, 26, 25, 1, 58300.00, 2000.00, 56300.00, '2026-06-25', '2026-06-30', 'PAID', 'KCC commerce teacher June payroll', 'system', 'system', 0);
+
+INSERT IGNORE INTO responsibility_assignment (assignment_id, staff_id, responsibility_id, scope, effective_from, effective_to, active, remarks, created_by, updated_by, version)
+VALUES
+(5, 7, 1, 'Class I B (JSC)',              '2026-04-01', NULL, TRUE, 'JSC Class I B teacher',     'system', 'system', 0),
+(6, 8, 2, 'Mathematics Department (JSC)', '2026-04-01', NULL, TRUE, 'JSC Math department head',  'system', 'system', 0),
+(7, 9, 3, 'Javier Cuttack',              '2026-04-01', NULL, TRUE, 'JSC exam coordinator',      'system', 'system', 0),
+(8,10, 3, 'Kalinga College',             '2026-04-01', NULL, TRUE, 'KCC exam coordinator',      'system', 'system', 0);
+
+-- =========================================================
+-- STEP 9: CLASS TEACHER ASSIGNMENTS
+-- =========================================================
+INSERT IGNORE INTO class_teacher_assignment (
+    assignment_id, academic_year_id, class_id, section_id, teacher_id,
+    effective_from, effective_to, active, remarks, created_by, updated_by, version)
+VALUES
+(1, 1, 4, 1, 4,  '2026-04-01', NULL, TRUE, 'JSB Class I-A class teacher (Rupesh)',     'system', 'system', 0),
+(2, 1, 4, 2, 18, '2026-04-01', NULL, TRUE, 'JSC Class I-B class teacher (Debendra)',   'system', 'system', 0),
+(3, 1, 5, 3, 5,  '2026-04-01', NULL, TRUE, 'Class II-A class teacher (Saswati)',       'system', 'system', 0),
+(4, 1, 5, 6, 19, '2026-04-01', NULL, TRUE, 'JSC Class II-B class teacher (Geetanjali)','system', 'system', 0),
+(5, 1, 7, 5, 14, '2026-04-01', NULL, TRUE, 'XI Commerce class teacher (Madhuri)',      'system', 'system', 0);
+
+-- =========================================================
+-- STEP 10: MORE SUBJECT ASSIGNMENTS (JSC teachers, ABC)
+-- =========================================================
+INSERT IGNORE INTO subject_assignment (
+    subject_assignment_id, academic_year_id, class_id, section_id, subject_id,
+    teacher_id, periods_per_week, active, remarks, created_by, updated_by, version)
+VALUES
+(8,  1, 4, 2, 1,  18, 5, TRUE, 'English for Class I B (JSC)',           'system', 'system', 0),
+(9,  1, 4, 2, 2,  19, 5, TRUE, 'Math for Class I B (JSC)',              'system', 'system', 0),
+(10, 1, 4, 2, 5,  18, 3, TRUE, 'Odia for Class I B (JSC)',              'system', 'system', 0),
+(11, 1, 5, 6, 1,  18, 5, TRUE, 'English for Class II B (JSC)',          'system', 'system', 0),
+(12, 1, 5, 6, 2,  19, 5, TRUE, 'Math for Class II B (JSC)',             'system', 'system', 0),
+(13, 1, 5, 3, 3,  10, 4, TRUE, 'Science for Class II A (ABC teacher)',  'system', 'system', 0),
+(14, 1, 7, 5, 14, 14, 3, TRUE, 'Economics for Class XI Commerce',       'system', 'system', 0);
+
+-- Timetable slots for JSC
+INSERT IGNORE INTO timetable_slot (slot_id, academic_year_id, class_id, section_id, subject_assignment_id, period_template_id, day_of_week, active, created_by, updated_by, version)
+VALUES
+(8,  1, 4, 2, 8,  1, 'MONDAY',    TRUE, 'system', 'system', 0),
+(9,  1, 4, 2, 9,  2, 'MONDAY',    TRUE, 'system', 'system', 0),
+(10, 1, 4, 2, 10, 4, 'MONDAY',    TRUE, 'system', 'system', 0),
+(11, 1, 5, 6, 11, 1, 'TUESDAY',   TRUE, 'system', 'system', 0),
+(12, 1, 5, 6, 12, 2, 'WEDNESDAY', TRUE, 'system', 'system', 0),
+(13, 1, 5, 3, 13, 1, 'THURSDAY',  TRUE, 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 11: ADDITIONAL PARENTS (for new students)
+-- =========================================================
+INSERT IGNORE INTO parent (
+    parent_id, parent_code, first_name, middle_name, last_name, gender, mobile_number,
+    alternate_mobile, email, occupation, organization_name, qualification, annual_income,
+    photo_url, active, remarks, user_id, created_by, updated_by, version)
+VALUES
+(4,  'PAR000004', 'Prasanta',     NULL, 'Nanda',   'Male',   '9777222601', NULL,         'parent1@jsc.edu.in',     'Government Employee',   'Odisha Secretariat',         'Post Graduate',  780000.00, NULL, TRUE, 'Father of Bikash (JSC)',  21,   'system', 'system', 0),
+(5,  'PAR000005', 'Bimalendu',    NULL, 'Sahoo',   'Male',   '9777111402', NULL,         'parent2@jsb.edu.in',     'Private Business',      'Sahoo Enterprises',          'Graduate',      1100000.00, NULL, TRUE, 'Father of Ishani',        NULL, 'system', 'system', 0),
+(6,  'PAR000006', 'Sarojini',     NULL, 'Behera',  'Female', '9777111403', NULL,         'parent3@jsb.edu.in',     'Homemaker',             NULL,                         'Intermediate',       0.00, NULL, TRUE, 'Mother of Aditya',        NULL, 'system', 'system', 0),
+(7,  'PAR000007', 'Rajendra',     NULL, 'Nayak',   'Male',   '9777111404', NULL,         'parent4@jsb.edu.in',     'Bank Employee',         'UCO Bank Bhubaneswar',       'Post Graduate',  950000.00, NULL, TRUE, 'Father of Tanvi',         NULL, 'system', 'system', 0),
+(8,  'PAR000008', 'Sumanta',      NULL, 'Pani',    'Male',   '9777222502', NULL,         'parent5@jsc.edu.in',     'School Teacher',        'Govt. HS Cuttack',           'Post Graduate',  720000.00, NULL, TRUE, 'Father of Arjun (JSC)',   NULL, 'system', 'system', 0),
+(9,  'PAR000009', 'Laxmipriya',   NULL, 'Swain',   'Female', '9777222503', NULL,         'parent6@jsc.edu.in',     'Nurse',                 'SCB Medical College',        'Diploma',        680000.00, NULL, TRUE, 'Mother of Manya (JSC)',   NULL, 'system', 'system', 0),
+(10, 'PAR000010', 'Narayan',      NULL, 'Das',     'Male',   '9777222504', NULL,         'parent7@jsc.edu.in',     'Lawyer',                'Orissa High Court',          'Post Graduate', 1800000.00, NULL, TRUE, 'Father of Kunal (JSC)',   NULL, 'system', 'system', 0),
+(11, 'PAR000011', 'Hemanta',      NULL, 'Mohanty', 'Male',   '9777222505', NULL,         'parent8@jsc.edu.in',     'Police Officer',        'Odisha Police',              'Graduate',       750000.00, NULL, TRUE, 'Father of Riya (JSC)',    NULL, 'system', 'system', 0),
+(12, 'PAR000012', 'Rajashree',    NULL, 'Panda',   'Female', '9777334402', NULL,         'parent9@abcpuri.edu.in', 'School Teacher',        'Govt. UP School Puri',       'Post Graduate',  700000.00, NULL, TRUE, 'Mother of Sai (ABC)',     NULL, 'system', 'system', 0),
+(13, 'PAR000013', 'Duryodhan',    NULL, 'Jena',    'Male',   '9777334403', NULL,         'parent10@abcpuri.edu.in','Fisherman',             NULL,                         'Intermediate',   420000.00, NULL, TRUE, 'Father of Anushka (ABC)', NULL, 'system', 'system', 0),
+(14, 'PAR000014', 'Satyabrata',   NULL, 'Pradhan', 'Male',   '9777334404', '9437334404', 'parent11@abcpuri.edu.in','Hotel Owner',           'Sea View Hotel Puri',        'Graduate',      1500000.00, NULL, TRUE, 'Father of Kabir (ABC)',   NULL, 'system', 'system', 0),
+(15, 'PAR000015', 'Binodini',     NULL, 'Barik',   'Female', '9777445402', NULL,         'parent12@kcc.edu.in',    'Bank Employee',         'Axis Bank Cuttack',          'Post Graduate',  880000.00, NULL, TRUE, 'Mother of Debasish (KCC)',NULL, 'system', 'system', 0),
+(16, 'PAR000016', 'Subash',       NULL, 'Sahu',    'Male',   '9777445403', NULL,         'parent13@kcc.edu.in',    'Pharmacist',            'Jan Aushadhi Kendra',        'Graduate',       620000.00, NULL, TRUE, 'Father of Sreeja (KCC)', NULL, 'system', 'system', 0),
+(17, 'PAR000017', 'Mamata',       NULL, 'Mahapatra','Female','9777445404', NULL,         'parent14@kcc.edu.in',    'Homemaker',             NULL,                         'Graduate',           0.00, NULL, TRUE, 'Mother of Aniket (KCC)', NULL, 'system', 'system', 0);
+
+INSERT IGNORE INTO student_parent (
+    student_parent_id, student_id, parent_id, relationship, primary_contact,
+    receive_sms, receive_email, pickup_authorized, active, created_by, updated_by, version)
+VALUES
+(5,  2,  5,  'FATHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(6,  3,  6,  'MOTHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(7,  4,  7,  'FATHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(8,  5,  8,  'FATHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(9,  6,  9,  'MOTHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(10, 7,  10, 'FATHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(11, 8,  11, 'FATHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(12, 10, 12, 'MOTHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(13, 11, 13, 'FATHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(14, 12, 14, 'FATHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(15, 14, 15, 'MOTHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(16, 15, 16, 'FATHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0),
+(17, 16, 17, 'MOTHER', TRUE,  TRUE, TRUE, TRUE, TRUE, 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 12: ADDITIONAL STUDENTS (5 JSB, 3 JSC, 3 ABC, 3 KCC)
+-- =========================================================
+INSERT IGNORE INTO student (
+    student_id, student_code, admission_number, roll_number, first_name, middle_name, last_name, gender,
+    date_of_birth, religion, nationality, mother_tongue, mobile_number, email, photo_url, admission_date,
+    status, transport_required, hostel_required, same_address, user_id, remarks, created_by, updated_by, version)
+VALUES
+-- JSB additional (21-25)
+(21, 'JSB-STU-0006', 'JSB-ADM-26006', '6',  'Priyanka',   NULL, 'Sahoo',    'Female', '2018-03-07', 'Hindu', 'Indian', 'Odia', 9777111306, 'priyanka@jsb.edu.in',  NULL, '2026-04-05', 'ACTIVE', FALSE, FALSE, TRUE, NULL, 'Class II JSB',    'system', 'system', 0),
+(22, 'JSB-STU-0007', 'JSB-ADM-26007', '7',  'Rohit',      NULL, 'Panda',    'Male',   '2017-11-15', 'Hindu', 'Indian', 'Odia', 9777111307, 'rohit@jsb.edu.in',     NULL, '2026-04-05', 'ACTIVE', TRUE,  FALSE, TRUE, NULL, 'Class III JSB',   'system', 'system', 0),
+(23, 'JSB-STU-0008', 'JSB-ADM-26008', '8',  'Lipsa',      NULL, 'Swain',    'Female', '2017-06-22', 'Hindu', 'Indian', 'Odia', 9777111308, 'lipsa@jsb.edu.in',     NULL, '2026-04-05', 'ACTIVE', FALSE, FALSE, TRUE, NULL, 'Class III JSB',   'system', 'system', 0),
+(24, 'JSB-STU-0009', 'JSB-ADM-26009', '9',  'Shreyansh',  NULL, 'Patnaik',  'Male',   '2016-09-30', 'Hindu', 'Indian', 'Odia', 9777111309, 'shreyansh@jsb.edu.in', NULL, '2026-04-05', 'ACTIVE', FALSE, FALSE, TRUE, NULL, 'Class IV JSB',    'system', 'system', 0),
+(25, 'JSB-STU-0010', 'JSB-ADM-26010', '10', 'Susmita',    NULL, 'Choudhury','Female', '2016-01-04', 'Hindu', 'Indian', 'Odia', 9777111310, 'susmita@jsb.edu.in',   NULL, '2026-04-05', 'ACTIVE', FALSE, FALSE, TRUE, NULL, 'Class IV JSB',    'system', 'system', 0),
+-- JSC additional (26-28)
+(26, 'JSC-STU-0006', 'JSC-ADM-26006', '6',  'Bikash',     NULL, 'Nanda',    'Male',   '2019-07-08', 'Hindu', 'Indian', 'Odia', 9777222501, 'student1@jsc.edu.in',  NULL, '2026-04-05', 'ACTIVE', FALSE, FALSE, TRUE, 20,   'Class I JSC',     'system', 'system', 0),
+(27, 'JSC-STU-0007', 'JSC-ADM-26007', '7',  'Pragnya',    NULL, 'Mishra',   'Female', '2018-11-25', 'Hindu', 'Indian', 'Odia', 9777222506, 'pragnya@jsc.edu.in',   NULL, '2026-04-05', 'ACTIVE', FALSE, FALSE, TRUE, NULL, 'Class II JSC',    'system', 'system', 0),
+(28, 'JSC-STU-0008', 'JSC-ADM-26008', '8',  'Subhankar',  NULL, 'Sahu',     'Male',   '2018-05-14', 'Hindu', 'Indian', 'Odia', 9777222507, 'subhankar@jsc.edu.in', NULL, '2026-04-05', 'ACTIVE', FALSE, FALSE, TRUE, NULL, 'Class II JSC',    'system', 'system', 0),
+-- ABC additional (29-31)
+(29, 'ABCP-STU-0006', 'ABCP-ADM-26006', '6', 'Sudha',     NULL, 'Kar',      'Female', '2019-10-12', 'Hindu', 'Indian', 'Odia', 9777333506, 'sudha@abcpuri.edu.in',      NULL, '2026-04-05', 'ACTIVE', FALSE, FALSE, TRUE, NULL, 'Class I ABC',    'system', 'system', 0),
+(30, 'ABCP-STU-0007', 'ABCP-ADM-26007', '7', 'Manoranjan',NULL, 'Behera',   'Male',   '2018-02-19', 'Hindu', 'Indian', 'Odia', 9777333507, 'manoranjan@abcpuri.edu.in', NULL, '2026-04-05', 'ACTIVE', FALSE, FALSE, TRUE, NULL, 'Class II ABC',   'system', 'system', 0),
+(31, 'ABCP-STU-0008', 'ABCP-ADM-26008', '8', 'Deepika',   NULL, 'Naik',     'Female', '2019-04-03', 'Hindu', 'Indian', 'Odia', 9777333508, 'deepika@abcpuri.edu.in',    NULL, '2026-04-05', 'ACTIVE', FALSE, FALSE, TRUE, NULL, 'Class I ABC',    'system', 'system', 0),
+-- KCC additional (32-34)
+(32, 'KCC-STU-0006', 'KCC-ADM-26006', '6', 'Deepak',     NULL, 'Rout',     'Male',   '2006-04-18', 'Hindu', 'Indian', 'Odia', 9777444606, 'deepak@kcc.edu.in',    NULL, '2026-04-05', 'ACTIVE', FALSE, TRUE,  TRUE, NULL, 'Degree student KCC', 'system', 'system', 0),
+(33, 'KCC-STU-0007', 'KCC-ADM-26007', '7', 'Monalisa',   NULL, 'Pati',     'Female', '2005-07-29', 'Hindu', 'Indian', 'Odia', 9777444607, 'monalisa@kcc.edu.in',  NULL, '2026-04-05', 'ACTIVE', FALSE, TRUE,  TRUE, NULL, 'Degree student KCC', 'system', 'system', 0),
+(34, 'KCC-STU-0008', 'KCC-ADM-26008', '8', 'Gouranga',   NULL, 'Behera',   'Male',   '2006-09-05', 'Hindu', 'Indian', 'Odia', 9777444608, 'gouranga@kcc.edu.in',  NULL, '2026-04-05', 'ACTIVE', FALSE, FALSE, TRUE, NULL, 'Degree student KCC', 'system', 'system', 0);
+
+INSERT IGNORE INTO student_enrollment (
+    enrollment_id, student_id, academic_year_id, class_id, section_id, roll_number,
+    status, active, remarks, created_by, updated_by, version)
+VALUES
+(21, 21, 1, 5, 3, '5', 'ACTIVE', TRUE, 'JSB Class II-A',    'system', 'system', 0),
+(22, 22, 1, 6, 4, '5', 'ACTIVE', TRUE, 'JSB Class III-A',   'system', 'system', 0),
+(23, 23, 1, 6, 4, '6', 'ACTIVE', TRUE, 'JSB Class III-A',   'system', 'system', 0),
+(24, 24, 1, 8, 7, '1', 'ACTIVE', TRUE, 'JSB Class IV-A',    'system', 'system', 0),
+(25, 25, 1, 8, 7, '2', 'ACTIVE', TRUE, 'JSB Class IV-A',    'system', 'system', 0),
+(26, 26, 1, 4, 2, '5', 'ACTIVE', TRUE, 'JSC Class I-B',     'system', 'system', 0),
+(27, 27, 1, 5, 6, '5', 'ACTIVE', TRUE, 'JSC Class II-B',    'system', 'system', 0),
+(28, 28, 1, 5, 6, '6', 'ACTIVE', TRUE, 'JSC Class II-B',    'system', 'system', 0),
+(29, 29, 1, 4, 1, '5', 'ACTIVE', TRUE, 'ABC Class I-A',     'system', 'system', 0),
+(30, 30, 1, 5, 3, '5', 'ACTIVE', TRUE, 'ABC Class II-A',    'system', 'system', 0),
+(31, 31, 1, 4, 1, '6', 'ACTIVE', TRUE, 'ABC Class I-A',     'system', 'system', 0),
+(32, 32, 1, 7, 5, '6', 'ACTIVE', TRUE, 'KCC XI Commerce',   'system', 'system', 0),
+(33, 33, 1, 7, 5, '7', 'ACTIVE', TRUE, 'KCC XI Commerce',   'system', 'system', 0),
+(34, 34, 1, 7, 5, '8', 'ACTIVE', TRUE, 'KCC XI Commerce',   'system', 'system', 0);
+
+INSERT IGNORE INTO student_medical (
+    medical_id, student_id, blood_group, allergies, medical_conditions, medications,
+    doctor_name, doctor_contact, emergency_notes, active, created_by, updated_by, version)
+VALUES
+(5,  26, 'B+', 'Dust allergy',    'None',                     'Antihistamine',      'Dr. B. Kumar Cuttack',  '9777005301', 'Inform PE teacher',                   TRUE, 'system', 'system', 0),
+(6,  5,  'A+', 'Peanut allergy',  'None',                     'None',               'Dr. R. K. Mishra',      '9777005102', 'Carry epipen form',                   TRUE, 'system', 'system', 0),
+(7,  14, 'O+', 'None',            'Myopia - wears glasses',   'None',               'Dr. Vision Care KCC',   '9777005401', 'Front row seating preferred',         TRUE, 'system', 'system', 0),
+(8,  32, 'AB+','None',            'Mild hypertension history','Monitor, no meds',   'Dr. Sasmita Panda',     '9777005402', 'Avoid excessive stress',              TRUE, 'system', 'system', 0);
+
+INSERT IGNORE INTO student_timeline (
+    timeline_id, student_id, event_type, title, description, created_by, updated_by, version)
+VALUES
+(5,  5,  'ENROLLMENT_CREATED', 'Joined Class I B',    'Arjun Pani admitted to Javier School Cuttack',  'system', 'system', 0),
+(6,  14, 'ENROLLMENT_CREATED', 'Joined College',      'Debasish Barik admitted to Kalinga College',    'system', 'system', 0),
+(7,  26, 'ENROLLMENT_CREATED', 'Joined Class I B',    'Bikash Nanda admitted to Javier School Cuttack','system', 'system', 0),
+(8,  32, 'ENROLLMENT_CREATED', 'Joined XI Commerce',  'Deepak Rout admitted to Kalinga College',       'system', 'system', 0);
+
+INSERT IGNORE INTO student_achievement (
+    achievement_id, student_id, title, category, achievement_date, issuer, rank_position, description,
+    certificate_document_id, active, created_by, updated_by, version)
+VALUES
+(4,  5,  'Cuttack Inter-School Drawing',  'CULTURAL',  '2026-06-20', 'Javier School Cuttack', '1st',      'Won drawing competition among 5 schools',   NULL, TRUE, 'system', 'system', 0),
+(5,  14, 'Commerce Quiz Winner',          'ACADEMIC',  '2026-06-22', 'Kalinga College',        '1st',      'First place in KCC inter-department quiz',   NULL, TRUE, 'system', 'system', 0),
+(6,  29, 'Puri Dance Festival Finalist',  'CULTURAL',  '2026-06-25', 'ABC School Puri',        'Finalist', 'Reached finals in annual dance competition', NULL, TRUE, 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 13: MORE ACADEMIC CALENDAR EVENTS
+-- =========================================================
+INSERT IGNORE INTO academic_calendar_event (
+    event_id, academic_year_id, title, event_type, start_date, end_date, all_day,
+    description, active, created_by, updated_by, version)
+VALUES
+(5,  1, 'Rath Yatra Celebration',      'SPECIAL_DAY',      '2026-07-04', '2026-07-04', TRUE, 'Puri Rath Yatra - special school assembly',          TRUE, 'system', 'system', 0),
+(6,  1, 'First Term End',              'TERM_END',          '2026-10-31', '2026-10-31', TRUE, 'End of first academic term',                          TRUE, 'system', 'system', 0),
+(7,  1, 'Puja Vacation',               'HOLIDAY',           '2026-10-01', '2026-10-20', TRUE, 'Durga Puja / Dussehra / Diwali holidays',            TRUE, 'system', 'system', 0),
+(8,  1, 'Annual Examination',          'EXAM',              '2027-02-10', '2027-02-28', TRUE, 'Annual final examination for all classes',            TRUE, 'system', 'system', 0),
+(9,  1, 'Sports Day',                  'SPECIAL_DAY',       '2026-11-15', '2026-11-15', TRUE, 'Annual sports day celebration',                       TRUE, 'system', 'system', 0),
+(10, 1, 'Winter Vacation',             'HOLIDAY',           '2026-12-26', '2027-01-03', TRUE, 'Christmas and New Year holidays',                     TRUE, 'system', 'system', 0),
+(11, 1, 'Science Exhibition',          'SPECIAL_DAY',       '2026-12-12', '2026-12-13', TRUE, 'Inter-school science exhibition at Bhubaneswar',      TRUE, 'system', 'system', 0),
+(12, 1, 'Republic Day',                'HOLIDAY',           '2027-01-26', '2027-01-26', TRUE, 'National Republic Day flag hoisting ceremony',        TRUE, 'system', 'system', 0),
+(13, 1, 'Teacher Training Workshop',   'PROFESSIONAL_DAY',  '2026-07-18', '2026-07-18', TRUE, 'Campus closed for teacher capacity building',          TRUE, 'system', 'system', 0),
+(14, 1, 'Annual Day',                  'SPECIAL_DAY',       '2027-01-10', '2027-01-10', TRUE, 'Annual day with cultural programs and prize giving',  TRUE, 'system', 'system', 0),
+(15, 1, 'Independence Day',            'HOLIDAY',           '2026-08-15', '2026-08-15', TRUE, 'National Independence Day',                            TRUE, 'system', 'system', 0),
+(16, 1, 'Gandhi Jayanti',              'HOLIDAY',           '2026-10-02', '2026-10-02', TRUE, 'Mahatma Gandhi Birthday - National Holiday',          TRUE, 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 14: MORE SYLLABUS DATA (JSC and ABC curriculum)
+-- =========================================================
+INSERT IGNORE INTO syllabus (syllabus_id, academic_year_id, class_id, subject_id, title, version_no, published, active, remarks, created_by, updated_by, version)
+VALUES
+(5, 1, 4, 1, 'Class I English - Javier Cuttack',       'v1', TRUE, TRUE, 'JSC curriculum', 'system', 'system', 0),
+(6, 1, 5, 1, 'Class II English Syllabus',              'v1', TRUE, TRUE, 'CBSE primary',  'system', 'system', 0),
+(7, 1, 5, 2, 'Class II Mathematics Syllabus',          'v1', TRUE, TRUE, 'CBSE primary',  'system', 'system', 0),
+(8, 1, 6, 3, 'Class III Science Syllabus',             'v1', TRUE, TRUE, 'Primary sci',   'system', 'system', 0),
+(9, 1, 7, 10,'Class XI Business Studies Syllabus',     'v1', TRUE, TRUE, 'CBSE XI',       'system', 'system', 0);
+
+INSERT IGNORE INTO syllabus_unit (unit_id, syllabus_id, unit_number, unit_name, estimated_hours, display_order, active, remarks, created_by, updated_by, version)
+VALUES
+(5, 5, 1, 'Friends and Animals',          8,  1, TRUE, 'Class I Eng Unit 1', 'system', 'system', 0),
+(6, 5, 2, 'Fun at School',               10,  2, TRUE, 'Class I Eng Unit 2', 'system', 'system', 0),
+(7, 6, 1, 'Reading and Writing',         12,  1, TRUE, 'Class II Eng Unit 1','system', 'system', 0),
+(8, 7, 1, 'Numbers to 100',             12,  1, TRUE, 'Class II Math Unit 1','system', 'system', 0),
+(9, 8, 1, 'Plants Around Us',           10,  1, TRUE, 'Class III Sci',       'system', 'system', 0),
+(10,9, 1, 'Nature and Purpose of Business',12,1, TRUE, 'Business Studies 1',  'system', 'system', 0);
+
+INSERT IGNORE INTO syllabus_chapter (chapter_id, unit_id, chapter_number, chapter_name, estimated_hours, display_order, active, remarks, created_by, updated_by, version)
+VALUES
+(5,  5, 1, 'My Pet Dog',          4, 1, TRUE, 'Story chapter',      'system', 'system', 0),
+(6,  6, 1, 'My Classroom',        5, 1, TRUE, 'Classroom vocab',    'system', 'system', 0),
+(7,  7, 1, 'Letters and Words',   6, 1, TRUE, 'Language chapter',   'system', 'system', 0),
+(8,  8, 1, 'Counting by 10s',     6, 1, TRUE, 'Math chapter',       'system', 'system', 0),
+(9,  9, 1, 'Types of Plants',     5, 1, TRUE, 'Botany chapter',     'system', 'system', 0),
+(10,10, 1, 'Concept of Business', 6, 1, TRUE, 'Business chapter',   'system', 'system', 0);
+
+INSERT IGNORE INTO syllabus_topic (topic_id, chapter_id, topic_number, topic_name, estimated_hours, display_order, active, remarks, created_by, updated_by, version)
+VALUES
+(5,  5, 1, 'My Favourite Animal',    2, 1, TRUE, 'Animal topic',      'system', 'system', 0),
+(6,  6, 1, 'Things in My Classroom', 3, 1, TRUE, 'Classroom topic',   'system', 'system', 0),
+(7,  7, 1, 'Vowels and Consonants',  3, 1, TRUE, 'Phonics topic',     'system', 'system', 0),
+(8,  8, 1, 'Counting 10, 20, 30...',  3, 1, TRUE, 'Skip counting',    'system', 'system', 0),
+(9,  9, 1, 'Trees and Shrubs',       3, 1, TRUE, 'Plant types',       'system', 'system', 0),
+(10,10, 1, 'Meaning of Business',    3, 1, TRUE, 'Business concept',  'system', 'system', 0);
+
+INSERT IGNORE INTO syllabus_coverage (coverage_id, topic_id, teacher_id, status, completion_date, remarks, created_by, updated_by, version)
+VALUES
+(5,  5, 18, 'COMPLETED',   '2026-06-28', 'Completed with activity',          'system', 'system', 0),
+(6,  6, 18, 'IN_PROGRESS', NULL,         'Started, 1 more period needed',    'system', 'system', 0),
+(7,  7, 18, 'NOT_STARTED', NULL,         'Scheduled for next week',          'system', 'system', 0),
+(8,  8, 19, 'COMPLETED',   '2026-06-25', 'Completed with worksheet',         'system', 'system', 0),
+(9,  9, 10, 'NOT_STARTED', NULL,         'Starting week of July 7',          'system', 'system', 0),
+(10,10, 14, 'COMPLETED',   '2026-06-22', 'Completed with case study',        'system', 'system', 0);
+
+-- Teacher arrangement for JSC
+INSERT IGNORE INTO teacher_arrangement (arrangement_id, slot_id, absent_teacher_id, substitute_teacher_id, arrangement_date, status, reason, approved_by, active, created_by, updated_by, version)
+VALUES
+(2, 8, 18, 19, '2026-06-29', 'APPROVED', 'JSC teacher attended district education workshop', 17, TRUE, 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 15: MORE STUDENT ATTENDANCE (3 orgs, 3 days each)
+-- =========================================================
+INSERT IGNORE INTO student_attendance (
+    attendance_id, organization_id, student_id, student_name, roll_number, admission_number,
+    academic_year_id, class_id, class_name, section_id, section_name, attendance_date,
+    status, remarks, marked_by, created_by, updated_by, version)
+VALUES
+-- June 27 - JSB
+(6,  1, 1,  'Aarav Mohanty',  '1', 'JSB-ADM-26001', 1, 4, 'Class I',   1, 'A', '2026-06-27', 'PRESENT', 'On time',       'javier.admin', 'system', 'system', 0),
+(7,  1, 2,  'Ishani Mishra',  '2', 'JSB-ADM-26002', 1, 4, 'Class I',   1, 'A', '2026-06-27', 'PRESENT', 'On time',       'javier.admin', 'system', 'system', 0),
+(8,  1, 17, 'Sambit Behera',  '5', 'JSB-ADM-26005', 1, 4, 'Class I',   2, 'B', '2026-06-27', 'ABSENT',  'Holiday trip',  'javier.admin', 'system', 'system', 0),
+-- June 27 - JSC
+(9,  2, 5,  'Arjun Pani',     '1', 'JSC-ADM-26001', 1, 4, 'Class I',   2, 'B', '2026-06-27', 'PRESENT', 'On time',       'jsc.admin',    'system', 'system', 0),
+(10, 2, 6,  'Manya Swain',    '2', 'JSC-ADM-26002', 1, 4, 'Class I',   2, 'B', '2026-06-27', 'PRESENT', 'On time',       'jsc.admin',    'system', 'system', 0),
+(11, 2, 7,  'Kunal Das',      '1', 'JSC-ADM-26003', 1, 5, 'Class II',  6, 'B', '2026-06-27', 'LATE',    'Bus delay',     'jsc.admin',    'system', 'system', 0),
+-- June 27 - ABC
+(12, 3, 9,  'Ishita Das',     '1', 'ABCP-ADM-26001',1, 4, 'Class I',   1, 'A', '2026-06-27', 'PRESENT', 'On time',       'abc.admin',    'system', 'system', 0),
+(13, 3, 10, 'Sai Panda',      '2', 'ABCP-ADM-26002',1, 4, 'Class I',   1, 'A', '2026-06-27', 'ABSENT',  'Medical leave', 'abc.admin',    'system', 'system', 0),
+-- June 27 - Kalinga
+(14, 4, 13, 'Ritika Panda',   '1', 'KCC-ADM-26001', 1, 7, 'XI Com',    5, 'A', '2026-06-27', 'PRESENT', 'Present',       'kalinga.admin','system', 'system', 0),
+(15, 4, 14, 'Debasish Barik', '2', 'KCC-ADM-26002', 1, 7, 'XI Com',    5, 'A', '2026-06-27', 'LATE',    'Bus delay',     'kalinga.admin','system', 'system', 0),
+-- June 28 - JSB
+(16, 1, 1,  'Aarav Mohanty',  '1', 'JSB-ADM-26001', 1, 4, 'Class I',   1, 'A', '2026-06-28', 'PRESENT', 'Saturday duty','javier.admin', 'system', 'system', 0),
+(17, 1, 2,  'Ishani Mishra',  '2', 'JSB-ADM-26002', 1, 4, 'Class I',   1, 'A', '2026-06-28', 'PRESENT', 'Saturday duty','javier.admin', 'system', 'system', 0),
+-- June 28 - JSC
+(18, 2, 5,  'Arjun Pani',     '1', 'JSC-ADM-26001', 1, 4, 'Class I',   2, 'B', '2026-06-28', 'PRESENT', 'Regular',       'jsc.admin',    'system', 'system', 0),
+(19, 2, 26, 'Bikash Nanda',   '5', 'JSC-ADM-26006', 1, 4, 'Class I',   2, 'B', '2026-06-28', 'PRESENT', 'Regular',       'jsc.admin',    'system', 'system', 0),
+-- June 28 - ABC
+(20, 3, 9,  'Ishita Das',     '1', 'ABCP-ADM-26001',1, 4, 'Class I',   1, 'A', '2026-06-28', 'PRESENT', 'Regular',       'abc.admin',    'system', 'system', 0),
+-- June 30 - JSC additional
+(21, 2, 26, 'Bikash Nanda',   '5', 'JSC-ADM-26006', 1, 4, 'Class I',   2, 'B', '2026-06-30', 'PRESENT', 'Regular',       'jsc.admin',    'system', 'system', 0),
+(22, 2, 27, 'Pragnya Mishra', '5', 'JSC-ADM-26007', 1, 5, 'Class II',  6, 'B', '2026-06-30', 'ABSENT',  'Sick leave',    'jsc.admin',    'system', 'system', 0),
+-- June 30 - ABC additional
+(23, 3, 10, 'Sai Panda',      '2', 'ABCP-ADM-26002',1, 4, 'Class I',   1, 'A', '2026-06-30', 'PRESENT', 'Recovered',     'abc.admin',    'system', 'system', 0),
+(24, 3, 11, 'Anushka Jena',   '1', 'ABCP-ADM-26003',1, 5, 'Class II',  3, 'A', '2026-06-30', 'PRESENT', 'On time',       'abc.admin',    'system', 'system', 0),
+-- June 30 - Kalinga additional
+(25, 4, 14, 'Debasish Barik', '2', 'KCC-ADM-26002', 1, 7, 'XI Com',    5, 'A', '2026-06-30', 'PRESENT', 'On time',       'kalinga.admin','system', 'system', 0),
+(26, 4, 15, 'Sreeja Sahu',    '3', 'KCC-ADM-26003', 1, 7, 'XI Com',    5, 'A', '2026-06-30', 'PRESENT', 'Regular',       'kalinga.admin','system', 'system', 0);
+
+-- =========================================================
+-- STEP 16: MORE STAFF ATTENDANCE (all 4 orgs, 3 days)
+-- =========================================================
+INSERT IGNORE INTO staff_attendance (
+    attendance_id, organization_id, staff_id, staff_name, staff_code, department, designation,
+    attendance_date, sign_in_time, sign_out_time, working_minutes, shift, status, remarks,
+    marked_by, created_by, updated_by, version)
+VALUES
+-- June 27 - JSB
+(5,  1, 1, 'Rupesh Pati',       'JSB-TCHR-001', 'English',       'English Teacher',     '2026-06-27', '2026-06-27 08:00:00', '2026-06-27 15:25:00', 445, 'Morning', 'PRESENT', 'Regular',       'javier.admin',  'system', 'system', 0),
+(6,  1, 2, 'Saswati Senapati',  'JSB-TCHR-002', 'Mathematics',   'Mathematics Teacher', '2026-06-27', '2026-06-27 08:02:00', '2026-06-27 15:20:00', 438, 'Morning', 'PRESENT', 'Regular',       'javier.admin',  'system', 'system', 0),
+-- June 27 - JSC
+(7,  2, 7, 'Debendra Barik',    'JSC-TCHR-001', 'English',       'English Teacher',     '2026-06-27', '2026-06-27 08:00:00', '2026-06-27 15:30:00', 450, 'Morning', 'PRESENT', 'Regular',       'jsc.admin',     'system', 'system', 0),
+(8,  2, 8, 'Geetanjali Rath',   'JSC-TCHR-002', 'Mathematics',   'Mathematics Teacher', '2026-06-27', '2026-06-27 08:05:00', '2026-06-27 15:28:00', 443, 'Morning', 'PRESENT', 'Regular',       'jsc.admin',     'system', 'system', 0),
+-- June 27 - ABC
+(9,  3, 3, 'Suman Nayak',       'ABCP-TCHR-001','Science',       'Science Teacher',     '2026-06-27', '2026-06-27 08:00:00', '2026-06-27 15:20:00', 440, 'Morning', 'PRESENT', 'Regular',       'abc.admin',     'system', 'system', 0),
+-- June 27 - Kalinga
+(10, 4, 4, 'Madhuri Tripathy',  'KCC-TCHR-001', 'Commerce',      'Commerce Lecturer',   '2026-06-27', '2026-06-27 08:10:00', '2026-06-27 15:40:00', 450, 'Morning', 'PRESENT', 'Regular',       'kalinga.admin', 'system', 'system', 0),
+-- June 28 - JSB (Saturday)
+(11, 1, 1, 'Rupesh Pati',       'JSB-TCHR-001', 'English',       'English Teacher',     '2026-06-28', '2026-06-28 08:00:00', '2026-06-28 12:30:00', 270, 'Morning', 'PRESENT', 'Half day Sat',  'javier.admin',  'system', 'system', 0),
+(12, 1, 5, 'Ananya Dash',       'JSB-ADM-001',  'Administration','Office Administrator', '2026-06-28', '2026-06-28 08:05:00', '2026-06-28 12:35:00', 270, 'Morning', 'PRESENT', 'Saturday duty', 'javier.admin',  'system', 'system', 0),
+-- June 28 - JSC
+(13, 2, 7, 'Debendra Barik',    'JSC-TCHR-001', 'English',       'English Teacher',     '2026-06-28', '2026-06-28 08:00:00', '2026-06-28 12:30:00', 270, 'Morning', 'PRESENT', 'Saturday',      'jsc.admin',     'system', 'system', 0),
+-- June 28 - Kalinga
+(14, 4, 4, 'Madhuri Tripathy',  'KCC-TCHR-001', 'Commerce',      'Commerce Lecturer',   '2026-06-28', '2026-06-28 09:00:00', '2026-06-28 14:00:00', 300, 'Morning', 'PRESENT', 'College half day','kalinga.admin','system', 'system', 0),
+-- June 30 - JSC new staff
+(15, 2, 9, 'Sulochana Babu',    'JSC-ADM-001',  'Administration','Office Administrator', '2026-06-30', '2026-06-30 08:00:00', '2026-06-30 15:30:00', 450, 'Morning', 'PRESENT', 'Regular',       'jsc.admin',     'system', 'system', 0),
+-- June 30 - Kalinga admin
+(16, 4,10, 'Sourav Swain',      'KCC-ADM-001',  'Administration','College Administrator','2026-06-30', '2026-06-30 08:00:00', '2026-06-30 15:45:00', 465, 'Morning', 'PRESENT', 'Regular',       'kalinga.admin', 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 17: MORE INQUIRY DATA (richer per org)
+-- =========================================================
+INSERT IGNORE INTO inquiry (
+    inquiry_id, organization_id, name, mobile_number, email, class_interested_in, address,
+    inquiry_source, referred_by, comments, assigned_counselor_id, status, is_deleted,
+    last_follow_up_date, last_follow_up_type, next_follow_up_date, created_by, updated_by, version)
+VALUES
+(5,  1, 'Pramod Biswal',    '9777115601', 'pramod@example.com',   'Class III',       'Nayapalli, Bhubaneswar',     'Walk-In', NULL,           'CBSE, wants sports facilities',        3,  'CONTACTED',  FALSE, '2026-06-30 14:00:00', 'WALK_IN', '2026-07-05', 'system', 'system', 0),
+(6,  1, 'Minakshi Nanda',   '9777115602', 'minakshi@example.com', 'LKG',             'Khandagiri, Bhubaneswar',    'Phone',   NULL,           'Enquiring in advance for next year',   3,  'NEW',        FALSE, NULL,                  NULL,      '2026-07-08', 'system', 'system', 0),
+(7,  2, 'Ramakanta Sahu',   '9777225601', 'ramakanta@example.com','Class II',        'College Square, Cuttack',    'Referral','jsc.parent1',  'Wants scholarship, referred by parent', 17, 'INTERESTED', FALSE, '2026-06-29 11:30:00', 'CALL',    '2026-07-03', 'system', 'system', 0),
+(8,  2, 'Suresh Mohanty',   '9777225602', 'suresh@example.com',   'Class I',         'Madhupatna, Cuttack',        'Walk-In', NULL,           'Elder son already in this school',      17, 'CONTACTED',  FALSE, '2026-06-28 10:00:00', 'WALK_IN', '2026-07-04', 'system', 'system', 0),
+(9,  3, 'Hemanta Rath',     '9777336601', 'hemanta@example.com',  'Class IV',        'Baliapanda, Puri',           'Phone',   NULL,           'Wants ICSE, transferring from govt school',9,'INTERESTED',FALSE, '2026-06-30 15:00:00', 'CALL',    '2026-07-06', 'system', 'system', 0),
+(10, 3, 'Geeta Pradhan',    '9777336602', 'geeta@example.com',    'Class I',         'Grand Road, Puri',           'Website', NULL,           'Single parent, needs hostel clarity',   9,  'NEW',        FALSE, NULL,                  NULL,      '2026-07-09', 'system', 'system', 0),
+(11, 4, 'Arun Patnaik',     '9777447601', 'arun@example.com',     '1st Year Degree', 'Dolamundai, Cuttack',        'Phone',   NULL,           'B.Com Hons, Utkal Univ affiliation?',  13, 'CONTACTED',  FALSE, '2026-06-30 12:00:00', 'CALL',    '2026-07-05', 'system', 'system', 0),
+(12, 4, 'Pradipta Singh',   '9777447602', 'pradipta@example.com', '1st Year Degree', 'Tulsipur, Cuttack',          'Walk-In', NULL,           'Wants hostel + affordable fee',         13, 'INTERESTED', FALSE, '2026-06-29 15:00:00', 'WALK_IN', '2026-07-02', 'system', 'system', 0);
+
+INSERT IGNORE INTO inquiry_follow_up (
+    follow_up_id, inquiry_id, follow_up_type, remarks, status_after,
+    follow_up_date, next_follow_up_date, created_by, updated_by, version)
+VALUES
+(4, 5,  'WALK_IN', 'Visited campus, liked library and labs',              'CONTACTED',  '2026-06-30 14:00:00', '2026-07-05', 'system', 'system', 0),
+(5, 7,  'CALL',    'Discussed scholarship structure, sent prospectus',    'INTERESTED', '2026-06-29 11:30:00', '2026-07-03', 'system', 'system', 0),
+(6, 8,  'WALK_IN', 'Parent came with elder child, saw classrooms',        'CONTACTED',  '2026-06-28 10:00:00', '2026-07-04', 'system', 'system', 0),
+(7, 9,  'CALL',    'Explained CBSE vs ICSE difference and fees',          'INTERESTED', '2026-06-30 15:00:00', '2026-07-06', 'system', 'system', 0),
+(8, 11, 'CALL',    'Shared college prospectus, discussed fee structure',  'CONTACTED',  '2026-06-30 12:00:00', '2026-07-05', 'system', 'system', 0),
+(9, 12, 'WALK_IN', 'Showed hostel and campus, parent very interested',    'INTERESTED', '2026-06-29 15:00:00', '2026-07-02', 'system', 'system', 0);
+
+INSERT IGNORE INTO counseling_note (
+    note_id, inquiry_id, student_requirements, parent_concerns, campus_visit_info,
+    recommendations, notes, created_by, updated_by, version)
+VALUES
+(3, 7,  'Good academic environment',     'Wants scholarship for meritorious student', 'Visited Cuttack campus', 'Send scholarship details',    'Good prospect for JSC',    'system', 'system', 0),
+(4, 9,  'ICSE curriculum preferred',     'Transport facility from Baliapanda',        'Not yet visited',        'Schedule campus tour',        'ABC Puri is a good fit',   'system', 'system', 0),
+(5, 11, 'B.Com Honours degree',          'Affordability is key concern',              'Visited KCC campus',     'Discuss installment payment',  'Warm lead for KCC',        'system', 'system', 0);
+
+-- =========================================================
+-- STEP 18: MORE APPLICATION ADMISSIONS
+-- =========================================================
+INSERT IGNORE INTO application_admission (
+    application_id, application_number, organization_id, inquiry_id, applicant_name, date_of_birth,
+    gender, applying_for_class, email, contact_number, address, parent_name, parent_contact,
+    parent_email, status, reviewed_by_user_id, reviewed_on, internal_comments, created_by, updated_by, version)
+VALUES
+(4, 'APP-JSC-0001', 2, 7, 'Ramakanta Sahu Jr',  '2018-08-10', 'Male',   'Class II',       'ramakanta.jr@example.com', '9777225601', 'College Square, Cuttack', 'Ramakanta Sahu',   '9777225601', 'ramakanta@example.com', 'SUBMITTED',    NULL, NULL,         'Awaiting documents',        'system', 'system', 0),
+(5, 'APP-ABC-0002', 3, 9, 'Sudhir Rath',         '2016-04-01', 'Male',   'Class IV',       'sudhir@example.com',       '9777336601', 'Baliapanda, Puri',        'Hemanta Rath',     '9777336601', 'hemanta@example.com',   'UNDER_REVIEW', 9, '2026-07-01', 'TC from previous school pending','system','system',0),
+(6, 'APP-KCC-0002', 4,12, 'Pradipta Singh',      '2007-03-18', 'Male',   '1st Year Degree','pradipta@example.com',     '9777447602', 'Tulsipur, Cuttack',       'Sangram Singh',    '9777447603', 'sangram.s@example.com', 'SUBMITTED',    NULL, NULL,         'Hostel preference noted',   'system', 'system', 0);
+
+-- =========================================================
+-- STEP 19: MORE NOTICES PER ORG
+-- =========================================================
+INSERT IGNORE INTO notice (
+    notice_id, organization_id, title, content, category, pinned, publish_date, expiry_date,
+    status, attachment_url, published_by_user_id, created_by, updated_by, version)
+VALUES
+(4, 2, 'Term Test Schedule - Cuttack',     'Term test for Class I-III is from July 1-5, 2026. Parents please sign test papers.', 'ACADEMIC', FALSE, '2026-06-25', '2026-07-07', 'PUBLISHED', NULL, 17, 'system', 'system', 0),
+(5, 3, 'ICSE Board Registration Notice',   'All Class X students submit registration forms by July 31, 2026.', 'ACADEMIC', TRUE, '2026-06-28', '2026-07-31', 'PUBLISHED', NULL, 9,  'system', 'system', 0),
+(6, 4, 'College Fee Payment Deadline',     'First semester fees must be paid by July 15, 2026. Late fee: 2% per month.', 'FINANCE', TRUE, '2026-06-25', '2026-07-15', 'PUBLISHED', NULL, 13, 'system', 'system', 0),
+(7, 1, 'Bus Route Update - Route 3',       'Bus Route 3 (Patia-Infocity) has new stop at Nalco Square from July 1.', 'OPERATIONAL', FALSE, '2026-06-29', '2026-07-31', 'PUBLISHED', NULL, 3,  'system', 'system', 0),
+(8, 2, 'Parent Teacher Meeting - July 12', 'PTA meeting on July 12, 2026 at 10 AM in Javier Cuttack campus hall.', 'PARENT_MEETING', TRUE, '2026-07-01', '2026-07-13', 'DRAFT', NULL, 17, 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 20: MORE AUDIT LOG ENTRIES
+-- =========================================================
+INSERT IGNORE INTO audit_log (
+    id, organization_id, tenant_code, correlation_id, event_type, action, entity_type, entity_id,
+    actor_user_id, actor_username, source_ip, user_agent, changes, summary, occurred_at, created_by, updated_by, version)
+VALUES
+(4, 2, 'jsc-cuttack',     'corr-004', 'CREATE', 'Create Staff',       'Staff',       '7',  17, 'jsc.admin',     '127.0.0.1', 'Chrome', '{"staffCode":"JSC-TCHR-001"}',       'Added Debendra Barik',         '2026-06-30 09:10:00', 'system', 'system', 0),
+(5, 3, 'abc-puri',        'corr-005', 'CREATE', 'Create Inquiry',     'Inquiry',     '9',  9,  'abc.admin',     '127.0.0.1', 'Chrome', '{"inquiryId":9}',                    'New inquiry from Hemanta Rath', '2026-06-30 15:00:00', 'system', 'system', 0),
+(6, 4, 'kcc-cuttack',     'corr-006', 'UPDATE', 'Mark Attendance',    'Attendance',  '14', 13, 'kalinga.admin', '127.0.0.1', 'Chrome', '{"status":"LATE"}',                  'Marked Debasish late',         '2026-06-30 09:20:00', 'system', 'system', 0),
+(7, 1, 'jsb-bhubaneswar', 'corr-007', 'LOGIN',  'User Login',         'User',        '3',  3,  'javier.admin',  '127.0.0.1', 'Chrome', NULL,                                 'Admin login - JSB',            '2026-06-30 08:00:00', 'system', 'system', 0),
+(8, 2, 'jsc-cuttack',     'corr-008', 'CREATE', 'Create Application', 'Application', '4',  17, 'jsc.admin',     '127.0.0.1', 'Edge',   '{"applicationNumber":"APP-JSC-0001"}','Application submitted JSC',   '2026-06-30 14:30:00', 'system', 'system', 0);
+
+INSERT IGNORE INTO security_audit_log (
+    id, event_code, username, tenant_code, source_ip, user_agent, success, severity, message, correlation_id, occurred_at, created_by, updated_by, version)
+VALUES
+(3, 'LOGIN_SUCCESS', 'jsc.owner',     'jsc-cuttack', '127.0.0.1', 'Chrome', TRUE,  'INFO',   'Successful login',       'corr-110', '2026-06-30 09:00:00', 'system', 'system', 0),
+(4, 'LOGIN_SUCCESS', 'abc.owner',     'abc-puri',    '127.0.0.1', 'Chrome', TRUE,  'INFO',   'Successful login',       'corr-111', '2026-06-30 09:05:00', 'system', 'system', 0),
+(5, 'LOGIN_SUCCESS', 'kalinga.owner', 'kcc-cuttack', '127.0.0.1', 'Chrome', TRUE,  'INFO',   'Successful login',       'corr-112', '2026-06-30 09:10:00', 'system', 'system', 0),
+(6, 'LOGIN_FAILED',  'jsc.admin',     'jsc-cuttack', '127.0.0.1', 'Chrome', FALSE, 'MEDIUM', 'Wrong password attempt', 'corr-113', '2026-06-30 08:55:00', 'system', 'system', 0);
+
+INSERT IGNORE INTO login_history (id, user_id, status, login_time, logout_time, ip_address, browser, operating_system, failure_reason, created_by, updated_by, version)
+VALUES
+(5, 16, 'SUCCESS', '2026-06-30 09:00:00', NULL, '127.0.0.1', 'Chrome', 'Windows 11', NULL,            'system', 'system', 0),
+(6, 17, 'SUCCESS', '2026-06-30 09:05:00', NULL, '127.0.0.1', 'Edge',   'Windows 11', NULL,            'system', 'system', 0),
+(7,  8, 'SUCCESS', '2026-06-30 09:10:00', NULL, '127.0.0.1', 'Chrome', 'macOS',      NULL,            'system', 'system', 0),
+(8, 12, 'SUCCESS', '2026-06-30 09:15:00', NULL, '127.0.0.1', 'Chrome', 'Windows 11', NULL,            'system', 'system', 0),
+(9, 17, 'FAILED',  '2026-06-30 08:55:00', NULL, '127.0.0.1', 'Chrome', 'Windows 11', 'Wrong password','system', 'system', 0);
+
+-- =========================================================
+-- STEP 21: MORE USER SESSIONS (JSC, ABC, Kalinga)
+-- =========================================================
+INSERT IGNORE INTO user_sessions (id, user_id, refresh_token, device_name, browser, operating_system, ip_address, login_at, logout_at, status, created_by, updated_by, version)
+VALUES
+(4, 16, 'seed-refresh-jsc-owner',     'Lenovo IdeaPad', 'Chrome', 'Windows 11', '127.0.0.1', '2026-06-30 09:00:00', NULL, 'ACTIVE', 'system', 'system', 0),
+(5, 12, 'seed-refresh-kalinga-owner', 'HP Pavilion',    'Chrome', 'Windows 11', '127.0.0.1', '2026-06-30 09:15:00', NULL, 'ACTIVE', 'system', 'system', 0),
+(6,  8, 'seed-refresh-abc-owner',     'Dell Laptop',    'Chrome', 'macOS',      '127.0.0.1', '2026-06-30 09:10:00', NULL, 'ACTIVE', 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 22: PERIOD TEMPLATE for College (different schedule)
+-- =========================================================
+INSERT IGNORE INTO timetable_template (template_id, schedule_id, template_name, active, remarks, created_by, updated_by, version)
+VALUES (2, 1, 'College Timetable', TRUE, 'Kalinga College lecture schedule', 'system', 'system', 0);
+
+INSERT IGNORE INTO period_template (period_template_id, template_id, period_number, period_name, start_time, end_time, period_type, display_order, active, created_by, updated_by, version)
+VALUES
+(6, 2, 1, 'Lecture 1', '09:00:00', '10:00:00', 'CLASS',  1, TRUE, 'system', 'system', 0),
+(7, 2, 2, 'Lecture 2', '10:00:00', '11:00:00', 'CLASS',  2, TRUE, 'system', 'system', 0),
+(8, 2, 3, 'Recess',    '11:00:00', '11:15:00', 'BREAK',  3, TRUE, 'system', 'system', 0),
+(9, 2, 4, 'Lecture 3', '11:15:00', '12:15:00', 'CLASS',  4, TRUE, 'system', 'system', 0),
+(10,2, 5, 'Lunch',     '13:00:00', '14:00:00', 'LUNCH',  5, TRUE, 'system', 'system', 0),
+(11,2, 6, 'Lecture 4', '14:00:00', '15:00:00', 'CLASS',  6, TRUE, 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 23: ADDITIONAL ADDRESSES
+-- =========================================================
+INSERT IGNORE INTO address (
+    address_id, address_line1, address_line2, landmark, city, district, state, country, postal_code, active, created_by, updated_by, version)
+VALUES
+(5, 'Sector 6, Cuttack',     'Near Badambadi',   'Badambadi Square', 'Cuttack',      'Cuttack', 'Odisha', 'India', '753009', TRUE, 'system', 'system', 0),
+(6, 'Dolamundai',            'Near Taladanda',   'Old Bus Stand',    'Cuttack',      'Cuttack', 'Odisha', 'India', '753001', TRUE, 'system', 'system', 0),
+(7, 'Grand Road, Near Temple','Sipasurubali',     'Puri Temple',      'Puri',         'Puri',    'Odisha', 'India', '752001', TRUE, 'system', 'system', 0),
+(8, 'Ranihat Colony',        'Near Ranihat',     'Ranihat Crossing', 'Cuttack',      'Cuttack', 'Odisha', 'India', '753006', TRUE, 'system', 'system', 0),
+(9, 'Unit-4, Near Police Lines','Near BJB College','BJB Nagar',       'Bhubaneswar',  'Khordha', 'Odisha', 'India', '751009', TRUE, 'system', 'system', 0);
+
+-- =========================================================
+-- STEP 24: MORE NOTIFICATION (JSC, Kalinga)
+-- =========================================================
+INSERT IGNORE INTO notification (
+    notification_id, organization_id, subject, body, channels_csv, category, scheduled_at, sent_at, status,
+    triggered_by_user_id, total_recipients, delivered_count, failed_count, created_by, updated_by, version)
+VALUES
+(3, 2, 'Welcome to Javier Cuttack', 'Welcome to JSC AY 2026-27. Please check the academic calendar.', 'EMAIL,IN_APP', 'GENERAL',    '2026-06-27 10:00:00', '2026-06-27 10:00:15', 'SENT',    17, 5, 5, 0, 'system', 'system', 0),
+(4, 4, 'Fee Reminder',              'Please clear pending fees by July 15, 2026.',                      'SMS,EMAIL',   'FINANCE',    '2026-06-30 11:00:00', NULL,                  'PENDING', 13, 8, 0, 0, 'system', 'system', 0),
+(5, 3, 'Attendance Alert - ABC',    'Sai Panda was absent on June 27. Please inform.',                  'SMS,EMAIL',   'ATTENDANCE', '2026-06-27 15:00:00', '2026-06-27 15:00:10', 'SENT',    9,  1, 1, 0, 'system', 'system', 0);
+
+-- =========================================================
+-- FINAL: Ensure all new users get Password@123 BCrypt
+-- (DevDataInitializer will handle this, but adding placeholder marker)
+-- =========================================================
+UPDATE users SET password = 'PLACEHOLDER' WHERE password IS NULL OR password = '';

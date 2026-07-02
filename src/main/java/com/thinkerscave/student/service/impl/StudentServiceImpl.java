@@ -1,53 +1,67 @@
 package com.thinkerscave.student.service.impl;
 
-import org.springframework.transaction.annotation.Transactional;
+import com.thinkerscave.access.dto.UserCreationContext;
+import com.thinkerscave.access.entity.Role;
+import com.thinkerscave.access.entity.User;
+import com.thinkerscave.access.repository.RoleRepository;
+import com.thinkerscave.access.service.UserService;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
 import com.thinkerscave.academics.repository.ClassRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
-import com.thinkerscave.student.entity.StudentEnrollment;
-import com.thinkerscave.student.enums.EnrollmentStatus;
-import com.thinkerscave.student.enums.ParentRelationship;
-import com.thinkerscave.student.repository.StudentEnrollmentRepository;
-import com.thinkerscave.access.entity.Role;
-import com.thinkerscave.access.repository.RoleRepository;
+import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.student.dto.EnrollmentDTO;
+import com.thinkerscave.student.dto.MedicalDTO;
+import com.thinkerscave.student.dto.ParentDTO;
+import com.thinkerscave.student.dto.StudentCreateRequest;
+import com.thinkerscave.student.dto.StudentDocumentDTO;
+import com.thinkerscave.student.dto.StudentProfileResponse;
+import com.thinkerscave.student.dto.StudentResponseDTO;
+import com.thinkerscave.student.dto.StudentSearchRequest;
+import com.thinkerscave.student.dto.TimelineDTO;
 import com.thinkerscave.student.entity.Parent;
 import com.thinkerscave.student.entity.Student;
+import com.thinkerscave.student.entity.StudentDocument;
+import com.thinkerscave.student.entity.StudentEnrollment;
 import com.thinkerscave.student.entity.StudentMedical;
 import com.thinkerscave.student.entity.StudentParent;
 import com.thinkerscave.student.entity.StudentTimeline;
-import com.thinkerscave.student.dto.StudentCreateRequest;
-import com.thinkerscave.student.dto.StudentResponseDTO;
-import com.thinkerscave.student.dto.StudentProfileResponse;
-import com.thinkerscave.student.dto.EnrollmentDTO;
-import com.thinkerscave.student.dto.ParentDTO;
-import com.thinkerscave.student.dto.MedicalDTO;
-import com.thinkerscave.student.dto.TimelineDTO;
-import com.thinkerscave.student.dto.StudentDocumentDTO;
+import com.thinkerscave.student.enums.EnrollmentStatus;
+import com.thinkerscave.student.enums.ParentRelationship;
+import com.thinkerscave.student.enums.StudentStatus;
+import com.thinkerscave.student.enums.StudentTimelineEventType;
 import com.thinkerscave.student.repository.ParentRepository;
+import com.thinkerscave.student.repository.StudentDocumentRepository;
+import com.thinkerscave.student.repository.StudentEnrollmentRepository;
+import com.thinkerscave.student.repository.StudentMedicalRepository;
 import com.thinkerscave.student.repository.StudentParentRepository;
 import com.thinkerscave.student.repository.StudentRepository;
-import com.thinkerscave.student.repository.StudentMedicalRepository;
 import com.thinkerscave.student.repository.StudentTimelineRepository;
 import com.thinkerscave.student.service.StudentService;
-import com.thinkerscave.access.dto.UserCreationContext;
-import com.thinkerscave.access.service.UserService;
-import com.thinkerscave.access.entity.User;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.util.List;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
@@ -74,6 +88,7 @@ public class StudentServiceImpl implements StudentService {
     private final StudentMedicalRepository studentMedicalRepository;
     private final StudentParentRepository studentParentRepository;
     private final StudentTimelineRepository studentTimelineRepository;
+    private final StudentDocumentRepository studentDocumentRepository;
 
     @PostConstruct
     public void init() {
@@ -95,15 +110,13 @@ public class StudentServiceImpl implements StudentService {
     @Override
     @Transactional
     public StudentResponseDTO saveStudentWithDocuments(StudentCreateRequest dto, MultipartFile photo,
-            List<MultipartFile> documents, List<String> types) throws IOException {
-        
-        // 1. Resolve Role
+                                                       List<MultipartFile> documents, List<String> types) throws IOException {
+
         Role studentRole = roleRepository.findByRoleCode(ROLE_STUDENT)
                 .orElseThrow(() -> new IllegalStateException("Role STUDENT not found"));
         Role parentRole = roleRepository.findByRoleCode(ROLE_PARENT)
                 .orElseThrow(() -> new IllegalStateException("Role PARENT not found"));
 
-        // 2. Invoke UserService for both
         UserCreationContext studentContext = new UserCreationContext(
                 dto.getFirstName(), dto.getMiddleName(), dto.getLastName(),
                 dto.getEmail(), dto.getMobileNumber(), null, null, null, TYPE_STUDENT);
@@ -114,11 +127,9 @@ public class StudentServiceImpl implements StudentService {
                 dto.getParentEmail(), dto.getParentMobileNumber(), null, null, null, TYPE_GUARDIAN);
         User parentUser = userService.createUser(guardianContext, parentRole);
 
-        // 3. Generate Codes
         String parentCode = "PAR" + System.currentTimeMillis();
         String studentCode = "STU" + System.currentTimeMillis();
 
-        // 4. Save Parent
         Parent parent = new Parent();
         parent.setParentCode(parentCode);
         parent.setFirstName(dto.getParentFirstName());
@@ -133,7 +144,6 @@ public class StudentServiceImpl implements StudentService {
         parent.setUser(parentUser);
         parent = parentRepository.save(parent);
 
-        // 5. Save Student
         Student student = new Student();
         student.setStudentCode(studentCode);
         student.setAdmissionNumber(dto.getAdmissionNumber());
@@ -149,15 +159,15 @@ public class StudentServiceImpl implements StudentService {
         student.setMobileNumber(dto.getMobileNumber() != null ? Long.parseLong(dto.getMobileNumber()) : null);
         student.setEmail(dto.getEmail());
         student.setRemarks(dto.getRemarks());
+        student.setStatus(StudentStatus.ACTIVE);
         student.setUser(studentUser);
-        
+
         if (photo != null && !photo.isEmpty()) {
-            student.setPhotoUrl(saveFile(photo, "photo_" + dto.getEmail()));
+            student.setPhotoUrl(saveFile(photo, "photo_" + safeFileToken(studentCode)));
         }
-        
+
         student = studentRepository.save(student);
 
-        // 6. Save StudentMedical
         StudentMedical medical = new StudentMedical();
         medical.setStudent(student);
         medical.setBloodGroup(dto.getBloodGroup());
@@ -169,7 +179,6 @@ public class StudentServiceImpl implements StudentService {
         medical.setEmergencyNotes(dto.getEmergencyNotes());
         studentMedicalRepository.save(medical);
 
-        // 7. Save StudentParent relation
         StudentParent sp = new StudentParent();
         sp.setStudent(student);
         sp.setParent(parent);
@@ -177,13 +186,12 @@ public class StudentServiceImpl implements StudentService {
         sp.setPrimaryContact(true);
         studentParentRepository.save(sp);
 
-        // 8. Save Enrollment
         if (dto.getAcademicYearId() != null && dto.getClassId() != null) {
             StudentEnrollment enrollment = new StudentEnrollment();
             enrollment.setStudent(student);
             enrollment.setRollNumber(dto.getRollNumber());
             enrollment.setStatus(EnrollmentStatus.ACTIVE);
-            
+
             academicYearRepository.findById(dto.getAcademicYearId()).ifPresent(enrollment::setAcademicYear);
             classRepository.findById(dto.getClassId()).ifPresent(enrollment::setClassEntity);
             if (dto.getSectionId() != null) {
@@ -192,87 +200,92 @@ public class StudentServiceImpl implements StudentService {
             studentEnrollmentRepository.save(enrollment);
         }
 
-        // 9. Timeline Event
-        addTimelineEvent(student, "STUDENT_CREATED", "Student Admitted", "Student successfully registered in system.");
+        if (documents != null && types != null) {
+            for (int i = 0; i < documents.size(); i++) {
+                MultipartFile file = documents.get(i);
+                if (file == null || file.isEmpty()) {
+                    continue;
+                }
+                String storedPath = saveFile(file, "doc_" + safeFileToken(studentCode));
+                StudentDocument document = new StudentDocument();
+                document.setStudent(student);
+                document.setDocumentName(file.getOriginalFilename());
+                document.setDocumentType(types.get(i));
+                document.setDocumentPath(storedPath);
+                document.setCreatedBy(getCurrentUsername());
+                studentDocumentRepository.save(document);
+            }
+        }
+
+        addTimelineEvent(student, StudentTimelineEventType.STUDENT_CREATED,
+                "Student Admitted", "Student successfully registered in system.");
 
         return mapToResponseDTO(student);
-    }
-
-    private void addTimelineEvent(Student student, String type, String title, String description) {
-        StudentTimeline timeline = new StudentTimeline();
-        timeline.setStudent(student);
-        timeline.setTitle(title);
-        timeline.setDescription(description);
-        try {
-            timeline.setEventType(com.thinkerscave.student.enums.StudentTimelineEventType.valueOf(type));
-        } catch (IllegalArgumentException e) {
-            timeline.setEventType(com.thinkerscave.student.enums.StudentTimelineEventType.STUDENT_UPDATED);
-        }
-        studentTimelineRepository.save(timeline);
-    }
-
-    private String saveFile(MultipartFile file, String prefix) throws IOException {
-        if (file == null || file.isEmpty()) return null;
-        Path destination = rootLocation.resolve(prefix + "_" + file.getOriginalFilename()).normalize().toAbsolutePath();
-        if (!destination.getParent().equals(rootLocation.toAbsolutePath())) {
-            throw new IOException("Cannot store file outside current directory.");
-        }
-        try (var inputStream = file.getInputStream()) {
-            Files.copy(inputStream, destination, StandardCopyOption.REPLACE_EXISTING);
-            return destination.toString();
-        }
     }
 
     @Override
     @Transactional
     public StudentResponseDTO updateStudent(Long studentId, StudentCreateRequest dto) {
-        return updatePersonal(studentId, dto);
-    }
-
-    @Override
-    public StudentResponseDTO getStudentById(Long studentId) {
-        Long orgId = com.thinkerscave.shared.context.OrganizationContext.getOrganizationId();
-        Student student = studentRepository.findById(studentId)
-                .orElseThrow(() -> new RuntimeException("Student not found"));
+        Student student = getStudent(studentId);
+        student.setAdmissionNumber(dto.getAdmissionNumber());
+        student.setRollNumber(dto.getRollNumber());
+        student.setFirstName(dto.getFirstName());
+        student.setMiddleName(dto.getMiddleName());
+        student.setLastName(dto.getLastName());
+        student.setGender(dto.getGender());
+        student.setDateOfBirth(dto.getDateOfBirth());
+        student.setReligion(dto.getReligion());
+        student.setNationality(dto.getNationality());
+        student.setMotherTongue(dto.getMotherTongue());
+        student.setMobileNumber(dto.getMobileNumber() != null ? Long.parseLong(dto.getMobileNumber()) : null);
+        student.setEmail(dto.getEmail());
+        student.setRemarks(dto.getRemarks());
+        studentRepository.save(student);
+        addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED,
+                "Student Updated", "Student profile details were updated.");
         return mapToResponseDTO(student);
     }
 
     @Override
+    public StudentResponseDTO getStudentById(Long studentId) {
+        return mapToResponseDTO(getStudent(studentId));
+    }
+
+    @Override
     public StudentProfileResponse getProfile360(Long studentId) {
-        Student student = studentRepository.findById(studentId)
-                .orElseThrow(() -> new RuntimeException("Student not found"));
+        Student student = getStudent(studentId);
 
         StudentProfileResponse response = new StudentProfileResponse();
         response.setStudent(mapToResponseDTO(student));
 
-        // Enrollment
         studentEnrollmentRepository.findByStudentStudentIdAndActiveTrue(studentId).ifPresent(enrollment -> {
             EnrollmentDTO dto = new EnrollmentDTO();
             dto.setEnrollmentId(enrollment.getEnrollmentId());
             dto.setRollNumber(enrollment.getRollNumber());
             dto.setStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : null);
-            if (enrollment.getAcademicYear() != null) dto.setAcademicYear(enrollment.getAcademicYear().getYearCode());
-            if (enrollment.getClassEntity() != null) dto.setClassName(enrollment.getClassEntity().getClassName());
-            if (enrollment.getSection() != null) dto.setSectionName(enrollment.getSection().getSectionName());
+            if (enrollment.getAcademicYear() != null) {
+                dto.setAcademicYear(enrollment.getAcademicYear().getYearCode());
+            }
+            if (enrollment.getClassEntity() != null) {
+                dto.setClassName(enrollment.getClassEntity().getClassName());
+            }
+            if (enrollment.getSection() != null) {
+                dto.setSectionName(enrollment.getSection().getSectionName());
+            }
             response.setEnrollment(dto);
         });
 
-        // Parent
-        studentParentRepository.findByStudentStudentId(studentId).stream()
-                .filter(sp -> Boolean.TRUE.equals(sp.getPrimaryContact()))
-                .findFirst()
-                .ifPresent(sp -> {
-                    ParentDTO dto = new ParentDTO();
-                    dto.setParentId(sp.getParent().getParentId());
-                    dto.setParentCode(sp.getParent().getParentCode());
-                    dto.setFullName(sp.getParent().getFirstName() + " " + sp.getParent().getLastName());
-                    dto.setMobileNumber(sp.getParent().getMobileNumber());
-                    dto.setEmail(sp.getParent().getEmail());
-                    dto.setOccupation(sp.getParent().getOccupation());
-                    response.setParent(dto);
-                });
+        resolvePrimaryParent(studentId).ifPresent(sp -> {
+            ParentDTO dto = new ParentDTO();
+            dto.setParentId(sp.getParent().getParentId());
+            dto.setParentCode(sp.getParent().getParentCode());
+            dto.setFullName(buildFullName(sp.getParent().getFirstName(), sp.getParent().getMiddleName(), sp.getParent().getLastName()));
+            dto.setMobileNumber(sp.getParent().getMobileNumber());
+            dto.setEmail(sp.getParent().getEmail());
+            dto.setOccupation(sp.getParent().getOccupation());
+            response.setParent(dto);
+        });
 
-        // Medical
         studentMedicalRepository.findByStudentStudentId(studentId).ifPresent(medical -> {
             MedicalDTO dto = new MedicalDTO();
             dto.setBloodGroup(medical.getBloodGroup());
@@ -285,56 +298,76 @@ public class StudentServiceImpl implements StudentService {
             response.setMedical(dto);
         });
 
-        // Timeline
-        response.setTimeline(studentTimelineRepository.findByStudentStudentIdOrderByCreatedOnDesc(studentId)
-                .stream()
-                .map(t -> {
-                    TimelineDTO dto = new TimelineDTO();
-                    dto.setTimelineId(t.getTimelineId());
-                    dto.setTitle(t.getTitle());
-                    dto.setDescription(t.getDescription());
-                    dto.setEventType(t.getEventType() != null ? t.getEventType().name() : null);
-                    dto.setCreatedDate(t.getCreatedOn() != null
-                            ? t.getCreatedOn().toInstant(java.time.ZoneOffset.UTC) : null);
-                    return dto;
-                })
-                .collect(java.util.stream.Collectors.toList()));
-
+        response.setTimeline(getTimeline(studentId));
         return response;
     }
 
     @Override
     @Transactional
     public StudentResponseDTO updatePersonal(Long studentId, StudentCreateRequest dto) {
-        Student student = studentRepository.findById(studentId).orElseThrow();
+        Student student = getStudent(studentId);
         student.setFirstName(dto.getFirstName());
+        student.setMiddleName(dto.getMiddleName());
         student.setLastName(dto.getLastName());
+        student.setGender(dto.getGender());
+        student.setDateOfBirth(dto.getDateOfBirth());
+        student.setMobileNumber(dto.getMobileNumber() != null ? Long.parseLong(dto.getMobileNumber()) : null);
+        student.setEmail(dto.getEmail());
         studentRepository.save(student);
-        addTimelineEvent(student, "UPDATE", "Profile Updated", "Personal information was updated.");
+        addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED,
+                "Profile Updated", "Personal information was updated.");
         return mapToResponseDTO(student);
     }
 
     @Override
     @Transactional
     public StudentResponseDTO updateMedical(Long studentId, MedicalDTO dto) {
-        Student student = studentRepository.findById(studentId).orElseThrow();
+        Student student = getStudent(studentId);
         StudentMedical medical = studentMedicalRepository.findByStudentStudentId(studentId)
-                .orElse(new StudentMedical());
+                .orElseGet(StudentMedical::new);
         medical.setStudent(student);
         medical.setBloodGroup(dto.getBloodGroup());
         medical.setAllergies(dto.getAllergies());
+        medical.setMedicalConditions(dto.getMedicalConditions());
+        medical.setMedications(dto.getMedications());
+        medical.setDoctorName(dto.getDoctorName());
+        medical.setDoctorContact(dto.getDoctorContact());
+        medical.setEmergencyNotes(dto.getEmergencyNotes());
         studentMedicalRepository.save(medical);
+        addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED,
+                "Medical Updated", "Medical details were updated.");
         return mapToResponseDTO(student);
     }
 
     @Override
     public List<TimelineDTO> getTimeline(Long studentId) {
-        return new ArrayList<>();
+        getStudent(studentId);
+        return studentTimelineRepository.findByStudentStudentIdOrderByCreatedOnDesc(studentId)
+                .stream()
+                .map(this::mapTimeline)
+                .collect(Collectors.toList());
     }
 
     @Override
     public Page<StudentResponseDTO> getAllStudents(Pageable pageable) {
         return studentRepository.findAll(pageable).map(this::mapToResponseDTO);
+    }
+
+    @Override
+    public Page<StudentResponseDTO> searchStudents(StudentSearchRequest request, Pageable pageable) {
+        List<StudentResponseDTO> filtered = studentRepository.findAll().stream()
+                .map(this::mapToResponseDTO)
+                .filter(dto -> matchesSearch(dto, request))
+                .collect(Collectors.toList());
+
+        if (pageable == null || pageable.isUnpaged()) {
+            return new PageImpl<>(filtered);
+        }
+
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), filtered.size());
+        List<StudentResponseDTO> content = start >= filtered.size() ? List.of() : filtered.subList(start, end);
+        return new PageImpl<>(content, pageable, filtered.size());
     }
 
     @Override
@@ -345,19 +378,206 @@ public class StudentServiceImpl implements StudentService {
     @Override
     @Transactional
     public void deleteStudent(Long studentId) {
-        Student student = studentRepository.findById(studentId).orElseThrow();
-        student.setStatus(com.thinkerscave.student.enums.StudentStatus.INACTIVE);
+        Student student = getStudent(studentId);
+        student.setStatus(StudentStatus.INACTIVE);
         studentRepository.save(student);
+        addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED,
+                "Student Deactivated", "Student status changed to inactive.");
+    }
+
+    @Override
+    @Transactional
+    public StudentResponseDTO updateStudentStatus(Long studentId, StudentStatus status) {
+        Student student = getStudent(studentId);
+        student.setStatus(status);
+        studentRepository.save(student);
+
+        StudentTimelineEventType timelineEvent = status == StudentStatus.ALUMNI
+                ? StudentTimelineEventType.ALUMNI
+                : StudentTimelineEventType.STUDENT_UPDATED;
+        addTimelineEvent(student, timelineEvent,
+                "Status Updated", "Student status updated to " + status.name() + ".");
+
+        return mapToResponseDTO(student);
+    }
+
+    @Override
+    @Transactional
+    public TimelineDTO addTimelineEntry(Long studentId, TimelineDTO timelineDTO) {
+        Student student = getStudent(studentId);
+        StudentTimeline timeline = new StudentTimeline();
+        timeline.setStudent(student);
+        timeline.setEventType(timelineDTO.getEventType() == null
+                ? StudentTimelineEventType.STUDENT_UPDATED
+                : StudentTimelineEventType.valueOf(timelineDTO.getEventType()));
+        timeline.setTitle(timelineDTO.getTitle());
+        timeline.setDescription(timelineDTO.getDescription());
+        StudentTimeline saved = studentTimelineRepository.save(timeline);
+        return mapTimeline(saved);
     }
 
     @Override
     public List<StudentDocumentDTO> getStudentDocuments(Long studentId) {
-        return new ArrayList<>();
+        getStudent(studentId);
+        return studentDocumentRepository.findByStudentStudentIdOrderByDocumentIdDesc(studentId)
+                .stream()
+                .map(this::mapDocument)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public StudentDocumentDTO uploadStudentDocument(Long studentId, MultipartFile file, String documentType) throws IOException {
+        Student student = getStudent(studentId);
+        String storedPath = saveFile(file, "doc_" + safeFileToken(student.getStudentCode()));
+
+        StudentDocument document = new StudentDocument();
+        document.setStudent(student);
+        document.setDocumentName(file.getOriginalFilename());
+        document.setDocumentType(documentType == null || documentType.isBlank() ? "OTHER" : documentType);
+        document.setDocumentPath(storedPath);
+        document.setCreatedBy(getCurrentUsername());
+
+        StudentDocument saved = studentDocumentRepository.save(document);
+        addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED,
+                "Document Uploaded", "A student document was uploaded.");
+        return mapDocument(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteDocument(Long docId) {
+        StudentDocument document = studentDocumentRepository.findById(docId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found with id: " + docId));
+        studentDocumentRepository.delete(document);
     }
 
     @Override
     public Resource downloadDocument(Long docId) {
-        return null;
+        StudentDocument document = studentDocumentRepository.findById(docId)
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found with id: " + docId));
+        Path path = Paths.get(document.getDocumentPath()).normalize();
+        try {
+            Resource resource = new UrlResource(path.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new ResourceNotFoundException("Document file not found");
+            }
+            return resource;
+        } catch (MalformedURLException e) {
+            throw new IllegalArgumentException("Invalid document path", e);
+        }
+    }
+
+    private void addTimelineEvent(Student student, StudentTimelineEventType type, String title, String description) {
+        StudentTimeline timeline = new StudentTimeline();
+        timeline.setStudent(student);
+        timeline.setTitle(title);
+        timeline.setDescription(description);
+        timeline.setEventType(type);
+        studentTimelineRepository.save(timeline);
+    }
+
+    private String saveFile(MultipartFile file, String prefix) throws IOException {
+        if (file == null || file.isEmpty()) {
+            return null;
+        }
+        Path destination = rootLocation.resolve(prefix + "_" + safeFileToken(file.getOriginalFilename()))
+                .normalize().toAbsolutePath();
+        if (!destination.getParent().equals(rootLocation.toAbsolutePath())) {
+            throw new IOException("Cannot store file outside current directory.");
+        }
+        try (var inputStream = file.getInputStream()) {
+            Files.copy(inputStream, destination, StandardCopyOption.REPLACE_EXISTING);
+            return destination.toString();
+        }
+    }
+
+    private boolean matchesSearch(StudentResponseDTO dto, StudentSearchRequest request) {
+        if (request == null) {
+            return true;
+        }
+
+        if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
+            String keyword = request.getKeyword().toLowerCase(Locale.ROOT);
+            boolean keywordMatch = containsIgnoreCase(dto.getFullName(), keyword)
+                    || containsIgnoreCase(dto.getAdmissionNumber(), keyword)
+                    || containsIgnoreCase(dto.getStudentCode(), keyword)
+                    || containsIgnoreCase(dto.getMobileNumber(), keyword)
+                    || containsIgnoreCase(dto.getEmail(), keyword);
+            if (!keywordMatch) {
+                return false;
+            }
+        }
+
+        if (request.getStatus() != null && !Objects.equals(dto.getStatus(), request.getStatus().name())) {
+            return false;
+        }
+
+        if (request.getParentName() != null && !request.getParentName().isBlank()) {
+            return containsIgnoreCase(dto.getParentName(), request.getParentName().toLowerCase(Locale.ROOT));
+        }
+
+        if (request.getClassId() != null || request.getSectionId() != null) {
+            Student student = studentRepository.findById(dto.getStudentId()).orElse(null);
+            if (student == null) {
+                return false;
+            }
+            StudentEnrollment enrollment = studentEnrollmentRepository.findByStudentStudentIdAndActiveTrue(student.getStudentId())
+                    .orElse(null);
+            if (enrollment == null) {
+                return false;
+            }
+            if (request.getClassId() != null && (enrollment.getClassEntity() == null
+                    || !Objects.equals(enrollment.getClassEntity().getClassId(), request.getClassId()))) {
+                return false;
+            }
+            if (request.getSectionId() != null && (enrollment.getSection() == null
+                    || !Objects.equals(enrollment.getSection().getSectionId(), request.getSectionId()))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private boolean containsIgnoreCase(String source, String valueLower) {
+        return source != null && source.toLowerCase(Locale.ROOT).contains(valueLower);
+    }
+
+    private Student getStudent(Long studentId) {
+        return studentRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Student not found with id: " + studentId));
+    }
+
+    private java.util.Optional<StudentParent> resolvePrimaryParent(Long studentId) {
+        List<StudentParent> links = studentParentRepository.findByStudentStudentId(studentId);
+        return links.stream().filter(StudentParent::getPrimaryContact).findFirst()
+                .or(() -> links.stream().findFirst());
+    }
+
+    private String buildFullName(String firstName, String middleName, String lastName) {
+        return java.util.stream.Stream.of(firstName, middleName, lastName)
+                .filter(s -> s != null && !s.isBlank())
+                .collect(Collectors.joining(" "));
+    }
+
+    private TimelineDTO mapTimeline(StudentTimeline timeline) {
+        TimelineDTO dto = new TimelineDTO();
+        dto.setTimelineId(timeline.getTimelineId());
+        dto.setTitle(timeline.getTitle());
+        dto.setDescription(timeline.getDescription());
+        dto.setEventType(timeline.getEventType() != null ? timeline.getEventType().name() : null);
+        dto.setCreatedBy(timeline.getCreatedBy());
+        dto.setCreatedDate(timeline.getCreatedOn() != null ? timeline.getCreatedOn().toInstant(ZoneOffset.UTC) : null);
+        return dto;
+    }
+
+    private StudentDocumentDTO mapDocument(StudentDocument document) {
+        StudentDocumentDTO dto = new StudentDocumentDTO();
+        dto.setDocumentId(document.getDocumentId());
+        dto.setDocumentName(document.getDocumentName());
+        dto.setDocumentType(document.getDocumentType());
+        return dto;
     }
 
     private StudentResponseDTO mapToResponseDTO(Student student) {
@@ -365,10 +585,40 @@ public class StudentServiceImpl implements StudentService {
         dto.setStudentId(student.getStudentId());
         dto.setStudentCode(student.getStudentCode());
         dto.setAdmissionNumber(student.getAdmissionNumber());
-        dto.setFullName(student.getFirstName() + " " + student.getLastName());
+        dto.setFullName(buildFullName(student.getFirstName(), student.getMiddleName(), student.getLastName()));
         dto.setMobileNumber(student.getMobileNumber() != null ? student.getMobileNumber().toString() : "");
         dto.setEmail(student.getEmail());
-        dto.setStatus(student.getStatus().name());
+        dto.setStatus(student.getStatus() != null ? student.getStatus().name() : StudentStatus.ACTIVE.name());
+
+        studentEnrollmentRepository.findByStudentStudentIdAndActiveTrue(student.getStudentId()).ifPresent(enrollment -> {
+            if (enrollment.getClassEntity() != null) {
+                dto.setClassName(enrollment.getClassEntity().getClassName());
+            }
+            if (enrollment.getSection() != null) {
+                dto.setSectionName(enrollment.getSection().getSectionName());
+            }
+        });
+
+        resolvePrimaryParent(student.getStudentId()).ifPresent(link -> {
+            dto.setParentName(buildFullName(link.getParent().getFirstName(), link.getParent().getMiddleName(), link.getParent().getLastName()));
+            dto.setParentMobileNumber(link.getParent().getMobileNumber());
+        });
+
         return dto;
+    }
+
+    private String safeFileToken(String value) {
+        if (value == null || value.isBlank()) {
+            return String.valueOf(System.currentTimeMillis());
+        }
+        return value.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    private String getCurrentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return "system";
+        }
+        return authentication.getName();
     }
 }
