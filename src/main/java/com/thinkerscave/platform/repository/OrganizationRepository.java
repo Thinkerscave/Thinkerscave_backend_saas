@@ -42,4 +42,6 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
     long countByActiveTrue();
 
     long countByStatus(OrganizationStatus status);
+
+    long countByCustomer_IdAndActiveTrue(Long customerId);
 }

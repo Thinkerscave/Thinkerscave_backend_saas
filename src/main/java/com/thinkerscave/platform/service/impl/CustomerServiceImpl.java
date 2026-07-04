@@ -3,18 +3,25 @@ package com.thinkerscave.platform.service.impl;
 import com.thinkerscave.platform.dto.request.CustomerContactRequest;
 import com.thinkerscave.platform.dto.request.CustomerRequest;
 import com.thinkerscave.platform.dto.response.CustomerContactResponse;
+import com.thinkerscave.platform.dto.response.CustomerDashboardResponse;
 import com.thinkerscave.platform.dto.response.CustomerDetailResponse;
+import com.thinkerscave.platform.dto.response.CustomerMetadataResponse;
 import com.thinkerscave.platform.dto.response.CustomerResponse;
+import com.thinkerscave.platform.dto.response.EnumOptionResponse;
 import com.thinkerscave.platform.dto.response.OrganizationSummaryResponse;
 import com.thinkerscave.platform.entity.Customer;
 import com.thinkerscave.platform.entity.CustomerContact;
 import com.thinkerscave.platform.enums.CustomerStatus;
 import com.thinkerscave.platform.enums.CustomerType;
+import com.thinkerscave.platform.enums.PreferredCommunication;
 import com.thinkerscave.platform.repository.CustomerContactRepository;
 import com.thinkerscave.platform.repository.CustomerRepository;
+import com.thinkerscave.platform.repository.OrganizationRepository;
+import com.thinkerscave.platform.repository.OrganizationSubscriptionRepository;
 import com.thinkerscave.platform.service.CustomerService;
 import com.thinkerscave.shared.enums.CodeType;
 import com.thinkerscave.shared.exceptions.AlreadyExistsException;
+import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.shared.service.CodeGeneratorService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +31,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,13 +44,44 @@ public class CustomerServiceImpl implements CustomerService {
 
     private final CustomerRepository customerRepository;
     private final CustomerContactRepository contactRepository;
+    private final OrganizationRepository organizationRepository;
+    private final OrganizationSubscriptionRepository subscriptionRepository;
     private final CodeGeneratorService codeGeneratorService;
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CustomerResponse> getCustomers(CustomerStatus status, CustomerType customerType, String search, Pageable pageable) {
-        return customerRepository.searchCustomers(status, customerType, search, pageable)
-                .map(c -> toResponse(c, contactRepository.countByCustomer_IdAndActiveTrue(c.getId())));
+    public Page<CustomerResponse> getCustomers(CustomerStatus status, CustomerType customerType, String search, boolean activeOnly, Pageable pageable) {
+        return customerRepository.searchCustomers(activeOnly, status, customerType, search, pageable)
+                .map(c -> toResponse(c, organizationRepository.countByCustomer_IdAndActiveTrue(c.getId())));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CustomerDashboardResponse getCustomerDashboard() {
+        LocalDate today = LocalDate.now();
+        LocalDate in30Days = today.plusDays(30);
+        BigDecimal annualRevenue = subscriptionRepository.sumActiveAnnualRevenue();
+
+        return CustomerDashboardResponse.builder()
+                .totalCustomers(customerRepository.countByActiveTrue())
+                .activeCustomers(customerRepository.countByStatus(CustomerStatus.ACTIVE))
+                .trialCustomers(customerRepository.countByStatus(CustomerStatus.TRIAL))
+                .suspendedCustomers(customerRepository.countByStatus(CustomerStatus.SUSPENDED))
+                .archivedCustomers(customerRepository.countByStatus(CustomerStatus.ARCHIVED))
+                .totalOrganizations(organizationRepository.countByActiveTrue())
+                .annualRevenue(annualRevenue != null ? annualRevenue : BigDecimal.ZERO)
+                .renewals30Days(subscriptionRepository.findRenewalsDue(today, in30Days).size())
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CustomerMetadataResponse getCustomerMetadata() {
+        return CustomerMetadataResponse.builder()
+                .statuses(enumOptions(CustomerStatus.class))
+                .customerTypes(enumOptions(CustomerType.class))
+                .preferredCommunications(enumOptions(PreferredCommunication.class))
+                .build();
     }
 
     @Override
@@ -141,7 +182,7 @@ public class CustomerServiceImpl implements CustomerService {
                 .build();
         customer = customerRepository.save(customer);
         log.info("Customer created: {}", code);
-        return toResponse(customer, 0L);
+        return toResponse(customer, organizationRepository.countByCustomer_IdAndActiveTrue(customer.getId()));
     }
 
     @Override
@@ -170,17 +211,52 @@ public class CustomerServiceImpl implements CustomerService {
         customer.setLogoUrl(request.getLogoUrl());
         customer.setPreferredCommunication(request.getPreferredCommunication());
         customer.setRemarks(request.getRemarks());
-        return toResponse(customerRepository.save(customer), contactRepository.countByCustomer_IdAndActiveTrue(id));
+        return toResponse(customerRepository.save(customer), organizationRepository.countByCustomer_IdAndActiveTrue(id));
+    }
+
+    @Override
+    @Transactional
+    public CustomerResponse updateCustomerStatus(Long id, CustomerStatus status) {
+        Customer customer = findById(id);
+        customer.setStatus(status);
+        if (status == CustomerStatus.ARCHIVED) {
+            customer.setActive(false);
+        } else if (status != CustomerStatus.ARCHIVED) {
+            customer.setActive(true);
+        }
+        return toResponse(customerRepository.save(customer), organizationRepository.countByCustomer_IdAndActiveTrue(id));
     }
 
     @Override
     @Transactional
     public void archiveCustomer(Long id) {
+        updateCustomerStatus(id, CustomerStatus.ARCHIVED);
+        log.info("Customer archived: {}", id);
+    }
+
+    @Override
+    @Transactional
+    public void restoreCustomer(Long id) {
         Customer customer = findById(id);
-        customer.setActive(false);
-        customer.setStatus(CustomerStatus.ARCHIVED);
+        customer.setActive(true);
+        customer.setStatus(CustomerStatus.ACTIVE);
         customerRepository.save(customer);
-        log.info("Customer archived: {}", customer.getCustomerCode());
+        log.info("Customer restored: {}", customer.getCustomerCode());
+    }
+
+    @Override
+    @Transactional
+    public void permanentlyDeleteCustomer(Long id) {
+        Customer customer = findById(id);
+        if (Boolean.TRUE.equals(customer.getActive()) && customer.getStatus() != CustomerStatus.ARCHIVED) {
+            throw new BadRequestException("Only archived customers can be permanently deleted");
+        }
+        long orgCount = organizationRepository.countByCustomer_IdAndActiveTrue(id);
+        if (orgCount > 0) {
+            throw new BadRequestException("Cannot delete customer with active organizations");
+        }
+        customerRepository.delete(customer);
+        log.info("Customer permanently deleted: {}", customer.getCustomerCode());
     }
 
     // ── Contacts ─────────────────────────────────────────────────────────────
@@ -319,5 +395,20 @@ public class CustomerServiceImpl implements CustomerService {
                 .createdOn(cc.getCreatedOn())
                 .createdBy(cc.getCreatedBy())
                 .build();
+    }
+
+    private <E extends Enum<E>> List<EnumOptionResponse> enumOptions(Class<E> enumClass) {
+        return Arrays.stream(enumClass.getEnumConstants())
+                .map(value -> EnumOptionResponse.builder()
+                        .code(value.name())
+                        .label(formatEnumLabel(value.name()))
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    private String formatEnumLabel(String code) {
+        return Arrays.stream(code.split("_"))
+                .map(part -> part.charAt(0) + part.substring(1).toLowerCase())
+                .collect(Collectors.joining(" "));
     }
 }

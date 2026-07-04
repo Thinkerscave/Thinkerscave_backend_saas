@@ -27,15 +27,17 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     @Query("""
             SELECT c FROM Customer c
-            WHERE c.active = true
+            WHERE (:activeOnly = false OR c.active = true)
             AND (:status IS NULL OR c.status = :status)
             AND (:customerType IS NULL OR c.customerType = :customerType)
-            AND (:search IS NULL OR LOWER(c.displayName) LIKE LOWER(CONCAT('%', :search, '%'))
+            AND (:search IS NULL OR :search = '' OR LOWER(c.displayName) LIKE LOWER(CONCAT('%', :search, '%'))
                 OR LOWER(c.legalName) LIKE LOWER(CONCAT('%', :search, '%'))
                 OR LOWER(c.email) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(c.mobileNumber) LIKE LOWER(CONCAT('%', :search, '%'))
                 OR LOWER(c.customerCode) LIKE LOWER(CONCAT('%', :search, '%')))
             """)
     Page<Customer> searchCustomers(
+            @Param("activeOnly") boolean activeOnly,
             @Param("status") CustomerStatus status,
             @Param("customerType") CustomerType customerType,
             @Param("search") String search,

@@ -36,6 +36,7 @@ public class DevDataInitializer implements ApplicationRunner {
             ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
             populator.addScript(new ClassPathResource("db/dev/data.sql"));
             populator.addScript(new ClassPathResource("db/dev/data-phase3-production-demo.sql"));
+            populator.addScript(new ClassPathResource("db/dev/data-phase4-customer-management.sql"));
             populator.setSeparator(";");
             populator.setContinueOnError(true);
             populator.execute(dataSource);

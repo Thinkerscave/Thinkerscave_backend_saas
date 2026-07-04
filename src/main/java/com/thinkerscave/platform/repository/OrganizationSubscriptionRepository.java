@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -40,4 +41,12 @@ public interface OrganizationSubscriptionRepository extends JpaRepository<Organi
     List<OrganizationSubscription> findRenewalsDue(@Param("from") LocalDate from, @Param("to") LocalDate to);
 
     long countByStatus(SubscriptionStatus status);
+
+    @Query("""
+            SELECT COALESCE(SUM(s.finalAmount), 0) FROM OrganizationSubscription s
+            WHERE s.active = true
+            AND s.status IN (com.thinkerscave.platform.enums.SubscriptionStatus.ACTIVE,
+                             com.thinkerscave.platform.enums.SubscriptionStatus.TRIAL)
+            """)
+    BigDecimal sumActiveAnnualRevenue();
 }

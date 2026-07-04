@@ -3,7 +3,9 @@ package com.thinkerscave.platform.service;
 import com.thinkerscave.platform.dto.request.CustomerContactRequest;
 import com.thinkerscave.platform.dto.request.CustomerRequest;
 import com.thinkerscave.platform.dto.response.CustomerContactResponse;
+import com.thinkerscave.platform.dto.response.CustomerDashboardResponse;
 import com.thinkerscave.platform.dto.response.CustomerDetailResponse;
+import com.thinkerscave.platform.dto.response.CustomerMetadataResponse;
 import com.thinkerscave.platform.dto.response.CustomerResponse;
 import com.thinkerscave.platform.enums.CustomerStatus;
 import com.thinkerscave.platform.enums.CustomerType;
@@ -14,7 +16,11 @@ import java.util.List;
 
 public interface CustomerService {
 
-    Page<CustomerResponse> getCustomers(CustomerStatus status, CustomerType customerType, String search, Pageable pageable);
+    Page<CustomerResponse> getCustomers(CustomerStatus status, CustomerType customerType, String search, boolean activeOnly, Pageable pageable);
+
+    CustomerDashboardResponse getCustomerDashboard();
+
+    CustomerMetadataResponse getCustomerMetadata();
 
     CustomerDetailResponse getCustomerById(Long id);
 
@@ -22,7 +28,13 @@ public interface CustomerService {
 
     CustomerResponse updateCustomer(Long id, CustomerRequest request);
 
+    CustomerResponse updateCustomerStatus(Long id, CustomerStatus status);
+
     void archiveCustomer(Long id);
+
+    void restoreCustomer(Long id);
+
+    void permanentlyDeleteCustomer(Long id);
 
     // Contacts
     List<CustomerContactResponse> getContacts(Long customerId);

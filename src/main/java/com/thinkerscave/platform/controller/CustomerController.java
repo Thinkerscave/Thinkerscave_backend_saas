@@ -2,6 +2,7 @@ package com.thinkerscave.platform.controller;
 
 import com.thinkerscave.platform.dto.request.CustomerContactRequest;
 import com.thinkerscave.platform.dto.request.CustomerRequest;
+import com.thinkerscave.platform.dto.request.CustomerStatusUpdateRequest;
 import com.thinkerscave.platform.dto.response.CustomerContactResponse;
 import com.thinkerscave.platform.dto.response.CustomerDetailResponse;
 import com.thinkerscave.platform.dto.response.CustomerResponse;
@@ -41,9 +42,24 @@ public class CustomerController {
             @RequestParam(required = false) CustomerStatus status,
             @RequestParam(required = false) CustomerType customerType,
             @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "true") boolean activeOnly,
             @PageableDefault(size = 20, sort = "createdOn") Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Customers retrieved",
-                customerService.getCustomers(status, customerType, search, pageable)));
+                customerService.getCustomers(status, customerType, search, activeOnly, pageable)));
+    }
+
+    @GetMapping("/dashboard")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @Operation(summary = "Customer module dashboard statistics")
+    public ResponseEntity<ApiResponse<com.thinkerscave.platform.dto.response.CustomerDashboardResponse>> getCustomerDashboard() {
+        return ResponseEntity.ok(ApiResponse.success("Customer dashboard retrieved", customerService.getCustomerDashboard()));
+    }
+
+    @GetMapping("/metadata")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @Operation(summary = "Customer module metadata (statuses, types)")
+    public ResponseEntity<ApiResponse<com.thinkerscave.platform.dto.response.CustomerMetadataResponse>> getCustomerMetadata() {
+        return ResponseEntity.ok(ApiResponse.success("Customer metadata retrieved", customerService.getCustomerMetadata()));
     }
 
     @GetMapping("/{id}")
@@ -76,6 +92,32 @@ public class CustomerController {
     public ResponseEntity<ApiResponse<Void>> archiveCustomer(@PathVariable Long id) {
         customerService.archiveCustomer(id);
         return ResponseEntity.ok(ApiResponse.noContent("Customer archived successfully"));
+    }
+
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @Operation(summary = "Update customer status")
+    public ResponseEntity<ApiResponse<CustomerResponse>> updateCustomerStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody CustomerStatusUpdateRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Customer status updated",
+                customerService.updateCustomerStatus(id, request.getStatus())));
+    }
+
+    @PostMapping("/{id}/restore")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @Operation(summary = "Restore archived customer")
+    public ResponseEntity<ApiResponse<Void>> restoreCustomer(@PathVariable Long id) {
+        customerService.restoreCustomer(id);
+        return ResponseEntity.ok(ApiResponse.noContent("Customer restored successfully"));
+    }
+
+    @DeleteMapping("/{id}/permanent")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @Operation(summary = "Permanently delete archived customer")
+    public ResponseEntity<ApiResponse<Void>> permanentlyDeleteCustomer(@PathVariable Long id) {
+        customerService.permanentlyDeleteCustomer(id);
+        return ResponseEntity.ok(ApiResponse.noContent("Customer permanently deleted"));
     }
 
     @GetMapping("/{id}/organizations")
