@@ -3,7 +3,11 @@ package com.thinkerscave.admission.enums;
 public enum InquiryStatus {
     NEW,
     CONTACTED,
+    FOLLOW_UP,
     INTERESTED,
+    MEETING_SCHEDULED,
+    APPLICATION_STARTED,
+    APPLICATION_SUBMITTED,
     COUNSELING,
     DOCUMENTS_PENDING,
     FOLLOW_UP_REQUIRED,

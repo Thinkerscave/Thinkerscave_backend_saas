@@ -5,12 +5,13 @@ import com.thinkerscave.admission.enums.ApplicationStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 
 @Repository
-public interface ApplicationAdmissionRepository extends JpaRepository<ApplicationAdmission, Long> {
+public interface ApplicationAdmissionRepository extends JpaRepository<ApplicationAdmission, Long>, JpaSpecificationExecutor<ApplicationAdmission> {
 
     Optional<ApplicationAdmission> findByApplicationNumberAndOrganizationId(String appNumber, Long orgId);
 
@@ -20,6 +21,10 @@ public interface ApplicationAdmissionRepository extends JpaRepository<Applicatio
             Long orgId, ApplicationStatus status, Pageable pageable);
 
     long countByOrganizationIdAndStatus(Long orgId, ApplicationStatus status);
+
+    boolean existsByInquiryIdAndOrganizationId(Long inquiryId, Long orgId);
+
+    Optional<ApplicationAdmission> findByInquiryIdAndOrganizationId(Long inquiryId, Long orgId);
 
     boolean existsByApplicationNumber(String applicationNumber);
 }

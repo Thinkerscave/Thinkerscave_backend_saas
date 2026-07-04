@@ -5,6 +5,7 @@ import com.thinkerscave.admission.enums.InquiryStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -14,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
+public interface InquiryRepository extends JpaRepository<Inquiry, Long>, JpaSpecificationExecutor<Inquiry> {
 
     Optional<Inquiry> findByInquiryIdAndOrganizationIdAndDeletedFalse(Long id, Long orgId);
 
@@ -27,6 +28,8 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
 
     boolean existsByMobileNumberAndOrganizationIdAndDeletedFalse(String mobileNumber, Long orgId);
 
+        boolean existsByInquiryIdAndOrganizationIdAndDeletedFalse(Long inquiryId, Long orgId);
+
     @Query("""
             SELECT i.status, COUNT(i)
             FROM Inquiry i
@@ -34,6 +37,22 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long> {
             GROUP BY i.status
             """)
     List<Object[]> countByStatusForOrg(@Param("orgId") Long orgId);
+
+        @Query("""
+            SELECT COALESCE(i.inquirySource, 'Unknown'), COUNT(i)
+            FROM Inquiry i
+            WHERE i.organizationId = :orgId AND i.deleted = false
+            GROUP BY i.inquirySource
+            """)
+        List<Object[]> countBySourceForOrg(@Param("orgId") Long orgId);
+
+        @Query("""
+            SELECT i.assignedCounselorId, COUNT(i)
+            FROM Inquiry i
+            WHERE i.organizationId = :orgId AND i.deleted = false
+            GROUP BY i.assignedCounselorId
+            """)
+        List<Object[]> countByCounselorForOrg(@Param("orgId") Long orgId);
 
     long countByOrganizationIdAndDeletedFalse(Long orgId);
 
