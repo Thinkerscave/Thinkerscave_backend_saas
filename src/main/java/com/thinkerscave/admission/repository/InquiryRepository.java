@@ -57,4 +57,18 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long>, JpaSpec
     long countByOrganizationIdAndDeletedFalse(Long orgId);
 
     long countByOrganizationIdAndStatusAndDeletedFalse(Long orgId, InquiryStatus status);
+
+    @Query("""
+            SELECT i FROM Inquiry i
+            WHERE i.organizationId = :orgId AND i.deleted = false AND (
+                LOWER(i.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+                LOWER(i.mobileNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
+                LOWER(COALESCE(i.email, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            )
+            ORDER BY i.createdOn DESC
+            """)
+    Page<Inquiry> searchByOrganization(
+            @Param("orgId") Long orgId,
+            @Param("keyword") String keyword,
+            Pageable pageable);
 }

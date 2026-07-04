@@ -33,10 +33,13 @@ public class DevDataInitializer implements ApplicationRunner {
         try {
             ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
             populator.addScript(new ClassPathResource("db/dev/data.sql"));
+            populator.addScript(new ClassPathResource("db/dev/data-phase3-production-demo.sql"));
             populator.setSeparator(";");
             populator.setContinueOnError(true);
             populator.execute(dataSource);
             log.info("Dev seed data loaded.");
+
+            provisionTenantDatabases();
 
             // Fix password hashes so they match the app's BCrypt encoder
             String hash = passwordEncoder.encode("Password@123");
@@ -67,6 +70,29 @@ public class DevDataInitializer implements ApplicationRunner {
             }
         } catch (Exception e) {
             log.warn("Dev seed data load issue: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Creates MySQL databases matching production schema-per-tenant names.
+     * Data remains in thinkerscave_dev (row-level org isolation) for local dev;
+     * these databases mirror the production tenant_registry.schema_name entries.
+     */
+    private void provisionTenantDatabases() {
+        String[] schemas = {
+                "tenant_jsb_bhubaneswar",
+                "tenant_jsc_cuttack",
+                "tenant_abc_puri",
+                "tenant_kcc_cuttack"
+        };
+        for (String schema : schemas) {
+            try {
+                jdbcTemplate.execute(
+                        "CREATE DATABASE IF NOT EXISTS `" + schema + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                log.info("Tenant database ready: {}", schema);
+            } catch (Exception e) {
+                log.warn("Could not create tenant database {}: {}", schema, e.getMessage());
+            }
         }
     }
 }
