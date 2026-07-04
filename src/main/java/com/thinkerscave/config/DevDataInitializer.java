@@ -12,6 +12,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Loads dev seed data AFTER Hibernate has created all entity tables.
@@ -68,6 +70,14 @@ public class DevDataInitializer implements ApplicationRunner {
             if (promotionFix > 0) {
                 log.info("Normalized promotion seed data ({} row change(s)).", promotionFix);
             }
+
+                int followUpFix = jdbcTemplate.update(
+                    "UPDATE inquiry_follow_up SET follow_up_type = 'CALL' WHERE follow_up_type IS NULL OR TRIM(follow_up_type) = ''");
+                followUpFix += jdbcTemplate.update(
+                    "UPDATE inquiry SET last_follow_up_type = 'CALL' WHERE last_follow_up_type IS NOT NULL AND TRIM(last_follow_up_type) = ''");
+                if (followUpFix > 0) {
+                log.info("Normalized follow-up enum seed data ({} row change(s)).", followUpFix);
+                }
         } catch (Exception e) {
             log.warn("Dev seed data load issue: {}", e.getMessage());
         }
@@ -79,12 +89,20 @@ public class DevDataInitializer implements ApplicationRunner {
      * these databases mirror the production tenant_registry.schema_name entries.
      */
     private void provisionTenantDatabases() {
-        String[] schemas = {
-                "tenant_jsb_bhubaneswar",
-                "tenant_jsc_cuttack",
-                "tenant_abc_puri",
-                "tenant_kcc_cuttack"
-        };
+        List<String> schemas = new ArrayList<>();
+        try {
+            schemas = jdbcTemplate.query(
+                    "SELECT DISTINCT schema_name FROM tenant_registry WHERE schema_name IS NOT NULL AND TRIM(schema_name) <> ''",
+                    (rs, rowNum) -> rs.getString("schema_name"));
+        } catch (Exception e) {
+            log.warn("Could not read tenant_registry for schema provisioning: {}", e.getMessage());
+        }
+
+        if (schemas.isEmpty()) {
+            log.warn("No tenant schemas found in tenant_registry; skipping tenant database provisioning.");
+            return;
+        }
+
         for (String schema : schemas) {
             try {
                 jdbcTemplate.execute(

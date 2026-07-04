@@ -30,14 +30,14 @@ public class AdmissionsCompatibilityController {
 
     @PostMapping("/api/v1/inquiries/{id}/proceed-admission")
     @Operation(summary = "Compatibility endpoint: proceed lead to application")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> proceedAdmission(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Application initialized", inquiryService.convertToApplication(id)));
     }
 
     @PostMapping("/api/v1/inquiries/{id}/follow-ups")
     @Operation(summary = "Compatibility endpoint: add follow-up")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<FollowUpResponse>> addFollowUp(@PathVariable Long id,
                                                                       @Valid @RequestBody FollowUpRequest request) {
         return ResponseEntity.ok(ApiResponse.created("Follow-up added", inquiryService.addFollowUp(id, request)));
@@ -45,21 +45,21 @@ public class AdmissionsCompatibilityController {
 
     @PostMapping("/api/v1/admissions/draft")
     @Operation(summary = "Compatibility endpoint: save application draft")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> saveDraft(@Valid @RequestBody ApplicationAdmissionRequest request) {
         return ResponseEntity.ok(ApiResponse.created("Draft saved", applicationService.saveDraft(request)));
     }
 
     @PostMapping("/api/v1/admissions")
     @Operation(summary = "Compatibility endpoint: submit application")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> submit(@Valid @RequestBody ApplicationAdmissionRequest request) {
         return ResponseEntity.ok(ApiResponse.created("Application submitted", applicationService.submit(request)));
     }
 
     @GetMapping("/api/v1/admissions/{id}")
     @Operation(summary = "Compatibility endpoint: get application")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> getAdmission(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Application loaded", applicationService.getById(id)));
     }

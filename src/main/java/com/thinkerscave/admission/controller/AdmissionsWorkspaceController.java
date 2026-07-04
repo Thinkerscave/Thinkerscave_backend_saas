@@ -50,21 +50,21 @@ public class AdmissionsWorkspaceController {
 
     @GetMapping("/inquiries/kpi")
     @Operation(summary = "Workspace inquiry KPI")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<InquiryWorkspaceKpiResponse>> inquiryKpi() {
         return ResponseEntity.ok(ApiResponse.success("Inquiry KPI loaded", inquiryService.getWorkspaceKpi()));
     }
 
     @GetMapping("/inquiries/quick-actions")
     @Operation(summary = "Workspace quick action counters")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<InquiryQuickActionResponse>> inquiryQuickActions() {
         return ResponseEntity.ok(ApiResponse.success("Quick actions loaded", inquiryService.getQuickActions()));
     }
 
     @PostMapping("/inquiries/search")
     @Operation(summary = "Workspace inquiry search")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<Page<InquiryResponse>>> inquirySearch(
             @RequestBody(required = false) LeadSearchRequest request,
             Pageable pageable) {
@@ -73,21 +73,21 @@ public class AdmissionsWorkspaceController {
 
     @GetMapping("/inquiries/{id}/full")
     @Operation(summary = "Workspace inquiry full detail")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<InquiryFullDetailResponse>> fullDetail(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Inquiry detail loaded", inquiryService.getFullDetail(id)));
     }
 
     @GetMapping("/inquiries/{id}/timeline")
     @Operation(summary = "Workspace inquiry timeline")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<List<InquiryTimelineItemResponse>>> timeline(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Timeline loaded", inquiryService.getTimeline(id)));
     }
 
     @PutMapping("/inquiries/{id}/assign-counselor")
     @Operation(summary = "Workspace assign counselor")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<InquiryResponse>> assignCounselor(
             @PathVariable Long id,
             @Valid @RequestBody AssignCounselorRequest request) {
@@ -97,7 +97,7 @@ public class AdmissionsWorkspaceController {
 
     @PostMapping("/inquiries/{id}/mark-interested")
     @Operation(summary = "Workspace mark interested")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<InquiryResponse>> markInterested(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Inquiry marked interested",
                 inquiryService.updateStatus(id, InquiryStatus.INTERESTED)));
@@ -105,7 +105,7 @@ public class AdmissionsWorkspaceController {
 
     @PostMapping("/inquiries/{id}/mark-closed")
     @Operation(summary = "Workspace mark closed")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<InquiryResponse>> markClosed(@PathVariable Long id,
                                                                     @RequestParam(required = false) String reason) {
         if (reason != null && !reason.isBlank()) {
@@ -116,14 +116,14 @@ public class AdmissionsWorkspaceController {
 
     @GetMapping("/inquiries/{id}/counseling-notes")
     @Operation(summary = "Workspace counseling notes")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<List<CounselingNoteResponse>>> counselingNotes(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Counseling notes loaded", inquiryService.getCounselingNotes(id)));
     }
 
     @PostMapping("/inquiries/{id}/counseling-notes")
     @Operation(summary = "Workspace add counseling note")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<CounselingNoteResponse>> addCounselingNote(@PathVariable Long id,
                                                                                   @Valid @RequestBody CounselingNoteRequest request) {
         return ResponseEntity.ok(ApiResponse.created("Counseling note added", inquiryService.addCounselingNote(id, request)));
@@ -131,14 +131,14 @@ public class AdmissionsWorkspaceController {
 
     @GetMapping("/admissions/kpi")
     @Operation(summary = "Workspace admissions KPI")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<AdmissionKpiResponse>> admissionKpi() {
         return ResponseEntity.ok(ApiResponse.success("Admissions KPI loaded", inquiryService.getKpi()));
     }
 
     @PostMapping("/admissions/search")
     @Operation(summary = "Workspace admissions search")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<Page<ApplicationAdmissionResponse>>> admissionSearch(
             @RequestBody(required = false) ApplicationSearchRequest request,
             Pageable pageable) {
@@ -147,14 +147,14 @@ public class AdmissionsWorkspaceController {
 
     @GetMapping("/admissions/{id}/progress")
     @Operation(summary = "Workspace wizard progress")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<ApplicationProgressResponse>> progress(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Progress loaded", applicationService.getProgress(id)));
     }
 
     @GetMapping("/settings")
     @Operation(summary = "Workspace settings")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<AdmissionsSettingsResponse>> settings() {
         AdmissionsSettingsResponse response = AdmissionsSettingsResponse.builder()
                 .inquirySources(List.of("Website", "Walk-in", "Referral", "Social Media", "Campaign"))

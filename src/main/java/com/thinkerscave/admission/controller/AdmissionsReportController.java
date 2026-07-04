@@ -24,28 +24,28 @@ public class AdmissionsReportController {
 
     @GetMapping("/overview")
     @Operation(summary = "Admissions overview metrics")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<Map<String, Object>>> overview() {
         return ResponseEntity.ok(ApiResponse.success("Overview report loaded", reportService.overview()));
     }
 
     @GetMapping("/funnel")
     @Operation(summary = "Admissions funnel report")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<Map<String, Long>>> funnel() {
         return ResponseEntity.ok(ApiResponse.success("Funnel report loaded", reportService.funnel()));
     }
 
     @GetMapping("/counselor-performance")
     @Operation(summary = "Counselor performance report")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> counselorPerformance() {
         return ResponseEntity.ok(ApiResponse.success("Counselor performance loaded", reportService.counselorPerformance()));
     }
 
     @GetMapping("/source-analysis")
     @Operation(summary = "Lead source analysis report")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<Map<String, Long>>> sourceAnalysis() {
         return ResponseEntity.ok(ApiResponse.success("Source analysis loaded", reportService.sourceAnalysis()));
     }

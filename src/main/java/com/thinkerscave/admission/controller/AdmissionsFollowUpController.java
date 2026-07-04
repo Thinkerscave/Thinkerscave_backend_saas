@@ -30,28 +30,28 @@ public class AdmissionsFollowUpController {
 
     @GetMapping("/today")
     @Operation(summary = "Get today's follow-ups")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<List<FollowUpResponse>>> today() {
         return ResponseEntity.ok(ApiResponse.success("Today's follow-ups", inquiryService.getTodayFollowUps()));
     }
 
     @GetMapping("/overdue")
     @Operation(summary = "Get overdue follow-ups")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<List<FollowUpResponse>>> overdue() {
         return ResponseEntity.ok(ApiResponse.success("Overdue follow-ups", inquiryService.getOverdueFollowUps()));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Update follow-up")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<FollowUpResponse>> update(@PathVariable Long id, @Valid @RequestBody FollowUpRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Follow-up updated", inquiryService.updateFollowUp(id, request)));
     }
 
     @PostMapping("/{id}/complete")
     @Operation(summary = "Complete follow-up")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
     public ResponseEntity<ApiResponse<FollowUpResponse>> complete(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Follow-up completed", inquiryService.completeFollowUp(id)));
     }
