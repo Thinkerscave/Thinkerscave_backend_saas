@@ -1,5 +1,6 @@
 package com.thinkerscave.security.controller;
 
+import com.thinkerscave.security.dto.LoginContext;
 import com.thinkerscave.security.dto.request.LoginRequest;
 import com.thinkerscave.security.dto.request.OtpResetPasswordRequest;
 import com.thinkerscave.security.dto.response.AuthResponse;
@@ -8,6 +9,7 @@ import com.thinkerscave.security.service.PasswordResetService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -27,8 +29,14 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "Login with username/email and password")
-    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("Login successful", authService.login(request)));
+    public ResponseEntity<ApiResponse<AuthResponse>> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest) {
+        LoginContext loginContext = LoginContext.fromHeaders(
+                httpRequest.getHeader(LoginContext.HEADER),
+                httpRequest.getHeader("X-Tenant-ID"),
+                httpRequest.getHeader("X-Organization-ID"));
+        return ResponseEntity.ok(ApiResponse.success("Login successful", authService.login(request, loginContext)));
     }
 
     @PostMapping("/refresh")

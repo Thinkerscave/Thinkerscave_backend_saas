@@ -16,6 +16,8 @@ public class AuthResponse {
     private String tokenType = "Bearer";
     private Long expiresIn;
     private UserSummaryResponse user;
+    private String tenantId;
+    private String loginContext;
     private Boolean firstTimeLogin;
     private Boolean requirePasswordChange;
 }

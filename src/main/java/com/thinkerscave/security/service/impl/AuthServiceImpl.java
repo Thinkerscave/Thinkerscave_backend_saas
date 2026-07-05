@@ -4,10 +4,14 @@ import com.thinkerscave.access.entity.LoginHistory;
 import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.entity.UserRole;
 import com.thinkerscave.access.enums.LoginStatus;
+import com.thinkerscave.access.enums.RoleType;
 import com.thinkerscave.access.enums.UserStatus;
 import com.thinkerscave.access.mapper.UserMapper;
 import com.thinkerscave.access.repository.LoginHistoryRepository;
 import com.thinkerscave.access.repository.UserRepository;
+import com.thinkerscave.platform.entity.TenantRegistry;
+import com.thinkerscave.platform.repository.TenantRegistryRepository;
+import com.thinkerscave.security.dto.LoginContext;
 import com.thinkerscave.security.dto.request.LoginRequest;
 import com.thinkerscave.security.dto.response.AuthResponse;
 import com.thinkerscave.security.dto.response.SessionResponse;
@@ -31,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -38,6 +43,7 @@ import java.util.Map;
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
+    private final TenantRegistryRepository tenantRegistryRepository;
     private final UserSessionRepository sessionRepository;
     private final LoginHistoryRepository loginHistoryRepository;
     private final JwtService jwtService;
@@ -46,10 +52,8 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse login(LoginRequest request) {
-        User user = userRepository.findByUsername(request.getUsernameOrEmail())
-                .or(() -> userRepository.findByEmail(request.getUsernameOrEmail()))
-                .orElseThrow(() -> new BadRequestException("Invalid credentials"));
+    public AuthResponse login(LoginRequest request, LoginContext loginContext) {
+        User user = resolveUserForLogin(request.getUsernameOrEmail(), loginContext);
 
         try {
             authenticationManager.authenticate(
@@ -60,27 +64,26 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Invalid credentials");
         }
 
-        // Reset failed attempts on successful login
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new BadRequestException("Account is not active");
+        }
+
         user.setFailedLoginAttempts(0);
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", user.getId());
-        claims.put("orgId", user.getOrganizationId());
-        claims.put("userCode", user.getUserCode());
+        String tenantId = loginContext.isPlatformLogin()
+                ? LoginContext.PLATFORM_TENANT
+                : loginContext.getTenantIdentifier();
+        String loginContextValue = loginContext.isPlatformLogin()
+                ? LoginContext.PLATFORM
+                : LoginContext.TENANT;
 
-        UserRole primaryRole = user.getUserRoles().stream()
-                .filter(ur -> Boolean.TRUE.equals(ur.getPrimaryRole()) && Boolean.TRUE.equals(ur.getActive()))
-                .findFirst().orElse(null);
-        if (primaryRole != null) {
-            claims.put("roleType", primaryRole.getRole().getRoleType().name());
-        }
+        Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue);
 
         String accessToken = jwtService.generateAccessToken(user.getUsername(), claims);
         String refreshToken = jwtService.generateRefreshToken(user.getUsername());
 
-        // Create session
         UserSession session = UserSession.builder()
                 .user(user)
                 .refreshToken(refreshToken)
@@ -98,10 +101,91 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
                 .expiresIn(900L)
+                .tenantId(tenantId)
+                .loginContext(loginContextValue)
                 .user(userMapper.toSummary(user))
                 .firstTimeLogin(user.getFirstTimeLogin())
                 .requirePasswordChange(Boolean.TRUE.equals(user.getFirstTimeLogin()))
                 .build();
+    }
+
+    private User resolveUserForLogin(String usernameOrEmail, LoginContext loginContext) {
+        if (loginContext.isPlatformLogin()) {
+            User user = findByUsernameOrEmail(usernameOrEmail)
+                    .orElseThrow(() -> new BadRequestException("Invalid credentials"));
+            if (!hasActiveRole(user, RoleType.SUPER_ADMIN)) {
+                throw new BadRequestException("This account is not authorized for Thinkers Department login");
+            }
+            return user;
+        }
+
+        TenantRegistry tenant = resolveTenantRegistry(loginContext);
+        Long organizationId = tenant.getOrganization().getId();
+
+        if (loginContext.getOrganizationId() != null && !organizationId.equals(loginContext.getOrganizationId())) {
+            throw new BadRequestException("Organization does not match the selected institution");
+        }
+
+        User user = findByUsernameOrEmailAndOrganization(usernameOrEmail, organizationId)
+                .orElseThrow(() -> new BadRequestException("Invalid credentials for the selected institution"));
+
+        if (hasActiveRole(user, RoleType.SUPER_ADMIN)) {
+            throw new BadRequestException("Platform accounts must sign in through Thinkers Department");
+        }
+
+        return user;
+    }
+
+    private TenantRegistry resolveTenantRegistry(LoginContext loginContext) {
+        if (loginContext.getTenantIdentifier() == null || loginContext.getTenantIdentifier().isBlank()) {
+            throw new BadRequestException("Tenant is required for institution login");
+        }
+
+        return tenantRegistryRepository.findActiveByTenantIdentifierNormalized(loginContext.getTenantIdentifier())
+                .orElseThrow(() -> new BadRequestException("Unknown institution tenant"));
+    }
+
+    private Optional<User> findByUsernameOrEmail(String usernameOrEmail) {
+        return userRepository.findByUsername(usernameOrEmail)
+                .or(() -> userRepository.findByEmail(usernameOrEmail));
+    }
+
+    private Optional<User> findByUsernameOrEmailAndOrganization(String usernameOrEmail, Long organizationId) {
+        return userRepository.findByUsernameAndOrganizationId(usernameOrEmail, organizationId)
+                .or(() -> userRepository.findByEmailAndOrganizationId(usernameOrEmail, organizationId));
+    }
+
+    private Map<String, Object> buildTokenClaims(User user, String tenantId, String loginContext) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", user.getId());
+        claims.put("orgId", user.getOrganizationId());
+        claims.put("userCode", user.getUserCode());
+        claims.put("tenant", tenantId);
+        claims.put("loginContext", loginContext);
+
+        UserRole primaryRole = user.getUserRoles().stream()
+                .filter(ur -> Boolean.TRUE.equals(ur.getPrimaryRole()) && Boolean.TRUE.equals(ur.getActive()))
+                .findFirst().orElse(null);
+        if (primaryRole != null) {
+            claims.put("roleType", primaryRole.getRole().getRoleType().name());
+        }
+        return claims;
+    }
+
+    private String resolveTenantForUser(User user) {
+        if (hasActiveRole(user, RoleType.SUPER_ADMIN)) {
+            return LoginContext.PLATFORM_TENANT;
+        }
+        return tenantRegistryRepository.findByOrganization_Id(user.getOrganizationId())
+                .map(TenantRegistry::getTenantIdentifier)
+                .orElse(LoginContext.PLATFORM_TENANT);
+    }
+
+    private boolean hasActiveRole(User user, RoleType roleType) {
+        return user.getUserRoles().stream()
+                .anyMatch(ur -> Boolean.TRUE.equals(ur.getActive())
+                        && Boolean.TRUE.equals(ur.getPrimaryRole())
+                        && ur.getRole().getRoleType() == roleType);
     }
 
     @Override
@@ -115,10 +199,11 @@ public class AuthServiceImpl implements AuthService {
         }
 
         User user = session.getUser();
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("userId", user.getId());
-        claims.put("orgId", user.getOrganizationId());
-        claims.put("userCode", user.getUserCode());
+        String tenantId = resolveTenantForUser(user);
+        String loginContextValue = hasActiveRole(user, RoleType.SUPER_ADMIN)
+                ? LoginContext.PLATFORM
+                : LoginContext.TENANT;
+        Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue);
 
         String newAccessToken = jwtService.generateAccessToken(user.getUsername(), claims);
         String newRefreshToken = jwtService.generateRefreshToken(user.getUsername());
@@ -131,6 +216,8 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(newRefreshToken)
                 .tokenType("Bearer")
                 .expiresIn(900L)
+                .tenantId(tenantId)
+                .loginContext(loginContextValue)
                 .user(userMapper.toSummary(user))
                 .firstTimeLogin(user.getFirstTimeLogin())
                 .requirePasswordChange(Boolean.TRUE.equals(user.getFirstTimeLogin()))

@@ -82,7 +82,7 @@ public class RoleController {
 
     @GetMapping("/{roleId}/permissions")
     @Operation(summary = "Get permission matrix for a role scoped to an organization")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
     public ResponseEntity<ApiResponse<PermissionMatrixResponse>> getPermissionMatrix(
             @PathVariable Long roleId,
             @RequestParam Long organizationId) {
@@ -91,7 +91,7 @@ public class RoleController {
 
     @PutMapping("/{roleId}/permissions")
     @Operation(summary = "Update (replace) permission matrix for a role")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
     public ResponseEntity<ApiResponse<Void>> updatePermissionMatrix(
             @PathVariable Long roleId,
             @RequestParam Long organizationId,

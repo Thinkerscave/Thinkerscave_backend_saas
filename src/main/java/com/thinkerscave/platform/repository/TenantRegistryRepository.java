@@ -16,6 +16,17 @@ public interface TenantRegistryRepository extends JpaRepository<TenantRegistry, 
 
     Optional<TenantRegistry> findByTenantIdentifier(String tenantIdentifier);
 
+    @Query("""
+            SELECT t FROM TenantRegistry t
+            WHERE t.active = true
+            AND (
+                LOWER(t.tenantIdentifier) = LOWER(:identifier)
+                OR LOWER(REPLACE(t.tenantIdentifier, '-', '_')) = LOWER(:identifier)
+                OR LOWER(REPLACE(t.tenantIdentifier, '_', '-')) = LOWER(:identifier)
+            )
+            """)
+    Optional<TenantRegistry> findActiveByTenantIdentifierNormalized(@Param("identifier") String identifier);
+
     Optional<TenantRegistry> findBySchemaName(String schemaName);
 
     Optional<TenantRegistry> findByOrganization_Id(Long organizationId);

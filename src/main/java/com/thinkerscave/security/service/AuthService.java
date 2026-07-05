@@ -1,5 +1,6 @@
 package com.thinkerscave.security.service;
 
+import com.thinkerscave.security.dto.LoginContext;
 import com.thinkerscave.security.dto.request.LoginRequest;
 import com.thinkerscave.security.dto.response.AuthResponse;
 import com.thinkerscave.security.dto.response.SessionResponse;
@@ -11,7 +12,7 @@ import org.springframework.data.domain.Pageable;
  */
 public interface AuthService {
 
-    AuthResponse login(LoginRequest request);
+    AuthResponse login(LoginRequest request, LoginContext loginContext);
 
     AuthResponse refreshToken(String refreshToken);
 
