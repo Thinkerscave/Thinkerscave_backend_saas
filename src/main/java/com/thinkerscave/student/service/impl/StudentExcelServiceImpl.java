@@ -4,6 +4,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -15,16 +18,25 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.thinkerscave.academics.entity.AcademicClass;
+import com.thinkerscave.academics.entity.AcademicSection;
+import com.thinkerscave.academics.entity.AcademicYear;
+import com.thinkerscave.academics.repository.AcademicYearRepository;
+import com.thinkerscave.academics.repository.ClassRepository;
+import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.shared.exceptions.FileProcessingException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.student.dto.BulkUploadResponse;
+import com.thinkerscave.student.dto.StudentCreateRequest;
 import com.thinkerscave.student.dto.StudentImportJobResponse;
 import com.thinkerscave.student.service.StudentExcelService;
+import com.thinkerscave.student.service.StudentService;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -34,6 +46,22 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 
 	private final Map<String, BulkUploadResponse> importJobs = new ConcurrentHashMap<>();
 	private final Map<String, byte[]> validationReports = new ConcurrentHashMap<>();
+
+	private final AcademicYearRepository academicYearRepository;
+	private final ClassRepository classRepository;
+	private final SectionRepository sectionRepository;
+	private final StudentService studentService;
+
+	// @Lazy breaks potential circular dependency via StudentService → UserService → ...
+	public StudentExcelServiceImpl(AcademicYearRepository academicYearRepository,
+			ClassRepository classRepository,
+			SectionRepository sectionRepository,
+			@Lazy StudentService studentService) {
+		this.academicYearRepository = academicYearRepository;
+		this.classRepository = classRepository;
+		this.sectionRepository = sectionRepository;
+		this.studentService = studentService;
+	}
 
 	@Override
 	public ByteArrayInputStream downloadTemplate() {
@@ -116,32 +144,136 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 
 		try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
 			Sheet sheet = workbook.getSheetAt(0);
+			int lastRowNum = sheet.getLastRowNum();
+			log.info("Bulk import: sheet='{}' lastRowNum={}", sheet.getSheetName(), lastRowNum);
 			int total = 0;
 			int success = 0;
 			int failed = 0;
 
-			for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+			// Cache year/class lookups to avoid N+1 on each row
+			Map<String, AcademicYear> yearCache = new ConcurrentHashMap<>();
+			Map<String, AcademicClass> classCache = new ConcurrentHashMap<>();
+			Map<String, AcademicSection> sectionCache = new ConcurrentHashMap<>();
+
+			for (int i = 1; i <= lastRowNum; i++) {
 				Row row = sheet.getRow(i);
 				if (row == null || isBlankRow(row)) {
 					continue;
 				}
 
 				total++;
-				String admissionNo = readCell(row, 0);
-				String firstName = readCell(row, 1);
-				String lastName = readCell(row, 3);
-				String academicYear = readCell(row, 8);
-				String classCode = readCell(row, 9);
-				String sectionCode = readCell(row, 10);
 
-				if (admissionNo.isBlank() || firstName.isBlank() || lastName.isBlank()
-						|| academicYear.isBlank() || classCode.isBlank() || sectionCode.isBlank()) {
+				// ── Read columns ───────────────────────────────────────────
+				String admissionNo   = readCell(row, 0);
+				String firstName     = readCell(row, 1);
+				String middleName    = readCell(row, 2);
+				String lastName      = readCell(row, 3);
+				String gender        = readCell(row, 4);
+				String dobRaw        = readCell(row, 5);
+				String mobile        = readCell(row, 6);
+				String email         = readCell(row, 7);
+				String yearCode      = readCell(row, 8);
+				String classCode     = readCell(row, 9);
+				String sectionCode   = readCell(row, 10);
+				String rollNumber    = readCell(row, 11);
+				String fatherName    = readCell(row, 12);
+				String fatherMobile  = readCell(row, 13);
+				String bloodGroup    = readCell(row, 17);
+				String remarks       = readCell(row, 18);
+
+				// ── Mandatory field check ──────────────────────────────────
+				if (firstName.isBlank() || lastName.isBlank()
+						|| yearCode.isBlank() || classCode.isBlank() || sectionCode.isBlank()
+						|| fatherName.isBlank() || fatherMobile.isBlank()) {
 					failed++;
-					errors.add("Row " + (i + 1) + ": missing mandatory fields");
+					errors.add("Row " + (i + 1) + ": missing mandatory fields "
+							+ "(First Name, Last Name, Academic Year, Class Code, Section Code, Father Name, Father Mobile)");
 					continue;
 				}
 
-				success++;
+				// ── Resolve Academic Year ──────────────────────────────────
+				AcademicYear year = yearCache.computeIfAbsent(yearCode, code ->
+						academicYearRepository.findByYearCode(code)
+								.orElse(null));
+				if (year == null) {
+					// Fallback: try current year
+					year = academicYearRepository.findByCurrentYearTrue().orElse(null);
+				}
+				if (year == null) {
+					failed++;
+					errors.add("Row " + (i + 1) + ": academic year '" + yearCode + "' not found");
+					continue;
+				}
+
+				final Long yearId = year.getAcademicYearId();
+
+				// ── Resolve Class ──────────────────────────────────────────
+				final String classCacheKey = yearId + "|" + classCode.toLowerCase();
+				AcademicClass cls = classCache.computeIfAbsent(classCacheKey, k ->
+						classRepository.findByAcademicYear_AcademicYearIdAndClassCodeIgnoreCase(yearId, classCode)
+								.orElseGet(() ->
+										classRepository.findByAcademicYear_AcademicYearIdAndClassNameIgnoreCase(yearId, classCode)
+												.orElse(null)));
+				if (cls == null) {
+					failed++;
+					errors.add("Row " + (i + 1) + ": class '" + classCode + "' not found for year '" + yearCode + "'");
+					continue;
+				}
+
+				// ── Resolve Section ────────────────────────────────────────
+				final String sectionCacheKey = cls.getClassId() + "|" + sectionCode.toLowerCase();
+				AcademicSection section = sectionCache.computeIfAbsent(sectionCacheKey, k ->
+						sectionRepository.findByAcademicClass_ClassIdAndSectionNameIgnoreCase(cls.getClassId(), sectionCode)
+								.orElse(null));
+				if (section == null) {
+					failed++;
+					errors.add("Row " + (i + 1) + ": section '" + sectionCode
+							+ "' not found for class '" + classCode + "'");
+					continue;
+				}
+
+				// ── Parse DOB ──────────────────────────────────────────────
+				LocalDate dob = parseDob(dobRaw);
+				if (dob == null) {
+					failed++;
+					errors.add("Row " + (i + 1) + ": invalid date of birth '" + dobRaw
+							+ "' (expected yyyy-MM-dd or dd/MM/yyyy)");
+					continue;
+				}
+
+				// ── Build request ──────────────────────────────────────────
+				String[] fatherParts = splitName(fatherName);
+				StudentCreateRequest req = new StudentCreateRequest();
+				// Auto-generate admission number if not provided (matches frontend behavior)
+				req.setAdmissionNumber(admissionNo.isBlank() ? "ADM-" + System.currentTimeMillis() : admissionNo);
+				req.setFirstName(firstName);
+				req.setMiddleName(middleName.isBlank() ? null : middleName);
+				req.setLastName(lastName);
+				req.setGender(gender.isBlank() ? "Male" : gender);
+				req.setDateOfBirth(dob);
+				req.setMobileNumber(mobile.isBlank() ? null : mobile);
+				req.setEmail(email.isBlank() ? null : email);
+				req.setRollNumber(rollNumber.isBlank() ? null : rollNumber);
+				req.setBloodGroup(bloodGroup.isBlank() ? null : bloodGroup);
+				req.setRemarks(remarks.isBlank() ? null : remarks);
+				req.setAcademicYearId(year.getAcademicYearId());
+				req.setClassId(cls.getClassId());
+				req.setSectionId(section.getSectionId());
+				req.setParentFirstName(fatherParts[0]);
+				req.setParentLastName(fatherParts[1]);
+				req.setParentMobileNumber(fatherMobile);
+
+				// ── Persist ────────────────────────────────────────────────
+				try {
+					studentService.createStudent(req);
+					success++;
+					log.info("Bulk import row {}: created student {}", i + 1, firstName + " " + lastName);
+				} catch (Exception ex) {
+					failed++;
+					String cause = ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName();
+					errors.add("Row " + (i + 1) + " (" + firstName + " " + lastName + "): " + cause);
+					log.warn("Bulk import row {} failed: {}", i + 1, cause);
+				}
 			}
 
 			summary.setTotalRecords(total);
@@ -150,14 +282,48 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 			summary.setErrors(errors);
 
 			importJobs.put(jobId, summary);
-			String reportText = errors.isEmpty() ? "No validation errors." : String.join(System.lineSeparator(), errors);
+			String reportText = errors.isEmpty() ? "No errors — all records imported successfully."
+					: String.join(System.lineSeparator(), errors);
 			validationReports.put(jobId, reportText.getBytes(StandardCharsets.UTF_8));
 
+			log.info("Bulk import complete: total={} success={} failed={}", total, success, failed);
 			return StudentImportJobResponse.builder().jobId(jobId).summary(summary).build();
+
 		} catch (IOException ex) {
 			log.error("Failed to process student import file", ex);
 			throw new FileProcessingException("Unable to process student import file", ex);
 		}
+	}
+
+	/** Split a full name into [firstName, lastName]. */
+	private String[] splitName(String fullName) {
+		if (fullName == null || fullName.isBlank()) {
+			return new String[] { "Unknown", "Unknown" };
+		}
+		int space = fullName.trim().indexOf(' ');
+		if (space < 0) {
+			return new String[] { fullName.trim(), fullName.trim() };
+		}
+		return new String[] {
+				fullName.substring(0, space).trim(),
+				fullName.substring(space + 1).trim()
+		};
+	}
+
+	/** Parse date of birth from several common formats. */
+	private LocalDate parseDob(String raw) {
+		if (raw == null || raw.isBlank()) return null;
+		List<DateTimeFormatter> formats = List.of(
+				DateTimeFormatter.ISO_LOCAL_DATE,                          // yyyy-MM-dd
+				DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+				DateTimeFormatter.ofPattern("d/M/yyyy"),
+				DateTimeFormatter.ofPattern("MM/dd/yyyy"),
+				DateTimeFormatter.ofPattern("dd-MM-yyyy")
+		);
+		for (DateTimeFormatter fmt : formats) {
+			try { return LocalDate.parse(raw.trim(), fmt); } catch (DateTimeParseException ignored) {}
+		}
+		return null;
 	}
 
 	@Override
@@ -179,12 +345,32 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 	}
 
 	private String readCell(Row row, int index) {
-		Cell cell = row.getCell(index);
+		Cell cell = row.getCell(index, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
 		if (cell == null) {
 			return "";
 		}
-		cell.setCellType(org.apache.poi.ss.usermodel.CellType.STRING);
-		return cell.getStringCellValue() != null ? cell.getStringCellValue().trim() : "";
+		return switch (cell.getCellType()) {
+			case STRING -> {
+				String v = cell.getStringCellValue();
+				yield v != null ? v.trim() : "";
+			}
+			case NUMERIC -> {
+				if (org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(cell)) {
+					yield cell.getLocalDateTimeCellValue().toLocalDate().toString();
+				}
+				double d = cell.getNumericCellValue();
+				yield d == Math.floor(d) ? String.valueOf((long) d) : String.valueOf(d);
+			}
+			case BOOLEAN -> String.valueOf(cell.getBooleanCellValue());
+			case FORMULA -> {
+				try {
+					yield cell.getStringCellValue().trim();
+				} catch (Exception e) {
+					yield String.valueOf(cell.getNumericCellValue());
+				}
+			}
+			default -> "";
+		};
 	}
 
 	private boolean isBlankRow(Row row) {

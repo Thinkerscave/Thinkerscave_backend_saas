@@ -29,5 +29,7 @@ public interface SectionRepository extends JpaRepository<AcademicSection, Long> 
     @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicClass WHERE s.sectionId = :sectionId")
     Optional<AcademicSection> findByIdWithClass(@Param("sectionId") Long sectionId);
 
+    Optional<AcademicSection> findByAcademicClass_ClassIdAndSectionNameIgnoreCase(Long classId, String sectionName);
+
     boolean existsByAcademicClass_ClassId(Long classId);
 }

@@ -57,9 +57,10 @@ public class StaffServiceImpl implements StaffService {
             throw new AlreadyExistsException("Staff with email already exists: " + request.getEmail());
         }
 
-        Role staffRole = roleRepository.findByRoleCode("STAFF")
-                .orElseGet(() -> roleRepository.findByRoleName("STAFF")
-                        .orElse(null));
+        Role staffRole = roleRepository.findByRoleCode("ROLE_STAFF")
+                .orElseGet(() -> roleRepository.findByRoleCode("STAFF")
+                        .orElseGet(() -> roleRepository.findByRoleName("STAFF")
+                                .orElse(null)));
 
         UserCreationContext context = new UserCreationContext(
                 request.getFirstName(), request.getMiddleName(), request.getLastName(),

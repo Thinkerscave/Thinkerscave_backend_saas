@@ -83,13 +83,13 @@ VALUES
 
 INSERT IGNORE INTO tenant_registry (
 	id, tenant_identifier, organization_id, schema_name, database_version, migration_version, template_version,
-	provision_status, database_size_mb, storage_used_mb, created_by, updated_by, version
+	provision_status, database_size_mb, storage_used_mb, active, created_by, updated_by, version
 )
 VALUES
-(1, 'jsb-bhubaneswar', 1, 'tenant_jsb_bhubaneswar', '1.0', '1.0', '1.0', 'COMPLETED', 128, 45, 'system', 'system', 0),
-(2, 'jsc-cuttack', 2, 'tenant_jsc_cuttack', '1.0', '1.0', '1.0', 'COMPLETED', 96, 32, 'system', 'system', 0),
-(3, 'abc-puri', 3, 'tenant_abc_puri', '1.0', '1.0', '1.0', 'COMPLETED', 88, 24, 'system', 'system', 0),
-(4, 'kcc-cuttack', 4, 'tenant_kcc_cuttack', '1.0', '1.0', '1.0', 'COMPLETED', 140, 50, 'system', 'system', 0);
+(1, 'jsb-bhubaneswar', 1, 'tenant_jsb_bhubaneswar', '1.0', '1.0', '1.0', 'COMPLETED', 128, 45, TRUE, 'system', 'system', 0),
+(2, 'jsc-cuttack', 2, 'tenant_jsc_cuttack', '1.0', '1.0', '1.0', 'COMPLETED', 96, 32, TRUE, 'system', 'system', 0),
+(3, 'abc-puri', 3, 'tenant_abc_puri', '1.0', '1.0', '1.0', 'COMPLETED', 88, 24, TRUE, 'system', 'system', 0),
+(4, 'kcc-cuttack', 4, 'tenant_kcc_cuttack', '1.0', '1.0', '1.0', 'COMPLETED', 140, 50, TRUE, 'system', 'system', 0);
 
 INSERT IGNORE INTO organization_domains (
 	id, organization_id, sub_domain, domain, custom_domain, ssl_enabled, dns_verified,
@@ -1406,3 +1406,811 @@ VALUES
 -- (DevDataInitializer will handle this, but adding placeholder marker)
 -- =========================================================
 UPDATE users SET password = 'PLACEHOLDER' WHERE password IS NULL OR password = '';
+
+-- =============================================================================
+-- PHASE 3: ROLE-BASED NAVIGATION & PERMISSION CONFIGURATION
+-- Complete menu hierarchy + comprehensive role permissions for all 4 orgs
+-- All entries are idempotent via INSERT IGNORE
+-- =============================================================================
+
+-- =========================================================
+-- STEP A: SPECIALIZED ROLES
+-- Adds TEACHER, PRINCIPAL, RECEPTIONIST, ACCOUNTANT as distinct org roles
+-- Maps to existing RoleType enum values; frontend roleGuard uses roleCode
+-- =========================================================
+INSERT IGNORE INTO roles (id, role_code, role_name, description, role_type, dashboard_code, system_role, active, display_order, created_by, updated_by, version)
+VALUES
+(7,  'ROLE_TEACHER',      'Teacher',      'Classroom teacher — teaching staff with academic management',    'STAFF',               'STAFF', FALSE, TRUE, 6,  'system', 'system', 0),
+(8,  'ROLE_PRINCIPAL',    'Principal',    'Campus principal — elevated academic and operational oversight',  'ORGANIZATION_ADMIN',  'ADMIN', FALSE, TRUE, 7,  'system', 'system', 0),
+(9,  'ROLE_RECEPTIONIST', 'Receptionist', 'Front desk staff — admissions intake and visitor management',    'STAFF',               'STAFF', FALSE, TRUE, 8,  'system', 'system', 0),
+(10, 'ROLE_ACCOUNTANT',   'Accountant',   'Finance officer — fee collection and payment management',        'STAFF',               'STAFF', FALSE, TRUE, 9,  'system', 'system', 0);
+
+-- =========================================================
+-- STEP B: SPECIALIZED ROLE USERS
+-- One per key org to validate role isolation
+-- =========================================================
+INSERT IGNORE INTO users (
+    id, organization_id, user_code, username, email, mobile_number, password,
+    first_name, last_name, display_name, profile_image_url, status,
+    email_verified, mobile_verified, first_time_login, failed_login_attempts, account_locked,
+    last_login_at, password_changed_at, locked_at, lock_expiry_at, created_by, updated_by, version)
+VALUES
+(22, 1, 'USR000022', 'javier.principal',  'principal@jsb.edu.in',    '9777111150', 'PLACEHOLDER', 'Pradeep',   'Mishra',   'Pradeep Mishra',   NULL, 'ACTIVE', TRUE, TRUE, FALSE, 0, FALSE, NULL, NULL, NULL, NULL, 'system', 'system', 0),
+(23, 1, 'USR000023', 'javier.accountant', 'accountant@jsb.edu.in',   '9777111160', 'PLACEHOLDER', 'Sumithra',  'Rao',      'Sumithra Rao',     NULL, 'ACTIVE', TRUE, TRUE, FALSE, 0, FALSE, NULL, NULL, NULL, NULL, 'system', 'system', 0),
+(24, 4, 'USR000024', 'kcc.principal',     'principal@kcc.edu.in',    '9777444450', 'PLACEHOLDER', 'Dr. Ratan', 'Behera',   'Dr. Ratan Behera', NULL, 'ACTIVE', TRUE, TRUE, FALSE, 0, FALSE, NULL, NULL, NULL, NULL, 'system', 'system', 0),
+(25, 2, 'USR000025', 'jsc.receptionist',  'receptionist@jsc.edu.in', '9777222250', 'PLACEHOLDER', 'Kajal',     'Tripathy', 'Kajal Tripathy',   NULL, 'ACTIVE', TRUE, TRUE, FALSE, 0, FALSE, NULL, NULL, NULL, NULL, 'system', 'system', 0);
+
+INSERT IGNORE INTO user_roles (id, user_id, role_id, primary_role, active, created_by, updated_by, version)
+VALUES
+(22, 22, 8,  TRUE, TRUE, 'system', 'system', 0),
+(23, 23, 10, TRUE, TRUE, 'system', 'system', 0),
+(24, 24, 8,  TRUE, TRUE, 'system', 'system', 0),
+(25, 25, 9,  TRUE, TRUE, 'system', 'system', 0);
+
+-- =========================================================
+-- STEP C: NEW TOP-LEVEL MODULE MENUS
+-- Adds FEES, EXAMS, COMMUNICATION, ENROLLMENT, TENANT_MANAGEMENT
+-- =========================================================
+INSERT IGNORE INTO menus (id, menu_code, menu_name, description, route, icon, menu_type, parent_menu_id, display_order, show_in_sidebar, active, default_page, created_by, updated_by, version)
+VALUES
+(8,  'FEES',              'Fees',              'Fees & finance management',        '/fees',                     'payments',              'MODULE', NULL, 8,  TRUE, TRUE, FALSE, 'system', 'system', 0),
+(9,  'EXAMS',             'Exams',             'Examination management',            '/exam-management',          'quiz',                  'MODULE', NULL, 9,  TRUE, TRUE, FALSE, 'system', 'system', 0),
+(10, 'COMMUNICATION',     'Communication',     'Notices, messages & announcements', '/communication',            'notifications_active',  'MODULE', NULL, 10, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(11, 'ENROLLMENT',        'Enrollment',        'Enrollment & promotion management', '/enrollment-management',    'how_to_reg',            'MODULE', NULL, 11, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(12, 'TENANT_MANAGEMENT', 'Tenant Management', 'Platform and tenant administration','/tenant-management',        'admin_panel_settings',  'MODULE', NULL, 12, TRUE, TRUE, FALSE, 'system', 'system', 0);
+
+-- =========================================================
+-- STEP D: SUB-MENU PAGES FOR ALL MODULES
+-- PAGE-level menus enable fine-grained sidebar navigation
+-- =========================================================
+INSERT IGNORE INTO menus (id, menu_code, menu_name, description, route, icon, menu_type, parent_menu_id, display_order, show_in_sidebar, active, default_page, created_by, updated_by, version)
+VALUES
+-- ADMISSION sub-pages (parent=7)
+(20, 'ADMISSION_OVERVIEW',     'Overview',          'Admission overview dashboard',      '/admissions/overview',          'dashboard',             'PAGE', 7,  1, TRUE, TRUE, TRUE,  'system', 'system', 0),
+(21, 'ADMISSION_LEADS',        'Leads',             'Inquiry & lead management',         '/admissions/leads',             'contacts',              'PAGE', 7,  2, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(22, 'ADMISSION_FOLLOWUPS',    'Follow-ups',        'Lead follow-up tracking',           '/admissions/follow-ups',        'update',                'PAGE', 7,  3, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(23, 'ADMISSION_APPLICATIONS', 'Applications',      'Admission applications',            '/admissions/applications',      'description',           'PAGE', 7,  4, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(24, 'ADMISSION_ENROLLMENT',   'Enrollment',        'Application to enrollment',         '/admissions/enrollment',        'how_to_reg',            'PAGE', 7,  5, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(25, 'ADMISSION_REPORTS',      'Reports',           'Admission reports & analytics',     '/admissions/reports',           'bar_chart',             'PAGE', 7,  6, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(26, 'ADMISSION_SETTINGS',     'Settings',          'Admission configuration',           '/admissions/settings',          'settings',              'PAGE', 7,  7, TRUE, TRUE, FALSE, 'system', 'system', 0),
+-- STUDENTS sub-pages (parent=3)
+(30, 'STUDENTS_DIRECTORY',     'Directory',         'Student directory listing',         '/students/directory',           'people',                'PAGE', 3,  1, TRUE, TRUE, TRUE,  'system', 'system', 0),
+(31, 'STUDENTS_TRANSFERS',     'Transfers',         'Transfer certificate management',   '/students/transfers',           'swap_horiz',            'PAGE', 3,  2, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(32, 'STUDENTS_DOCUMENTS',     'Documents',         'Student documents vault',           '/students/documents-vault',     'folder',                'PAGE', 3,  3, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(33, 'STUDENTS_ALUMNI',        'Alumni',            'Alumni tracking & management',      '/students/alumni',              'people_alt',            'PAGE', 3,  4, TRUE, TRUE, FALSE, 'system', 'system', 0),
+-- STAFF sub-pages (parent=4)
+(40, 'STAFF_DIRECTORY',        'Directory',         'Staff directory listing',           '/staff/directory',              'badge',                 'PAGE', 4,  1, TRUE, TRUE, TRUE,  'system', 'system', 0),
+(41, 'STAFF_RESPONSIBILITIES', 'Responsibilities',  'Staff responsibilities & duties',   '/staff/responsibilities',       'assignment_ind',        'PAGE', 4,  2, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(42, 'STAFF_PAYROLL',          'Payroll',           'Salary & payroll records',          '/staff/payroll',                'account_balance_wallet','PAGE', 4,  3, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(43, 'STAFF_LEAVE',            'Leave',             'Leave requests & availability',     '/staff/leave-availability',     'event_busy',            'PAGE', 4,  4, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(44, 'STAFF_DOCUMENTS',        'Documents',         'Staff documents vault',             '/staff/documents',              'folder',                'PAGE', 4,  5, TRUE, TRUE, FALSE, 'system', 'system', 0),
+-- ATTENDANCE sub-pages (parent=5)
+(50, 'ATTENDANCE_STUDENTS',    'Students',          'Student attendance management',     '/attendance/students',          'school',                'PAGE', 5,  1, TRUE, TRUE, TRUE,  'system', 'system', 0),
+(51, 'ATTENDANCE_STAFF',       'Staff',             'Staff attendance management',       '/attendance/staff',             'badge',                 'PAGE', 5,  2, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(52, 'ATTENDANCE_REPORTS',     'Reports',           'Attendance reports & statistics',   '/attendance/reports',           'bar_chart',             'PAGE', 5,  3, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(53, 'ATTENDANCE_CALENDAR',    'Calendar',          'Monthly attendance calendar view',  '/attendance/calendar',          'calendar_today',        'PAGE', 5,  4, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(54, 'ATTENDANCE_SETTINGS',    'Settings',          'Attendance configuration & rules',  '/attendance/settings',          'settings',              'PAGE', 5,  5, TRUE, TRUE, FALSE, 'system', 'system', 0),
+-- ACADEMICS sub-pages (parent=6)
+(60, 'ACADEMICS_SETUP',        'Academic Setup',    'Academic year, class & section setup','/academics/academic-setup',   'settings',              'PAGE', 6,  1, TRUE, TRUE, TRUE,  'system', 'system', 0),
+(61, 'ACADEMICS_TIMETABLE',    'Timetable',         'Class timetable configuration',    '/academics/timetable',          'schedule',              'PAGE', 6,  2, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(62, 'ACADEMICS_ARRANGEMENT',  'Teacher Arrangement','Teacher substitution management',  '/academics/teacher-arrangement','swap_horiz',            'PAGE', 6,  3, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(63, 'ACADEMICS_CALENDAR',     'Academic Calendar', 'Academic events & holiday calendar','/academics/academic-calendar', 'event',                 'PAGE', 6,  4, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(64, 'ACADEMICS_SYLLABUS',     'Syllabus Tracker',  'Syllabus coverage progress',       '/academics/syllabus-tracker',   'menu_book',             'PAGE', 6,  5, TRUE, TRUE, FALSE, 'system', 'system', 0),
+-- ACCESS sub-pages (parent=2)
+(70, 'ACCESS_OVERVIEW',        'Overview',          'Access management dashboard',       '/access-management',            'dashboard',             'PAGE', 2,  1, TRUE, TRUE, TRUE,  'system', 'system', 0),
+(71, 'ACCESS_ROLES',           'Roles',             'Role configuration & permissions',  '/access-management/roles',      'manage_accounts',       'PAGE', 2,  2, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(72, 'ACCESS_MENUS',           'Menu Catalog',      'Menu & navigation configuration',   '/access-management/menus',      'menu',                  'PAGE', 2,  3, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(73, 'ACCESS_USERS',           'Users',             'User account management',           '/access-management/users',      'people',                'PAGE', 2,  4, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(74, 'ACCESS_SECURITY',        'Security Policy',   'Password & session policy',         '/access-management/security-policy','security',          'PAGE', 2,  5, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(75, 'ACCESS_HISTORY',         'Login History',     'Login audit & session history',     '/access-management/login-history',  'history',           'PAGE', 2,  6, TRUE, TRUE, FALSE, 'system', 'system', 0),
+-- FEES sub-pages (parent=8)
+(80, 'FEES_OVERVIEW',          'Overview',          'Fees collection dashboard',         '/fees/dashboard',               'dashboard',             'PAGE', 8,  1, TRUE, TRUE, TRUE,  'system', 'system', 0),
+(81, 'FEES_SETUP',             'Setup',             'Fee policy, heads & structure',     '/fees/setup/overview',          'tune',                  'PAGE', 8,  2, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(82, 'FEES_CONTRACTS',         'Contracts',         'Fee contracts & fee plans',         '/fees/contracts',               'description',           'PAGE', 8,  3, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(83, 'FEES_LEDGER',            'Ledger',            'Student fee ledger',                '/fees/ledger',                  'account_balance',       'PAGE', 8,  4, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(84, 'FEES_PAYMENTS',          'Payments',          'Fee payment collection',            '/fees/payments',                'payments',              'PAGE', 8,  5, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(85, 'FEES_RECEIPTS',          'Receipts',          'Payment receipts & invoices',       '/fees/receipts',                'receipt',               'PAGE', 8,  6, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(86, 'FEES_ADJUSTMENTS',       'Adjustments',       'Fee waivers & adjustments',         '/fees/adjustments',             'tune',                  'PAGE', 8,  7, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(87, 'FEES_REPORTS',           'Reports',           'Fee collection reports',            '/fees/reports',                 'bar_chart',             'PAGE', 8,  8, TRUE, TRUE, FALSE, 'system', 'system', 0),
+-- EXAMS sub-pages (parent=9)
+(90, 'EXAMS_MANAGEMENT',       'Exam Management',   'Examination scheduling & results',  '/exam-management',              'quiz',                  'PAGE', 9,  1, TRUE, TRUE, TRUE,  'system', 'system', 0),
+-- COMMUNICATION sub-pages (parent=10)
+(100,'COMM_NOTICES',           'Notices',           'Announcements, notices & circulars','/communication',                'notifications_active',  'PAGE', 10, 1, TRUE, TRUE, TRUE,  'system', 'system', 0),
+-- ENROLLMENT sub-pages (parent=11)
+(110,'ENROLLMENT_MANAGE',      'Enrollment',        'Student enrollment management',     '/enrollment-management',        'how_to_reg',            'PAGE', 11, 1, TRUE, TRUE, TRUE,  'system', 'system', 0),
+(111,'PROMOTION_MANAGE',       'Promotion',         'Student class promotion management','/promotion-management',         'arrow_upward',          'PAGE', 11, 2, TRUE, TRUE, FALSE, 'system', 'system', 0),
+-- TENANT_MANAGEMENT sub-pages (parent=12)
+(120,'TENANT_DASHBOARD',       'Dashboard',         'Platform overview dashboard',       '/tenant-management/dashboard',          'dashboard',         'PAGE', 12, 1, TRUE, TRUE, TRUE,  'system', 'system', 0),
+(121,'TENANT_CUSTOMERS',       'Customers',         'Customer account management',       '/tenant-management/customers',          'business',          'PAGE', 12, 2, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(122,'TENANT_ORGANIZATIONS',   'Organizations',     'Organization management',           '/tenant-management/organizations',      'domain',            'PAGE', 12, 3, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(123,'TENANT_SUBSCRIPTIONS',   'Subscriptions',     'Subscription plans & billing',      '/tenant-management/subscription-plans', 'card_membership',   'PAGE', 12, 4, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(124,'TENANT_PROMOTIONS',      'Promotions',        'Promotions & discount management',  '/tenant-management/promotions',         'local_offer',       'PAGE', 12, 5, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(125,'TENANT_FEATURES',        'Feature Catalog',   'Platform feature flag catalog',     '/tenant-management/feature-catalog',    'extension',         'PAGE', 12, 6, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(126,'TENANT_HEALTH',          'Tenant Health',     'Tenant health & uptime monitoring', '/tenant-management/tenant-health',      'monitor_heart',     'PAGE', 12, 7, TRUE, TRUE, FALSE, 'system', 'system', 0),
+(127,'TENANT_AUDIT',           'Audit Center',      'Platform audit logs & trails',      '/tenant-management/audit-center',       'policy',            'PAGE', 12, 8, TRUE, TRUE, FALSE, 'system', 'system', 0);
+
+-- =============================================================================
+-- STEP E: COMPREHENSIVE ROLE_PERMISSIONS
+-- Organized by: Organization → Role → Menus
+-- Permission levels: V=canView, M=canManage, A=canApprove
+-- All 4 orgs configured with slightly different access to validate multi-tenancy
+-- Starting from ID 36 (IDs 1-35 already exist)
+-- =============================================================================
+
+INSERT IGNORE INTO role_permissions (id, organization_id, role_id, menu_id, can_view, can_manage, can_approve, created_by, updated_by, version)
+VALUES
+-- ==============================================================
+-- ORG 1 (JSB - Javier School Bhubaneswar) — Full Feature Set
+-- ==============================================================
+
+-- SUPER_ADMIN (role_id=6) on Org 1 — Platform + All org menus
+(36,  1, 6,  1,   TRUE, TRUE, TRUE,  'system', 'system', 0), -- DASHBOARD module
+(37,  1, 6,  120, TRUE, TRUE, TRUE,  'system', 'system', 0), -- TENANT_DASHBOARD
+(38,  1, 6,  121, TRUE, TRUE, TRUE,  'system', 'system', 0), -- TENANT_CUSTOMERS
+(39,  1, 6,  122, TRUE, TRUE, TRUE,  'system', 'system', 0), -- TENANT_ORGANIZATIONS
+(40,  1, 6,  123, TRUE, TRUE, TRUE,  'system', 'system', 0), -- TENANT_SUBSCRIPTIONS
+(41,  1, 6,  124, TRUE, TRUE, TRUE,  'system', 'system', 0), -- TENANT_PROMOTIONS
+(42,  1, 6,  125, TRUE, TRUE, TRUE,  'system', 'system', 0), -- TENANT_FEATURES
+(43,  1, 6,  126, TRUE, TRUE, TRUE,  'system', 'system', 0), -- TENANT_HEALTH
+(44,  1, 6,  127, TRUE, TRUE, TRUE,  'system', 'system', 0), -- TENANT_AUDIT
+(45,  1, 6,  70,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_OVERVIEW
+(46,  1, 6,  71,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_ROLES
+(47,  1, 6,  72,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_MENUS
+(48,  1, 6,  73,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_USERS
+(49,  1, 6,  74,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_SECURITY
+(50,  1, 6,  75,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_HISTORY
+(51,  1, 6,  30,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STUDENTS_DIRECTORY
+(52,  1, 6,  31,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STUDENTS_TRANSFERS
+(53,  1, 6,  32,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STUDENTS_DOCUMENTS
+(54,  1, 6,  33,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STUDENTS_ALUMNI
+(55,  1, 6,  40,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STAFF_DIRECTORY
+(56,  1, 6,  41,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STAFF_RESPONSIBILITIES
+(57,  1, 6,  42,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STAFF_PAYROLL
+(58,  1, 6,  43,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STAFF_LEAVE
+(59,  1, 6,  44,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STAFF_DOCUMENTS
+(60,  1, 6,  50,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(61,  1, 6,  51,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ATTENDANCE_STAFF
+(62,  1, 6,  52,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ATTENDANCE_REPORTS
+(63,  1, 6,  53,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ATTENDANCE_CALENDAR
+(64,  1, 6,  54,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ATTENDANCE_SETTINGS
+(65,  1, 6,  60,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACADEMICS_SETUP
+(66,  1, 6,  61,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACADEMICS_TIMETABLE
+(67,  1, 6,  62,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACADEMICS_ARRANGEMENT
+(68,  1, 6,  63,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACADEMICS_CALENDAR
+(69,  1, 6,  64,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(70,  1, 6,  20,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_OVERVIEW
+(71,  1, 6,  21,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_LEADS
+(72,  1, 6,  22,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_FOLLOWUPS
+(73,  1, 6,  23,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(74,  1, 6,  24,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_ENROLLMENT
+(75,  1, 6,  25,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_REPORTS
+(76,  1, 6,  26,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_SETTINGS
+(77,  1, 6,  80,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_OVERVIEW
+(78,  1, 6,  81,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_SETUP
+(79,  1, 6,  82,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_CONTRACTS
+(80,  1, 6,  83,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_LEDGER
+(81,  1, 6,  84,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_PAYMENTS
+(82,  1, 6,  85,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_RECEIPTS
+(83,  1, 6,  86,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_ADJUSTMENTS
+(84,  1, 6,  87,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_REPORTS
+(85,  1, 6,  90,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- EXAMS_MANAGEMENT
+(86,  1, 6,  100, TRUE, TRUE, TRUE,  'system', 'system', 0), -- COMM_NOTICES
+(87,  1, 6,  110, TRUE, TRUE, TRUE,  'system', 'system', 0), -- ENROLLMENT_MANAGE
+(88,  1, 6,  111, TRUE, TRUE, TRUE,  'system', 'system', 0), -- PROMOTION_MANAGE
+
+-- ORG 1 OWNER (role_id=1) — All org pages (existing MODULE entries: IDs 1-4)
+(89,  1, 1,  70,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_OVERVIEW
+(90,  1, 1,  71,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_ROLES
+(91,  1, 1,  72,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_MENUS
+(92,  1, 1,  73,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_USERS
+(93,  1, 1,  74,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_SECURITY
+(94,  1, 1,  75,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACCESS_HISTORY
+(95,  1, 1,  30,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STUDENTS_DIRECTORY
+(96,  1, 1,  31,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STUDENTS_TRANSFERS
+(97,  1, 1,  32,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STUDENTS_DOCUMENTS
+(98,  1, 1,  33,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STUDENTS_ALUMNI
+(99,  1, 1,  40,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STAFF_DIRECTORY
+(100, 1, 1,  41,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STAFF_RESPONSIBILITIES
+(101, 1, 1,  42,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STAFF_PAYROLL
+(102, 1, 1,  43,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STAFF_LEAVE
+(103, 1, 1,  44,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- STAFF_DOCUMENTS
+(104, 1, 1,  50,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(105, 1, 1,  51,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ATTENDANCE_STAFF
+(106, 1, 1,  52,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ATTENDANCE_REPORTS
+(107, 1, 1,  53,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ATTENDANCE_CALENDAR
+(108, 1, 1,  54,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ATTENDANCE_SETTINGS
+(109, 1, 1,  60,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACADEMICS_SETUP
+(110, 1, 1,  61,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACADEMICS_TIMETABLE
+(111, 1, 1,  62,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACADEMICS_ARRANGEMENT
+(112, 1, 1,  63,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACADEMICS_CALENDAR
+(113, 1, 1,  64,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(114, 1, 1,  20,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_OVERVIEW
+(115, 1, 1,  21,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_LEADS
+(116, 1, 1,  22,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_FOLLOWUPS
+(117, 1, 1,  23,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(118, 1, 1,  24,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_ENROLLMENT
+(119, 1, 1,  25,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_REPORTS
+(120, 1, 1,  26,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- ADMISSION_SETTINGS
+(121, 1, 1,  80,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_OVERVIEW
+(122, 1, 1,  81,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_SETUP
+(123, 1, 1,  82,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_CONTRACTS
+(124, 1, 1,  83,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_LEDGER
+(125, 1, 1,  84,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_PAYMENTS
+(126, 1, 1,  85,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_RECEIPTS
+(127, 1, 1,  86,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_ADJUSTMENTS
+(128, 1, 1,  87,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- FEES_REPORTS
+(129, 1, 1,  90,  TRUE, TRUE, TRUE,  'system', 'system', 0), -- EXAMS_MANAGEMENT
+(130, 1, 1,  100, TRUE, TRUE, TRUE,  'system', 'system', 0), -- COMM_NOTICES
+(131, 1, 1,  110, TRUE, TRUE, TRUE,  'system', 'system', 0), -- ENROLLMENT_MANAGE
+(132, 1, 1,  111, TRUE, TRUE, TRUE,  'system', 'system', 0), -- PROMOTION_MANAGE
+
+-- ORG 1 ADMIN (role_id=2) — All org pages, approve only on fee transactions
+(133, 1, 2,  1,   TRUE, TRUE,  FALSE, 'system', 'system', 0), -- DASHBOARD module
+(134, 1, 2,  70,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_OVERVIEW
+(135, 1, 2,  71,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_ROLES
+(136, 1, 2,  72,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_MENUS
+(137, 1, 2,  73,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_USERS
+(138, 1, 2,  74,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_SECURITY
+(139, 1, 2,  75,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_HISTORY
+(140, 1, 2,  30,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY
+(141, 1, 2,  31,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_TRANSFERS
+(142, 1, 2,  32,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_DOCUMENTS
+(143, 1, 2,  33,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_ALUMNI
+(144, 1, 2,  40,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_DIRECTORY
+(145, 1, 2,  41,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_RESPONSIBILITIES
+(146, 1, 2,  42,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_PAYROLL
+(147, 1, 2,  43,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_LEAVE
+(148, 1, 2,  44,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_DOCUMENTS
+(149, 1, 2,  50,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(150, 1, 2,  51,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STAFF
+(151, 1, 2,  52,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_REPORTS
+(152, 1, 2,  53,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_CALENDAR
+(153, 1, 2,  54,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_SETTINGS
+(154, 1, 2,  60,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SETUP
+(155, 1, 2,  61,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_TIMETABLE
+(156, 1, 2,  62,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_ARRANGEMENT
+(157, 1, 2,  63,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR
+(158, 1, 2,  64,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(159, 1, 2,  20,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_OVERVIEW
+(160, 1, 2,  21,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_LEADS
+(161, 1, 2,  22,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_FOLLOWUPS
+(162, 1, 2,  23,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(163, 1, 2,  24,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_ENROLLMENT
+(164, 1, 2,  25,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_REPORTS
+(165, 1, 2,  26,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_SETTINGS
+(166, 1, 2,  80,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_OVERVIEW
+(167, 1, 2,  81,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_SETUP
+(168, 1, 2,  82,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_CONTRACTS
+(169, 1, 2,  83,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_LEDGER
+(170, 1, 2,  84,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_PAYMENTS (admin can approve)
+(171, 1, 2,  85,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_RECEIPTS (admin can approve)
+(172, 1, 2,  86,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_ADJUSTMENTS (admin can approve)
+(173, 1, 2,  87,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_REPORTS
+(174, 1, 2,  90,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- EXAMS_MANAGEMENT
+(175, 1, 2,  100, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- COMM_NOTICES
+(176, 1, 2,  110, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ENROLLMENT_MANAGE
+(177, 1, 2,  111, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- PROMOTION_MANAGE
+
+-- ORG 1 PRINCIPAL (role_id=8) — Academic oversight, no finance access
+(178, 1, 8,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD module (view)
+(179, 1, 8,  30,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY
+(180, 1, 8,  31,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_TRANSFERS
+(181, 1, 8,  32,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_DOCUMENTS
+(182, 1, 8,  33,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_ALUMNI
+(183, 1, 8,  40,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_DIRECTORY
+(184, 1, 8,  41,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_RESPONSIBILITIES
+(185, 1, 8,  43,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_LEAVE
+(186, 1, 8,  44,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_DOCUMENTS
+(187, 1, 8,  50,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(188, 1, 8,  51,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STAFF
+(189, 1, 8,  52,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_REPORTS
+(190, 1, 8,  53,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_CALENDAR
+(191, 1, 8,  54,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_SETTINGS
+(192, 1, 8,  60,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_SETUP (principal approves)
+(193, 1, 8,  61,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_TIMETABLE
+(194, 1, 8,  62,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_ARRANGEMENT
+(195, 1, 8,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR
+(196, 1, 8,  64,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(197, 1, 8,  20,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_OVERVIEW
+(198, 1, 8,  21,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_LEADS
+(199, 1, 8,  22,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_FOLLOWUPS
+(200, 1, 8,  23,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(201, 1, 8,  24,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_ENROLLMENT (principal approves)
+(202, 1, 8,  25,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ADMISSION_REPORTS
+(203, 1, 8,  90,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- EXAMS_MANAGEMENT
+(204, 1, 8,  100, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- COMM_NOTICES
+
+-- ORG 1 TEACHER (role_id=7) — Classroom teaching, attendance & academics
+(205, 1, 7,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD
+(206, 1, 7,  30,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY (view)
+(207, 1, 7,  50,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS (mark)
+(208, 1, 7,  52,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_REPORTS (view)
+(209, 1, 7,  53,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_CALENDAR (view)
+(210, 1, 7,  60,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_SETUP (view)
+(211, 1, 7,  61,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_TIMETABLE (manage own)
+(212, 1, 7,  62,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_ARRANGEMENT (raise)
+(213, 1, 7,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR (view)
+(214, 1, 7,  64,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS (update own)
+(215, 1, 7,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- EXAMS_MANAGEMENT (view)
+(216, 1, 7,  100, TRUE, FALSE, FALSE, 'system', 'system', 0), -- COMM_NOTICES (view)
+
+-- ORG 1 RECEPTIONIST (role_id=9) — Admissions intake & front desk
+(217, 1, 9,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD
+(218, 1, 9,  30,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY (view)
+(219, 1, 9,  20,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_OVERVIEW
+(220, 1, 9,  21,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_LEADS (manage)
+(221, 1, 9,  22,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_FOLLOWUPS (manage)
+(222, 1, 9,  23,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_APPLICATIONS (manage)
+(223, 1, 9,  24,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_ENROLLMENT (process)
+(224, 1, 9,  25,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ADMISSION_REPORTS (view)
+(225, 1, 9,  50,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS (view)
+(226, 1, 9,  52,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_REPORTS (view)
+(227, 1, 9,  100, TRUE, FALSE, FALSE, 'system', 'system', 0), -- COMM_NOTICES (view)
+
+-- ORG 1 ACCOUNTANT (role_id=10) — Full fee management access
+(228, 1, 10, 1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD
+(229, 1, 10, 30,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY (lookup for fees)
+(230, 1, 10, 80,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_OVERVIEW
+(231, 1, 10, 81,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_SETUP (configure)
+(232, 1, 10, 82,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_CONTRACTS
+(233, 1, 10, 83,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_LEDGER (view & update)
+(234, 1, 10, 84,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_PAYMENTS (collect & approve)
+(235, 1, 10, 85,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_RECEIPTS (issue & approve)
+(236, 1, 10, 86,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_ADJUSTMENTS (approve)
+(237, 1, 10, 87,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- FEES_REPORTS (view)
+(238, 1, 10, 100, TRUE, FALSE, FALSE, 'system', 'system', 0), -- COMM_NOTICES (view)
+
+-- ORG 1 STAFF (role_id=3) — General teaching staff
+(239, 1, 3,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD
+(240, 1, 3,  30,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY (view)
+(241, 1, 3,  50,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS (mark)
+(242, 1, 3,  52,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_REPORTS (view)
+(243, 1, 3,  53,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_CALENDAR (view)
+(244, 1, 3,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR (view)
+(245, 1, 3,  64,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS (update own)
+(246, 1, 3,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- EXAMS_MANAGEMENT (view)
+(247, 1, 3,  100, TRUE, FALSE, FALSE, 'system', 'system', 0), -- COMM_NOTICES (view)
+
+-- ORG 1 STUDENT (role_id=4) — Student self-service portal
+(248, 1, 4,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD
+(249, 1, 4,  50,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS (own record)
+(250, 1, 4,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR
+(251, 1, 4,  64,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS (read)
+(252, 1, 4,  83,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- FEES_LEDGER (own)
+(253, 1, 4,  85,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- FEES_RECEIPTS (own)
+(254, 1, 4,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- EXAMS_MANAGEMENT
+(255, 1, 4,  100, TRUE, FALSE, FALSE, 'system', 'system', 0), -- COMM_NOTICES
+
+-- ORG 1 PARENT (role_id=5) — Parent portal
+(256, 1, 5,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD
+(257, 1, 5,  50,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS (child's)
+(258, 1, 5,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR
+(259, 1, 5,  64,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(260, 1, 5,  83,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- FEES_LEDGER (child's)
+(261, 1, 5,  85,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- FEES_RECEIPTS (child's)
+(262, 1, 5,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- EXAMS_MANAGEMENT
+(263, 1, 5,  100, TRUE, FALSE, FALSE, 'system', 'system', 0), -- COMM_NOTICES
+
+-- ==============================================================
+-- ORG 2 (JSC - Javier School Cuttack) — Standard CBSE School
+-- ==============================================================
+
+-- ORG 2 OWNER (role_id=1) — Full access; partial MODULE entries exist (IDs 9-14)
+(264, 2, 1,  70,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_OVERVIEW
+(265, 2, 1,  71,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_ROLES
+(266, 2, 1,  72,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_MENUS
+(267, 2, 1,  73,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_USERS
+(268, 2, 1,  74,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_SECURITY
+(269, 2, 1,  75,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_HISTORY
+(270, 2, 1,  30,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_DIRECTORY
+(271, 2, 1,  31,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_TRANSFERS
+(272, 2, 1,  32,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_DOCUMENTS
+(273, 2, 1,  33,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_ALUMNI
+(274, 2, 1,  40,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_DIRECTORY
+(275, 2, 1,  41,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_RESPONSIBILITIES
+(276, 2, 1,  42,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_PAYROLL
+(277, 2, 1,  43,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_LEAVE
+(278, 2, 1,  44,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_DOCUMENTS
+(279, 2, 1,  50,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(280, 2, 1,  51,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_STAFF
+(281, 2, 1,  52,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_REPORTS
+(282, 2, 1,  53,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_CALENDAR
+(283, 2, 1,  54,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_SETTINGS
+(284, 2, 1,  60,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_SETUP
+(285, 2, 1,  61,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_TIMETABLE
+(286, 2, 1,  62,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_ARRANGEMENT
+(287, 2, 1,  63,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_CALENDAR
+(288, 2, 1,  64,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(289, 2, 1,  20,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_OVERVIEW
+(290, 2, 1,  21,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_LEADS
+(291, 2, 1,  22,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_FOLLOWUPS
+(292, 2, 1,  23,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(293, 2, 1,  24,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_ENROLLMENT
+(294, 2, 1,  25,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_REPORTS
+(295, 2, 1,  26,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_SETTINGS
+(296, 2, 1,  80,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_OVERVIEW
+(297, 2, 1,  81,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_SETUP
+(298, 2, 1,  82,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_CONTRACTS
+(299, 2, 1,  83,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_LEDGER
+(300, 2, 1,  84,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_PAYMENTS
+(301, 2, 1,  85,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_RECEIPTS
+(302, 2, 1,  86,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_ADJUSTMENTS
+(303, 2, 1,  87,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_REPORTS
+(304, 2, 1,  90,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- EXAMS_MANAGEMENT
+(305, 2, 1,  100, TRUE, TRUE,  TRUE,  'system', 'system', 0), -- COMM_NOTICES
+(306, 2, 1,  110, TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ENROLLMENT_MANAGE
+(307, 2, 1,  111, TRUE, TRUE,  TRUE,  'system', 'system', 0), -- PROMOTION_MANAGE
+
+-- ORG 2 ADMIN (role_id=2) — Partial MODULE entries exist (IDs 15-19); add all pages
+(308, 2, 2,  1,   TRUE, TRUE,  FALSE, 'system', 'system', 0), -- DASHBOARD (existing ID 15 covers MODULE)
+(309, 2, 2,  70,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_OVERVIEW
+(310, 2, 2,  71,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_ROLES
+(311, 2, 2,  72,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_MENUS
+(312, 2, 2,  73,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_USERS
+(313, 2, 2,  74,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_SECURITY
+(314, 2, 2,  75,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_HISTORY
+(315, 2, 2,  30,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY
+(316, 2, 2,  31,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_TRANSFERS
+(317, 2, 2,  32,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_DOCUMENTS
+(318, 2, 2,  33,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_ALUMNI
+(319, 2, 2,  40,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_DIRECTORY
+(320, 2, 2,  41,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_RESPONSIBILITIES
+(321, 2, 2,  42,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_PAYROLL
+(322, 2, 2,  43,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_LEAVE
+(323, 2, 2,  44,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_DOCUMENTS
+(324, 2, 2,  50,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(325, 2, 2,  51,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STAFF
+(326, 2, 2,  52,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_REPORTS
+(327, 2, 2,  53,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_CALENDAR
+(328, 2, 2,  54,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_SETTINGS
+(329, 2, 2,  60,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SETUP
+(330, 2, 2,  61,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_TIMETABLE
+(331, 2, 2,  62,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_ARRANGEMENT
+(332, 2, 2,  63,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR
+(333, 2, 2,  64,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(334, 2, 2,  20,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_OVERVIEW
+(335, 2, 2,  21,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_LEADS
+(336, 2, 2,  22,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_FOLLOWUPS
+(337, 2, 2,  23,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(338, 2, 2,  24,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_ENROLLMENT
+(339, 2, 2,  25,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_REPORTS
+(340, 2, 2,  26,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_SETTINGS
+(341, 2, 2,  80,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_OVERVIEW
+(342, 2, 2,  81,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_SETUP
+(343, 2, 2,  82,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_CONTRACTS
+(344, 2, 2,  83,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_LEDGER
+(345, 2, 2,  84,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_PAYMENTS
+(346, 2, 2,  85,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_RECEIPTS
+(347, 2, 2,  86,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_ADJUSTMENTS
+(348, 2, 2,  87,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_REPORTS
+(349, 2, 2,  90,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- EXAMS_MANAGEMENT
+(350, 2, 2,  100, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- COMM_NOTICES
+(351, 2, 2,  110, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ENROLLMENT_MANAGE
+(352, 2, 2,  111, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- PROMOTION_MANAGE
+
+-- ORG 2 RECEPTIONIST (role_id=9) — JSC has a dedicated receptionist user
+(353, 2, 9,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD
+(354, 2, 9,  30,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY (view)
+(355, 2, 9,  20,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_OVERVIEW
+(356, 2, 9,  21,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_LEADS
+(357, 2, 9,  22,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_FOLLOWUPS
+(358, 2, 9,  23,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(359, 2, 9,  24,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_ENROLLMENT
+(360, 2, 9,  25,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ADMISSION_REPORTS (view)
+(361, 2, 9,  50,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS (view)
+(362, 2, 9,  100, TRUE, FALSE, FALSE, 'system', 'system', 0), -- COMM_NOTICES
+
+-- ORG 2 STAFF (role_id=3)
+(363, 2, 3,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD
+(364, 2, 3,  30,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY
+(365, 2, 3,  50,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(366, 2, 3,  52,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_REPORTS
+(367, 2, 3,  53,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_CALENDAR
+(368, 2, 3,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR
+(369, 2, 3,  64,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(370, 2, 3,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- EXAMS_MANAGEMENT
+(371, 2, 3,  100, TRUE, FALSE, FALSE, 'system', 'system', 0), -- COMM_NOTICES
+
+-- ORG 2 STUDENT (role_id=4)
+(372, 2, 4,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD
+(373, 2, 4,  50,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(374, 2, 4,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR
+(375, 2, 4,  64,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(376, 2, 4,  83,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- FEES_LEDGER
+(377, 2, 4,  85,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- FEES_RECEIPTS
+(378, 2, 4,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- EXAMS_MANAGEMENT
+(379, 2, 4,  100, TRUE, FALSE, FALSE, 'system', 'system', 0), -- COMM_NOTICES
+
+-- ORG 2 PARENT (role_id=5)
+(380, 2, 5,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD
+(381, 2, 5,  50,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(382, 2, 5,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR
+(383, 2, 5,  64,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(384, 2, 5,  83,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- FEES_LEDGER
+(385, 2, 5,  85,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- FEES_RECEIPTS
+(386, 2, 5,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- EXAMS_MANAGEMENT
+(387, 2, 5,  100, TRUE, FALSE, FALSE, 'system', 'system', 0), -- COMM_NOTICES
+
+-- ==============================================================
+-- ORG 3 (ABCP - ABC School Puri) — ICSE School, no Enrollment module
+-- ==============================================================
+
+-- ORG 3 OWNER (role_id=1) — existing partial MODULE entries (IDs 20-23); add all pages
+(388, 3, 1,  70,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_OVERVIEW
+(389, 3, 1,  71,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_ROLES
+(390, 3, 1,  72,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_MENUS
+(391, 3, 1,  73,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_USERS
+(392, 3, 1,  74,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_SECURITY
+(393, 3, 1,  75,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_HISTORY
+(394, 3, 1,  30,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_DIRECTORY
+(395, 3, 1,  31,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_TRANSFERS
+(396, 3, 1,  32,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_DOCUMENTS
+(397, 3, 1,  33,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_ALUMNI
+(398, 3, 1,  40,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_DIRECTORY
+(399, 3, 1,  41,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_RESPONSIBILITIES
+(400, 3, 1,  42,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_PAYROLL
+(401, 3, 1,  43,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_LEAVE
+(402, 3, 1,  44,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_DOCUMENTS
+(403, 3, 1,  50,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(404, 3, 1,  51,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_STAFF
+(405, 3, 1,  52,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_REPORTS
+(406, 3, 1,  53,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_CALENDAR
+(407, 3, 1,  54,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_SETTINGS
+(408, 3, 1,  60,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_SETUP
+(409, 3, 1,  61,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_TIMETABLE
+(410, 3, 1,  62,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_ARRANGEMENT
+(411, 3, 1,  63,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_CALENDAR
+(412, 3, 1,  64,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(413, 3, 1,  20,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_OVERVIEW
+(414, 3, 1,  21,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_LEADS
+(415, 3, 1,  22,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_FOLLOWUPS
+(416, 3, 1,  23,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(417, 3, 1,  24,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_ENROLLMENT
+(418, 3, 1,  25,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_REPORTS
+(419, 3, 1,  26,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_SETTINGS
+(420, 3, 1,  80,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_OVERVIEW
+(421, 3, 1,  81,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_SETUP
+(422, 3, 1,  82,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_CONTRACTS
+(423, 3, 1,  83,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_LEDGER
+(424, 3, 1,  84,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_PAYMENTS
+(425, 3, 1,  85,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_RECEIPTS
+(426, 3, 1,  86,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_ADJUSTMENTS
+(427, 3, 1,  87,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_REPORTS
+(428, 3, 1,  90,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- EXAMS_MANAGEMENT
+(429, 3, 1,  100, TRUE, TRUE,  TRUE,  'system', 'system', 0), -- COMM_NOTICES
+
+-- ORG 3 ADMIN (role_id=2) — existing partial MODULE entries (IDs 24-27)
+(430, 3, 2,  1,   TRUE, TRUE,  FALSE, 'system', 'system', 0), -- DASHBOARD
+(431, 3, 2,  70,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_OVERVIEW
+(432, 3, 2,  71,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_ROLES
+(433, 3, 2,  72,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_MENUS
+(434, 3, 2,  73,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_USERS
+(435, 3, 2,  74,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_SECURITY
+(436, 3, 2,  75,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_HISTORY
+(437, 3, 2,  30,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY
+(438, 3, 2,  31,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_TRANSFERS
+(439, 3, 2,  32,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_DOCUMENTS
+(440, 3, 2,  33,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_ALUMNI
+(441, 3, 2,  40,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_DIRECTORY
+(442, 3, 2,  41,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_RESPONSIBILITIES
+(443, 3, 2,  42,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_PAYROLL
+(444, 3, 2,  43,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_LEAVE
+(445, 3, 2,  44,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_DOCUMENTS
+(446, 3, 2,  50,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(447, 3, 2,  51,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STAFF
+(448, 3, 2,  52,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_REPORTS
+(449, 3, 2,  53,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_CALENDAR
+(450, 3, 2,  54,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_SETTINGS
+(451, 3, 2,  60,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SETUP
+(452, 3, 2,  61,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_TIMETABLE
+(453, 3, 2,  62,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_ARRANGEMENT
+(454, 3, 2,  63,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR
+(455, 3, 2,  64,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(456, 3, 2,  20,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_OVERVIEW
+(457, 3, 2,  21,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_LEADS
+(458, 3, 2,  22,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_FOLLOWUPS
+(459, 3, 2,  23,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(460, 3, 2,  24,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_ENROLLMENT
+(461, 3, 2,  25,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_REPORTS
+(462, 3, 2,  26,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_SETTINGS
+(463, 3, 2,  80,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_OVERVIEW
+(464, 3, 2,  81,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_SETUP
+(465, 3, 2,  82,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_CONTRACTS
+(466, 3, 2,  83,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_LEDGER
+(467, 3, 2,  84,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_PAYMENTS
+(468, 3, 2,  85,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_RECEIPTS
+(469, 3, 2,  86,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_ADJUSTMENTS
+(470, 3, 2,  87,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_REPORTS
+(471, 3, 2,  90,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- EXAMS_MANAGEMENT
+(472, 3, 2,  100, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- COMM_NOTICES
+
+-- ORG 3 STAFF (role_id=3)
+(473, 3, 3,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0),
+(474, 3, 3,  30,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(475, 3, 3,  50,  TRUE, TRUE,  FALSE, 'system', 'system', 0),
+(476, 3, 3,  52,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(477, 3, 3,  53,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(478, 3, 3,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(479, 3, 3,  64,  TRUE, TRUE,  FALSE, 'system', 'system', 0),
+(480, 3, 3,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(481, 3, 3,  100, TRUE, FALSE, FALSE, 'system', 'system', 0),
+
+-- ORG 3 STUDENT (role_id=4)
+(482, 3, 4,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0),
+(483, 3, 4,  50,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(484, 3, 4,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(485, 3, 4,  64,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(486, 3, 4,  83,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(487, 3, 4,  85,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(488, 3, 4,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(489, 3, 4,  100, TRUE, FALSE, FALSE, 'system', 'system', 0),
+
+-- ORG 3 PARENT (role_id=5)
+(490, 3, 5,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0),
+(491, 3, 5,  50,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(492, 3, 5,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(493, 3, 5,  64,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(494, 3, 5,  83,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(495, 3, 5,  85,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(496, 3, 5,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(497, 3, 5,  100, TRUE, FALSE, FALSE, 'system', 'system', 0),
+
+-- ==============================================================
+-- ORG 4 (KCC - Kalinga College Cuttack) — College, enrollment-focused
+-- ==============================================================
+
+-- ORG 4 OWNER (role_id=1) — existing partial MODULE entries (IDs 28-31)
+(498, 4, 1,  70,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_OVERVIEW
+(499, 4, 1,  71,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_ROLES
+(500, 4, 1,  72,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_MENUS
+(501, 4, 1,  73,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_USERS
+(502, 4, 1,  74,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_SECURITY
+(503, 4, 1,  75,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACCESS_HISTORY
+(504, 4, 1,  30,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_DIRECTORY
+(505, 4, 1,  31,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_TRANSFERS
+(506, 4, 1,  32,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_DOCUMENTS
+(507, 4, 1,  33,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STUDENTS_ALUMNI
+(508, 4, 1,  40,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_DIRECTORY
+(509, 4, 1,  41,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_RESPONSIBILITIES
+(510, 4, 1,  42,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_PAYROLL
+(511, 4, 1,  43,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_LEAVE
+(512, 4, 1,  44,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- STAFF_DOCUMENTS
+(513, 4, 1,  50,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(514, 4, 1,  51,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_STAFF
+(515, 4, 1,  52,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_REPORTS
+(516, 4, 1,  53,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_CALENDAR
+(517, 4, 1,  54,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ATTENDANCE_SETTINGS
+(518, 4, 1,  60,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_SETUP
+(519, 4, 1,  61,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_TIMETABLE
+(520, 4, 1,  62,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_ARRANGEMENT
+(521, 4, 1,  63,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_CALENDAR
+(522, 4, 1,  64,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(523, 4, 1,  20,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_OVERVIEW
+(524, 4, 1,  21,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_LEADS
+(525, 4, 1,  22,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_FOLLOWUPS
+(526, 4, 1,  23,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(527, 4, 1,  24,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_ENROLLMENT
+(528, 4, 1,  25,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_REPORTS
+(529, 4, 1,  26,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_SETTINGS
+(530, 4, 1,  80,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_OVERVIEW
+(531, 4, 1,  81,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_SETUP
+(532, 4, 1,  82,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_CONTRACTS
+(533, 4, 1,  83,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_LEDGER
+(534, 4, 1,  84,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_PAYMENTS
+(535, 4, 1,  85,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_RECEIPTS
+(536, 4, 1,  86,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_ADJUSTMENTS
+(537, 4, 1,  87,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_REPORTS
+(538, 4, 1,  90,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- EXAMS_MANAGEMENT
+(539, 4, 1,  100, TRUE, TRUE,  TRUE,  'system', 'system', 0), -- COMM_NOTICES
+(540, 4, 1,  110, TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ENROLLMENT_MANAGE
+(541, 4, 1,  111, TRUE, TRUE,  TRUE,  'system', 'system', 0), -- PROMOTION_MANAGE
+
+-- ORG 4 ADMIN (role_id=2) — existing partial MODULE entries (IDs 32-35)
+(542, 4, 2,  1,   TRUE, TRUE,  FALSE, 'system', 'system', 0), -- DASHBOARD
+(543, 4, 2,  70,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_OVERVIEW
+(544, 4, 2,  71,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_ROLES
+(545, 4, 2,  72,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_MENUS
+(546, 4, 2,  73,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_USERS
+(547, 4, 2,  74,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_SECURITY
+(548, 4, 2,  75,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACCESS_HISTORY
+(549, 4, 2,  30,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY
+(550, 4, 2,  31,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_TRANSFERS
+(551, 4, 2,  32,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_DOCUMENTS
+(552, 4, 2,  33,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_ALUMNI
+(553, 4, 2,  40,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_DIRECTORY
+(554, 4, 2,  41,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_RESPONSIBILITIES
+(555, 4, 2,  42,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_PAYROLL
+(556, 4, 2,  43,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_LEAVE
+(557, 4, 2,  44,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_DOCUMENTS
+(558, 4, 2,  50,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(559, 4, 2,  51,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STAFF
+(560, 4, 2,  52,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_REPORTS
+(561, 4, 2,  53,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_CALENDAR
+(562, 4, 2,  54,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_SETTINGS
+(563, 4, 2,  60,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SETUP
+(564, 4, 2,  61,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_TIMETABLE
+(565, 4, 2,  62,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_ARRANGEMENT
+(566, 4, 2,  63,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR
+(567, 4, 2,  64,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(568, 4, 2,  20,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_OVERVIEW
+(569, 4, 2,  21,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_LEADS
+(570, 4, 2,  22,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_FOLLOWUPS
+(571, 4, 2,  23,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(572, 4, 2,  24,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_ENROLLMENT
+(573, 4, 2,  25,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_REPORTS
+(574, 4, 2,  26,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_SETTINGS
+(575, 4, 2,  80,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_OVERVIEW
+(576, 4, 2,  81,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_SETUP
+(577, 4, 2,  82,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_CONTRACTS
+(578, 4, 2,  83,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_LEDGER
+(579, 4, 2,  84,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_PAYMENTS
+(580, 4, 2,  85,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_RECEIPTS
+(581, 4, 2,  86,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- FEES_ADJUSTMENTS
+(582, 4, 2,  87,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- FEES_REPORTS
+(583, 4, 2,  90,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- EXAMS_MANAGEMENT
+(584, 4, 2,  100, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- COMM_NOTICES
+(585, 4, 2,  110, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ENROLLMENT_MANAGE
+(586, 4, 2,  111, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- PROMOTION_MANAGE
+
+-- ORG 4 PRINCIPAL (role_id=8) — kcc.principal user (id=24)
+(587, 4, 8,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0), -- DASHBOARD
+(588, 4, 8,  30,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_DIRECTORY
+(589, 4, 8,  31,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STUDENTS_TRANSFERS
+(590, 4, 8,  40,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_DIRECTORY
+(591, 4, 8,  41,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_RESPONSIBILITIES
+(592, 4, 8,  43,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- STAFF_LEAVE
+(593, 4, 8,  50,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STUDENTS
+(594, 4, 8,  51,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ATTENDANCE_STAFF
+(595, 4, 8,  52,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ATTENDANCE_REPORTS
+(596, 4, 8,  60,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_SETUP
+(597, 4, 8,  61,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_TIMETABLE
+(598, 4, 8,  62,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ACADEMICS_ARRANGEMENT
+(599, 4, 8,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0), -- ACADEMICS_CALENDAR
+(600, 4, 8,  64,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ACADEMICS_SYLLABUS
+(601, 4, 8,  20,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_OVERVIEW
+(602, 4, 8,  23,  TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ADMISSION_APPLICATIONS
+(603, 4, 8,  24,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- ADMISSION_ENROLLMENT
+(604, 4, 8,  90,  TRUE, TRUE,  TRUE,  'system', 'system', 0), -- EXAMS_MANAGEMENT
+(605, 4, 8,  100, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- COMM_NOTICES
+(606, 4, 8,  110, TRUE, TRUE,  FALSE, 'system', 'system', 0), -- ENROLLMENT_MANAGE
+
+-- ORG 4 STAFF (role_id=3) — College faculty
+(607, 4, 3,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0),
+(608, 4, 3,  30,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(609, 4, 3,  50,  TRUE, TRUE,  FALSE, 'system', 'system', 0),
+(610, 4, 3,  52,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(611, 4, 3,  60,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(612, 4, 3,  61,  TRUE, TRUE,  FALSE, 'system', 'system', 0),
+(613, 4, 3,  64,  TRUE, TRUE,  FALSE, 'system', 'system', 0),
+(614, 4, 3,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(615, 4, 3,  100, TRUE, FALSE, FALSE, 'system', 'system', 0),
+
+-- ORG 4 STUDENT (role_id=4) — College student
+(616, 4, 4,  1,   TRUE, FALSE, FALSE, 'system', 'system', 0),
+(617, 4, 4,  50,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(618, 4, 4,  60,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(619, 4, 4,  63,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(620, 4, 4,  64,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(621, 4, 4,  83,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(622, 4, 4,  85,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(623, 4, 4,  90,  TRUE, FALSE, FALSE, 'system', 'system', 0),
+(624, 4, 4,  100, TRUE, FALSE, FALSE, 'system', 'system', 0);
+
+-- =========================================================
+-- ORG 1 Admin DASHBOARD fix — existing ID 1 covers OWNER for menu_id=1
+-- Add DASHBOARD module entry for ORG1 ADMIN (was missing from Phase 1 & 2)
+-- Covered above at ID 133
+-- =========================================================
+
+-- =========================================================
+-- Ensure superadmin user is in org 1 and has ROLE_SUPER_ADMIN
+-- (already set by existing UPDATE statement above, this is a safety net)
+-- =========================================================
+UPDATE user_roles ur
+INNER JOIN users u ON u.id = ur.user_id
+SET ur.role_id = 6
+WHERE u.username = 'superadmin' AND ur.primary_role = TRUE;
+
+-- Refresh placeholder passwords for new users (DevDataInitializer handles BCrypt encoding)
+UPDATE users SET password = 'PLACEHOLDER'
+WHERE id IN (22, 23, 24, 25) AND (password IS NULL OR password = '');

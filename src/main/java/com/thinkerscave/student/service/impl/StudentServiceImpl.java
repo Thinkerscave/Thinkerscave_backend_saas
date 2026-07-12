@@ -70,8 +70,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class StudentServiceImpl implements StudentService {
 
-    private static final String ROLE_STUDENT = "STUDENT";
-    private static final String ROLE_PARENT = "PARENT";
+    private static final String ROLE_STUDENT = "ROLE_STUDENT";
+    private static final String ROLE_PARENT = "ROLE_PARENT";
     private static final String TYPE_STUDENT = "student";
     private static final String TYPE_GUARDIAN = "guardian";
 

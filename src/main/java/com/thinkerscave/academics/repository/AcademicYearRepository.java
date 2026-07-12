@@ -18,6 +18,8 @@ public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long
 
     boolean existsByYearCodeAndAcademicYearIdNot(String yearCode, Long id);
 
+    Optional<AcademicYear> findByYearCode(String yearCode);
+
     Optional<AcademicYear> findByCurrentYearTrue();
 
     List<AcademicYear> findByActiveOrderByStartDateDesc(Boolean active);

@@ -27,6 +27,9 @@ public interface StudentAttendanceRepository extends JpaRepository<StudentAttend
     List<StudentAttendance> findByOrganizationIdAndClassIdAndAttendanceDateOrderByRollNumber(
             Long orgId, Long classId, LocalDate date);
 
+    List<StudentAttendance> findByOrganizationIdAndAttendanceDateOrderByClassNameAscRollNumberAsc(
+            Long orgId, LocalDate date);
+
     Optional<StudentAttendance> findByOrganizationIdAndStudentIdAndAttendanceDate(
             Long orgId, Long studentId, LocalDate date);
 
