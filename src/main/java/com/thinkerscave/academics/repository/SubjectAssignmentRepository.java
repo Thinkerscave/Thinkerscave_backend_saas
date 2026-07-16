@@ -20,6 +20,9 @@ public interface SubjectAssignmentRepository extends JpaRepository<SubjectAssign
     List<SubjectAssignment> findByTeacherIdAndAcademicYear_AcademicYearIdAndActiveTrue(
             Long teacherId, Long yearId);
 
+    /** Used by the Staff dashboard's "My Classes Overview" widget — spans all academic years. */
+    List<SubjectAssignment> findByTeacherIdAndActiveTrue(Long teacherId);
+
     @Query("SELECT SUM(sa.periodsPerWeek) FROM SubjectAssignment sa WHERE sa.teacherId = :teacherId AND sa.academicYear.academicYearId = :yearId AND sa.active = true")
     Integer sumPeriodsPerWeekByTeacher(@Param("teacherId") Long teacherId, @Param("yearId") Long yearId);
 }

@@ -11,4 +11,7 @@ import com.thinkerscave.student.entity.StudentParent;
 public interface StudentParentRepository extends JpaRepository<StudentParent, Long> {
 
 	List<StudentParent> findByStudentStudentId(Long studentId);
+
+	/** Used by the Parent dashboard to resolve linked children (list-based, future-ready for multiple children). */
+	List<StudentParent> findByParent_ParentIdAndActiveTrue(Long parentId);
 }

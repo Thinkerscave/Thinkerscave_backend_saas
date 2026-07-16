@@ -9,6 +9,7 @@ import com.thinkerscave.attendance.enums.StaffAttendanceStatus;
 import com.thinkerscave.attendance.repository.StaffAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceFreezeService;
 import com.thinkerscave.attendance.service.StaffAttendanceService;
+import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.staff.entity.Staff;
 import com.thinkerscave.staff.repository.StaffRepository;
@@ -36,6 +37,7 @@ public class StaffAttendanceServiceImpl implements StaffAttendanceService {
     private final StaffAttendanceRepository staffAttendanceRepository;
     private final StaffRepository staffRepository;
     private final AttendanceFreezeService attendanceFreezeService;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
@@ -146,6 +148,25 @@ public class StaffAttendanceServiceImpl implements StaffAttendanceService {
                 .stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public StaffAttendanceResponse getMyTodayStatus(String username) {
+        Long orgId = OrganizationContext.getOrganizationId();
+        Staff staff = userRepository.findByUsername(username)
+                .flatMap(u -> staffRepository.findByUser_Id(u.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Staff profile not found for user: " + username));
+
+        return staffAttendanceRepository
+                .findByOrganizationIdAndStaffIdAndAttendanceDate(orgId, staff.getStaffId(), LocalDate.now())
+                .map(this::toResponse)
+                .orElseGet(() -> StaffAttendanceResponse.builder()
+                        .staffId(staff.getStaffId())
+                        .staffName(staff.getFirstName() + " " + staff.getLastName())
+                        .staffCode(staff.getStaffCode())
+                        .designation(staff.getDesignation())
+                        .attendanceDate(LocalDate.now())
+                        .build());
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────

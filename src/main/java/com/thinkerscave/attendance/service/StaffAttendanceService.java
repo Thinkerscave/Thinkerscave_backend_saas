@@ -41,4 +41,13 @@ public interface StaffAttendanceService {
      * Get staff attendance within a date range.
      */
     List<StaffAttendanceResponse> getStaffAttendanceByRange(Long staffId, LocalDate from, LocalDate to);
+
+    /**
+     * Lightweight sign-in/out status for the currently authenticated staff member,
+     * for today. Returns a response with null sign-in/out fields (not an error)
+     * when the staff hasn't signed in yet. Used by the Staff dashboard's
+     * attendance widget to seed its initial state without exposing the full
+     * organization roster.
+     */
+    StaffAttendanceResponse getMyTodayStatus(String username);
 }

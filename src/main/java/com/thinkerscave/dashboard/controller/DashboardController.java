@@ -2,6 +2,8 @@ package com.thinkerscave.dashboard.controller;
 
 import com.thinkerscave.dashboard.dto.DashboardSearchResponseDTO;
 import com.thinkerscave.dashboard.dto.DashboardSummaryDTO;
+import com.thinkerscave.dashboard.dto.response.DashboardResponse;
+import com.thinkerscave.dashboard.service.DashboardOrchestrationService;
 import com.thinkerscave.dashboard.service.DashboardSearchService;
 import com.thinkerscave.dashboard.service.DashboardService;
 import com.thinkerscave.shared.dto.ApiResponse;
@@ -23,6 +25,7 @@ public class DashboardController {
 
     private final DashboardService dashboardService;
     private final DashboardSearchService dashboardSearchService;
+    private final DashboardOrchestrationService dashboardOrchestrationService;
 
     @GetMapping("/summary")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF', 'TEACHER', 'PRINCIPAL', 'HR_MANAGER')")
@@ -36,5 +39,12 @@ public class DashboardController {
     @Operation(summary = "Global search across students, staff and admission leads")
     public ResponseEntity<ApiResponse<DashboardSearchResponseDTO>> search(@RequestParam String query) {
         return ResponseEntity.ok(ApiResponse.success("Search results", dashboardSearchService.search(query)));
+    }
+
+    @GetMapping("/workspace")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Backend-driven, role-based dashboard workspace: dashboard type + fully composed widget list")
+    public ResponseEntity<ApiResponse<DashboardResponse>> workspace() {
+        return ResponseEntity.ok(ApiResponse.success("Dashboard workspace retrieved", dashboardOrchestrationService.getWorkspace()));
     }
 }

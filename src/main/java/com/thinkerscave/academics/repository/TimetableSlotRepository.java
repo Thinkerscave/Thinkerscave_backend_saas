@@ -25,4 +25,10 @@ public interface TimetableSlotRepository extends JpaRepository<TimetableSlot, Lo
                               @Param("day") DayOfWeek day,
                               @Param("periodId") Long periodId,
                               @Param("yearId") Long yearId);
+
+    /** Used by the Staff dashboard's "Today's Timetable" widget. */
+    @Query("SELECT ts FROM TimetableSlot ts WHERE ts.subjectAssignment.teacherId = :teacherId " +
+           "AND ts.dayOfWeek = :day AND ts.active = true " +
+           "ORDER BY ts.periodTemplate.periodNumber ASC")
+    List<TimetableSlot> findByTeacherIdAndDayOfWeek(@Param("teacherId") Long teacherId, @Param("day") DayOfWeek day);
 }

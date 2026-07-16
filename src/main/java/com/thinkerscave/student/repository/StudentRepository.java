@@ -27,6 +27,9 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
 
 	long countByStatus(StudentStatus status);
 
+	/** Used to resolve the logged-in Student's record for the Student dashboard. */
+	Optional<Student> findByUser_Id(Long userId);
+
 	@Query("""
 			SELECT s FROM Student s WHERE
 			LOWER(s.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR

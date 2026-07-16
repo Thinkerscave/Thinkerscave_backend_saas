@@ -18,6 +18,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -61,6 +62,15 @@ public class StaffAttendanceController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Sign-out recorded",
                 staffAttendanceService.signOut(request)));
+    }
+
+    @GetMapping("/me/today")
+    @Operation(summary = "Get the current staff member's own sign-in/out status for today")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF')")
+    public ResponseEntity<ApiResponse<StaffAttendanceResponse>> getMyTodayStatus(Authentication authentication) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Today's attendance status retrieved",
+                staffAttendanceService.getMyTodayStatus(authentication.getName())));
     }
 
     @GetMapping("/today")
