@@ -47,11 +47,13 @@ public class DevDataInitializer implements ApplicationRunner {
 
             provisionTenantDatabases();
 
-            // Fix password hashes so they match the app's BCrypt encoder
-            String hash = passwordEncoder.encode("Password@123");
+            // Fix password hashes so they match the app's BCrypt encoder.
+            // Dev default for all seeded users (including platform superadmin).
+            String hash = passwordEncoder.encode("password123");
             int updated = jdbcTemplate.update(
-                    "UPDATE users SET password = ? WHERE password IS NOT NULL", hash);
-            log.info("Updated {} user passwords with BCrypt hash.", updated);
+                    "UPDATE users SET password = ?, account_locked = FALSE, failed_login_attempts = 0, lock_expiry_at = NULL WHERE password IS NOT NULL",
+                    hash);
+            log.info("Updated {} user passwords with BCrypt hash and cleared lockouts.", updated);
 
             jdbcTemplate.update("""
                     INSERT IGNORE INTO roles (id, role_code, role_name, description, role_type, dashboard_code, system_role, active, display_order, created_by, updated_by, version)
@@ -140,7 +142,7 @@ public class DevDataInitializer implements ApplicationRunner {
             log.warn("Could not read platform table list: {}", e.getMessage());
         }
 
-        String bcryptHash = passwordEncoder.encode("Password@123");
+        String bcryptHash = passwordEncoder.encode("password123");
 
         for (Map<String, Object> tenant : tenants) {
             String schema   = (String) tenant.get("schema_name");
@@ -183,7 +185,7 @@ public class DevDataInitializer implements ApplicationRunner {
                         // 4. BCrypt-rehash placeholder passwords
                         JdbcTemplate tenantJdbc = new JdbcTemplate(tenantDs);
                         tenantJdbc.update(
-                                "UPDATE users SET password = ? WHERE password IS NOT NULL",
+                                "UPDATE users SET password = ?, account_locked = FALSE, failed_login_attempts = 0, lock_expiry_at = NULL WHERE password IS NOT NULL",
                                 bcryptHash);
                         log.info("Seed data and passwords loaded for tenant: {}", schema);
                     }

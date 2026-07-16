@@ -6,16 +6,20 @@ import com.thinkerscave.security.dto.request.OtpResetPasswordRequest;
 import com.thinkerscave.security.dto.response.AuthResponse;
 import com.thinkerscave.security.service.AuthService;
 import com.thinkerscave.security.service.PasswordResetService;
+import com.thinkerscave.security.util.RefreshTokenCookieHelper;
 import com.thinkerscave.shared.dto.ApiResponse;
+import com.thinkerscave.shared.exceptions.BadRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -26,30 +30,61 @@ public class AuthController {
 
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
+    private final RefreshTokenCookieHelper refreshTokenCookieHelper;
 
     @PostMapping("/login")
     @Operation(summary = "Login with username/email and password")
     public ResponseEntity<ApiResponse<AuthResponse>> login(
             @Valid @RequestBody LoginRequest request,
-            HttpServletRequest httpRequest) {
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
         LoginContext loginContext = LoginContext.fromHeaders(
                 httpRequest.getHeader(LoginContext.HEADER),
                 httpRequest.getHeader("X-Tenant-ID"),
                 httpRequest.getHeader("X-Organization-ID"));
-        return ResponseEntity.ok(ApiResponse.success("Login successful", authService.login(request, loginContext)));
+        AuthResponse authResponse = authService.login(request, loginContext);
+        return ResponseEntity.ok(ApiResponse.success("Login successful", applyRefreshCookie(authResponse, httpResponse)));
     }
 
     @PostMapping("/refresh")
-    @Operation(summary = "Refresh access token using refresh token")
-    public ResponseEntity<ApiResponse<AuthResponse>> refresh(@RequestParam String refreshToken) {
-        return ResponseEntity.ok(ApiResponse.success("Token refreshed", authService.refreshToken(refreshToken)));
+    @Operation(summary = "Refresh access token using refresh token cookie or legacy query param")
+    public ResponseEntity<ApiResponse<AuthResponse>> refresh(
+            @RequestParam(required = false) String refreshToken,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+        String token = refreshTokenCookieHelper.resolveRefreshToken(httpRequest, refreshToken);
+        if (!StringUtils.hasText(token)) {
+            throw new BadRequestException("Refresh token is required");
+        }
+        AuthResponse authResponse = authService.refreshToken(token);
+        return ResponseEntity.ok(ApiResponse.success("Token refreshed", applyRefreshCookie(authResponse, httpResponse)));
     }
 
     @PostMapping("/logout")
     @Operation(summary = "Logout current session")
-    public ResponseEntity<ApiResponse<Void>> logout(@RequestParam String refreshToken) {
-        authService.logout(refreshToken);
+    public ResponseEntity<ApiResponse<Void>> logout(
+            @RequestParam(required = false) String refreshToken,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+        String token = refreshTokenCookieHelper.resolveRefreshToken(httpRequest, refreshToken);
+        if (StringUtils.hasText(token)) {
+            authService.logout(token);
+        }
+        refreshTokenCookieHelper.clearRefreshTokenCookie(httpResponse);
         return ResponseEntity.ok(ApiResponse.noContent("Logged out successfully"));
+    }
+
+    /**
+     * When cookie mode is enabled, set HttpOnly cookie and omit refreshToken from JSON
+     * so browser JavaScript never receives it.
+     */
+    private AuthResponse applyRefreshCookie(AuthResponse authResponse, HttpServletResponse httpResponse) {
+        if (refreshTokenCookieHelper.isEnabled() && authResponse != null
+                && StringUtils.hasText(authResponse.getRefreshToken())) {
+            refreshTokenCookieHelper.setRefreshTokenCookie(httpResponse, authResponse.getRefreshToken());
+            authResponse.setRefreshToken(null);
+        }
+        return authResponse;
     }
 
     // ----------------------------------------------------------------

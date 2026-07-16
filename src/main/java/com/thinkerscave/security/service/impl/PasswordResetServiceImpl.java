@@ -36,7 +36,7 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         Optional<User> userOpt = userRepository.findByEmail(email.toLowerCase());
         // Security: always return success — do not reveal if email exists
         if (userOpt.isEmpty()) {
-            log.debug("Forgot password requested for unknown email: {}", email);
+            log.debug("Forgot password requested for unknown account");
             return;
         }
         User user = userOpt.get();

@@ -7,6 +7,8 @@ import com.thinkerscave.access.enums.LoginStatus;
 import com.thinkerscave.access.enums.RoleType;
 import com.thinkerscave.access.enums.UserStatus;
 import com.thinkerscave.access.mapper.UserMapper;
+import com.thinkerscave.access.entity.SecurityPolicy;
+import com.thinkerscave.access.repository.SecurityPolicyRepository;
 import com.thinkerscave.access.repository.LoginHistoryRepository;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.platform.entity.TenantRegistry;
@@ -46,21 +48,38 @@ public class AuthServiceImpl implements AuthService {
     private final TenantRegistryRepository tenantRegistryRepository;
     private final UserSessionRepository sessionRepository;
     private final LoginHistoryRepository loginHistoryRepository;
+    private final SecurityPolicyRepository securityPolicyRepository;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final UserMapper userMapper;
+
+    @org.springframework.beans.factory.annotation.Value("${app.security.lockout.max-failed-attempts:5}")
+    private int defaultMaxFailedAttempts;
+
+    @org.springframework.beans.factory.annotation.Value("${app.security.lockout.retry-delay-ms:500}")
+    private long retryDelayMs;
+
+    @org.springframework.beans.factory.annotation.Value("${jwt.expiration:900000}")
+    private long accessTokenExpirationMs;
 
     @Override
     @Transactional
     public AuthResponse login(LoginRequest request, LoginContext loginContext) {
         User user = resolveUserForLogin(request.getUsernameOrEmail(), loginContext);
 
+        if (Boolean.TRUE.equals(user.getAccountLocked())) {
+            recordLoginFailure(user, "Account locked");
+            throw new BadRequestException("Account is locked due to too many failed login attempts. Contact an administrator.");
+        }
+
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(user.getUsername(), request.getPassword()));
         } catch (AuthenticationException ex) {
             recordLoginFailure(user, "Invalid password");
-            incrementFailedAttempts(user);
+            applyFailedLoginLockout(user, loginContext);
+            // Uniform message + small delay frustrates brute force without leaking account state
+            sleepBriefly();
             throw new BadRequestException("Invalid credentials");
         }
 
@@ -69,6 +88,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         user.setFailedLoginAttempts(0);
+        user.setAccountLocked(false);
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
 
@@ -100,7 +120,7 @@ public class AuthServiceImpl implements AuthService {
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType("Bearer")
-                .expiresIn(900L)
+                .expiresIn(accessTokenExpirationMs / 1000)
                 .tenantId(tenantId)
                 .loginContext(loginContextValue)
                 .user(userMapper.toSummary(user))
@@ -215,7 +235,7 @@ public class AuthServiceImpl implements AuthService {
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
                 .tokenType("Bearer")
-                .expiresIn(900L)
+                .expiresIn(accessTokenExpirationMs / 1000)
                 .tenantId(tenantId)
                 .loginContext(loginContextValue)
                 .user(userMapper.toSummary(user))
@@ -280,6 +300,38 @@ public class AuthServiceImpl implements AuthService {
     private void incrementFailedAttempts(User user) {
         user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
         userRepository.save(user);
+    }
+
+    private void applyFailedLoginLockout(User user, LoginContext loginContext) {
+        incrementFailedAttempts(user);
+        int maxAttempts = resolveMaxFailedAttempts(user, loginContext);
+        if (user.getFailedLoginAttempts() != null && user.getFailedLoginAttempts() >= maxAttempts) {
+            user.setAccountLocked(true);
+            userRepository.save(user);
+            log.warn("Account locked after {} failed login attempts (userId={})",
+                    user.getFailedLoginAttempts(), user.getId());
+        }
+    }
+
+    private int resolveMaxFailedAttempts(User user, LoginContext loginContext) {
+        Long orgId = loginContext.getOrganizationId() != null
+                ? loginContext.getOrganizationId()
+                : user.getOrganizationId();
+        if (orgId != null) {
+            return securityPolicyRepository.findByOrganizationId(orgId)
+                    .map(SecurityPolicy::getMaxFailedAttempts)
+                    .filter(v -> v != null && v > 0)
+                    .orElse(defaultMaxFailedAttempts);
+        }
+        return defaultMaxFailedAttempts;
+    }
+
+    private void sleepBriefly() {
+        try {
+            Thread.sleep(Math.max(0, retryDelayMs));
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     private SessionResponse mapSession(UserSession s) {

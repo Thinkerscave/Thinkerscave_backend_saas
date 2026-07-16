@@ -116,7 +116,9 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
 
     private WidgetDTO<ChartData> studentGrowthChart() {
         return safeWidget("student-growth", WidgetType.CHART, "Student growth", "Last 6 months", 2, DataMode.LIVE, () -> {
-            var timestamps = studentRepository.findAll().stream().map(s -> s.getCreatedOn()).collect(Collectors.toList());
+            var timestamps = studentRepository.findAll(PageRequest.of(0, 2000)).stream()
+                    .map(s -> s.getCreatedOn())
+                    .collect(Collectors.toList());
             return ChartBucketUtil.monthlyCounts(timestamps, 6, "Students", "line");
         });
     }
@@ -205,7 +207,7 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
     private WidgetDTO<StatListData> todaysBirthdays() {
         return safeWidget("todays-birthdays", WidgetType.STAT_LIST, "Today's birthdays", 2, DataMode.LIVE, () -> {
             MonthDay today = MonthDay.from(LocalDate.now());
-            List<Staff> staff = staffRepository.findAll();
+            List<Staff> staff = staffRepository.findAll(PageRequest.of(0, 2000)).getContent();
             var items = staff.stream()
                     .filter(s -> Boolean.TRUE.equals(s.getActive()) && s.getDateOfBirth() != null
                             && MonthDay.from(s.getDateOfBirth()).equals(today))

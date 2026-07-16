@@ -9,6 +9,7 @@ import com.thinkerscave.academics.repository.AcademicYearRepository;
 import com.thinkerscave.academics.repository.ClassRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.shared.storage.LocalFileStorageService;
 import com.thinkerscave.student.dto.EnrollmentDTO;
 import com.thinkerscave.student.dto.MedicalDTO;
 import com.thinkerscave.student.dto.ParentDTO;
@@ -37,11 +38,9 @@ import com.thinkerscave.student.repository.StudentParentRepository;
 import com.thinkerscave.student.repository.StudentRepository;
 import com.thinkerscave.student.repository.StudentTimelineRepository;
 import com.thinkerscave.student.service.StudentService;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -52,11 +51,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -75,8 +69,7 @@ public class StudentServiceImpl implements StudentService {
     private static final String TYPE_STUDENT = "student";
     private static final String TYPE_GUARDIAN = "guardian";
 
-    private final Path rootLocation = Paths.get("uploads");
-
+    private final LocalFileStorageService fileStorageService;
     private final UserService userService;
     private final RoleRepository roleRepository;
     private final ParentRepository parentRepository;
@@ -89,17 +82,6 @@ public class StudentServiceImpl implements StudentService {
     private final StudentParentRepository studentParentRepository;
     private final StudentTimelineRepository studentTimelineRepository;
     private final StudentDocumentRepository studentDocumentRepository;
-
-    @PostConstruct
-    public void init() {
-        try {
-            if (!Files.exists(rootLocation)) {
-                Files.createDirectories(rootLocation);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException("Could not initialize storage", e);
-        }
-    }
 
     @Override
     @Transactional
@@ -163,7 +145,7 @@ public class StudentServiceImpl implements StudentService {
         student.setUser(studentUser);
 
         if (photo != null && !photo.isEmpty()) {
-            student.setPhotoUrl(saveFile(photo, "photo_" + safeFileToken(studentCode)));
+            student.setPhotoUrl(fileStorageService.store(photo, "photo_" + safeFileToken(studentCode)));
         }
 
         student = studentRepository.save(student);
@@ -206,7 +188,7 @@ public class StudentServiceImpl implements StudentService {
                 if (file == null || file.isEmpty()) {
                     continue;
                 }
-                String storedPath = saveFile(file, "doc_" + safeFileToken(studentCode));
+                String storedPath = fileStorageService.store(file, "doc_" + safeFileToken(studentCode));
                 StudentDocument document = new StudentDocument();
                 document.setStudent(student);
                 document.setDocumentName(file.getOriginalFilename());
@@ -355,24 +337,54 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public Page<StudentResponseDTO> searchStudents(StudentSearchRequest request, Pageable pageable) {
-        List<StudentResponseDTO> filtered = studentRepository.findAll().stream()
-                .map(this::mapToResponseDTO)
-                .filter(dto -> matchesSearch(dto, request))
-                .collect(Collectors.toList());
+        Pageable effectivePageable = (pageable == null || pageable.isUnpaged())
+                ? Pageable.ofSize(50)
+                : pageable;
 
-        if (pageable == null || pageable.isUnpaged()) {
-            return new PageImpl<>(filtered);
+        Page<Student> page;
+        if (request != null && request.getStatus() != null
+                && (request.getKeyword() == null || request.getKeyword().isBlank())
+                && (request.getParentName() == null || request.getParentName().isBlank())
+                && request.getClassId() == null && request.getSectionId() == null) {
+            page = studentRepository.findByStatus(request.getStatus(), effectivePageable);
+        } else if (request != null && request.getKeyword() != null && !request.getKeyword().isBlank()
+                && request.getStatus() == null
+                && (request.getParentName() == null || request.getParentName().isBlank())
+                && request.getClassId() == null && request.getSectionId() == null) {
+            page = studentRepository.searchByKeyword(request.getKeyword().trim(), effectivePageable);
+        } else if (request == null
+                || ((request.getKeyword() == null || request.getKeyword().isBlank())
+                && request.getStatus() == null
+                && (request.getParentName() == null || request.getParentName().isBlank())
+                && request.getClassId() == null && request.getSectionId() == null)) {
+            page = studentRepository.findAll(effectivePageable);
+        } else {
+            // Complex filters: page in DB first (cap) then refine — avoids loading entire table
+            Page<Student> candidatePage = request.getStatus() != null
+                    ? studentRepository.findByStatus(request.getStatus(), Pageable.ofSize(500))
+                    : (request.getKeyword() != null && !request.getKeyword().isBlank()
+                    ? studentRepository.searchByKeyword(request.getKeyword().trim(), Pageable.ofSize(500))
+                    : studentRepository.findAll(Pageable.ofSize(500)));
+            List<StudentResponseDTO> filtered = candidatePage.getContent().stream()
+                    .map(this::mapToResponseDTO)
+                    .filter(dto -> matchesSearch(dto, request))
+                    .collect(Collectors.toList());
+            int start = (int) effectivePageable.getOffset();
+            int end = Math.min(start + effectivePageable.getPageSize(), filtered.size());
+            List<StudentResponseDTO> content = start >= filtered.size() ? List.of() : filtered.subList(start, end);
+            return new PageImpl<>(content, effectivePageable, filtered.size());
         }
 
-        int start = (int) pageable.getOffset();
-        int end = Math.min(start + pageable.getPageSize(), filtered.size());
-        List<StudentResponseDTO> content = start >= filtered.size() ? List.of() : filtered.subList(start, end);
-        return new PageImpl<>(content, pageable, filtered.size());
+        return page.map(this::mapToResponseDTO);
     }
 
     @Override
     public List<StudentResponseDTO> getAllStudents() {
-        return studentRepository.findAll().stream().map(this::mapToResponseDTO).collect(Collectors.toList());
+        // Cap unbounded list endpoint to avoid loading entire tenant table into memory.
+        // Prefer getAllStudents(Pageable) / searchStudents for large datasets.
+        return studentRepository.findAll(Pageable.ofSize(1000)).stream()
+                .map(this::mapToResponseDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -429,7 +441,7 @@ public class StudentServiceImpl implements StudentService {
     @Transactional
     public StudentDocumentDTO uploadStudentDocument(Long studentId, MultipartFile file, String documentType) throws IOException {
         Student student = getStudent(studentId);
-        String storedPath = saveFile(file, "doc_" + safeFileToken(student.getStudentCode()));
+        String storedPath = fileStorageService.store(file, "doc_" + safeFileToken(student.getStudentCode()));
 
         StudentDocument document = new StudentDocument();
         document.setStudent(student);
@@ -456,16 +468,7 @@ public class StudentServiceImpl implements StudentService {
     public Resource downloadDocument(Long docId) {
         StudentDocument document = studentDocumentRepository.findById(docId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found with id: " + docId));
-        Path path = Paths.get(document.getDocumentPath()).normalize();
-        try {
-            Resource resource = new UrlResource(path.toUri());
-            if (!resource.exists() || !resource.isReadable()) {
-                throw new ResourceNotFoundException("Document file not found");
-            }
-            return resource;
-        } catch (MalformedURLException e) {
-            throw new IllegalArgumentException("Invalid document path", e);
-        }
+        return fileStorageService.loadAsResource(document.getDocumentPath());
     }
 
     private void addTimelineEvent(Student student, StudentTimelineEventType type, String title, String description) {
@@ -475,21 +478,6 @@ public class StudentServiceImpl implements StudentService {
         timeline.setDescription(description);
         timeline.setEventType(type);
         studentTimelineRepository.save(timeline);
-    }
-
-    private String saveFile(MultipartFile file, String prefix) throws IOException {
-        if (file == null || file.isEmpty()) {
-            return null;
-        }
-        Path destination = rootLocation.resolve(prefix + "_" + safeFileToken(file.getOriginalFilename()))
-                .normalize().toAbsolutePath();
-        if (!destination.getParent().equals(rootLocation.toAbsolutePath())) {
-            throw new IOException("Cannot store file outside current directory.");
-        }
-        try (var inputStream = file.getInputStream()) {
-            Files.copy(inputStream, destination, StandardCopyOption.REPLACE_EXISTING);
-            return destination.toString();
-        }
     }
 
     private boolean matchesSearch(StudentResponseDTO dto, StudentSearchRequest request) {

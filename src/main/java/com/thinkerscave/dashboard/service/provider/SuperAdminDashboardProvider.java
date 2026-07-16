@@ -105,7 +105,7 @@ public class SuperAdminDashboardProvider extends AbstractDashboardWidgetProvider
     private WidgetDTO<ChartData> organizationGrowthChart() {
         return safeWidget("organization-growth", WidgetType.CHART, "Organization growth", "Cumulative organizations over the last 6 months",
                 2, DataMode.LIVE, () -> {
-            List<Organization> all = organizationRepository.findAll();
+            List<Organization> all = organizationRepository.findAll(PageRequest.of(0, 5000)).getContent();
             long baseline = all.size() - all.stream().filter(o -> o.getCreatedOn() != null
                     && o.getCreatedOn().isAfter(java.time.LocalDateTime.now().minusMonths(6))).count();
             List<java.time.LocalDateTime> timestamps = all.stream().map(Organization::getCreatedOn).collect(Collectors.toList());
@@ -116,7 +116,7 @@ public class SuperAdminDashboardProvider extends AbstractDashboardWidgetProvider
     private WidgetDTO<ChartData> newOrganizationsChart() {
         return safeWidget("new-organizations", WidgetType.CHART, "New organizations", "Per month, last 6 months",
                 2, DataMode.LIVE, () -> {
-            List<java.time.LocalDateTime> timestamps = organizationRepository.findAll().stream()
+            List<java.time.LocalDateTime> timestamps = organizationRepository.findAll(PageRequest.of(0, 5000)).stream()
                     .map(Organization::getCreatedOn).collect(Collectors.toList());
             return ChartBucketUtil.monthlyCounts(timestamps, 6, "New organizations", "bar");
         });
@@ -125,7 +125,7 @@ public class SuperAdminDashboardProvider extends AbstractDashboardWidgetProvider
     private WidgetDTO<ChartData> userGrowthChart() {
         return safeWidget("user-growth", WidgetType.CHART, "User growth", "Platform-wide, last 6 months",
                 2, DataMode.LIVE, () -> {
-            List<java.time.LocalDateTime> timestamps = userRepository.findAll().stream()
+            List<java.time.LocalDateTime> timestamps = userRepository.findAll(PageRequest.of(0, 5000)).stream()
                     .map(User::getCreatedOn).collect(Collectors.toList());
             return ChartBucketUtil.monthlyCounts(timestamps, 6, "New users", "area");
         });
@@ -179,7 +179,7 @@ public class SuperAdminDashboardProvider extends AbstractDashboardWidgetProvider
 
     private WidgetDTO<TopOrganizationsData> topOrganizations() {
         return safeWidget("top-organizations", WidgetType.TOP_ORGANIZATIONS, "Top organizations", "By active users", 2, DataMode.LIVE, () -> {
-            List<Organization> orgs = organizationRepository.findAll();
+            List<Organization> orgs = organizationRepository.findAll(PageRequest.of(0, 5000)).getContent();
             List<TopOrgItem> items = orgs.stream()
                     .map(o -> new Object[]{o, userRepository.countByOrganizationIdAndStatus(o.getId(), UserStatus.ACTIVE)})
                     .sorted(Comparator.comparingLong((Object[] a) -> (Long) a[1]).reversed())

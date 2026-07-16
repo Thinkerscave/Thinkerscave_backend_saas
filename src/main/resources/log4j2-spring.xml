@@ -6,12 +6,10 @@
     </Properties>
 
     <Appenders>
-        <!-- Console Appender -->
         <Console name="Console" target="SYSTEM_OUT">
             <PatternLayout pattern="${LOG_PATTERN}"/>
         </Console>
 
-        <!-- File Appender - All Logs -->
         <RollingFile name="FileAppender"
                      fileName="${APP_LOG_ROOT}/application.log"
                      filePattern="${APP_LOG_ROOT}/application-%d{yyyy-MM-dd}-%i.log">
@@ -23,7 +21,6 @@
             <DefaultRolloverStrategy max="10"/>
         </RollingFile>
 
-        <!-- File Appender - Error Logs Only -->
         <RollingFile name="ErrorAppender"
                      fileName="${APP_LOG_ROOT}/error.log"
                      filePattern="${APP_LOG_ROOT}/error-%d{yyyy-MM-dd}-%i.log">
@@ -38,7 +35,6 @@
             <DefaultRolloverStrategy max="10"/>
         </RollingFile>
 
-        <!-- File Appender - Security/Authentication Logs -->
         <RollingFile name="SecurityAppender"
                      fileName="${APP_LOG_ROOT}/security.log"
                      filePattern="${APP_LOG_ROOT}/security-%d{yyyy-MM-dd}-%i.log">
@@ -52,39 +48,38 @@
     </Appenders>
 
     <Loggers>
-        <!-- Application Loggers -->
-        <Logger name="com.thinkerscave" level="DEBUG" additivity="false">
-            <AppenderRef ref="Console"/>
-            <AppenderRef ref="FileAppender"/>
-            <AppenderRef ref="ErrorAppender"/>
-        </Logger>
+        <SpringProfile name="prod">
+            <Logger name="com.thinkerscave" level="INFO" additivity="false">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="FileAppender"/>
+                <AppenderRef ref="ErrorAppender"/>
+            </Logger>
+            <Logger name="org.springframework.security" level="WARN" additivity="false">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="SecurityAppender"/>
+            </Logger>
+            <Logger name="org.hibernate.SQL" level="WARN" additivity="false">
+                <AppenderRef ref="Console"/>
+            </Logger>
+        </SpringProfile>
 
-        <!-- Security Logger -->
-        <Logger name="com.thinkerscave.common.security" level="DEBUG" additivity="false">
-            <AppenderRef ref="Console"/>
-            <AppenderRef ref="SecurityAppender"/>
-            <AppenderRef ref="ErrorAppender"/>
-        </Logger>
+        <SpringProfile name="!prod">
+            <Logger name="com.thinkerscave" level="DEBUG" additivity="false">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="FileAppender"/>
+                <AppenderRef ref="ErrorAppender"/>
+            </Logger>
+            <Logger name="org.springframework.security" level="INFO" additivity="false">
+                <AppenderRef ref="Console"/>
+                <AppenderRef ref="SecurityAppender"/>
+            </Logger>
+        </SpringProfile>
 
-        <!-- Spring Framework -->
         <Logger name="org.springframework" level="INFO" additivity="false">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="FileAppender"/>
         </Logger>
 
-        <!-- Hibernate -->
-        <Logger name="org.hibernate" level="INFO" additivity="false">
-            <AppenderRef ref="Console"/>
-            <AppenderRef ref="FileAppender"/>
-        </Logger>
-
-        <!-- SQL Logging (set to DEBUG to see SQL queries) -->
-        <Logger name="org.hibernate.SQL" level="DEBUG" additivity="false">
-            <AppenderRef ref="Console"/>
-            <AppenderRef ref="FileAppender"/>
-        </Logger>
-
-        <!-- Root Logger -->
         <Root level="INFO">
             <AppenderRef ref="Console"/>
             <AppenderRef ref="FileAppender"/>

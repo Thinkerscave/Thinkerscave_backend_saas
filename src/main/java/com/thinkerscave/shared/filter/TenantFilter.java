@@ -1,7 +1,10 @@
 package com.thinkerscave.shared.filter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thinkerscave.security.service.JwtService;
 import com.thinkerscave.shared.context.TenantContext;
+import com.thinkerscave.shared.exceptions.ApiError;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,26 +14,23 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 
 /**
- * TenantFilter — Order 1.
+ * Resolves tenant for schema-per-tenant routing.
  *
- * Resolves the current tenant slug and stores it in {@link TenantContext}.
- * Detection priority (highest → lowest):
- * <ol>
- *   <li>Subdomain from hostname (production SaaS)</li>
- *   <li>{@code X-Tenant-ID} request header</li>
- *   <li>{@code tenant} claim embedded in JWT Bearer token</li>
- *   <li>Default "public" fallback</li>
- * </ol>
+ * <p><b>Authenticated requests</b> (Bearer present): tenant MUST come from the JWT
+ * {@code tenant} claim. {@code X-Tenant-ID} is rejected if it mismatches.
  *
- * When {@code app.multi-tenancy.enabled=false} (dev / H2 mode) the filter
- * is a no-op and always sets the "public" default tenant.
+ * <p><b>Pre-auth requests</b> (login / public): subdomain or {@code X-Tenant-ID} is allowed.
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
@@ -45,6 +45,7 @@ public class TenantFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final SubdomainTenantResolver subdomainResolver;
+    private final ObjectMapper objectMapper;
 
     @Value("${app.multi-tenancy.enabled:true}")
     private boolean multiTenancyEnabled;
@@ -60,47 +61,85 @@ public class TenantFilter extends OncePerRequestFilter {
                 return;
             }
 
-            String tenant = null;
+            String bearerToken = extractBearerToken(request);
+            String headerTenant = normalizeTenant(request.getHeader(TENANT_HEADER));
 
-            // Priority 1: subdomain
-            try {
-                tenant = subdomainResolver.extractTenantFromSubdomain(request);
-            } catch (Exception e) {
-                log.trace("Subdomain extraction failed: {}", e.getMessage());
-            }
-
-            // Priority 2: X-Tenant-ID header
-            if (tenant == null || tenant.isBlank()) {
-                String header = request.getHeader(TENANT_HEADER);
-                if (header != null && !header.isBlank()) {
-                    tenant = header.trim().toLowerCase().replace('-', '_');
+            if (bearerToken != null) {
+                String jwtTenant;
+                try {
+                    jwtTenant = extractJwtTenant(bearerToken);
+                } catch (JwtException | IllegalArgumentException ex) {
+                    // Let JwtAuthenticationFilter produce the auth error; still set a safe default.
+                    TenantContext.setTenant(DEFAULT_TENANT);
+                    filterChain.doFilter(request, response);
+                    return;
                 }
-            }
 
-            // Priority 3: tenant claim in JWT
-            if (tenant == null || tenant.isBlank()) {
-                String authHeader = request.getHeader(AUTH_HEADER);
-                if (authHeader != null && authHeader.startsWith(BEARER_PREFIX)) {
-                    try {
-                        String token = authHeader.substring(BEARER_PREFIX.length());
-                        // Attempt to extract a "tenant" claim if present
-                        var claims = jwtService.extractAllClaims(token);
-                        Object tenantClaim = claims.get("tenant");
-                        if (tenantClaim != null) {
-                            tenant = tenantClaim.toString();
-                        }
-                    } catch (Exception e) {
-                        log.trace("JWT tenant extraction failed: {}", e.getMessage());
-                    }
+                if (!StringUtils.hasText(jwtTenant)) {
+                    sendForbidden(response, "Authenticated token is missing tenant claim");
+                    return;
                 }
+
+                jwtTenant = normalizeTenant(jwtTenant);
+                if (StringUtils.hasText(headerTenant) && !headerTenant.equalsIgnoreCase(jwtTenant)) {
+                    log.warn("Tenant spoofing rejected: header={} jwtTenant={} path={}",
+                            headerTenant, jwtTenant, request.getRequestURI());
+                    sendForbidden(response, "X-Tenant-ID does not match authenticated tenant");
+                    return;
+                }
+
+                TenantContext.setTenant(jwtTenant);
+            } else {
+                // Pre-authentication: subdomain → header → default (login / public flows)
+                String tenant = null;
+                try {
+                    tenant = normalizeTenant(subdomainResolver.extractTenantFromSubdomain(request));
+                } catch (Exception e) {
+                    log.trace("Subdomain extraction failed: {}", e.getMessage());
+                }
+                if (!StringUtils.hasText(tenant)) {
+                    tenant = headerTenant;
+                }
+                TenantContext.setTenant(StringUtils.hasText(tenant) ? tenant : DEFAULT_TENANT);
             }
 
-            TenantContext.setTenant(tenant != null && !tenant.isBlank() ? tenant : DEFAULT_TENANT);
             log.trace("Tenant resolved: {}", TenantContext.getTenant());
-
             filterChain.doFilter(request, response);
         } finally {
             TenantContext.clear();
         }
+    }
+
+    private String extractBearerToken(HttpServletRequest request) {
+        String authHeader = request.getHeader(AUTH_HEADER);
+        if (authHeader != null && authHeader.startsWith(BEARER_PREFIX) && authHeader.length() > BEARER_PREFIX.length()) {
+            return authHeader.substring(BEARER_PREFIX.length()).trim();
+        }
+        return null;
+    }
+
+    private String extractJwtTenant(String token) {
+        var claims = jwtService.extractAllClaims(token);
+        Object tenantClaim = claims.get("tenant");
+        return tenantClaim != null ? tenantClaim.toString() : null;
+    }
+
+    private String normalizeTenant(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        return raw.trim().toLowerCase().replace('-', '_');
+    }
+
+    private void sendForbidden(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpStatus.FORBIDDEN.value());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        ApiError error = ApiError.builder()
+                .status(HttpStatus.FORBIDDEN.value())
+                .code("TENANT_MISMATCH")
+                .message(message)
+                .timestamp(LocalDateTime.now())
+                .build();
+        objectMapper.writeValue(response.getOutputStream(), error);
     }
 }
