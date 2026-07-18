@@ -24,6 +24,28 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
 
     @Query("""
             SELECT o FROM Organization o
+            JOIN FETCH o.tenantRegistry tr
+            WHERE o.active = true
+              AND (tr.active IS NULL OR tr.active = true)
+              AND o.customer.ownerUserId = :ownerUserId
+            """)
+    List<Organization> findActiveByOwnerUserId(@Param("ownerUserId") Long ownerUserId);
+
+    @Query("""
+            SELECT CASE WHEN COUNT(o) > 0 THEN true ELSE false END
+            FROM Organization o
+            JOIN o.tenantRegistry tr
+            WHERE o.id = :organizationId
+              AND o.active = true
+              AND (tr.active IS NULL OR tr.active = true)
+              AND o.customer.ownerUserId = :ownerUserId
+            """)
+    boolean existsActiveOwnedOrganization(
+            @Param("ownerUserId") Long ownerUserId,
+            @Param("organizationId") Long organizationId);
+
+    @Query("""
+            SELECT o FROM Organization o
             WHERE o.active = true
             AND (:status IS NULL OR o.status = :status)
             AND (:institutionType IS NULL OR o.institutionType = :institutionType)

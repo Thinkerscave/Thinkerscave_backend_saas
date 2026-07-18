@@ -12,6 +12,8 @@ import com.thinkerscave.access.repository.SecurityPolicyRepository;
 import com.thinkerscave.access.repository.LoginHistoryRepository;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.platform.entity.TenantRegistry;
+import com.thinkerscave.platform.entity.Organization;
+import com.thinkerscave.platform.repository.OrganizationRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
 import com.thinkerscave.security.dto.LoginContext;
 import com.thinkerscave.security.dto.request.LoginRequest;
@@ -22,6 +24,7 @@ import com.thinkerscave.security.enums.SessionStatus;
 import com.thinkerscave.security.repository.UserSessionRepository;
 import com.thinkerscave.security.service.AuthService;
 import com.thinkerscave.security.service.JwtService;
+import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +38,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -46,6 +51,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
     private final TenantRegistryRepository tenantRegistryRepository;
+    private final OrganizationRepository organizationRepository;
     private final UserSessionRepository sessionRepository;
     private final LoginHistoryRepository loginHistoryRepository;
     private final SecurityPolicyRepository securityPolicyRepository;
@@ -99,7 +105,8 @@ public class AuthServiceImpl implements AuthService {
                 ? LoginContext.PLATFORM
                 : LoginContext.TENANT;
 
-        Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue);
+        Long effectiveOrgId = loginContext.isPlatformLogin() ? null : resolveTenantRegistry(loginContext).getOrganization().getId();
+        Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue, effectiveOrgId);
 
         String accessToken = jwtService.generateAccessToken(user.getUsername(), claims);
         String refreshToken = jwtService.generateRefreshToken(user.getUsername());
@@ -147,7 +154,10 @@ public class AuthServiceImpl implements AuthService {
         }
 
         User user = findByUsernameOrEmailAndOrganization(usernameOrEmail, organizationId)
-                .orElseThrow(() -> new BadRequestException("Invalid credentials for the selected institution"));
+            .orElseGet(() -> findByUsernameOrEmail(usernameOrEmail)
+                .filter(candidate -> hasActiveRole(candidate, RoleType.ORGANIZATION_OWNER)
+                    && organizationRepository.existsActiveOwnedOrganization(candidate.getId(), organizationId))
+                .orElseThrow(() -> new BadRequestException("Invalid credentials for the selected institution")));
 
         if (hasActiveRole(user, RoleType.SUPER_ADMIN)) {
             throw new BadRequestException("Platform accounts must sign in through Thinkers Department");
@@ -161,8 +171,17 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Tenant is required for institution login");
         }
 
-        return tenantRegistryRepository.findActiveByTenantIdentifierNormalized(loginContext.getTenantIdentifier())
-                .orElseThrow(() -> new BadRequestException("Unknown institution tenant"));
+        // Tenant registry is authoritative on the platform catalog. Login requests
+        // often arrive with X-Tenant-ID already set, which would otherwise switch
+        // Hibernate to an empty/new tenant DB before this lookup runs.
+        String previousTenant = TenantContext.getTenant();
+        try {
+            TenantContext.setTenant("public");
+            return tenantRegistryRepository.findActiveByTenantIdentifierNormalized(loginContext.getTenantIdentifier())
+                    .orElseThrow(() -> new BadRequestException("Unknown institution tenant"));
+        } finally {
+            TenantContext.setTenant(previousTenant);
+        }
     }
 
     private Optional<User> findByUsernameOrEmail(String usernameOrEmail) {
@@ -175,10 +194,10 @@ public class AuthServiceImpl implements AuthService {
                 .or(() -> userRepository.findByEmailAndOrganizationId(usernameOrEmail, organizationId));
     }
 
-    private Map<String, Object> buildTokenClaims(User user, String tenantId, String loginContext) {
+    private Map<String, Object> buildTokenClaims(User user, String tenantId, String loginContext, Long effectiveOrgId) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
-        claims.put("orgId", user.getOrganizationId());
+        claims.put("orgId", effectiveOrgId != null ? effectiveOrgId : user.getOrganizationId());
         claims.put("userCode", user.getUserCode());
         claims.put("tenant", tenantId);
         claims.put("loginContext", loginContext);
@@ -189,12 +208,36 @@ public class AuthServiceImpl implements AuthService {
         if (primaryRole != null) {
             claims.put("roleType", primaryRole.getRole().getRoleType().name());
         }
+
+        if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
+            List<Organization> ownedOrganizations = organizationRepository.findActiveByOwnerUserId(user.getId());
+            List<String> switchableTenants = new ArrayList<>();
+            List<Long> switchableOrgIds = new ArrayList<>();
+            for (Organization org : ownedOrganizations) {
+                if (org.getTenantRegistry() == null || org.getTenantRegistry().getTenantIdentifier() == null) {
+                    continue;
+                }
+                switchableTenants.add(org.getTenantRegistry().getTenantIdentifier());
+                switchableOrgIds.add(org.getId());
+            }
+            claims.put("switchableTenants", switchableTenants);
+            claims.put("switchableOrgIds", switchableOrgIds);
+            claims.put("tenantSwitchEnabled", true);
+        }
         return claims;
     }
 
     private String resolveTenantForUser(User user) {
         if (hasActiveRole(user, RoleType.SUPER_ADMIN)) {
             return LoginContext.PLATFORM_TENANT;
+        }
+        if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
+            return organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+                    .map(Organization::getTenantRegistry)
+                    .filter(tr -> tr != null && tr.getTenantIdentifier() != null)
+                    .map(TenantRegistry::getTenantIdentifier)
+                    .findFirst()
+                    .orElse(LoginContext.PLATFORM_TENANT);
         }
         return tenantRegistryRepository.findByOrganization_Id(user.getOrganizationId())
                 .map(TenantRegistry::getTenantIdentifier)
@@ -223,7 +266,7 @@ public class AuthServiceImpl implements AuthService {
         String loginContextValue = hasActiveRole(user, RoleType.SUPER_ADMIN)
                 ? LoginContext.PLATFORM
                 : LoginContext.TENANT;
-        Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue);
+        Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue, user.getOrganizationId());
 
         String newAccessToken = jwtService.generateAccessToken(user.getUsername(), claims);
         String newRefreshToken = jwtService.generateRefreshToken(user.getUsername());

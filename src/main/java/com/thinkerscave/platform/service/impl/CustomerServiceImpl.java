@@ -1,6 +1,7 @@
 package com.thinkerscave.platform.service.impl;
 
 import com.thinkerscave.access.dto.UserCreationContext;
+import com.thinkerscave.access.dto.UserProvisioningResult;
 import com.thinkerscave.access.entity.Role;
 import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.repository.RoleRepository;
@@ -25,6 +26,7 @@ import com.thinkerscave.platform.repository.CustomerRepository;
 import com.thinkerscave.platform.repository.OrganizationRepository;
 import com.thinkerscave.platform.repository.OrganizationSubscriptionRepository;
 import com.thinkerscave.platform.service.CustomerService;
+import com.thinkerscave.security.service.EmailService;
 import com.thinkerscave.shared.enums.CodeType;
 import com.thinkerscave.shared.exceptions.AlreadyExistsException;
 import com.thinkerscave.shared.exceptions.BadRequestException;
@@ -32,6 +34,7 @@ import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.shared.service.CodeGeneratorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -60,6 +63,10 @@ public class CustomerServiceImpl implements CustomerService {
     private final CodeGeneratorService codeGeneratorService;
     private final UserService userService;
     private final RoleRepository roleRepository;
+    private final EmailService emailService;
+
+    @Value("${app.platform.login-url:http://localhost:4200/auth/login}")
+    private String platformLoginUrl;
 
     @Override
     @Transactional(readOnly = true)
@@ -188,12 +195,19 @@ public class CustomerServiceImpl implements CustomerService {
 
         customer = customerRepository.save(customer);
 
-        User owner = createOwnerUser(customer, primary);
+        UserProvisioningResult ownerProvisioning = createOwnerUser(customer, primary);
+        User owner = ownerProvisioning.getUser();
         customer.setOwnerUserId(owner.getId());
         customer = customerRepository.save(customer);
 
-        log.info("Customer created: {} ownerUserId={} username={}", code, owner.getId(), owner.getUsername());
-        return toResponse(customer, 0);
+        sendCustomerWelcomeEmail(customer, primary, owner, ownerProvisioning.getTemporaryPassword());
+
+        log.info("Customer created: {} ownerUserId={} username={} temporaryPassword={}",
+                code, owner.getId(), owner.getUsername(), ownerProvisioning.getTemporaryPassword());
+        CustomerResponse response = toResponse(customer, 0);
+        response.setOwnerUsername(owner.getUsername());
+        response.setTemporaryPassword(ownerProvisioning.getTemporaryPassword());
+        return response;
     }
 
     @Override
@@ -410,7 +424,7 @@ public class CustomerServiceImpl implements CustomerService {
                 .forEach(c -> c.setActive(false));
     }
 
-    private User createOwnerUser(Customer customer, CustomerContact primary) {
+    private UserProvisioningResult createOwnerUser(Customer customer, CustomerContact primary) {
         Role ownerRole = roleRepository.findByRoleCode(ROLE_OWNER_CODE)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + ROLE_OWNER_CODE));
 
@@ -426,7 +440,25 @@ public class CustomerServiceImpl implements CustomerService {
                 null,
                 primary.getDesignation() != null ? primary.getDesignation() : "Owner"
         );
-        return userService.createUser(context, ownerRole);
+        return userService.createUserWithTemporaryPassword(context, ownerRole);
+    }
+
+    private void sendCustomerWelcomeEmail(Customer customer, CustomerContact primary, User owner, String temporaryPassword) {
+        try {
+            String subject = "Welcome to ThinkersCave";
+            String ownerName = primary != null ? primary.getFullName() : owner.getDisplayName();
+            String html = emailService.buildCustomerWelcomeEmailBody(
+                    customer.getCustomerName(),
+                    ownerName,
+                    platformLoginUrl,
+                    owner.getUsername(),
+                    temporaryPassword);
+            emailService.sendHtmlEmail(owner.getEmail(), subject, html);
+            log.info("Customer welcome email queued: customerCode={} email={}", customer.getCustomerCode(), owner.getEmail());
+        } catch (Exception ex) {
+            log.error("Customer welcome email failed: customerCode={} reason={}",
+                    customer.getCustomerCode(), ex.getMessage(), ex);
+        }
     }
 
     private static String[] splitContactName(String fullName) {

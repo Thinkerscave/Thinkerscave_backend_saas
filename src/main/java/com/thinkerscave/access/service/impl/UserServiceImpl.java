@@ -1,6 +1,7 @@
 package com.thinkerscave.access.service.impl;
 
 import com.thinkerscave.access.dto.UserCreationContext;
+import com.thinkerscave.access.dto.UserProvisioningResult;
 import com.thinkerscave.access.entity.Role;
 import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.entity.UserRole;
@@ -29,6 +30,12 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public User createUser(UserCreationContext context, Role role) {
+        return createUserWithTemporaryPassword(context, role).getUser();
+    }
+
+    @Override
+    @Transactional
+    public UserProvisioningResult createUserWithTemporaryPassword(UserCreationContext context, Role role) {
         log.info("Creating user for email: {}", context.email());
 
         String tempPassword = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
@@ -78,6 +85,6 @@ public class UserServiceImpl implements UserService {
         user.getUserRoles().add(userRole);
 
         log.info("User created: code={}, email={}", userCode, context.email());
-        return user;
+        return new UserProvisioningResult(user, tempPassword);
     }
 }

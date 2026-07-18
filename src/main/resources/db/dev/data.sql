@@ -2213,3 +2213,18 @@ WHERE u.username = 'superadmin' AND ur.primary_role = TRUE;
 -- Refresh placeholder passwords for new users (DevDataInitializer handles BCrypt encoding)
 UPDATE users SET password = 'PLACEHOLDER'
 WHERE id IN (22, 23, 24, 25) AND (password IS NULL OR password = '');
+
+-- Keep code_sequence aligned with seeded business keys (avoids CUS000001 collisions on create).
+INSERT INTO code_sequence (code_type, `last_value`, version, created_by, created_on, updated_by, updated_on)
+VALUES
+  ('CUSTOMER', 3, 0, 'system', NOW(6), 'system', NOW(6)),
+  ('CONTACT', 3, 0, 'system', NOW(6), 'system', NOW(6)),
+  ('ORGANIZATION', 4, 0, 'system', NOW(6), 'system', NOW(6)),
+  ('USER', 29, 0, 'system', NOW(6), 'system', NOW(6)),
+  ('PROVISION_JOB', 0, 0, 'system', NOW(6), 'system', NOW(6)),
+  ('TENANT', 0, 0, 'system', NOW(6), 'system', NOW(6)),
+  ('PROMOTION', 0, 0, 'system', NOW(6), 'system', NOW(6)),
+  ('TEMPLATE', 0, 0, 'system', NOW(6), 'system', NOW(6))
+ON DUPLICATE KEY UPDATE
+  `last_value` = GREATEST(`last_value`, VALUES(`last_value`)),
+  updated_on = NOW(6);

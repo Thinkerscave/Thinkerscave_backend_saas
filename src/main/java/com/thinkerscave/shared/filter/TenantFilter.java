@@ -23,6 +23,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Resolves tenant for schema-per-tenant routing.
@@ -66,8 +69,11 @@ public class TenantFilter extends OncePerRequestFilter {
 
             if (bearerToken != null) {
                 String jwtTenant;
+                Set<String> switchableTenants = Set.of();
                 try {
-                    jwtTenant = extractJwtTenant(bearerToken);
+                    var claims = jwtService.extractAllClaims(bearerToken);
+                    jwtTenant = extractTenantFromClaims(claims.get("tenant"));
+                    switchableTenants = extractSwitchableTenants(claims.get("switchableTenants"));
                 } catch (JwtException | IllegalArgumentException ex) {
                     // Let JwtAuthenticationFilter produce the auth error; still set a safe default.
                     TenantContext.setTenant(DEFAULT_TENANT);
@@ -82,13 +88,16 @@ public class TenantFilter extends OncePerRequestFilter {
 
                 jwtTenant = normalizeTenant(jwtTenant);
                 if (StringUtils.hasText(headerTenant) && !headerTenant.equalsIgnoreCase(jwtTenant)) {
-                    log.warn("Tenant spoofing rejected: header={} jwtTenant={} path={}",
-                            headerTenant, jwtTenant, request.getRequestURI());
-                    sendForbidden(response, "X-Tenant-ID does not match authenticated tenant");
-                    return;
+                    if (!switchableTenants.contains(normalizeTenant(headerTenant))) {
+                        log.warn("Tenant spoofing rejected: header={} jwtTenant={} path={}",
+                                headerTenant, jwtTenant, request.getRequestURI());
+                        sendForbidden(response, "X-Tenant-ID does not match authenticated tenant");
+                        return;
+                    }
+                    TenantContext.setTenant(normalizeTenant(headerTenant));
+                } else {
+                    TenantContext.setTenant(jwtTenant);
                 }
-
-                TenantContext.setTenant(jwtTenant);
             } else {
                 // Pre-authentication: subdomain → header → default (login / public flows)
                 String tenant = null;
@@ -118,10 +127,22 @@ public class TenantFilter extends OncePerRequestFilter {
         return null;
     }
 
-    private String extractJwtTenant(String token) {
-        var claims = jwtService.extractAllClaims(token);
-        Object tenantClaim = claims.get("tenant");
+    private String extractTenantFromClaims(Object tenantClaim) {
         return tenantClaim != null ? tenantClaim.toString() : null;
+    }
+
+    private Set<String> extractSwitchableTenants(Object raw) {
+        if (!(raw instanceof Collection<?> values)) {
+            return Set.of();
+        }
+        Set<String> normalized = new HashSet<>();
+        for (Object value : values) {
+            String tenant = normalizeTenant(value != null ? value.toString() : null);
+            if (tenant != null) {
+                normalized.add(tenant);
+            }
+        }
+        return normalized;
     }
 
     private String normalizeTenant(String raw) {

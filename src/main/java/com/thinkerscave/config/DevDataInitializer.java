@@ -13,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -39,9 +40,11 @@ public class DevDataInitializer implements ApplicationRunner {
             ResourceDatabasePopulator migrate = new ResourceDatabasePopulator();
             migrate.addScript(new ClassPathResource("db/dev/migrate_customers_simplify.sql"));
             migrate.addScript(new ClassPathResource("db/dev/migrate_customer_contacts_normalize.sql"));
+            migrate.addScript(new ClassPathResource("db/dev/migrate_customers_owner_user.sql"));
             migrate.setSeparator(";");
             migrate.setContinueOnError(true);
             migrate.execute(dataSource);
+            ensureCustomerOwnerColumn();
             log.info("Customer schema migrations applied (if needed).");
 
             ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
@@ -175,6 +178,8 @@ public class DevDataInitializer implements ApplicationRunner {
                         log.debug("Table copy skipped {}.{}: {}", schema, table, te.getMessage());
                     }
                 }
+
+                ensureCustomerOwnerColumn(schema);
                 log.info("Table structures copied to {}", schema);
 
                 // 3. Load tenant seed data into the tenant schema
@@ -203,6 +208,38 @@ public class DevDataInitializer implements ApplicationRunner {
             } catch (Exception e) {
                 log.warn("Could not provision tenant database {}: {}", schema, e.getMessage());
             }
+        }
+    }
+
+    private void ensureCustomerOwnerColumn() {
+        ensureCustomerOwnerColumn(null);
+    }
+
+    private void ensureCustomerOwnerColumn(String schema) {
+        String tableRef = (schema == null || schema.isBlank()) ? "customers" : ("`" + schema + "`.`customers`");
+        try (Connection connection = dataSource.getConnection()) {
+            String catalog = (schema == null || schema.isBlank()) ? connection.getCatalog() : schema;
+            boolean exists;
+            try (ResultSet columns = connection.getMetaData().getColumns(catalog, null, "customers", "owner_user_id")) {
+                exists = columns.next();
+            }
+
+            if (!exists) {
+                jdbcTemplate.execute("ALTER TABLE " + tableRef + " ADD COLUMN owner_user_id BIGINT NULL");
+                log.info("Applied fallback migration: {}.owner_user_id added", tableRef);
+            }
+
+            try {
+                if (schema == null || schema.isBlank()) {
+                    jdbcTemplate.execute("CREATE INDEX idx_customer_owner ON customers (owner_user_id)");
+                } else {
+                    jdbcTemplate.execute("CREATE INDEX idx_customer_owner ON " + tableRef + " (owner_user_id)");
+                }
+            } catch (Exception ignored) {
+                // Ignore duplicate-index or unsupported-if-exists differences across engines.
+            }
+        } catch (Exception ex) {
+            log.warn("Could not ensure {} owner_user_id migration: {}", tableRef, ex.getMessage());
         }
     }
 }

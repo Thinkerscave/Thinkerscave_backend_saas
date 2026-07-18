@@ -22,6 +22,9 @@ public class ProvisioningResultResponse {
     private Long provisioningJobId;
     private String jobCode;
     private String adminEmail;
+    private String adminUsername;
+    /** One-time temporary password for the Organization Admin (returned only at provision time). */
+    private String temporaryPassword;
     private String defaultDomain;
     private String message;
 }

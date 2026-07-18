@@ -22,6 +22,10 @@ public class CustomerResponse {
     private String notes;
     private CustomerStatus status;
     private Long ownerUserId;
+    /** Present only on create — owner login username (typically business email). */
+    private String ownerUsername;
+    /** Present only on create — one-time temporary password for the owner account. */
+    private String temporaryPassword;
     private Boolean active;
     private Long organizationCount;
     private CustomerContactResponse primaryContact;

@@ -1,6 +1,7 @@
 package com.thinkerscave.platform.service.impl;
 
 import com.thinkerscave.access.dto.UserCreationContext;
+import com.thinkerscave.access.dto.UserProvisioningResult;
 import com.thinkerscave.access.entity.Role;
 import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.repository.RoleRepository;
@@ -41,22 +42,31 @@ import com.thinkerscave.platform.repository.SubscriptionFeatureOverrideRepositor
 import com.thinkerscave.platform.repository.SubscriptionPlanRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
 import com.thinkerscave.platform.service.ProvisionService;
+import com.thinkerscave.security.service.EmailService;
 import com.thinkerscave.shared.enums.CodeType;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.shared.service.CodeGeneratorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.sql.DataSource;
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -64,6 +74,9 @@ import java.util.List;
 public class ProvisionServiceImpl implements ProvisionService {
 
     private static final String ROLE_ORG_ADMIN_CODE = "ROLE_ADMIN";
+    private static final List<String> REQUIRED_TENANT_TABLES = List.of(
+            "users", "roles", "user_roles", "tenant_registry", "organizations"
+    );
 
     private final CustomerRepository customerRepository;
     private final OrganizationRepository organizationRepository;
@@ -81,6 +94,18 @@ public class ProvisionServiceImpl implements ProvisionService {
     private final UserService userService;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final EmailService emailService;
+    private final JdbcTemplate jdbcTemplate;
+    private final DataSource dataSource;
+
+    @Value("${app.tenancy.platform-schema:thinkerscave_dev}")
+    private String platformSchema;
+
+    @Value("${spring.flyway.enabled:false}")
+    private boolean flywayEnabled;
+
+    @Value("${app.platform.login-url:http://localhost:4200/auth/login}")
+    private String platformLoginUrl;
 
     /**
      * Main provisioning workflow — orchestrates the complete 18-step process:
@@ -170,7 +195,7 @@ public class ProvisionServiceImpl implements ProvisionService {
                 .currency(request.getCurrency())
                 .language(request.getLanguage())
                 .logoUrl(request.getLogoUrl())
-                .status(OrganizationStatus.ACTIVE)
+                .status(OrganizationStatus.PENDING)
                 .onboardingCompleted(false)
                 .active(true)
                 .remarks(request.getRemarks())
@@ -197,31 +222,39 @@ public class ProvisionServiceImpl implements ProvisionService {
                 .build();
         job = jobRepository.save(job);
 
+        String provisionedSchemaName = null;
         try {
             // ── Step 7: Create TenantRegistry ────────────────────────────────
-            String tenantId = codeGeneratorService.generate(CodeType.TENANT);
-            String schemaName = "org_" + orgCode.toLowerCase();
             String subDomainSlug = normalizeSubdomain(
                     request.getTenantSubdomain() != null && !request.getTenantSubdomain().isBlank()
                             ? request.getTenantSubdomain()
                             : request.getOrganizationName()
             );
+            String tenantId = normalizeTenantIdentifier(subDomainSlug);
+            String schemaName = tenantId;
+            provisionedSchemaName = schemaName;
             String tenantDomain = subDomainSlug + ".thinkerscave.app";
 
             TenantRegistry tenant = TenantRegistry.builder()
                     .tenantIdentifier(tenantId)
                     .organization(org)
                     .schemaName(schemaName)
-                    .provisionStatus(ProvisionStatus.COMPLETED)
+                    .provisionStatus(ProvisionStatus.IN_PROGRESS)
                     .tenantDomain(tenantDomain)
                     .maintenanceMode(false)
-                    .active(true)
+                    .active(false)
                     .build();
             tenant = tenantRepository.save(tenant);
             log.info("TenantRegistry created: {} -> schema: {}", tenantId, schemaName);
 
-            // ── Step 8: Schema provisioning (dev placeholder) ─────────────────
-            log.info("[DEV] Schema provisioning skipped for H2 dev profile. Schema: {}", schemaName);
+                // ── Step 8: Schema provisioning + validation ───────────────────────
+                provisionTenantSchema(schemaName);
+                verifyTenantSchemaReadiness(schemaName);
+                tenant.setProvisionStatus(ProvisionStatus.COMPLETED);
+                tenant.setMigrationVersion(flywayEnabled ? "flyway" : "bootstrap-copy");
+                tenant.setLastMigrationAt(LocalDateTime.now());
+                tenant.setActive(true);
+                tenantRepository.save(tenant);
             updateJobProgress(job, "SCHEMA_PROVISIONED", 30);
 
             // ── Step 9: Create Domain ─────────────────────────────────────────
@@ -337,14 +370,24 @@ public class ProvisionServiceImpl implements ProvisionService {
                     null,
                     "Administrator"
             );
-            User adminUser = userService.createUser(adminContext, adminRole);
+            UserProvisioningResult adminProvisioning = userService.createUserWithTemporaryPassword(adminContext, adminRole);
+            User adminUser = adminProvisioning.getUser();
             adminUser.setOrganizationId(org.getId());
             userRepository.save(adminUser);
             log.info("Admin user created for org {}: {}", orgCode, adminUser.getEmail());
             updateJobProgress(job, "ADMIN_USER_CREATED", 90);
 
-            // ── Step 16: Mark Organization as onboarded ───────────────────────
-            org.setOnboardingCompleted(true);
+            // ── Step 16: Map customer owner to this organization ──────────────
+            mapCustomerOwnerToOrganization(customer, org);
+            updateJobProgress(job, "CUSTOMER_OWNER_MAPPED", 94);
+
+            // Seed tenant catalog with auth/workspace rows so institution login
+            // can resolve tenant_registry + admin/owner users in the tenant DB.
+            bootstrapTenantWorkspace(schemaName, tenant, org, customer, adminUser);
+
+            // Keep onboarding pending for first-login checklist.
+            org.setOnboardingCompleted(false);
+            org.setStatus(OrganizationStatus.ACTIVE);
             organizationRepository.save(org);
 
             // ── Step 17: Complete Job ─────────────────────────────────────────
@@ -357,9 +400,13 @@ public class ProvisionServiceImpl implements ProvisionService {
             job.setTenantRegistry(tenant);
             jobRepository.save(job);
 
+            sendProvisioningEmails(customer, org, tenantDomain, adminUser, adminProvisioning.getTemporaryPassword());
+
             log.info("Provisioning completed: orgCode={}, tenantId={}, jobCode={}", orgCode, tenantId, jobCode);
 
             // ── Step 18: Return result ────────────────────────────────────────
+            log.info("Provisioning credentials: orgCode={} adminUsername={} temporaryPassword={}",
+                    orgCode, adminUser.getUsername(), adminProvisioning.getTemporaryPassword());
             return ProvisioningResultResponse.builder()
                     .organizationId(org.getId())
                     .organizationCode(orgCode)
@@ -371,12 +418,15 @@ public class ProvisionServiceImpl implements ProvisionService {
                     .provisioningJobId(job.getId())
                     .jobCode(jobCode)
                     .adminEmail(adminUser.getEmail())
+                    .adminUsername(adminUser.getUsername())
+                    .temporaryPassword(adminProvisioning.getTemporaryPassword())
                     .defaultDomain(tenantDomain)
                     .message("Organization provisioned successfully.")
                     .build();
 
         } catch (Exception ex) {
             log.error("Provisioning failed for org: {}, error: {}", orgCode, ex.getMessage(), ex);
+            cleanupTenantSchema(provisionedSchemaName);
             job.setStatus(ProvisionJobStatus.FAILED);
             job.setCurrentStep("FAILED");
             job.setErrorMessage(ex.getMessage());
@@ -418,6 +468,176 @@ public class ProvisionServiceImpl implements ProvisionService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private void provisionTenantSchema(String schemaName) {
+        if (schemaName == null || schemaName.isBlank()) {
+            throw new BadRequestException("Tenant schema name is required for provisioning");
+        }
+        log.info("Provisioning tenant schema: {}", schemaName);
+        jdbcTemplate.execute("CREATE DATABASE IF NOT EXISTS `" + schemaName + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+        List<String> platformTables = fetchPlatformTables();
+        for (String table : platformTables) {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS `" + schemaName + "`.`" + table + "` LIKE `" + platformSchema + "`.`" + table + "`");
+        }
+        log.info("Tenant schema initialized: {} with {} tables", schemaName, platformTables.size());
+    }
+
+    private void verifyTenantSchemaReadiness(String schemaName) {
+        List<String> missingTables = new ArrayList<>();
+        try (Connection connection = dataSource.getConnection()) {
+            connection.setCatalog(schemaName);
+            for (String table : REQUIRED_TENANT_TABLES) {
+                try (ResultSet rs = connection.getMetaData().getTables(schemaName, null, table, new String[]{"TABLE"})) {
+                    if (!rs.next()) {
+                        missingTables.add(table);
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            throw new BadRequestException("Tenant schema validation failed: " + ex.getMessage());
+        }
+
+        if (!missingTables.isEmpty()) {
+            throw new BadRequestException("Tenant schema is missing required tables: " + String.join(", ", missingTables));
+        }
+        log.info("Tenant schema validation completed: {}", schemaName);
+    }
+
+    private void cleanupTenantSchema(String schemaName) {
+        if (schemaName == null || schemaName.isBlank()) {
+            return;
+        }
+        try {
+            jdbcTemplate.execute("DROP DATABASE IF EXISTS `" + schemaName + "`");
+            log.warn("Provisioning rollback cleanup executed for tenant schema={}", schemaName);
+        } catch (Exception cleanupEx) {
+            log.error("Failed to cleanup tenant schema {} after provisioning failure: {}", schemaName, cleanupEx.getMessage(), cleanupEx);
+        }
+    }
+
+    private List<String> fetchPlatformTables() {
+        List<String> tables = new ArrayList<>();
+        try (Connection connection = dataSource.getConnection()) {
+            try (Statement st = connection.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema='" + platformSchema + "' AND table_type='BASE TABLE'")) {
+                while (rs.next()) {
+                    tables.add(rs.getString(1));
+                }
+            }
+        } catch (Exception ex) {
+            throw new BadRequestException("Unable to inspect platform schema tables: " + ex.getMessage());
+        }
+        if (tables.isEmpty()) {
+            throw new BadRequestException("No platform tables found in schema: " + platformSchema);
+        }
+        return tables;
+    }
+
+    private void mapCustomerOwnerToOrganization(Customer customer, Organization organization) {
+        if (customer.getOwnerUserId() == null) {
+            return;
+        }
+        userRepository.findById(customer.getOwnerUserId()).ifPresent(owner -> {
+            if (owner.getOrganizationId() == null || owner.getOrganizationId() <= 0) {
+                owner.setOrganizationId(organization.getId());
+                userRepository.save(owner);
+            }
+        });
+    }
+
+    /**
+     * Copies the minimum platform rows required for tenant-scoped login and
+     * first-load dashboard into the newly created tenant catalog.
+     * Table structures alone are not enough — institution login runs against the tenant DB.
+     */
+    private void bootstrapTenantWorkspace(
+            String schemaName,
+            TenantRegistry tenant,
+            Organization organization,
+            Customer customer,
+            User adminUser) {
+        if (schemaName == null || schemaName.isBlank()) {
+            return;
+        }
+
+        Long ownerUserId = customer.getOwnerUserId();
+        Long adminUserId = adminUser != null ? adminUser.getId() : null;
+
+        try {
+            copyPlatformRows(schemaName, "roles", null);
+            copyPlatformRows(schemaName, "customers", "id = " + customer.getId());
+            copyPlatformRows(schemaName, "organizations", "id = " + organization.getId());
+            copyPlatformRows(schemaName, "tenant_registry", "id = " + tenant.getId());
+            copyPlatformRows(schemaName, "organization_domains", "organization_id = " + organization.getId());
+            copyPlatformRows(schemaName, "organization_configurations", "organization_id = " + organization.getId());
+            copyPlatformRows(schemaName, "organization_subscriptions", "organization_id = " + organization.getId());
+
+            if (adminUserId != null) {
+                copyPlatformRows(schemaName, "users", "id = " + adminUserId);
+                copyPlatformRows(schemaName, "user_roles", "user_id = " + adminUserId);
+            }
+            if (ownerUserId != null && (adminUserId == null || !ownerUserId.equals(adminUserId))) {
+                copyPlatformRows(schemaName, "users", "id = " + ownerUserId);
+                copyPlatformRows(schemaName, "user_roles", "user_id = " + ownerUserId);
+            }
+
+            log.info("Tenant workspace bootstrap completed for schema={}", schemaName);
+        } catch (Exception ex) {
+            throw new BadRequestException("Failed to bootstrap tenant workspace data: " + ex.getMessage());
+        }
+    }
+
+    private void copyPlatformRows(String tenantSchema, String table, String whereClause) {
+        String sql = "INSERT IGNORE INTO `" + tenantSchema + "`.`" + table + "` "
+                + "SELECT * FROM `" + platformSchema + "`.`" + table + "`"
+                + (whereClause != null && !whereClause.isBlank() ? " WHERE " + whereClause : "");
+        jdbcTemplate.execute(sql);
+    }
+
+    private void sendProvisioningEmails(
+            Customer customer,
+            Organization organization,
+            String workspaceDomain,
+            User adminUser,
+            String adminTemporaryPassword) {
+        String workspaceUrl = "https://" + workspaceDomain + "/auth/login";
+
+        CustomerContact primaryContact = customer.getContacts().stream()
+                .filter(c -> Boolean.TRUE.equals(c.getActive()) && c.getContactType() == ContactType.PRIMARY)
+                .findFirst()
+                .orElse(null);
+
+        if (primaryContact != null && primaryContact.getEmail() != null && !primaryContact.getEmail().isBlank()) {
+            try {
+                String ownerSubject = "Organization created successfully";
+                String ownerHtml = emailService.buildOrganizationProvisionedOwnerEmailBody(
+                        primaryContact.getFullName(),
+                        organization.getOrganizationName(),
+                        workspaceUrl);
+                emailService.sendHtmlEmail(primaryContact.getEmail(), ownerSubject, ownerHtml);
+                log.info("Provisioning owner email queued for customer={} org={}", customer.getCustomerCode(), organization.getOrganizationCode());
+            } catch (Exception ex) {
+                log.error("Failed to queue customer owner provisioning email for org {}: {}",
+                        organization.getOrganizationCode(), ex.getMessage(), ex);
+            }
+        }
+
+        try {
+            String adminSubject = "Welcome to " + organization.getOrganizationName();
+            String adminHtml = emailService.buildOrganizationAdminWelcomeEmailBody(
+                    adminUser.getDisplayName(),
+                    organization.getOrganizationName(),
+                    workspaceUrl,
+                    adminUser.getUsername(),
+                    adminTemporaryPassword);
+            emailService.sendHtmlEmail(adminUser.getEmail(), adminSubject, adminHtml);
+            log.info("Provisioning admin email queued for org={} admin={}", organization.getOrganizationCode(), adminUser.getEmail());
+        } catch (Exception ex) {
+            log.error("Failed to queue organization admin welcome email for org {}: {}",
+                    organization.getOrganizationCode(), ex.getMessage(), ex);
+        }
+    }
 
     private void updateJobProgress(ProvisioningJob job, String step, int percentage) {
         job.setCurrentStep(step);
@@ -471,6 +691,14 @@ public class ProvisionServiceImpl implements ProvisionService {
                 .replaceAll("[^a-z0-9-]", "-")
                 .replaceAll("-+", "-")
                 .replaceAll("^-|-$", "");
+    }
+
+    private String normalizeTenantIdentifier(String subdomain) {
+        String normalized = normalizeSubdomain(subdomain).replace('-', '_');
+        if (normalized.startsWith("tenant_")) {
+            return normalized;
+        }
+        return "tenant_" + normalized;
     }
 
     private ProvisioningJobResponse toJobResponse(ProvisioningJob j) {

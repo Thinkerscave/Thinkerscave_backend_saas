@@ -69,4 +69,95 @@ public class EmailService {
                 </html>
                 """.formatted(firstName != null ? firstName : "User", otp);
     }
+
+    public String buildCustomerWelcomeEmailBody(
+            String customerName,
+            String ownerName,
+            String loginUrl,
+            String username,
+            String temporaryPassword) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6fb; padding: 24px;">
+                  <div style="max-width: 640px; margin: auto; background: #fff; border-radius: 10px; padding: 28px; border: 1px solid #e5e7eb;">
+                    <h2 style="margin: 0 0 8px; color: #0f172a;">Welcome to ThinkersCave</h2>
+                    <p style="margin: 0 0 18px; color: #334155;">Hello %s, your customer account for <strong>%s</strong> is ready.</p>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                      <p style="margin: 0 0 6px;"><strong>Login URL:</strong> <a href="%s">%s</a></p>
+                      <p style="margin: 0 0 6px;"><strong>Username:</strong> %s</p>
+                      <p style="margin: 0;"><strong>Temporary Password:</strong> %s</p>
+                    </div>
+                    <p style="margin: 0 0 8px; color: #334155;">Please sign in and change your password immediately from your profile/password screen.</p>
+                    <p style="margin: 0; color: #64748b; font-size: 12px;">If you did not expect this email, contact support.</p>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                ownerName != null ? ownerName : "Customer Owner",
+                customerName != null ? customerName : "your organization",
+                loginUrl,
+                loginUrl,
+                username,
+                temporaryPassword
+        );
+    }
+
+    public String buildOrganizationProvisionedOwnerEmailBody(String ownerName, String organizationName, String workspaceUrl) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6fb; padding: 24px;">
+                  <div style="max-width: 640px; margin: auto; background: #fff; border-radius: 10px; padding: 28px; border: 1px solid #e5e7eb;">
+                    <h2 style="margin: 0 0 8px; color: #0f172a;">Organization Provisioned</h2>
+                    <p style="margin: 0 0 14px; color: #334155;">Hello %s, your workspace is now ready.</p>
+                    <p style="margin: 0 0 6px;"><strong>Organization:</strong> %s</p>
+                    <p style="margin: 0 0 16px;"><strong>Workspace URL:</strong> <a href="%s">%s</a></p>
+                    <p style="margin: 0; color: #334155;">You can switch between your organizations from the workspace switcher after login.</p>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                ownerName != null ? ownerName : "Customer Owner",
+                organizationName,
+                workspaceUrl,
+                workspaceUrl
+        );
+    }
+
+    public String buildOrganizationAdminWelcomeEmailBody(
+            String adminName,
+            String organizationName,
+            String loginUrl,
+            String username,
+            String temporaryPassword) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6fb; padding: 24px;">
+                  <div style="max-width: 640px; margin: auto; background: #fff; border-radius: 10px; padding: 28px; border: 1px solid #e5e7eb;">
+                    <h2 style="margin: 0 0 8px; color: #0f172a;">Welcome to %s</h2>
+                    <p style="margin: 0 0 18px; color: #334155;">Hello %s, your Organization Admin account is ready.</p>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                      <p style="margin: 0 0 6px;"><strong>Login URL:</strong> <a href="%s">%s</a></p>
+                      <p style="margin: 0 0 6px;"><strong>Username:</strong> %s</p>
+                      <p style="margin: 0;"><strong>Temporary Password:</strong> %s</p>
+                    </div>
+                    <p style="margin: 0 0 8px; color: #334155;">On first login, you will be prompted to change the password before accessing the dashboard.</p>
+                    <p style="margin: 0; color: #64748b; font-size: 12px;">Use "Forgot password" if you need to reset credentials.</p>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                organizationName,
+                adminName != null ? adminName : "Administrator",
+                loginUrl,
+                loginUrl,
+                username,
+                temporaryPassword
+        );
+    }
 }
