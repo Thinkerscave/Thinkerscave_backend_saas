@@ -15,21 +15,12 @@ public class CustomerContactResponse {
     private Long id;
     private String contactCode;
     private Long customerId;
-    private String fullName;
-    private String designation;
     private ContactType contactType;
+    private String fullName;
     private String email;
     private String mobileNumber;
-    private String alternateMobileNumber;
-    private String officePhone;
-    private String department;
-    private Boolean primaryContact;
-    private Boolean billingContact;
-    private Boolean technicalContact;
-    private Boolean salesContact;
-    private Boolean supportContact;
+    private String designation;
     private Boolean active;
-    private String remarks;
     private LocalDateTime createdOn;
     private String createdBy;
 }

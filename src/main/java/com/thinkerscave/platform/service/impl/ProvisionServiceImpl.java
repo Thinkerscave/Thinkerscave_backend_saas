@@ -1,10 +1,18 @@
 package com.thinkerscave.platform.service.impl;
 
+import com.thinkerscave.access.dto.UserCreationContext;
+import com.thinkerscave.access.entity.Role;
+import com.thinkerscave.access.entity.User;
+import com.thinkerscave.access.repository.RoleRepository;
+import com.thinkerscave.access.repository.UserRepository;
+import com.thinkerscave.access.service.UserService;
 import com.thinkerscave.platform.dto.request.ProvisionOrganizationRequest;
 import com.thinkerscave.platform.dto.response.ProvisioningJobResponse;
 import com.thinkerscave.platform.dto.response.ProvisioningResultResponse;
 import com.thinkerscave.platform.entity.Customer;
+import com.thinkerscave.platform.entity.CustomerContact;
 import com.thinkerscave.platform.entity.Organization;
+import com.thinkerscave.platform.enums.ContactType;
 import com.thinkerscave.platform.entity.OrganizationConfiguration;
 import com.thinkerscave.platform.entity.OrganizationDomain;
 import com.thinkerscave.platform.entity.OrganizationSubscription;
@@ -55,6 +63,8 @@ import java.util.List;
 @Slf4j
 public class ProvisionServiceImpl implements ProvisionService {
 
+    private static final String ROLE_ORG_ADMIN_CODE = "ROLE_ADMIN";
+
     private final CustomerRepository customerRepository;
     private final OrganizationRepository organizationRepository;
     private final TenantRegistryRepository tenantRepository;
@@ -68,6 +78,9 @@ public class ProvisionServiceImpl implements ProvisionService {
     private final ProvisioningJobRepository jobRepository;
     private final ProvisioningTemplateRepository templateRepository;
     private final CodeGeneratorService codeGeneratorService;
+    private final UserService userService;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
 
     /**
      * Main provisioning workflow — orchestrates the complete 18-step process:
@@ -108,20 +121,33 @@ public class ProvisionServiceImpl implements ProvisionService {
                     .orElseThrow(() -> new ResourceNotFoundException("Customer not found: " + request.getExistingCustomerId()));
         } else {
             if (request.getCustomerEmail() == null || request.getCustomerLegalName() == null) {
-                throw new BadRequestException("Customer email and legal name are required when creating a new customer");
+                throw new BadRequestException("Customer email and customer name are required when creating a new customer");
             }
-            customer = customerRepository.findByEmail(request.getCustomerEmail())
+            customer = customerRepository.findByBusinessEmail(request.getCustomerEmail())
                     .orElseGet(() -> {
                         String code = codeGeneratorService.generate(CodeType.CUSTOMER);
-                        return customerRepository.save(Customer.builder()
+                        String name = request.getCustomerLegalName();
+                        String display = request.getCustomerDisplayName() != null
+                                ? request.getCustomerDisplayName()
+                                : name;
+                        Customer created = Customer.builder()
                                 .customerCode(code)
-                                .legalName(request.getCustomerLegalName())
-                                .displayName(request.getCustomerDisplayName() != null ? request.getCustomerDisplayName() : request.getCustomerLegalName())
-                                .email(request.getCustomerEmail())
-                                .mobileNumber(request.getCustomerMobile())
+                                .customerName(display != null ? display : name)
+                                .businessEmail(request.getCustomerEmail().trim().toLowerCase())
+                                .mobileNumber(request.getCustomerMobile() != null ? request.getCustomerMobile() : "0000000000")
+                                .status(com.thinkerscave.platform.enums.CustomerStatus.ACTIVE)
                                 .active(true)
-                                .onboardingCompleted(false)
-                                .build());
+                                .build();
+                        CustomerContact primary = CustomerContact.builder()
+                                .contactCode(codeGeneratorService.generate(CodeType.CONTACT))
+                                .contactType(ContactType.PRIMARY)
+                                .fullName(name != null ? name : "Owner")
+                                .email(request.getCustomerEmail().trim().toLowerCase())
+                                .mobileNumber(request.getCustomerMobile() != null ? request.getCustomerMobile() : "0000000000")
+                                .active(true)
+                                .build();
+                        created.addContact(primary);
+                        return customerRepository.save(created);
                     });
         }
 
@@ -175,11 +201,11 @@ public class ProvisionServiceImpl implements ProvisionService {
             // ── Step 7: Create TenantRegistry ────────────────────────────────
             String tenantId = codeGeneratorService.generate(CodeType.TENANT);
             String schemaName = "org_" + orgCode.toLowerCase();
-            String subDomainSlug = request.getOrganizationName()
-                    .toLowerCase()
-                    .replaceAll("[^a-z0-9]", "-")
-                    .replaceAll("-+", "-")
-                    .replaceAll("^-|-$", "");
+            String subDomainSlug = normalizeSubdomain(
+                    request.getTenantSubdomain() != null && !request.getTenantSubdomain().isBlank()
+                            ? request.getTenantSubdomain()
+                            : request.getOrganizationName()
+            );
             String tenantDomain = subDomainSlug + ".thinkerscave.app";
 
             TenantRegistry tenant = TenantRegistry.builder()
@@ -296,16 +322,30 @@ public class ProvisionServiceImpl implements ProvisionService {
             }
             updateJobProgress(job, "FEATURES_CONFIGURED", 80);
 
-            // ── Step 15: Admin user (placeholder) ─────────────────────────────
-            log.info("[TODO] Admin user creation for org {} will be handled during tenant-level bootstrap. Email: {}",
-                    orgCode, request.getAdminEmail());
+            // ── Step 15: Create admin user ────────────────────────────────────
+            Role adminRole = roleRepository.findByRoleCode(ROLE_ORG_ADMIN_CODE)
+                    .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + ROLE_ORG_ADMIN_CODE));
+
+            UserCreationContext adminContext = new UserCreationContext(
+                    request.getAdminFirstName(),
+                    null,
+                    request.getAdminLastName() != null ? request.getAdminLastName() : "",
+                    request.getAdminEmail().trim().toLowerCase(),
+                    request.getAdminMobile(),
+                    null,
+                    null,
+                    null,
+                    "Administrator"
+            );
+            User adminUser = userService.createUser(adminContext, adminRole);
+            adminUser.setOrganizationId(org.getId());
+            userRepository.save(adminUser);
+            log.info("Admin user created for org {}: {}", orgCode, adminUser.getEmail());
             updateJobProgress(job, "ADMIN_USER_CREATED", 90);
 
             // ── Step 16: Mark Organization as onboarded ───────────────────────
             org.setOnboardingCompleted(true);
             organizationRepository.save(org);
-            customer.setOnboardingCompleted(true);
-            customerRepository.save(customer);
 
             // ── Step 17: Complete Job ─────────────────────────────────────────
             LocalDateTime completedAt = LocalDateTime.now();
@@ -330,9 +370,9 @@ public class ProvisionServiceImpl implements ProvisionService {
                     .subscriptionId(subscription.getId())
                     .provisioningJobId(job.getId())
                     .jobCode(jobCode)
-                    .adminEmail(request.getAdminEmail())
+                    .adminEmail(adminUser.getEmail())
                     .defaultDomain(tenantDomain)
-                    .message("Organization provisioned successfully. Admin user setup required.")
+                    .message("Organization provisioned successfully.")
                     .build();
 
         } catch (Exception ex) {
@@ -413,10 +453,24 @@ public class ProvisionServiceImpl implements ProvisionService {
     }
 
     private BigDecimal calculateDiscount(BigDecimal price, Promotion promotion) {
-        return switch (promotion.getDiscountType()) {
+        BigDecimal discount = switch (promotion.getDiscountType()) {
             case PERCENTAGE -> price.multiply(promotion.getDiscountValue()).divide(BigDecimal.valueOf(100));
             case FLAT_AMOUNT -> promotion.getDiscountValue().min(price);
         };
+        if (promotion.getMaximumDiscount() != null && promotion.getMaximumDiscount().compareTo(BigDecimal.ZERO) > 0) {
+            discount = discount.min(promotion.getMaximumDiscount());
+        }
+        return discount.min(price);
+    }
+
+    private String normalizeSubdomain(String value) {
+        if (value == null || value.isBlank()) {
+            return "tenant";
+        }
+        return value.toLowerCase()
+                .replaceAll("[^a-z0-9-]", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("^-|-$", "");
     }
 
     private ProvisioningJobResponse toJobResponse(ProvisioningJob j) {

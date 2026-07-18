@@ -1,9 +1,8 @@
 package com.thinkerscave.platform.repository;
 
 import com.thinkerscave.platform.entity.CustomerContact;
+import com.thinkerscave.platform.enums.ContactType;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -12,16 +11,15 @@ import java.util.Optional;
 @Repository
 public interface CustomerContactRepository extends JpaRepository<CustomerContact, Long> {
 
-    @Query("""
-            SELECT c FROM CustomerContact c
-            WHERE c.customer.id = :customerId AND c.active = true
-            ORDER BY c.primaryContact DESC
-            """)
-    List<CustomerContact> findByCustomer_IdAndActiveTrueOrderByPrimaryContactDesc(@Param("customerId") Long customerId);
+    List<CustomerContact> findByCustomer_IdAndActiveTrueOrderByContactTypeAsc(Long customerId);
+
+    List<CustomerContact> findByCustomer_IdOrderByContactTypeAsc(Long customerId);
+
+    Optional<CustomerContact> findByCustomer_IdAndContactTypeAndActiveTrue(Long customerId, ContactType contactType);
 
     Optional<CustomerContact> findByContactCode(String contactCode);
 
-    boolean existsByCustomer_IdAndPrimaryContactTrue(Long customerId);
+    boolean existsByCustomer_IdAndContactTypeAndActiveTrue(Long customerId, ContactType contactType);
 
     long countByCustomer_IdAndActiveTrue(Long customerId);
 }

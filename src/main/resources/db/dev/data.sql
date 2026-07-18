@@ -10,37 +10,36 @@
 -- =========================================================
 
 INSERT IGNORE INTO customers (
-	id, customer_code, legal_name, display_name, customer_type, status,
-	email, mobile_number, alternate_mobile_number, website, tax_number,
-	registration_number, address_line_1, address_line_2, city, state, country,
-	postal_code, logo_url, preferred_communication, onboarding_completed, active,
-	remarks, created_by, updated_by, version
+	id, customer_code, customer_name, status,
+	business_email, mobile_number, alternate_mobile_number,
+	notes, active,
+	created_by, created_on, updated_by, updated_on, version
 )
 VALUES
-(1, 'CUS000001', 'Javier Education Group', 'Javier Education Group', 'EDUCATION_GROUP', 'ACTIVE',
- 'founder@javier.edu.in', '9777001100', '9437001100', 'https://javier.edu.in', 'ODJEG1234A',
- 'REG-JEG-2024-001', 'Plot No. 12, Patia', 'Near Infocity', 'Bhubaneswar', 'Odisha', 'India',
- '751024', 'https://cdn.thinkerscave.local/logos/javier-group.png', 'WHATSAPP', TRUE, TRUE,
- 'Group account for Javier School campuses in Odisha', 'system', 'system', 0),
-(2, 'CUS000002', 'ABC School Trust', 'ABC School Trust', 'SCHOOL', 'ACTIVE',
- 'trust@abcschool.edu.in', '9861002200', '9337002200', 'https://abcschool.edu.in', 'ODABC6789B',
- 'REG-ABC-2018-014', 'Plot 44, Chandrasekharpur', 'Near Nalco Square', 'Bhubaneswar', 'Odisha', 'India',
- '751016', 'https://cdn.thinkerscave.local/logos/abc-school.png', 'EMAIL', TRUE, TRUE,
- 'Single school trust operating under Odisha board', 'system', 'system', 0),
-(3, 'CUS000003', 'Kalinga Learning Foundation', 'Kalinga Learning Foundation', 'EDUCATION_GROUP', 'ACTIVE',
- 'contact@kalinga.edu.in', '9692003300', '9338003300', 'https://kalinga.edu.in', 'ODKLF2468C',
- 'REG-KLF-2019-011', 'Plot 7, Sector 5', 'Near New Bus Stand', 'Cuttack', 'Odisha', 'India',
- '753014', 'https://cdn.thinkerscave.local/logos/kalinga-foundation.png', 'PHONE', TRUE, TRUE,
- 'Group account for Kalinga campuses', 'system', 'system', 0);
+(1, 'CUS000001', 'Javier Education Group', 'ACTIVE',
+ 'founder@javier.edu.in', '9777001100', '9437001100',
+ 'Group account for Javier School campuses in Odisha', TRUE,
+ 'system', NOW(6), 'system', NOW(6), 0),
+(2, 'CUS000002', 'ABC School Trust', 'ACTIVE',
+ 'trust@abcschool.edu.in', '9861002200', '9337002200',
+ 'Single school trust operating under Odisha board', TRUE,
+ 'system', NOW(6), 'system', NOW(6), 0),
+(3, 'CUS000003', 'Kalinga Learning Foundation', 'ACTIVE',
+ 'contact@kalinga.edu.in', '9692003300', '9338003300',
+ 'Group account for Kalinga campuses', TRUE,
+ 'system', NOW(6), 'system', NOW(6), 0);
 
 INSERT IGNORE INTO customer_contacts (
 	id, contact_code, customer_id, full_name, designation, contact_type, email, mobile_number,
-	alternate_mobile_number, department, primary_contact, created_by, updated_by, version
+	active, created_by, created_on, updated_by, updated_on, version
 )
 VALUES
-(1, 'CTC000001', 1, 'Sanjay Mohanty', 'Founder & Chairman', 'PRIMARY', 'founder@javier.edu.in', '9777001100', '9437001100', 'Board Office', TRUE, 'system', 'system', 0),
-(2, 'CTC000002', 2, 'Dr. Madhumita Das', 'Managing Trustee', 'PRIMARY', 'trust@abcschool.edu.in', '9861002200', '9337002200', 'Trust Office', TRUE, 'system', 'system', 0),
-(3, 'CTC000003', 3, 'Raghunath Patra', 'Secretary', 'PRIMARY', 'contact@kalinga.edu.in', '9692003300', '9338003300', 'Head Office', TRUE, 'system', 'system', 0);
+(1, 'CTC000001', 1, 'Sanjay Mohanty', 'Founder & Chairman', 'PRIMARY', 'founder@javier.edu.in', '9777001100',
+ 1, 'system', NOW(6), 'system', NOW(6), 0),
+(2, 'CTC000002', 2, 'Dr. Madhumita Das', 'Managing Trustee', 'PRIMARY', 'trust@abcschool.edu.in', '9861002200',
+ 1, 'system', NOW(6), 'system', NOW(6), 0),
+(3, 'CTC000003', 3, 'Raghunath Patra', 'Secretary', 'PRIMARY', 'contact@kalinga.edu.in', '9692003300',
+ 1, 'system', NOW(6), 'system', NOW(6), 0);
 
 INSERT IGNORE INTO organizations (
 	id, organization_code, customer_id, organization_name, short_name, institution_type, board_name,

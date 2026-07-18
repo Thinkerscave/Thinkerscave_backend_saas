@@ -44,4 +44,19 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
     long countByStatus(OrganizationStatus status);
 
     long countByCustomer_IdAndActiveTrue(Long customerId);
+
+    @Query("""
+            SELECT DISTINCT o FROM Organization o
+            LEFT JOIN FETCH o.tenantRegistry tr
+            WHERE o.active = true
+              AND o.status = com.thinkerscave.platform.enums.OrganizationStatus.ACTIVE
+              AND tr IS NOT NULL
+              AND (tr.active IS NULL OR tr.active = true)
+              AND (:search IS NULL OR :search = ''
+                   OR LOWER(o.organizationName) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(COALESCE(o.city, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(COALESCE(o.state, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(COALESCE(tr.tenantIdentifier, '')) LIKE LOWER(CONCAT('%', :search, '%')))
+            """)
+    List<Organization> findPublicLoginOrganizations(@Param("search") String search);
 }

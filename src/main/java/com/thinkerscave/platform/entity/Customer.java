@@ -1,8 +1,6 @@
 package com.thinkerscave.platform.entity;
 
 import com.thinkerscave.platform.enums.CustomerStatus;
-import com.thinkerscave.platform.enums.CustomerType;
-import com.thinkerscave.platform.enums.PreferredCommunication;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import lombok.*;
@@ -10,6 +8,10 @@ import lombok.*;
 import java.util.HashSet;
 import java.util.Set;
 
+/**
+ * Lightweight account owner in ThinkerCape.
+ * Contact people live on {@link CustomerContact}; orgs/billing live elsewhere.
+ */
 @Entity
 @Getter
 @Setter
@@ -21,10 +23,11 @@ import java.util.Set;
         name = "customers",
         indexes = {
                 @Index(name = "idx_customer_code", columnList = "customer_code"),
-                @Index(name = "idx_customer_name", columnList = "display_name"),
-                @Index(name = "idx_customer_email", columnList = "email"),
+                @Index(name = "idx_customer_name", columnList = "customer_name"),
+                @Index(name = "idx_customer_email", columnList = "business_email"),
                 @Index(name = "idx_customer_mobile", columnList = "mobile_number"),
-                @Index(name = "idx_customer_status", columnList = "status")
+                @Index(name = "idx_customer_status", columnList = "status"),
+                @Index(name = "idx_customer_owner", columnList = "owner_user_id")
         }
 )
 public class Customer extends Auditable {
@@ -35,148 +38,37 @@ public class Customer extends Auditable {
     @Column(name = "id")
     private Long id;
 
-    /**
-     * Business unique customer code.
-     * Example : CUS000001
-     */
     @Column(name = "customer_code", nullable = false, unique = true, length = 50)
     private String customerCode;
 
-    /**
-     * Registered legal name.
-     */
-    @Column(name = "legal_name", nullable = false, length = 200)
-    private String legalName;
+    @Column(name = "customer_name", nullable = false, length = 150)
+    private String customerName;
 
-    /**
-     * Display name used across platform.
-     */
-    @Column(name = "display_name", nullable = false, length = 200)
-    private String displayName;
+    @Column(name = "business_email", nullable = false, unique = true, length = 150)
+    private String businessEmail;
 
-    /**
-     * Customer type.
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "customer_type", nullable = false, length = 50)
-    private CustomerType customerType;
+    @Column(name = "mobile_number", nullable = false, length = 30)
+    private String mobileNumber;
 
-    /**
-     * Customer lifecycle status.
-     */
+    @Column(name = "alternate_mobile_number", length = 30)
+    private String alternateMobileNumber;
+
+    @Column(name = "notes", length = 500)
+    private String notes;
+
     @Builder.Default
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
-    private CustomerStatus status = CustomerStatus.LEAD;
+    private CustomerStatus status = CustomerStatus.ACTIVE;
 
-    /**
-     * Primary email.
-     */
-    @Column(name = "email", nullable = false, unique = true, length = 150)
-    private String email;
+    /** Linked Organization Owner user created at customer onboarding. */
+    @Column(name = "owner_user_id")
+    private Long ownerUserId;
 
-    /**
-     * Primary mobile number.
-     */
-    @Column(name = "mobile_number", nullable = false, length = 20)
-    private String mobileNumber;
-
-    /**
-     * Alternate mobile number.
-     */
-    @Column(name = "alternate_mobile_number", length = 20)
-    private String alternateMobileNumber;
-
-    /**
-     * Official website.
-     */
-    @Column(name = "website", length = 255)
-    private String website;
-
-    /**
-     * GST / VAT / Tax Number.
-     */
-    @Column(name = "tax_number", length = 100)
-    private String taxNumber;
-
-    /**
-     * Business registration number.
-     */
-    @Column(name = "registration_number", length = 100)
-    private String registrationNumber;
-
-    /**
-     * Address Line 1.
-     */
-    @Column(name = "address_line_1", length = 255)
-    private String addressLine1;
-
-    /**
-     * Address Line 2.
-     */
-    @Column(name = "address_line_2", length = 255)
-    private String addressLine2;
-
-    /**
-     * City.
-     */
-    @Column(name = "city", length = 100)
-    private String city;
-
-    /**
-     * State.
-     */
-    @Column(name = "state", length = 100)
-    private String state;
-
-    /**
-     * Country.
-     */
-    @Column(name = "country", length = 100)
-    private String country;
-
-    /**
-     * Postal / ZIP code.
-     */
-    @Column(name = "postal_code", length = 20)
-    private String postalCode;
-
-    /**
-     * Organization logo URL.
-     */
-    @Column(name = "logo_url", length = 500)
-    private String logoUrl;
-
-    /**
-     * Preferred communication method.
-     */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "preferred_communication", length = 30)
-    private PreferredCommunication preferredCommunication;
-
-    /**
-     * Whether onboarding has been completed.
-     */
-    @Builder.Default
-    @Column(name = "onboarding_completed", nullable = false)
-    private Boolean onboardingCompleted = false;
-
-    /**
-     * Customer active flag.
-     */
     @Builder.Default
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
-    /**
-     * Internal remarks.
-     */
-    @Column(name = "remarks", length = 1000)
-    private String remarks;
-
-    /**
-     * Customer contacts.
-     */
     @Builder.Default
     @OneToMany(
             mappedBy = "customer",
@@ -186,14 +78,12 @@ public class Customer extends Auditable {
     )
     private Set<CustomerContact> contacts = new HashSet<>();
 
-    /**
-     * Organizations owned by this customer.
-     */
     @Builder.Default
-    @OneToMany(
-            mappedBy = "customer",
-            fetch = FetchType.LAZY
-    )
+    @OneToMany(mappedBy = "customer", fetch = FetchType.LAZY)
     private Set<Organization> organizations = new HashSet<>();
 
+    public void addContact(CustomerContact contact) {
+        contacts.add(contact);
+        contact.setCustomer(this);
+    }
 }

@@ -1,13 +1,12 @@
 package com.thinkerscave.platform.dto.response;
 
 import com.thinkerscave.platform.enums.CustomerStatus;
-import com.thinkerscave.platform.enums.CustomerType;
-import com.thinkerscave.platform.enums.PreferredCommunication;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -16,28 +15,18 @@ public class CustomerResponse {
 
     private Long id;
     private String customerCode;
-    private String legalName;
-    private String displayName;
-    private CustomerType customerType;
-    private CustomerStatus status;
-    private String email;
+    private String customerName;
+    private String businessEmail;
     private String mobileNumber;
     private String alternateMobileNumber;
-    private String website;
-    private String taxNumber;
-    private String registrationNumber;
-    private String addressLine1;
-    private String addressLine2;
-    private String city;
-    private String state;
-    private String country;
-    private String postalCode;
-    private String logoUrl;
-    private PreferredCommunication preferredCommunication;
-    private Boolean onboardingCompleted;
+    private String notes;
+    private CustomerStatus status;
+    private Long ownerUserId;
     private Boolean active;
-    private String remarks;
-    private long organizationCount;
+    private Long organizationCount;
+    private CustomerContactResponse primaryContact;
+    private CustomerContactResponse secondaryContact;
+    private List<CustomerContactResponse> contacts;
     private LocalDateTime createdOn;
     private String createdBy;
     private LocalDateTime updatedOn;

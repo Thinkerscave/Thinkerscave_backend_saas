@@ -5,10 +5,10 @@ import com.thinkerscave.platform.dto.request.CustomerRequest;
 import com.thinkerscave.platform.dto.request.CustomerStatusUpdateRequest;
 import com.thinkerscave.platform.dto.response.CustomerContactResponse;
 import com.thinkerscave.platform.dto.response.CustomerDetailResponse;
+import com.thinkerscave.platform.dto.response.CustomerListItemResponse;
 import com.thinkerscave.platform.dto.response.CustomerResponse;
 import com.thinkerscave.platform.dto.response.OrganizationSummaryResponse;
 import com.thinkerscave.platform.enums.CustomerStatus;
-import com.thinkerscave.platform.enums.CustomerType;
 import com.thinkerscave.platform.repository.OrganizationRepository;
 import com.thinkerscave.platform.service.CustomerService;
 import com.thinkerscave.shared.dto.ApiResponse;
@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/platform/customers")
 @RequiredArgsConstructor
-@Tag(name = "Customer Management", description = "Manage platform customers")
+@Tag(name = "Customer Management", description = "Manage lightweight ThinkerCape customer accounts")
 public class CustomerController {
 
     private final CustomerService customerService;
@@ -38,14 +38,14 @@ public class CustomerController {
     @GetMapping
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     @Operation(summary = "List customers with filters and pagination")
-    public ResponseEntity<ApiResponse<Page<CustomerResponse>>> getCustomers(
+    public ResponseEntity<ApiResponse<Page<CustomerListItemResponse>>> getCustomers(
             @RequestParam(required = false) CustomerStatus status,
-            @RequestParam(required = false) CustomerType customerType,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "true") boolean activeOnly,
-            @PageableDefault(size = 20, sort = "createdOn") Pageable pageable) {
+            @RequestParam(required = false) String created,
+            @PageableDefault(size = 10, sort = "createdOn") Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Customers retrieved",
-                customerService.getCustomers(status, customerType, search, activeOnly, pageable)));
+                customerService.getCustomers(status, search, activeOnly, created, pageable)));
     }
 
     @GetMapping("/dashboard")
@@ -57,7 +57,7 @@ public class CustomerController {
 
     @GetMapping("/metadata")
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")
-    @Operation(summary = "Customer module metadata (statuses, types)")
+    @Operation(summary = "Customer module metadata (statuses)")
     public ResponseEntity<ApiResponse<com.thinkerscave.platform.dto.response.CustomerMetadataResponse>> getCustomerMetadata() {
         return ResponseEntity.ok(ApiResponse.success("Customer metadata retrieved", customerService.getCustomerMetadata()));
     }
@@ -71,7 +71,7 @@ public class CustomerController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")
-    @Operation(summary = "Create a new customer")
+    @Operation(summary = "Create a new customer and linked organization owner")
     public ResponseEntity<ApiResponse<CustomerResponse>> createCustomer(@Valid @RequestBody CustomerRequest request) {
         return ResponseEntity.status(201)
                 .body(ApiResponse.created("Customer created successfully", customerService.createCustomer(request)));
@@ -146,8 +146,6 @@ public class CustomerController {
                 .collect(Collectors.toList());
         return ResponseEntity.ok(ApiResponse.success("Customer organizations retrieved", orgs));
     }
-
-    // ── Customer Contacts ─────────────────────────────────────────────────────
 
     @GetMapping("/{id}/contacts")
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")

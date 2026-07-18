@@ -5,10 +5,10 @@ import com.thinkerscave.platform.dto.request.CustomerRequest;
 import com.thinkerscave.platform.dto.response.CustomerContactResponse;
 import com.thinkerscave.platform.dto.response.CustomerDashboardResponse;
 import com.thinkerscave.platform.dto.response.CustomerDetailResponse;
+import com.thinkerscave.platform.dto.response.CustomerListItemResponse;
 import com.thinkerscave.platform.dto.response.CustomerMetadataResponse;
 import com.thinkerscave.platform.dto.response.CustomerResponse;
 import com.thinkerscave.platform.enums.CustomerStatus;
-import com.thinkerscave.platform.enums.CustomerType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -16,8 +16,12 @@ import java.util.List;
 
 public interface CustomerService {
 
-    Page<CustomerResponse> getCustomers(CustomerStatus status, CustomerType customerType, String search, boolean activeOnly, Pageable pageable);
-
+    Page<CustomerListItemResponse> getCustomers(
+            CustomerStatus status,
+            String search,
+            boolean activeOnly,
+            String createdPreset,
+            Pageable pageable);
     CustomerDashboardResponse getCustomerDashboard();
 
     CustomerMetadataResponse getCustomerMetadata();
@@ -36,7 +40,6 @@ public interface CustomerService {
 
     void permanentlyDeleteCustomer(Long id);
 
-    // Contacts
     List<CustomerContactResponse> getContacts(Long customerId);
 
     CustomerContactResponse addContact(Long customerId, CustomerContactRequest request);

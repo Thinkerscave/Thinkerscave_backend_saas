@@ -36,6 +36,14 @@ public class DevDataInitializer implements ApplicationRunner {
     public void run(ApplicationArguments args) {
         log.info("Loading dev seed data from db/dev/data.sql ...");
         try {
+            ResourceDatabasePopulator migrate = new ResourceDatabasePopulator();
+            migrate.addScript(new ClassPathResource("db/dev/migrate_customers_simplify.sql"));
+            migrate.addScript(new ClassPathResource("db/dev/migrate_customer_contacts_normalize.sql"));
+            migrate.setSeparator(";");
+            migrate.setContinueOnError(true);
+            migrate.execute(dataSource);
+            log.info("Customer schema migrations applied (if needed).");
+
             ResourceDatabasePopulator populator = new ResourceDatabasePopulator();
             populator.addScript(new ClassPathResource("db/dev/data.sql"));
             populator.addScript(new ClassPathResource("db/dev/data-phase3-production-demo.sql"));
@@ -49,7 +57,7 @@ public class DevDataInitializer implements ApplicationRunner {
 
             // Fix password hashes so they match the app's BCrypt encoder.
             // Dev default for all seeded users (including platform superadmin).
-            String hash = passwordEncoder.encode("password123");
+            String hash = passwordEncoder.encode("Password@123");
             int updated = jdbcTemplate.update(
                     "UPDATE users SET password = ?, account_locked = FALSE, failed_login_attempts = 0, lock_expiry_at = NULL WHERE password IS NOT NULL",
                     hash);
@@ -142,7 +150,7 @@ public class DevDataInitializer implements ApplicationRunner {
             log.warn("Could not read platform table list: {}", e.getMessage());
         }
 
-        String bcryptHash = passwordEncoder.encode("password123");
+        String bcryptHash = passwordEncoder.encode("Password@123");
 
         for (Map<String, Object> tenant : tenants) {
             String schema   = (String) tenant.get("schema_name");

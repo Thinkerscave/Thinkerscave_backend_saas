@@ -4,6 +4,7 @@ import com.thinkerscave.platform.enums.ContactType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -12,42 +13,23 @@ import lombok.Setter;
 @Setter
 public class CustomerContactRequest {
 
-    @NotBlank
-    @Size(max = 150)
+    @NotBlank(message = "Full name is required")
+    @Size(min = 3, max = 100)
     private String fullName;
+
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email is invalid")
+    @Size(max = 150)
+    private String email;
+
+    @NotBlank(message = "Mobile number is required")
+    @Size(max = 30)
+    @Pattern(regexp = "^[+]?[0-9\\s\\-]{7,30}$", message = "Mobile number is invalid")
+    private String mobileNumber;
 
     @Size(max = 100)
     private String designation;
 
-    @NotNull
+    @NotNull(message = "Contact type is required")
     private ContactType contactType;
-
-    @Email
-    @Size(max = 150)
-    private String email;
-
-    @Size(max = 20)
-    private String mobileNumber;
-
-    @Size(max = 20)
-    private String alternateMobileNumber;
-
-    @Size(max = 20)
-    private String officePhone;
-
-    @Size(max = 100)
-    private String department;
-
-    private Boolean primaryContact;
-
-    private Boolean billingContact;
-
-    private Boolean technicalContact;
-
-    private Boolean salesContact;
-
-    private Boolean supportContact;
-
-    @Size(max = 1000)
-    private String remarks;
 }

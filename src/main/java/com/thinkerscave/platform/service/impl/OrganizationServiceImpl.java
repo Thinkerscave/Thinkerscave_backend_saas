@@ -6,6 +6,7 @@ import com.thinkerscave.platform.dto.response.OrganizationDetailResponse;
 import com.thinkerscave.platform.dto.response.OrganizationDomainResponse;
 import com.thinkerscave.platform.dto.response.OrganizationSubscriptionResponse;
 import com.thinkerscave.platform.dto.response.OrganizationSummaryResponse;
+import com.thinkerscave.platform.dto.response.PublicOrganizationOptionResponse;
 import com.thinkerscave.platform.dto.response.TenantRegistryResponse;
 import com.thinkerscave.platform.entity.Customer;
 import com.thinkerscave.platform.entity.Organization;
@@ -24,6 +25,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @RequiredArgsConstructor
@@ -142,6 +149,33 @@ public class OrganizationServiceImpl implements OrganizationService {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PublicOrganizationOptionResponse> listPublicOrganizations(String search) {
+        String normalized = StringUtils.hasText(search) ? search.trim() : null;
+        return organizationRepository.findPublicLoginOrganizations(normalized).stream()
+                .filter(o -> o.getTenantRegistry() != null
+                        && StringUtils.hasText(o.getTenantRegistry().getTenantIdentifier()))
+                .map(this::toPublicOption)
+                .sorted(Comparator.comparing(PublicOrganizationOptionResponse::getName,
+                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .collect(Collectors.toList());
+    }
+
+    private PublicOrganizationOptionResponse toPublicOption(Organization o) {
+        String location = Stream.of(o.getCity(), o.getState(), o.getCountry())
+                .filter(StringUtils::hasText)
+                .collect(Collectors.joining(", "));
+        return PublicOrganizationOptionResponse.builder()
+                .id(o.getId())
+                .name(o.getOrganizationName())
+                .tenantId(o.getTenantRegistry().getTenantIdentifier())
+                .location(StringUtils.hasText(location) ? location : "Institution")
+                .logoUrl(o.getLogoUrl())
+                .institutionType(o.getInstitutionType() != null ? o.getInstitutionType().name() : null)
+                .build();
+    }
 
     public Organization findById(Long id) {
         return organizationRepository.findById(id)
@@ -302,7 +336,7 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .remarks(o.getRemarks())
                 .customerId(o.getCustomer().getId())
                 .customerCode(o.getCustomer().getCustomerCode())
-                .customerName(o.getCustomer().getDisplayName())
+                .customerName(o.getCustomer().getCustomerName())
                 .tenant(tenantResponse)
                 .domain(domainResponse)
                 .subscription(subscriptionResponse)

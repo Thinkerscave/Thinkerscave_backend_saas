@@ -13,19 +13,18 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Request DTO for the 8-step provisioning wizard.
- * Collects all required information to provision a complete organization workspace.
+ * Request DTO for provisioning a new organization under a customer account.
  */
 @Getter
 @Setter
 public class ProvisionOrganizationRequest {
 
-    // ── Step 1: Customer ──────────────────────────────────────────────────────
+    // ── Customer ──────────────────────────────────────────────────────
 
-    /** Existing customer id. If provided, an existing customer is used. */
+    /** Existing customer id. Required for the add-organization flow. */
     private Long existingCustomerId;
 
-    /** New customer fields — used if existingCustomerId is null */
+    /** New customer fields — used only when existingCustomerId is null */
     @Size(max = 200)
     private String customerLegalName;
 
@@ -39,17 +38,22 @@ public class ProvisionOrganizationRequest {
     @Size(max = 20)
     private String customerMobile;
 
-    // ── Step 2: Organization Details ─────────────────────────────────────────
+    // ── Organization Details ─────────────────────────────────────────
 
     @NotBlank
     @Size(max = 200)
     private String organizationName;
 
+    @NotBlank
     @Size(max = 100)
     private String shortName;
 
     @NotNull
     private InstitutionType institutionType;
+
+    @NotBlank
+    @Size(max = 63)
+    private String tenantSubdomain;
 
     @Size(max = 100)
     private String boardName;
@@ -93,7 +97,6 @@ public class ProvisionOrganizationRequest {
     @Size(max = 100)
     private String adminFirstName;
 
-    @NotBlank
     @Size(max = 100)
     private String adminLastName;
 
