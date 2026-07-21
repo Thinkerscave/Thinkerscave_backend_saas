@@ -17,6 +17,6 @@ public class CodeSequence extends Auditable {
     @Column(name = "code_type", length = 50)
     private CodeType codeType;
 
-    @Column(name = "`last_value`", nullable = false)
+    @Column(name = "last_value", nullable = false)
     private Long lastValue = 0L;
 }

@@ -20,8 +20,9 @@ import java.util.Map;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
 /**
- * Loads dev seed data AFTER Hibernate has created all entity tables.
- * Active only under the "dev" Spring profile.
+ * Loads local seed data AFTER Hibernate has created all entity tables.
+ * Active only under the "testing" Spring profile (local MySQL).
+ * Not used for the remote "dev" server profile.
  */
 @Component
 @Profile("dev")
