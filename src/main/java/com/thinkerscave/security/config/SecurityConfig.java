@@ -42,7 +42,7 @@ public class SecurityConfig {
     private final AuthRateLimitFilter authRateLimitFilter;
     private final Environment environment;
 
-    @Value("${app.cors.allowed-origins:http://localhost:4200,http://localhost:4300,http://localhost:3000}")
+    @Value("${app.cors.allowed-origins:*}")
     private String allowedOrigins;
 
     private static final String[] ALWAYS_PUBLIC = {

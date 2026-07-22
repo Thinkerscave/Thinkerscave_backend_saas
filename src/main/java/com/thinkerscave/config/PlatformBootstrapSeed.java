@@ -27,12 +27,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Idempotent bootstrap for an empty remote DEV PostgreSQL database.
+ * Idempotent bootstrap for an empty remote PostgreSQL database (test/prod).
  * Creates platform host org, system roles, privileges, Super Admin menus,
- * role_permissions, and superadmin / admin@123.
+ * role_permissions, and superadmin / admin@123 when the DB has no superadmin.
  */
 @Component
-@Profile("dev")
+@Profile({"test", "prod"})
 @Order(100)
 @Slf4j
 @RequiredArgsConstructor
