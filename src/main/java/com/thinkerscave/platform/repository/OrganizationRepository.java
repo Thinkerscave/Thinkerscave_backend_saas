@@ -50,9 +50,10 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
             AND (:status IS NULL OR o.status = :status)
             AND (:institutionType IS NULL OR o.institutionType = :institutionType)
             AND (:customerId IS NULL OR o.customer.id = :customerId)
-            AND (:search IS NULL OR LOWER(o.organizationName) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(o.organizationCode) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(o.email) LIKE LOWER(CONCAT('%', :search, '%')))
+            AND (:search IS NULL
+                OR LOWER(o.organizationName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                OR LOWER(o.organizationCode) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                OR LOWER(o.email) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
             """)
     Page<Organization> searchOrganizations(
             @Param("status") OrganizationStatus status,
@@ -75,10 +76,10 @@ public interface OrganizationRepository extends JpaRepository<Organization, Long
               AND tr IS NOT NULL
               AND (tr.active IS NULL OR tr.active = true)
               AND (:search IS NULL OR :search = ''
-                   OR LOWER(o.organizationName) LIKE LOWER(CONCAT('%', :search, '%'))
-                   OR LOWER(COALESCE(o.city, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                   OR LOWER(COALESCE(o.state, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                   OR LOWER(COALESCE(tr.tenantIdentifier, '')) LIKE LOWER(CONCAT('%', :search, '%')))
+                   OR LOWER(o.organizationName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                   OR LOWER(COALESCE(o.city, '')) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                   OR LOWER(COALESCE(o.state, '')) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                   OR LOWER(COALESCE(tr.tenantIdentifier, '')) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
             """)
     List<Organization> findPublicLoginOrganizations(@Param("search") String search);
 }
