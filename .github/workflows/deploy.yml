@@ -61,7 +61,23 @@ jobs:
 
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 
-            docker pull "$IMAGE:latest"
+            # Free disk + clear broken containerd ingest leftovers (common pull rename failures)
+            df -h / /var/lib/docker /var/lib/containerd 2>/dev/null || df -h /
+            docker system prune -af || true
+            sudo rm -rf /var/lib/containerd/io.containerd.content.v1.content/ingest/* 2>/dev/null || true
+            sudo rm -rf /var/lib/docker/containerd/daemon/io.containerd.content.v1.content/ingest/* 2>/dev/null || true
+
+            pull_image() {
+              docker pull "$IMAGE:latest"
+            }
+
+            if ! pull_image; then
+              echo "First pull failed — cleaning ingest cache and retrying..."
+              sudo rm -rf /var/lib/containerd/io.containerd.content.v1.content/ingest/* 2>/dev/null || true
+              sudo rm -rf /var/lib/docker/containerd/daemon/io.containerd.content.v1.content/ingest/* 2>/dev/null || true
+              docker system prune -af || true
+              pull_image
+            fi
 
             docker stop thinkerscave-backend || true
             docker rm   thinkerscave-backend || true
