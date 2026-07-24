@@ -43,14 +43,14 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
 	 */
 	private long resolveExistingMax(CodeType codeType) {
 		String sql = switch (codeType) {
-			case CUSTOMER -> "SELECT COALESCE(MAX(CAST(SUBSTRING(customer_code, 4) AS UNSIGNED)), 0) FROM customers";
-			case ORGANIZATION -> "SELECT COALESCE(MAX(CAST(SUBSTRING(organization_code, 4) AS UNSIGNED)), 0) FROM organizations";
-			case USER -> "SELECT COALESCE(MAX(CAST(SUBSTRING(user_code, 4) AS UNSIGNED)), 0) FROM users";
-			case CONTACT -> "SELECT COALESCE(MAX(CAST(SUBSTRING(contact_code, 4) AS UNSIGNED)), 0) FROM customer_contacts";
-			case TENANT -> "SELECT COALESCE(MAX(CAST(SUBSTRING(tenant_identifier, 4) AS UNSIGNED)), 0) FROM tenant_registry WHERE tenant_identifier REGEXP '^[A-Z]{3}[0-9]+$'";
-			case PROVISION_JOB -> "SELECT COALESCE(MAX(CAST(SUBSTRING(job_code, 4) AS UNSIGNED)), 0) FROM provisioning_jobs";
-			case PROMOTION -> "SELECT COALESCE(MAX(CAST(SUBSTRING(promotion_code, 4) AS UNSIGNED)), 0) FROM promotions WHERE promotion_code REGEXP '^[A-Z]{3}[0-9]+$'";
-			case TEMPLATE -> "SELECT COALESCE(MAX(CAST(SUBSTRING(template_code, 4) AS UNSIGNED)), 0) FROM provisioning_templates";
+			case CUSTOMER -> "SELECT COALESCE(MAX(CAST(SUBSTRING(customer_code, 4) AS BIGINT)), 0) FROM customers";
+			case ORGANIZATION -> "SELECT COALESCE(MAX(CAST(SUBSTRING(organization_code, 4) AS BIGINT)), 0) FROM organizations";
+			case USER -> "SELECT COALESCE(MAX(CAST(SUBSTRING(user_code, 4) AS BIGINT)), 0) FROM users";
+			case CONTACT -> "SELECT COALESCE(MAX(CAST(SUBSTRING(contact_code, 4) AS BIGINT)), 0) FROM customer_contacts";
+			case TENANT -> "SELECT COALESCE(MAX(CAST(SUBSTRING(tenant_identifier, 4) AS BIGINT)), 0) FROM tenant_registry";
+			case PROVISION_JOB -> "SELECT COALESCE(MAX(CAST(SUBSTRING(job_code, 4) AS BIGINT)), 0) FROM provisioning_jobs";
+			case PROMOTION -> "SELECT COALESCE(MAX(CAST(SUBSTRING(promotion_code, 4) AS BIGINT)), 0) FROM promotions";
+			case TEMPLATE -> "SELECT COALESCE(MAX(CAST(SUBSTRING(template_code, 4) AS BIGINT)), 0) FROM provisioning_templates";
 			default -> null;
 		};
 		if (sql == null) {

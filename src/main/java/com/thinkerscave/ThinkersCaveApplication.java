@@ -4,6 +4,8 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableAsync;
 
+import java.util.TimeZone;
+
 /**
  * ThinkersCave SaaS Platform — main application entry point.
  *
@@ -32,6 +34,10 @@ import org.springframework.scheduling.annotation.EnableAsync;
 public class ThinkersCaveApplication {
 
     public static void main(String[] args) {
+        // Must run before any JDBC connect. PG JDBC sends JVM default as TimeZone startup
+        // param; remote PG rejects Windows "Asia/Calcutta". IDE runs often omit -Duser.timezone=UTC.
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
+        System.setProperty("user.timezone", "UTC");
         SpringApplication.run(ThinkersCaveApplication.class, args);
     }
 }

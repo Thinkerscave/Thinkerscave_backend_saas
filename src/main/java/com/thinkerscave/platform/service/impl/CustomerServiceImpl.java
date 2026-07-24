@@ -77,12 +77,16 @@ public class CustomerServiceImpl implements CustomerService {
             String createdPreset,
             Pageable pageable) {
         LocalDateTime[] range = resolveCreatedRange(createdPreset);
+        LocalDateTime createdFrom = range[0] != null ? range[0] : LocalDateTime.of(1970, 1, 1, 0, 0);
+        LocalDateTime createdTo = range[1] != null ? range[1] : LocalDateTime.of(2999, 12, 31, 23, 59, 59);
         return customerRepository.searchCustomers(
                         activeOnly,
                         status,
                         blankToNull(search),
-                        range[0],
-                        range[1],
+                range[0] != null,
+                createdFrom,
+                range[1] != null,
+                createdTo,
                         pageable)
                 .map(this::toListItem);
     }

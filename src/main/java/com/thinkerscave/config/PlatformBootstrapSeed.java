@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Idempotent bootstrap for an empty remote PostgreSQL database (test/prod).
  * Creates platform host org, system roles, privileges, Super Admin menus,
- * role_permissions, and superadmin / admin@123 when the DB has no superadmin.
+ * role_permissions, and superadmin / Password@123 when the DB has no superadmin.
  */
 @Component
 @Profile({"test", "prod"})
@@ -55,23 +55,19 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
-        if (userRepository.existsByUsername(SUPERADMIN_USERNAME)) {
-            log.info("Platform bootstrap skipped — '{}' already exists.", SUPERADMIN_USERNAME);
-            return;
-        }
-
-        log.info("Empty platform detected — seeding roles, menus, privileges, and Super Admin...");
+                log.info("Ensuring platform bootstrap baseline (roles, menus, permissions, and Super Admin access)...");
 
         Customer customer = ensurePlatformCustomer();
         Organization organization = ensurePlatformOrganization(customer);
         seedPrivileges();
         Role superAdminRole = seedRoles();
         seedMenusAndPermissions(organization, superAdminRole);
-        User superAdmin = seedSuperAdmin(organization);
+                User superAdmin = userRepository.findByUsername(SUPERADMIN_USERNAME)
+                                .orElseGet(() -> seedSuperAdmin(organization));
         ensureUserRole(superAdmin, superAdminRole);
         seedCodeSequences();
 
-        log.info("Platform bootstrap complete. Login: {} / {}", SUPERADMIN_USERNAME, SUPERADMIN_PASSWORD);
+                log.info("Platform bootstrap baseline verified. Login: {} / {}", SUPERADMIN_USERNAME, SUPERADMIN_PASSWORD);
     }
 
     private Customer ensurePlatformCustomer() {
@@ -203,36 +199,39 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
 
     private Menu ensureMenu(String code, String name, String description, String route, String icon,
                             MenuType type, Menu parent, int order) {
-        return menuRepository.findByMenuCode(code).orElseGet(() ->
-                menuRepository.save(Menu.builder()
+        Menu menu = menuRepository.findByMenuCode(code).orElseGet(() ->
+                Menu.builder()
                         .menuCode(code)
-                        .menuName(name)
-                        .description(description)
-                        .route(route)
-                        .icon(icon)
-                        .menuType(type)
-                        .parentMenu(parent)
-                        .displayOrder(order)
-                        .showInSidebar(true)
-                        .active(true)
                         .defaultPage(false)
-                        .build()));
+                        .build());
+
+        menu.setMenuName(name);
+        menu.setDescription(description);
+        menu.setRoute(route);
+        menu.setIcon(icon);
+        menu.setMenuType(type);
+        menu.setParentMenu(parent);
+        menu.setDisplayOrder(order);
+        menu.setShowInSidebar(true);
+        menu.setActive(true);
+
+        return menuRepository.save(menu);
     }
 
     private void grant(Organization org, Role role, Menu menu,
                        boolean view, boolean manage, boolean approve) {
-        if (rolePermissionRepository.existsByRole_IdAndMenu_IdAndOrganization_Id(
-                role.getId(), menu.getId(), org.getId())) {
-            return;
-        }
-        rolePermissionRepository.save(RolePermission.builder()
-                .organization(org)
-                .role(role)
-                .menu(menu)
-                .canView(view)
-                .canManage(manage)
-                .canApprove(approve)
-                .build());
+        RolePermission rp = rolePermissionRepository
+                .findByRole_IdAndMenu_IdAndOrganization_Id(role.getId(), menu.getId(), org.getId())
+                .orElseGet(() -> RolePermission.builder()
+                        .organization(org)
+                        .role(role)
+                        .menu(menu)
+                        .build());
+
+        rp.setCanView(view);
+        rp.setCanManage(manage);
+        rp.setCanApprove(approve);
+        rolePermissionRepository.save(rp);
     }
 
     private User seedSuperAdmin(Organization organization) {

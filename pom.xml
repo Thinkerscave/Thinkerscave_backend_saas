@@ -241,6 +241,10 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<!-- Required for PostgreSQL servers that reject Asia/Calcutta -->
+					<jvmArguments>-Duser.timezone=UTC</jvmArguments>
+				</configuration>
 			</plugin>
 			<!-- JaCoCo Code Coverage Plugin -->
 			<plugin>

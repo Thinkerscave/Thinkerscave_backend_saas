@@ -474,22 +474,49 @@ public class ProvisionServiceImpl implements ProvisionService {
             throw new BadRequestException("Tenant schema name is required for provisioning");
         }
         log.info("Provisioning tenant schema: {}", schemaName);
-        jdbcTemplate.execute("CREATE DATABASE IF NOT EXISTS `" + schemaName + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
 
-        List<String> platformTables = fetchPlatformTables();
+        boolean postgres = isPostgres();
+        if (postgres) {
+            jdbcTemplate.execute("CREATE SCHEMA IF NOT EXISTS \"" + schemaName + "\"");
+        } else {
+            jdbcTemplate.execute("CREATE DATABASE IF NOT EXISTS `" + schemaName + "` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+        }
+
+        String sourceSchema = resolvePlatformSourceSchema();
+        List<String> platformTables = fetchPlatformTables(sourceSchema);
         for (String table : platformTables) {
-            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS `" + schemaName + "`.`" + table + "` LIKE `" + platformSchema + "`.`" + table + "`");
+            if (postgres) {
+                jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS \"" + schemaName + "\".\"" + table + "\" (LIKE \""
+                        + sourceSchema + "\".\"" + table + "\" INCLUDING ALL)");
+            } else {
+                jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS `" + schemaName + "`.`" + table + "` LIKE `" + sourceSchema + "`.`" + table + "`");
+            }
         }
         log.info("Tenant schema initialized: {} with {} tables", schemaName, platformTables.size());
     }
 
     private void verifyTenantSchemaReadiness(String schemaName) {
         List<String> missingTables = new ArrayList<>();
-        try (Connection connection = dataSource.getConnection()) {
-            connection.setCatalog(schemaName);
+        boolean postgres = isPostgres();
+        try {
             for (String table : REQUIRED_TENANT_TABLES) {
-                try (ResultSet rs = connection.getMetaData().getTables(schemaName, null, table, new String[]{"TABLE"})) {
-                    if (!rs.next()) {
+                if (postgres) {
+                    String regClass = jdbcTemplate.queryForObject(
+                            "SELECT to_regclass(?)",
+                            String.class,
+                            schemaName + "." + table
+                    );
+                    if (regClass == null) {
+                        missingTables.add(table);
+                    }
+                } else {
+                    Integer count = jdbcTemplate.queryForObject(
+                            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = ?",
+                            Integer.class,
+                            schemaName,
+                            table
+                    );
+                    if (count == null || count == 0) {
                         missingTables.add(table);
                     }
                 }
@@ -509,27 +536,61 @@ public class ProvisionServiceImpl implements ProvisionService {
             return;
         }
         try {
-            jdbcTemplate.execute("DROP DATABASE IF EXISTS `" + schemaName + "`");
+            if (isPostgres()) {
+                jdbcTemplate.execute("DROP SCHEMA IF EXISTS \"" + schemaName + "\" CASCADE");
+            } else {
+                jdbcTemplate.execute("DROP DATABASE IF EXISTS `" + schemaName + "`");
+            }
             log.warn("Provisioning rollback cleanup executed for tenant schema={}", schemaName);
         } catch (Exception cleanupEx) {
             log.error("Failed to cleanup tenant schema {} after provisioning failure: {}", schemaName, cleanupEx.getMessage(), cleanupEx);
         }
     }
 
-    private List<String> fetchPlatformTables() {
+    private boolean isPostgres() {
+        try (Connection connection = dataSource.getConnection()) {
+            String product = connection.getMetaData().getDatabaseProductName();
+            return product != null && product.toLowerCase(Locale.ROOT).contains("postgresql");
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    private String resolvePlatformSourceSchema() {
+        List<String> configuredTables = fetchPlatformTables(platformSchema);
+        if (!configuredTables.isEmpty()) {
+            return platformSchema;
+        }
+
+        if (isPostgres()) {
+            try {
+                String currentSchema = jdbcTemplate.queryForObject("SELECT current_schema()", String.class);
+                if (currentSchema != null && !currentSchema.isBlank()) {
+                    List<String> currentSchemaTables = fetchPlatformTables(currentSchema);
+                    if (!currentSchemaTables.isEmpty()) {
+                        log.warn("Configured platform schema '{}' has no tables; using detected schema '{}' for provisioning clone", platformSchema, currentSchema);
+                        return currentSchema;
+                    }
+                }
+            } catch (Exception ignored) {
+                // Fall through to throw a clear schema/table error below.
+            }
+        }
+
+        throw new BadRequestException("No platform tables found in schema: " + platformSchema);
+    }
+
+    private List<String> fetchPlatformTables(String schemaName) {
         List<String> tables = new ArrayList<>();
         try (Connection connection = dataSource.getConnection()) {
             try (Statement st = connection.createStatement();
-                 ResultSet rs = st.executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema='" + platformSchema + "' AND table_type='BASE TABLE'")) {
+                 ResultSet rs = st.executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema='" + schemaName + "' AND table_type='BASE TABLE'")) {
                 while (rs.next()) {
                     tables.add(rs.getString(1));
                 }
             }
         } catch (Exception ex) {
             throw new BadRequestException("Unable to inspect platform schema tables: " + ex.getMessage());
-        }
-        if (tables.isEmpty()) {
-            throw new BadRequestException("No platform tables found in schema: " + platformSchema);
         }
         return tables;
     }
@@ -563,23 +624,24 @@ public class ProvisionServiceImpl implements ProvisionService {
 
         Long ownerUserId = customer.getOwnerUserId();
         Long adminUserId = adminUser != null ? adminUser.getId() : null;
+        String sourceSchema = resolvePlatformSourceSchema();
 
         try {
-            copyPlatformRows(schemaName, "roles", null);
-            copyPlatformRows(schemaName, "customers", "id = " + customer.getId());
-            copyPlatformRows(schemaName, "organizations", "id = " + organization.getId());
-            copyPlatformRows(schemaName, "tenant_registry", "id = " + tenant.getId());
-            copyPlatformRows(schemaName, "organization_domains", "organization_id = " + organization.getId());
-            copyPlatformRows(schemaName, "organization_configurations", "organization_id = " + organization.getId());
-            copyPlatformRows(schemaName, "organization_subscriptions", "organization_id = " + organization.getId());
+            copyPlatformRows(schemaName, sourceSchema, "roles", null);
+            copyPlatformRows(schemaName, sourceSchema, "customers", "id = " + customer.getId());
+            copyPlatformRows(schemaName, sourceSchema, "organizations", "id = " + organization.getId());
+            copyPlatformRows(schemaName, sourceSchema, "tenant_registry", "id = " + tenant.getId());
+            copyPlatformRows(schemaName, sourceSchema, "organization_domains", "organization_id = " + organization.getId());
+            copyPlatformRows(schemaName, sourceSchema, "organization_configurations", "organization_id = " + organization.getId());
+            copyPlatformRows(schemaName, sourceSchema, "organization_subscriptions", "organization_id = " + organization.getId());
 
             if (adminUserId != null) {
-                copyPlatformRows(schemaName, "users", "id = " + adminUserId);
-                copyPlatformRows(schemaName, "user_roles", "user_id = " + adminUserId);
+                copyPlatformRows(schemaName, sourceSchema, "users", "id = " + adminUserId);
+                copyPlatformRows(schemaName, sourceSchema, "user_roles", "user_id = " + adminUserId);
             }
             if (ownerUserId != null && (adminUserId == null || !ownerUserId.equals(adminUserId))) {
-                copyPlatformRows(schemaName, "users", "id = " + ownerUserId);
-                copyPlatformRows(schemaName, "user_roles", "user_id = " + ownerUserId);
+                copyPlatformRows(schemaName, sourceSchema, "users", "id = " + ownerUserId);
+                copyPlatformRows(schemaName, sourceSchema, "user_roles", "user_id = " + ownerUserId);
             }
 
             log.info("Tenant workspace bootstrap completed for schema={}", schemaName);
@@ -588,10 +650,18 @@ public class ProvisionServiceImpl implements ProvisionService {
         }
     }
 
-    private void copyPlatformRows(String tenantSchema, String table, String whereClause) {
-        String sql = "INSERT IGNORE INTO `" + tenantSchema + "`.`" + table + "` "
-                + "SELECT * FROM `" + platformSchema + "`.`" + table + "`"
-                + (whereClause != null && !whereClause.isBlank() ? " WHERE " + whereClause : "");
+    private void copyPlatformRows(String tenantSchema, String sourceSchema, String table, String whereClause) {
+        String sql;
+        if (isPostgres()) {
+            sql = "INSERT INTO \"" + tenantSchema + "\".\"" + table + "\" "
+                    + "SELECT * FROM \"" + sourceSchema + "\".\"" + table + "\""
+                    + (whereClause != null && !whereClause.isBlank() ? " WHERE " + whereClause : "")
+                    + " ON CONFLICT DO NOTHING";
+        } else {
+            sql = "INSERT IGNORE INTO `" + tenantSchema + "`.`" + table + "` "
+                    + "SELECT * FROM `" + sourceSchema + "`.`" + table + "`"
+                    + (whereClause != null && !whereClause.isBlank() ? " WHERE " + whereClause : "");
+        }
         jdbcTemplate.execute(sql);
     }
 

@@ -29,8 +29,8 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
             SELECT c FROM Customer c
             WHERE (:activeOnly = false OR c.active = true)
             AND (:status IS NULL OR c.status = :status)
-            AND (:createdFrom IS NULL OR c.createdOn >= :createdFrom)
-            AND (:createdTo IS NULL OR c.createdOn < :createdTo)
+            AND (:hasCreatedFrom = false OR c.createdOn >= :createdFrom)
+            AND (:hasCreatedTo = false OR c.createdOn < :createdTo)
             AND (
                 :search IS NULL OR :search = ''
                 OR LOWER(c.customerName) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -51,7 +51,9 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
             @Param("activeOnly") boolean activeOnly,
             @Param("status") CustomerStatus status,
             @Param("search") String search,
+            @Param("hasCreatedFrom") boolean hasCreatedFrom,
             @Param("createdFrom") LocalDateTime createdFrom,
+            @Param("hasCreatedTo") boolean hasCreatedTo,
             @Param("createdTo") LocalDateTime createdTo,
             Pageable pageable);
 
