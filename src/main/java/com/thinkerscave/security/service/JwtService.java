@@ -15,6 +15,16 @@ public interface JwtService {
 
     String generateRefreshToken(String username);
 
+    /**
+     * Issues a refresh token whose lifetime depends on "remember this device".
+     */
+    String generateRefreshToken(String username, boolean rememberMe);
+
+    /**
+     * Reads the remember-me claim from a refresh token. Returns null when absent (legacy tokens).
+     */
+    Boolean extractRememberMe(String token);
+
     String extractUsername(String token);
 
     Long extractUserId(String token);

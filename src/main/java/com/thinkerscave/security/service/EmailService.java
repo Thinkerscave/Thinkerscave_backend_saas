@@ -8,10 +8,11 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 /**
- * Async email service for transactional emails (OTP, welcome, etc.).
- * Falls back gracefully when mail is not configured (dev/test profiles).
+ * Transactional HTML email sender (OTP, welcome, provisioning).
+ * Configure free Gmail SMTP via MAIL_* env vars — see .env.example.
  */
 @Service
 @RequiredArgsConstructor
@@ -20,35 +21,62 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Value("${spring.mail.username:noreply@thinkerscave.com}")
+    @Value("${spring.mail.username:}")
+    private String mailUsername;
+
+    @Value("${app.mail.from:${spring.mail.username:noreply@thinkerscave.com}}")
     private String fromEmail;
 
+    @Value("${app.notification.email.enabled:true}")
+    private boolean emailEnabled;
+
     /**
-     * Sends an HTML email asynchronously.
-     *
-     * @param to       Recipient email address
-     * @param subject  Email subject
-     * @param htmlBody HTML content
+     * Async fire-and-forget send (non-critical paths).
      */
     @Async
     public void sendHtmlEmail(String to, String subject, String htmlBody) {
-        try {
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
-            helper.setFrom(fromEmail);
-            helper.setTo(to);
-            helper.setSubject(subject);
-            helper.setText(htmlBody, true);
-            mailSender.send(mimeMessage);
-            log.info("Email sent to {}", to);
-        } catch (Exception e) {
-            log.error("Failed to send email to {}: {}", to, e.getMessage());
-        }
+        sendHtmlEmailSync(to, subject, htmlBody);
     }
 
     /**
-     * Builds the HTML body for OTP emails.
+     * Synchronous send with success flag — preferred for OTP / onboarding credentials.
      */
+    public boolean sendHtmlEmailSync(String to, String subject, String htmlBody) {
+        if (!emailEnabled) {
+            log.warn("Email disabled (app.notification.email.enabled=false). to={} subject={}", to, subject);
+            return false;
+        }
+        if (!StringUtils.hasText(to)) {
+            log.warn("Email skipped: empty recipient. subject={}", subject);
+            return false;
+        }
+        try {
+            String from = resolveFrom();
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
+            helper.setFrom(from);
+            helper.setTo(to.trim());
+            helper.setSubject(subject);
+            helper.setText(htmlBody, true);
+            mailSender.send(mimeMessage);
+            log.info("Email sent to={} from={} subject={}", to, from, subject);
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to send email to={} subject={} reason={}", to, subject, e.getMessage());
+            return false;
+        }
+    }
+
+    private String resolveFrom() {
+        if (StringUtils.hasText(fromEmail)) {
+            return fromEmail.trim();
+        }
+        if (StringUtils.hasText(mailUsername)) {
+            return mailUsername.trim();
+        }
+        return "noreply@thinkerscave.com";
+    }
+
     public String buildOtpEmailBody(String firstName, String otp) {
         return """
                 <!DOCTYPE html>

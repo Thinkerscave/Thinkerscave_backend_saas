@@ -24,14 +24,17 @@ public class JwtServiceImpl implements JwtService {
     private final SecretKey signingKey;
     private final long accessTokenExpiry;
     private final long refreshTokenExpiry;
+    private final long rememberMeRefreshTokenExpiry;
 
     public JwtServiceImpl(
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.expiration:900000}") long accessTokenExpiry,
-            @Value("${refresh.token.expiration:86400000}") long refreshTokenExpiry) {
+            @Value("${refresh.token.expiration:86400000}") long refreshTokenExpiry,
+            @Value("${refresh.token.remember-me-expiration:2592000000}") long rememberMeRefreshTokenExpiry) {
         this.signingKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessTokenExpiry = accessTokenExpiry;
         this.refreshTokenExpiry = refreshTokenExpiry;
+        this.rememberMeRefreshTokenExpiry = rememberMeRefreshTokenExpiry;
     }
 
     @Override
@@ -42,7 +45,24 @@ public class JwtServiceImpl implements JwtService {
 
     @Override
     public String generateRefreshToken(String username) {
-        return buildToken(new HashMap<>(), username, refreshTokenExpiry);
+        return generateRefreshToken(username, false);
+    }
+
+    @Override
+    public String generateRefreshToken(String username, boolean rememberMe) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("rememberMe", rememberMe);
+        long expiry = rememberMe ? rememberMeRefreshTokenExpiry : refreshTokenExpiry;
+        return buildToken(claims, username, expiry);
+    }
+
+    @Override
+    public Boolean extractRememberMe(String token) {
+        try {
+            return extractAllClaims(token).get("rememberMe", Boolean.class);
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     private String buildToken(Map<String, Object> claims, String subject, long expiry) {

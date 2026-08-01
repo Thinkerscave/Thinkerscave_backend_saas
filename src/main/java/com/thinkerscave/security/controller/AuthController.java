@@ -81,7 +81,8 @@ public class AuthController {
     private AuthResponse applyRefreshCookie(AuthResponse authResponse, HttpServletResponse httpResponse) {
         if (refreshTokenCookieHelper.isEnabled() && authResponse != null
                 && StringUtils.hasText(authResponse.getRefreshToken())) {
-            refreshTokenCookieHelper.setRefreshTokenCookie(httpResponse, authResponse.getRefreshToken());
+            refreshTokenCookieHelper.setRefreshTokenCookie(
+                    httpResponse, authResponse.getRefreshToken(), authResponse.getRememberMe());
             authResponse.setRefreshToken(null);
         }
         return authResponse;

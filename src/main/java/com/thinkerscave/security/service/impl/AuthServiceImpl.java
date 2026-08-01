@@ -109,7 +109,8 @@ public class AuthServiceImpl implements AuthService {
         Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue, effectiveOrgId);
 
         String accessToken = jwtService.generateAccessToken(user.getUsername(), claims);
-        String refreshToken = jwtService.generateRefreshToken(user.getUsername());
+        boolean rememberMe = Boolean.TRUE.equals(request.getRememberMe());
+        String refreshToken = jwtService.generateRefreshToken(user.getUsername(), rememberMe);
 
         UserSession session = UserSession.builder()
                 .user(user)
@@ -133,6 +134,7 @@ public class AuthServiceImpl implements AuthService {
                 .user(userMapper.toSummary(user))
                 .firstTimeLogin(user.getFirstTimeLogin())
                 .requirePasswordChange(Boolean.TRUE.equals(user.getFirstTimeLogin()))
+                .rememberMe(rememberMe)
                 .build();
     }
 
@@ -269,7 +271,9 @@ public class AuthServiceImpl implements AuthService {
         Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue, user.getOrganizationId());
 
         String newAccessToken = jwtService.generateAccessToken(user.getUsername(), claims);
-        String newRefreshToken = jwtService.generateRefreshToken(user.getUsername());
+        Boolean rememberMe = jwtService.extractRememberMe(refreshToken);
+        boolean remember = Boolean.TRUE.equals(rememberMe);
+        String newRefreshToken = jwtService.generateRefreshToken(user.getUsername(), remember);
 
         session.setRefreshToken(newRefreshToken);
         sessionRepository.save(session);
@@ -284,6 +288,7 @@ public class AuthServiceImpl implements AuthService {
                 .user(userMapper.toSummary(user))
                 .firstTimeLogin(user.getFirstTimeLogin())
                 .requirePasswordChange(Boolean.TRUE.equals(user.getFirstTimeLogin()))
+                .rememberMe(rememberMe)
                 .build();
     }
 

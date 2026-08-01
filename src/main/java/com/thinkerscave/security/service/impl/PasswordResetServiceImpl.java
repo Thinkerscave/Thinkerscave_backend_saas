@@ -4,11 +4,12 @@ import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.security.entity.PasswordResetToken;
 import com.thinkerscave.security.repository.PasswordResetTokenRepository;
-import com.thinkerscave.security.service.EmailService;
+import com.thinkerscave.security.service.OutboundMessageService;
 import com.thinkerscave.security.service.PasswordResetService;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,13 +28,16 @@ public class PasswordResetServiceImpl implements PasswordResetService {
 
     private final UserRepository userRepository;
     private final PasswordResetTokenRepository tokenRepository;
-    private final EmailService emailService;
+    private final OutboundMessageService outboundMessageService;
     private final PasswordEncoder passwordEncoder;
+
+    @Value("${app.auth.password-reset.log-otp:false}")
+    private boolean logOtp;
 
     @Override
     @Transactional
     public void forgotPassword(String email) {
-        Optional<User> userOpt = userRepository.findByEmail(email.toLowerCase());
+        Optional<User> userOpt = userRepository.findByEmailIgnoreCase(email == null ? "" : email.trim());
         // Security: always return success — do not reveal if email exists
         if (userOpt.isEmpty()) {
             log.debug("Forgot password requested for unknown account");
@@ -42,7 +46,6 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         User user = userOpt.get();
         String otp = generateOtp();
 
-        // Remove any existing token for this user
         tokenRepository.deleteByUser(user);
 
         PasswordResetToken token = PasswordResetToken.builder()
@@ -52,10 +55,17 @@ public class PasswordResetServiceImpl implements PasswordResetService {
                 .build();
         tokenRepository.save(token);
 
-        String subject = "Your ThinkersCave Password Reset OTP";
-        String body = emailService.buildOtpEmailBody(user.getFirstName(), otp);
-        emailService.sendHtmlEmail(user.getEmail(), subject, body);
-        log.info("Password reset OTP sent for user id={}", user.getId());
+        outboundMessageService.sendPasswordResetOtp(
+                user.getEmail(),
+                user.getMobileNumber(),
+                user.getFirstName(),
+                otp);
+
+        if (logOtp) {
+            log.warn("Password-reset OTP for {} / mobile={} = {} (valid {} minutes). Enable only in non-prod.",
+                    user.getEmail(), user.getMobileNumber(), otp, OTP_EXPIRY_MINUTES);
+        }
+        log.info("Password reset OTP dispatched for user id={}", user.getId());
     }
 
     @Override
@@ -83,12 +93,8 @@ public class PasswordResetServiceImpl implements PasswordResetService {
         log.info("Password reset successfully for user id={}", user.getId());
     }
 
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
-
     private User findUserByEmail(String email) {
-        return userRepository.findByEmail(email.toLowerCase())
+        return userRepository.findByEmailIgnoreCase(email == null ? "" : email.trim())
                 .orElseThrow(() -> new BadRequestException("Invalid or expired OTP"));
     }
 

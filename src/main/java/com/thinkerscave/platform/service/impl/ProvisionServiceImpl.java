@@ -42,7 +42,7 @@ import com.thinkerscave.platform.repository.SubscriptionFeatureOverrideRepositor
 import com.thinkerscave.platform.repository.SubscriptionPlanRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
 import com.thinkerscave.platform.service.ProvisionService;
-import com.thinkerscave.security.service.EmailService;
+import com.thinkerscave.security.service.OutboundMessageService;
 import com.thinkerscave.shared.enums.CodeType;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
@@ -94,7 +94,7 @@ public class ProvisionServiceImpl implements ProvisionService {
     private final UserService userService;
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
-    private final EmailService emailService;
+    private final OutboundMessageService outboundMessageService;
     private final JdbcTemplate jdbcTemplate;
     private final DataSource dataSource;
 
@@ -680,33 +680,52 @@ public class ProvisionServiceImpl implements ProvisionService {
 
         if (primaryContact != null && primaryContact.getEmail() != null && !primaryContact.getEmail().isBlank()) {
             try {
-                String ownerSubject = "Organization created successfully";
-                String ownerHtml = emailService.buildOrganizationProvisionedOwnerEmailBody(
+                String ownerMobile = firstNonBlank(
+                        primaryContact.getMobileNumber(),
+                        customer.getMobileNumber(),
+                        organization.getMobileNumber());
+                outboundMessageService.sendOrganizationOwnerReady(
+                        primaryContact.getEmail(),
+                        ownerMobile,
                         primaryContact.getFullName(),
                         organization.getOrganizationName(),
                         workspaceUrl);
-                emailService.sendHtmlEmail(primaryContact.getEmail(), ownerSubject, ownerHtml);
-                log.info("Provisioning owner email queued for customer={} org={}", customer.getCustomerCode(), organization.getOrganizationCode());
+                log.info("Provisioning owner notified for customer={} org={}",
+                        customer.getCustomerCode(), organization.getOrganizationCode());
             } catch (Exception ex) {
-                log.error("Failed to queue customer owner provisioning email for org {}: {}",
+                log.error("Failed to notify customer owner for org {}: {}",
                         organization.getOrganizationCode(), ex.getMessage(), ex);
             }
         }
 
         try {
-            String adminSubject = "Welcome to " + organization.getOrganizationName();
-            String adminHtml = emailService.buildOrganizationAdminWelcomeEmailBody(
+            String adminMobile = firstNonBlank(adminUser.getMobileNumber(), organization.getMobileNumber());
+            outboundMessageService.sendOrganizationAdminWelcome(
+                    adminUser.getEmail(),
+                    adminMobile,
                     adminUser.getDisplayName(),
                     organization.getOrganizationName(),
                     workspaceUrl,
                     adminUser.getUsername(),
                     adminTemporaryPassword);
-            emailService.sendHtmlEmail(adminUser.getEmail(), adminSubject, adminHtml);
-            log.info("Provisioning admin email queued for org={} admin={}", organization.getOrganizationCode(), adminUser.getEmail());
+            log.info("Provisioning admin notified for org={} admin={}",
+                    organization.getOrganizationCode(), adminUser.getEmail());
         } catch (Exception ex) {
-            log.error("Failed to queue organization admin welcome email for org {}: {}",
+            log.error("Failed to notify organization admin for org {}: {}",
                     organization.getOrganizationCode(), ex.getMessage(), ex);
         }
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private void updateJobProgress(ProvisioningJob job, String step, int percentage) {
