@@ -19,6 +19,10 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     boolean existsByBusinessEmailAndIdNot(String businessEmail, Long id);
 
+    boolean existsByMobileNumber(String mobileNumber);
+
+    boolean existsByMobileNumberAndIdNot(String mobileNumber, Long id);
+
     boolean existsByCustomerCode(String customerCode);
 
     Optional<Customer> findByCustomerCode(String customerCode);

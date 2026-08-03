@@ -178,6 +178,11 @@ public class CustomerServiceImpl implements CustomerService {
             throw new AlreadyExistsException("Customer email already exists: " + email);
         }
 
+        String mobileNumber = normalizePhone(request.getMobileNumber());
+        if (customerRepository.existsByMobileNumber(mobileNumber)) {
+            throw new AlreadyExistsException("Customer mobile number already exists: " + mobileNumber);
+        }
+
         String code = codeGeneratorService.generate(CodeType.CUSTOMER);
         Customer customer = Customer.builder()
                 .customerCode(code)
@@ -223,6 +228,11 @@ public class CustomerServiceImpl implements CustomerService {
         String email = normalizeEmail(request.getBusinessEmail());
         if (customerRepository.existsByBusinessEmailAndIdNot(email, id)) {
             throw new AlreadyExistsException("Customer email already exists: " + email);
+        }
+
+        String mobileNumber = normalizePhone(request.getMobileNumber());
+        if (customerRepository.existsByMobileNumberAndIdNot(mobileNumber, id)) {
+            throw new AlreadyExistsException("Customer mobile number already exists: " + mobileNumber);
         }
 
         customer.setCustomerName(request.getCustomerName().trim());

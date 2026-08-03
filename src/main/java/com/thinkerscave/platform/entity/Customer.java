@@ -47,7 +47,7 @@ public class Customer extends Auditable {
     @Column(name = "business_email", nullable = false, unique = true, length = 150)
     private String businessEmail;
 
-    @Column(name = "mobile_number", nullable = false, length = 30)
+    @Column(name = "mobile_number", nullable = false, unique = true, length = 30)
     private String mobileNumber;
 
     @Column(name = "alternate_mobile_number", length = 30)

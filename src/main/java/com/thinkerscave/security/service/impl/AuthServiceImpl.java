@@ -13,6 +13,8 @@ import com.thinkerscave.access.repository.LoginHistoryRepository;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.platform.entity.TenantRegistry;
 import com.thinkerscave.platform.entity.Organization;
+import com.thinkerscave.platform.enums.CustomerStatus;
+import com.thinkerscave.platform.enums.OrganizationStatus;
 import com.thinkerscave.platform.repository.OrganizationRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
 import com.thinkerscave.security.dto.LoginContext;
@@ -149,10 +151,20 @@ public class AuthServiceImpl implements AuthService {
         }
 
         TenantRegistry tenant = resolveTenantRegistry(loginContext);
-        Long organizationId = tenant.getOrganization().getId();
+        Organization organization = tenant.getOrganization();
+        Long organizationId = organization.getId();
 
         if (loginContext.getOrganizationId() != null && !organizationId.equals(loginContext.getOrganizationId())) {
             throw new BadRequestException("Organization does not match the selected institution");
+        }
+
+        if (organization.getStatus() == OrganizationStatus.SUSPENDED) {
+            throw new BadRequestException("This organization has been suspended. Please contact support for assistance.");
+        }
+
+        if (organization.getCustomer() != null 
+                && organization.getCustomer().getStatus() == CustomerStatus.SUSPENDED) {
+            throw new BadRequestException("Account access has been suspended. Please contact support for assistance.");
         }
 
         User user = findByUsernameOrEmailAndOrganization(usernameOrEmail, organizationId)
