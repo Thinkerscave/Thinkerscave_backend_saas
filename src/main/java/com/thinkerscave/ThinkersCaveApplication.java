@@ -24,6 +24,7 @@ import java.util.TimeZone;
         "com.thinkerscave.config",
         "com.thinkerscave.dashboard",
         "com.thinkerscave.document",
+        "com.thinkerscave.onboarding",
         "com.thinkerscave.platform",
         "com.thinkerscave.security",
         "com.thinkerscave.shared",

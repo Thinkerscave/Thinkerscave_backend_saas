@@ -1,10 +1,8 @@
 package com.thinkerscave.onboarding.service;
 
-import com.thinkerscave.onboarding.dto.OnboardingChecklistItemResponse;
-
-import java.util.List;
+import com.thinkerscave.onboarding.dto.OnboardingChecklistResponse;
 
 public interface OnboardingService {
 
-    List<OnboardingChecklistItemResponse> getChecklist();
+    OnboardingChecklistResponse getChecklist();
 }

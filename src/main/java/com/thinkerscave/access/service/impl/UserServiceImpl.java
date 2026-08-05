@@ -8,6 +8,7 @@ import com.thinkerscave.access.entity.UserRole;
 import com.thinkerscave.access.enums.UserStatus;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.access.service.UserService;
+import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.enums.CodeType;
 import com.thinkerscave.shared.service.CodeGeneratorService;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,15 @@ public class UserServiceImpl implements UserService {
                 ? context.firstName() + (context.lastName() != null ? " " + context.lastName() : "")
                 : email;
 
+        // Resolve organization from the current tenant request context. During initial
+        // organization provisioning (owner creation) there is no request-bound
+        // OrganizationContext yet, so this falls back to 0 and is fixed up afterward
+        // by ProvisionServiceImpl.mapCustomerOwnerToOrganization once the organization exists.
+        Long organizationId = OrganizationContext.getOrganizationId();
+        if (organizationId == null) {
+            organizationId = 0L;
+        }
+
         User user = User.builder()
                 .userCode(userCode)
                 .email(email)
@@ -69,7 +79,7 @@ public class UserServiceImpl implements UserService {
                 .firstName(context.firstName() != null ? context.firstName() : "")
                 .lastName(context.lastName() != null ? context.lastName() : context.defaultLastName())
                 .displayName(displayName)
-                .organizationId(0L) // Resolved at provisioning time
+                .organizationId(organizationId)
                 .status(UserStatus.ACTIVE)
                 .firstTimeLogin(true)
                 .build();

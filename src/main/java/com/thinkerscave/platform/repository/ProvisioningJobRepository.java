@@ -23,8 +23,8 @@ public interface ProvisioningJobRepository extends JpaRepository<ProvisioningJob
             SELECT j FROM ProvisioningJob j
             WHERE j.active = true
             AND (:status IS NULL OR j.status = :status)
-            AND (:search IS NULL OR LOWER(j.jobCode) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(j.organization.organizationName) LIKE LOWER(CONCAT('%', :search, '%')))
+            AND (:search IS NULL OR LOWER(j.jobCode) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                OR LOWER(j.organization.organizationName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
             ORDER BY j.createdOn DESC
             """)
     Page<ProvisioningJob> searchJobs(

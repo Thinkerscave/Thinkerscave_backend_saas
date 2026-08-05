@@ -96,6 +96,20 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
+    public boolean extractFirstTimeLogin(String token) {
+        try {
+            Boolean value = extractClaim(token, claims -> claims.get("firstTimeLogin", Boolean.class));
+            if (Boolean.TRUE.equals(value)) {
+                return true;
+            }
+            Boolean requireChange = extractClaim(token, claims -> claims.get("requirePasswordChange", Boolean.class));
+            return Boolean.TRUE.equals(requireChange);
+        } catch (Exception ex) {
+            return false;
+        }
+    }
+
+    @Override
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }

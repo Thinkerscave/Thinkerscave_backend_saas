@@ -1,6 +1,7 @@
 package com.thinkerscave.access.repository;
 
 import com.thinkerscave.access.entity.Menu;
+import com.thinkerscave.access.enums.MenuScope;
 import com.thinkerscave.access.enums.MenuType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -36,4 +37,8 @@ public interface MenuRepository extends JpaRepository<Menu, Long>, JpaSpecificat
     boolean hasChildren(@Param("menuId") Long menuId);
 
     List<Menu> findByParentMenu_IdAndActiveTrue(Long parentId);
+
+    List<Menu> findByMenuScopeAndParentMenuIsNullAndActiveTrue(MenuScope menuScope);
+
+    List<Menu> findByFeature_IdInAndParentMenuIsNullAndActiveTrue(List<Long> featureIds);
 }

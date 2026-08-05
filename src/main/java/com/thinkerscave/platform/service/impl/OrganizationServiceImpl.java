@@ -1,9 +1,11 @@
 package com.thinkerscave.platform.service.impl;
 
 import com.thinkerscave.platform.dto.request.OrganizationRequest;
+import com.thinkerscave.platform.dto.request.OrganizationProfileUpdateRequest;
 import com.thinkerscave.platform.dto.response.OrganizationConfigurationResponse;
 import com.thinkerscave.platform.dto.response.OrganizationDetailResponse;
 import com.thinkerscave.platform.dto.response.OrganizationDomainResponse;
+import com.thinkerscave.platform.dto.response.OrganizationProfileResponse;
 import com.thinkerscave.platform.dto.response.OrganizationSubscriptionResponse;
 import com.thinkerscave.platform.dto.response.OrganizationSummaryResponse;
 import com.thinkerscave.platform.dto.response.PublicOrganizationOptionResponse;
@@ -147,7 +149,33 @@ public class OrganizationServiceImpl implements OrganizationService {
         org.setStatus(OrganizationStatus.SUSPENDED);
         return toSummaryResponse(organizationRepository.save(org));
     }
+    @Override
+    @Transactional(readOnly = true)
+    public OrganizationProfileResponse getMyOrganizationProfile(Long organizationId) {
+        return toProfileResponse(findById(organizationId));
+    }
 
+    @Override
+    @Transactional
+    public OrganizationProfileResponse updateMyOrganizationProfile(Long organizationId, OrganizationProfileUpdateRequest request) {
+        Organization org = findById(organizationId);
+        org.setOrganizationName(request.getOrganizationName());
+        org.setShortName(request.getShortName());
+        org.setBoardName(request.getBoardName());
+        org.setEmail(request.getEmail());
+        org.setMobileNumber(request.getMobileNumber());
+        org.setAlternateMobileNumber(request.getAlternateMobileNumber());
+        org.setWebsite(request.getWebsite());
+        org.setAddressLine1(request.getAddressLine1());
+        org.setAddressLine2(request.getAddressLine2());
+        org.setCity(request.getCity());
+        org.setState(request.getState());
+        org.setCountry(request.getCountry());
+        org.setPostalCode(request.getPostalCode());
+        org.setLogoUrl(request.getLogoUrl());
+        // institutionType is intentionally never touched here — not editable via self-service profile.
+        return toProfileResponse(organizationRepository.save(org));
+    }
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     @Override
@@ -161,6 +189,28 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .sorted(Comparator.comparing(PublicOrganizationOptionResponse::getName,
                         Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .collect(Collectors.toList());
+    }
+
+    private OrganizationProfileResponse toProfileResponse(Organization o) {
+        return OrganizationProfileResponse.builder()
+                .id(o.getId())
+                .organizationCode(o.getOrganizationCode())
+                .organizationName(o.getOrganizationName())
+                .shortName(o.getShortName())
+                .institutionType(o.getInstitutionType())
+                .boardName(o.getBoardName())
+                .email(o.getEmail())
+                .mobileNumber(o.getMobileNumber())
+                .alternateMobileNumber(o.getAlternateMobileNumber())
+                .website(o.getWebsite())
+                .addressLine1(o.getAddressLine1())
+                .addressLine2(o.getAddressLine2())
+                .city(o.getCity())
+                .state(o.getState())
+                .country(o.getCountry())
+                .postalCode(o.getPostalCode())
+                .logoUrl(o.getLogoUrl())
+                .build();
     }
 
     private PublicOrganizationOptionResponse toPublicOption(Organization o) {

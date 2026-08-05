@@ -61,9 +61,9 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long>, JpaSpec
     @Query("""
             SELECT i FROM Inquiry i
             WHERE i.organizationId = :orgId AND i.deleted = false AND (
-                LOWER(i.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
-                LOWER(i.mobileNumber) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
-                LOWER(COALESCE(i.email, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                LOWER(i.name) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR
+                LOWER(i.mobileNumber) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR
+                LOWER(COALESCE(i.email, '')) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
             )
             ORDER BY i.createdOn DESC
             """)

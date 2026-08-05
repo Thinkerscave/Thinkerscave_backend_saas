@@ -4,7 +4,9 @@ import com.thinkerscave.access.dto.request.CreateMenuRequest;
 import com.thinkerscave.access.dto.request.UpdateMenuRequest;
 import com.thinkerscave.access.dto.response.MenuResponse;
 import com.thinkerscave.access.dto.response.SidebarItemResponse;
+import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.enums.MenuType;
+import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.access.service.MenuService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -14,7 +16,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,6 +31,7 @@ import java.util.List;
 public class MenuController {
 
     private final MenuService menuService;
+    private final UserRepository userRepository;
 
     @PostMapping
     @Operation(summary = "Create a new menu or page")
@@ -46,18 +52,21 @@ public class MenuController {
 
     @GetMapping("/{menuId}")
     @Operation(summary = "Get menu by ID")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<MenuResponse>> getMenu(@PathVariable Long menuId) {
         return ResponseEntity.ok(ApiResponse.success(menuService.getMenuById(menuId)));
     }
 
     @GetMapping("/tree")
     @Operation(summary = "Get full menu tree (all menus hierarchically)")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<MenuResponse>>> getTree() {
         return ResponseEntity.ok(ApiResponse.success(menuService.getMenuTree()));
     }
 
     @GetMapping("/search")
     @Operation(summary = "Search menus with pagination")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<MenuResponse>>> searchMenus(
             @RequestParam(required = false) MenuType menuType,
             @RequestParam(required = false) Boolean active,
@@ -86,9 +95,41 @@ public class MenuController {
 
     @GetMapping("/sidebar")
     @Operation(summary = "Build sidebar tree for a user with effective permissions")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<SidebarItemResponse>>> getSidebar(
             @RequestParam Long userId,
             @RequestParam Long organizationId) {
+        assertCanViewSidebar(userId, organizationId);
         return ResponseEntity.ok(ApiResponse.success(menuService.buildSidebar(userId, organizationId)));
+    }
+
+    /**
+     * IDOR guard: a caller may only request their own sidebar (own user id + own
+     * organization id) unless they hold an org-admin-level authority, in which case
+     * they may still only view users within their own organization.
+     */
+    private void assertCanViewSidebar(Long requestedUserId, Long requestedOrganizationId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+        User caller = userRepository.findByUsername(authentication.getName())
+                .or(() -> userRepository.findByEmail(authentication.getName()))
+                .orElseThrow(() -> new AccessDeniedException("Caller not resolvable"));
+
+        boolean isSelf = caller.getId().equals(requestedUserId)
+                && caller.getOrganizationId() != null
+                && caller.getOrganizationId().equals(requestedOrganizationId);
+        boolean isOrgAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ORGANIZATION_ADMIN") || a.getAuthority().equals("ORGANIZATION_OWNER")
+                        || a.getAuthority().equals("SUPER_ADMIN"));
+
+        if (isSelf) {
+            return;
+        }
+        if (isOrgAdmin && caller.getOrganizationId() != null && caller.getOrganizationId().equals(requestedOrganizationId)) {
+            return;
+        }
+        throw new AccessDeniedException("Not authorized to view this user's sidebar");
     }
 }

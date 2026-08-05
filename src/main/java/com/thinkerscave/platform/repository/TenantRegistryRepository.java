@@ -39,9 +39,9 @@ public interface TenantRegistryRepository extends JpaRepository<TenantRegistry, 
             SELECT t FROM TenantRegistry t
             WHERE t.active = true
             AND (:status IS NULL OR t.provisionStatus = :status)
-            AND (:search IS NULL OR LOWER(t.tenantIdentifier) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(t.organization.organizationName) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(t.schemaName) LIKE LOWER(CONCAT('%', :search, '%')))
+            AND (:search IS NULL OR LOWER(t.tenantIdentifier) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                OR LOWER(t.organization.organizationName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                OR LOWER(t.schemaName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
             """)
     Page<TenantRegistry> searchTenants(
             @Param("status") ProvisionStatus status,

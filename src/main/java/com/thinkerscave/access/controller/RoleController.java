@@ -43,18 +43,21 @@ public class RoleController {
 
     @GetMapping("/{roleId}")
     @Operation(summary = "Get role by ID")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<RoleResponse>> getRole(@PathVariable Long roleId) {
         return ResponseEntity.ok(ApiResponse.success(roleService.getRoleById(roleId)));
     }
 
     @GetMapping
     @Operation(summary = "List all active roles")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<RoleResponse>>> getAllRoles() {
         return ResponseEntity.ok(ApiResponse.success(roleService.getAllActiveRoles()));
     }
 
     @GetMapping("/search")
     @Operation(summary = "Search roles with pagination")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Page<RoleResponse>>> searchRoles(
             @RequestParam(required = false) Boolean active,
             @RequestParam(required = false) String search,

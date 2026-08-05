@@ -33,6 +33,12 @@ public interface JwtService {
 
     String extractRoleType(String token);
 
+    /**
+     * Returns true when the access token requires a mandatory first-login password change.
+     * Absent or null claims are treated as false (legacy tokens).
+     */
+    boolean extractFirstTimeLogin(String token);
+
     Date extractExpiration(String token);
 
     Claims extractAllClaims(String token);

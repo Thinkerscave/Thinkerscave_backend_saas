@@ -45,6 +45,9 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         if (classRepository.existsByAcademicYear_AcademicYearIdAndClassCode(request.getAcademicYearId(), request.getClassCode())) {
             throw new AlreadyExistsException("Class code '" + request.getClassCode() + "' already exists for this academic year");
         }
+        if (classRepository.existsByAcademicYear_AcademicYearIdAndClassNameIgnoreCase(request.getAcademicYearId(), request.getClassName())) {
+            throw new AlreadyExistsException("Class name '" + request.getClassName() + "' already exists for this academic year");
+        }
         AcademicClass cls = new AcademicClass();
         cls.setAcademicYear(year);
         mapClassRequest(request, cls);
@@ -59,6 +62,10 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         if (classRepository.existsByAcademicYear_AcademicYearIdAndClassCodeAndClassIdNot(
                 cls.getAcademicYear().getAcademicYearId(), request.getClassCode(), classId)) {
             throw new AlreadyExistsException("Class code '" + request.getClassCode() + "' already exists for this academic year");
+        }
+        if (classRepository.existsByAcademicYear_AcademicYearIdAndClassNameIgnoreCaseAndClassIdNot(
+                cls.getAcademicYear().getAcademicYearId(), request.getClassName(), classId)) {
+            throw new AlreadyExistsException("Class name '" + request.getClassName() + "' already exists for this academic year");
         }
         mapClassRequest(request, cls);
         return toClassResponse(classRepository.save(cls));

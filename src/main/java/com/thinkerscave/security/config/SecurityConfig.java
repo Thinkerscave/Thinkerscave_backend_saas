@@ -1,6 +1,7 @@
 package com.thinkerscave.security.config;
 
 import com.thinkerscave.security.filter.AuthRateLimitFilter;
+import com.thinkerscave.security.filter.FirstTimeLoginFilter;
 import com.thinkerscave.security.filter.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,6 +40,7 @@ public class SecurityConfig {
 
     private final UserDetailsService userDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final FirstTimeLoginFilter firstTimeLoginFilter;
     private final AuthRateLimitFilter authRateLimitFilter;
     private final Environment environment;
 
@@ -79,6 +81,7 @@ public class SecurityConfig {
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(authRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(firstTimeLoginFilter, JwtAuthenticationFilter.class)
                 .headers(headers -> {
                     headers.frameOptions(frame -> frame.sameOrigin());
                     headers.contentTypeOptions(Customizer.withDefaults());

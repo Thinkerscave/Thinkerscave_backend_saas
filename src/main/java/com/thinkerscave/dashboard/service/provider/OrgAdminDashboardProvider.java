@@ -21,6 +21,10 @@ import com.thinkerscave.dashboard.enums.WidgetType;
 import com.thinkerscave.dashboard.service.SampleWidgetFactory;
 import com.thinkerscave.dashboard.util.ChartBucketUtil;
 import com.thinkerscave.dashboard.util.RoleLabels;
+import com.thinkerscave.onboarding.dto.OnboardingChecklistItemResponse;
+import com.thinkerscave.onboarding.dto.OnboardingChecklistResponse;
+import com.thinkerscave.onboarding.service.OnboardingService;
+import com.thinkerscave.platform.repository.OrganizationRepository;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.staff.repository.StaffRepository;
 import com.thinkerscave.student.repository.StudentRepository;
@@ -50,6 +54,8 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
     private final AuditLogRepository auditLogRepository;
     private final AcademicCalendarEventRepository academicCalendarEventRepository;
     private final SampleWidgetFactory sampleWidgetFactory;
+    private final OnboardingService onboardingService;
+    private final OrganizationRepository organizationRepository;
 
     @Override
     public List<WidgetDTO<?>> getWidgets(User user) {
@@ -70,14 +76,52 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
     }
 
     private WidgetDTO<WelcomeHeaderData> welcomeHeader(User user) {
-        return safeWidget("welcome-header", WidgetType.WELCOME_HEADER, "Welcome", 4, DataMode.LIVE, () ->
-                WelcomeHeaderData.builder()
-                        .displayName(user != null ? displayName(user) : "Admin")
-                        .roleLabel(RoleLabels.of(com.thinkerscave.access.enums.RoleType.ORGANIZATION_ADMIN))
-                        .greeting(RoleLabels.greeting())
-                        .avatarUrl(user != null ? user.getProfileImageUrl() : null)
-                        .todayLabel(LocalDate.now().toString())
-                        .build());
+        return safeWidget("welcome-header", WidgetType.WELCOME_HEADER, "Welcome", 4, DataMode.LIVE, () -> {
+            WelcomeHeaderData.WelcomeHeaderDataBuilder builder = WelcomeHeaderData.builder()
+                    .displayName(user != null ? displayName(user) : "Admin")
+                    .roleLabel(RoleLabels.of(com.thinkerscave.access.enums.RoleType.ORGANIZATION_ADMIN))
+                    .organizationName(resolveOrganizationName())
+                    .greeting(RoleLabels.greeting())
+                    .avatarUrl(user != null ? user.getProfileImageUrl() : null)
+                    .todayLabel(LocalDate.now().toString());
+            applySetupGuide(builder);
+            return builder.build();
+        });
+    }
+
+    private void applySetupGuide(WelcomeHeaderData.WelcomeHeaderDataBuilder builder) {
+        try {
+            OnboardingChecklistResponse checklist = onboardingService.getChecklist();
+            boolean showGuide = !checklist.isSetupComplete();
+            builder.setupComplete(checklist.isSetupComplete())
+                    .showSetupGuide(showGuide)
+                    .setupProgressPercent(checklist.getProgressPercent())
+                    .recommendedNextLabel(showGuide ? checklist.getRecommendedNextLabel() : null)
+                    .recommendedNextRoute(showGuide ? checklist.getRecommendedNextRoute() : null)
+                    .setupChecklist(showGuide ? checklist.getItems().stream()
+                            .filter(OnboardingChecklistItemResponse::isAvailable)
+                            .map(i -> WelcomeHeaderData.SetupChecklistItem.builder()
+                                    .key(i.getKey())
+                                    .label(i.getLabel())
+                                    .completed(i.isCompleted())
+                                    .requiredForCompletion(i.isRequiredForCompletion())
+                                    .available(i.isAvailable())
+                                    .route(i.getRoute())
+                                    .build())
+                            .collect(Collectors.toList()) : null);
+        } catch (Exception ex) {
+            builder.showSetupGuide(false).setupComplete(false);
+        }
+    }
+
+    private String resolveOrganizationName() {
+        Long orgId = OrganizationContext.getOrganizationId();
+        if (orgId == null || orgId <= 0) {
+            return null;
+        }
+        return organizationRepository.findById(orgId)
+                .map(org -> org.getOrganizationName())
+                .orElse(null);
     }
 
     private WidgetDTO<KpiGridData> kpiGrid() {

@@ -91,6 +91,23 @@ public class OutboundMessageService {
         log.info("Org admin welcome dispatched emailOk={} smsOk={} email={}", mailOk, smsOk, email);
     }
 
+    public void sendAdminPasswordReset(
+            String email,
+            String mobile,
+            String userName,
+            String loginUrl,
+            String username,
+            String temporaryPassword) {
+        String subject = "Your ThinkersCave password has been reset";
+        String html = emailService.buildAdminPasswordResetEmailBody(userName, loginUrl, username, temporaryPassword);
+        boolean mailOk = emailService.sendHtmlEmailSync(email, subject, html);
+
+        String sms = "ThinkersCave: your password was reset. Temp password: " + safe(temporaryPassword)
+                + " Login: " + safe(loginUrl);
+        boolean smsOk = trySms(mobile, sms);
+        log.info("Admin password reset dispatched emailOk={} smsOk={} email={}", mailOk, smsOk, email);
+    }
+
     private boolean trySms(String mobile, String message) {
         if (!smsService.isEnabled() || !StringUtils.hasText(mobile)) {
             return false;

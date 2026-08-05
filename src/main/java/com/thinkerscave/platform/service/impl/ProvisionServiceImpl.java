@@ -1,9 +1,8 @@
 package com.thinkerscave.platform.service.impl;
 
-import com.thinkerscave.access.dto.UserCreationContext;
-import com.thinkerscave.access.dto.UserProvisioningResult;
 import com.thinkerscave.access.entity.Role;
 import com.thinkerscave.access.entity.User;
+import com.thinkerscave.access.enums.UserStatus;
 import com.thinkerscave.access.repository.RoleRepository;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.access.service.UserService;
@@ -39,10 +38,12 @@ import com.thinkerscave.platform.repository.PromotionRepository;
 import com.thinkerscave.platform.repository.ProvisioningJobRepository;
 import com.thinkerscave.platform.repository.ProvisioningTemplateRepository;
 import com.thinkerscave.platform.repository.SubscriptionFeatureOverrideRepository;
+import com.thinkerscave.platform.repository.SubscriptionPlanFeatureRepository;
 import com.thinkerscave.platform.repository.SubscriptionPlanRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
 import com.thinkerscave.platform.service.ProvisionService;
 import com.thinkerscave.security.service.OutboundMessageService;
+import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.enums.CodeType;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
@@ -54,6 +55,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,8 +67,11 @@ import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -74,6 +79,7 @@ import java.util.Locale;
 public class ProvisionServiceImpl implements ProvisionService {
 
     private static final String ROLE_ORG_ADMIN_CODE = "ROLE_ADMIN";
+    private static final String ROLE_ORG_OWNER_CODE = "ROLE_OWNER";
     private static final List<String> REQUIRED_TENANT_TABLES = List.of(
             "users", "roles", "user_roles", "tenant_registry", "organizations"
     );
@@ -97,6 +103,8 @@ public class ProvisionServiceImpl implements ProvisionService {
     private final OutboundMessageService outboundMessageService;
     private final JdbcTemplate jdbcTemplate;
     private final DataSource dataSource;
+    private final SubscriptionPlanFeatureRepository subscriptionPlanFeatureRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${app.tenancy.platform-schema:thinkerscave_dev}")
     private String platformSchema;
@@ -356,34 +364,92 @@ public class ProvisionServiceImpl implements ProvisionService {
             updateJobProgress(job, "FEATURES_CONFIGURED", 80);
 
             // ── Step 15: Create admin user ────────────────────────────────────
-            Role adminRole = roleRepository.findByRoleCode(ROLE_ORG_ADMIN_CODE)
-                    .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + ROLE_ORG_ADMIN_CODE));
+            // Organization Admin is an "internal" tenant user: it must be created
+            // directly inside the organization's own schema, never duplicated into
+            // the public/platform schema (only SUPER_ADMIN and Customer/Organization
+            // Owner accounts live in public — see mapCustomerOwnerToOrganization below).
+            //
+            // Uses raw JDBC (same fully-qualified "schema"."table" pattern as
+            // copyPlatformRows) instead of JPA/Hibernate for two reasons found during
+            // testing:
+            // (1) Hibernate binds one schema to a session for its whole transaction
+            //     lifetime — flipping TenantContext mid-transaction on this method's
+            //     own (ambient) session is a no-op and non-deterministically left the
+            //     admin user in the public schema instead.
+            // (2) A @Transactional(REQUIRES_NEW) helper (a separate DB connection)
+            //     cannot see this transaction's own not-yet-committed tenant schema/
+            //     tables (Postgres MVCC visibility), causing "relation ... does not
+            //     exist" errors — provisionTenantSchema() (Step 8) creates the schema
+            //     earlier in this SAME still-open transaction, so it isn't visible to
+            //     any other connection until this method commits.
+            // Raw JDBC on the SAME connection/transaction sidesteps both problems.
+            //
+            // The tenant schema's "roles" table is normally populated later, inside
+            // bootstrapTenantWorkspace() — but the admin user creation below needs to
+            // resolve ROLE_ADMIN by code against the tenant schema *first*, so copy just
+            // that one reference table here (idempotent; bootstrapTenantWorkspace's own
+            // copy of it afterwards is a harmless no-op via ON CONFLICT DO NOTHING).
+            copyPlatformRows(schemaName, resolvePlatformSourceSchema(), "roles", null);
 
-            UserCreationContext adminContext = new UserCreationContext(
-                    request.getAdminFirstName(),
-                    null,
-                    request.getAdminLastName() != null ? request.getAdminLastName() : "",
-                    request.getAdminEmail().trim().toLowerCase(),
-                    request.getAdminMobile(),
-                    null,
-                    null,
-                    null,
-                    "Administrator"
-            );
-            UserProvisioningResult adminProvisioning = userService.createUserWithTemporaryPassword(adminContext, adminRole);
-            User adminUser = adminProvisioning.getUser();
-            adminUser.setOrganizationId(org.getId());
-            userRepository.save(adminUser);
-            log.info("Admin user created for org {}: {}", orgCode, adminUser.getEmail());
+            String adminEmail = request.getAdminEmail().trim().toLowerCase();
+            String adminLastName = request.getAdminLastName() != null ? request.getAdminLastName() : "";
+            String adminDisplayName = request.getAdminFirstName()
+                    + (!adminLastName.isBlank() ? " " + adminLastName : "");
+            String adminUserCode = codeGeneratorService.generate(CodeType.USER);
+            String adminTemporaryPassword = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+
+            Long adminRoleId = jdbcTemplate.queryForObject(
+                    "SELECT id FROM \"" + schemaName + "\".\"roles\" WHERE role_code = ?",
+                    Long.class, ROLE_ORG_ADMIN_CODE);
+
+            Long adminUserId = jdbcTemplate.queryForObject(
+                    "INSERT INTO \"" + schemaName + "\".\"users\" "
+                            + "(user_code, email, username, mobile_number, password, first_name, last_name, "
+                            + "display_name, organization_id, status, first_time_login, email_verified, "
+                            + "mobile_verified, account_locked, failed_login_attempts, version) "
+                            + "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0) RETURNING id",
+                    Long.class,
+                    adminUserCode, adminEmail, adminEmail, request.getAdminMobile(),
+                    passwordEncoder.encode(adminTemporaryPassword),
+                    request.getAdminFirstName(), adminLastName, adminDisplayName,
+                    org.getId(), UserStatus.ACTIVE.name(), true, false, false, false, 0);
+
+            jdbcTemplate.update(
+                    "INSERT INTO \"" + schemaName + "\".\"user_roles\" "
+                            + "(user_id, role_id, primary_role, active, version) VALUES (?,?,?,?,0)",
+                    adminUserId, adminRoleId, true, true);
+
+            User adminUser = User.builder()
+                    .id(adminUserId)
+                    .userCode(adminUserCode)
+                    .email(adminEmail)
+                    .username(adminEmail)
+                    .mobileNumber(request.getAdminMobile())
+                    .firstName(request.getAdminFirstName())
+                    .lastName(adminLastName)
+                    .displayName(adminDisplayName)
+                    .organizationId(org.getId())
+                    .status(UserStatus.ACTIVE)
+                    .firstTimeLogin(true)
+                    .build();
+            log.info("Admin user created directly in tenant schema {} for org {}: {}", schemaName, orgCode, adminUser.getEmail());
             updateJobProgress(job, "ADMIN_USER_CREATED", 90);
 
             // ── Step 16: Map customer owner to this organization ──────────────
+            // Organization Owner remains an "external"/platform identity (it can own
+            // and switch across multiple organizations), so it stays in public only —
+            // it is intentionally NOT duplicated into the tenant schema.
             mapCustomerOwnerToOrganization(customer, org);
             updateJobProgress(job, "CUSTOMER_OWNER_MAPPED", 94);
 
             // Seed tenant catalog with auth/workspace rows so institution login
             // can resolve tenant_registry + admin/owner users in the tenant DB.
             bootstrapTenantWorkspace(schemaName, tenant, org, customer, adminUser);
+
+            // Grant the organization access to the menus its subscription plan
+            // entitles it to, and full permissions on those menus for the Owner
+            // and Admin roles — this is what makes the sidebar non-empty on first login.
+            seedTenantMenuEntitlementsAndPermissions(schemaName, org, plan, request.getDisabledFeatureIds());
 
             // Keep onboarding pending for first-login checklist.
             org.setOnboardingCompleted(false);
@@ -400,13 +466,13 @@ public class ProvisionServiceImpl implements ProvisionService {
             job.setTenantRegistry(tenant);
             jobRepository.save(job);
 
-            sendProvisioningEmails(customer, org, tenantDomain, adminUser, adminProvisioning.getTemporaryPassword());
+            sendProvisioningEmails(customer, org, tenantDomain, adminUser, adminTemporaryPassword);
 
             log.info("Provisioning completed: orgCode={}, tenantId={}, jobCode={}", orgCode, tenantId, jobCode);
 
             // ── Step 18: Return result ────────────────────────────────────────
             log.info("Provisioning credentials: orgCode={} adminUsername={} temporaryPassword={}",
-                    orgCode, adminUser.getUsername(), adminProvisioning.getTemporaryPassword());
+                    orgCode, adminUser.getUsername(), adminTemporaryPassword);
             return ProvisioningResultResponse.builder()
                     .organizationId(org.getId())
                     .organizationCode(orgCode)
@@ -419,7 +485,7 @@ public class ProvisionServiceImpl implements ProvisionService {
                     .jobCode(jobCode)
                     .adminEmail(adminUser.getEmail())
                     .adminUsername(adminUser.getUsername())
-                    .temporaryPassword(adminProvisioning.getTemporaryPassword())
+                    .temporaryPassword(adminTemporaryPassword)
                     .defaultDomain(tenantDomain)
                     .message("Organization provisioned successfully.")
                     .build();
@@ -608,9 +674,16 @@ public class ProvisionServiceImpl implements ProvisionService {
     }
 
     /**
-     * Copies the minimum platform rows required for tenant-scoped login and
-     * first-load dashboard into the newly created tenant catalog.
+     * Copies the minimum platform reference rows required for tenant-scoped
+     * lookups and first-load dashboard into the newly created tenant catalog.
      * Table structures alone are not enough — institution login runs against the tenant DB.
+     *
+     * Deliberately does NOT copy "users"/"user_roles" for the admin or owner:
+     * the Organization Admin is created directly inside this schema (see Step 15
+     * in provision()), and the Organization Owner is an "external"/platform
+     * identity that must remain exclusively in the public schema. Duplicating
+     * either into this schema previously caused two independent credential rows
+     * to drift out of sync (different password hashes) after any password change.
      */
     private void bootstrapTenantWorkspace(
             String schemaName,
@@ -622,8 +695,6 @@ public class ProvisionServiceImpl implements ProvisionService {
             return;
         }
 
-        Long ownerUserId = customer.getOwnerUserId();
-        Long adminUserId = adminUser != null ? adminUser.getId() : null;
         String sourceSchema = resolvePlatformSourceSchema();
 
         try {
@@ -634,15 +705,10 @@ public class ProvisionServiceImpl implements ProvisionService {
             copyPlatformRows(schemaName, sourceSchema, "organization_domains", "organization_id = " + organization.getId());
             copyPlatformRows(schemaName, sourceSchema, "organization_configurations", "organization_id = " + organization.getId());
             copyPlatformRows(schemaName, sourceSchema, "organization_subscriptions", "organization_id = " + organization.getId());
-
-            if (adminUserId != null) {
-                copyPlatformRows(schemaName, sourceSchema, "users", "id = " + adminUserId);
-                copyPlatformRows(schemaName, sourceSchema, "user_roles", "user_id = " + adminUserId);
-            }
-            if (ownerUserId != null && (adminUserId == null || !ownerUserId.equals(adminUserId))) {
-                copyPlatformRows(schemaName, sourceSchema, "users", "id = " + ownerUserId);
-                copyPlatformRows(schemaName, sourceSchema, "user_roles", "user_id = " + ownerUserId);
-            }
+            // PLATFORM-scope menus (Tenant Management) are Super Admin-only and must
+            // never be duplicated into a tenant schema; only CORE/SUBSCRIPTION menus
+            // are copied here as the full org-facing catalog.
+            copyPlatformRows(schemaName, sourceSchema, "menus", "menu_scope <> 'PLATFORM'");
 
             log.info("Tenant workspace bootstrap completed for schema={}", schemaName);
         } catch (Exception ex) {
@@ -663,6 +729,91 @@ public class ProvisionServiceImpl implements ProvisionService {
                     + (whereClause != null && !whereClause.isBlank() ? " WHERE " + whereClause : "");
         }
         jdbcTemplate.execute(sql);
+    }
+
+    /**
+     * Computes the menus this organization is entitled to (CORE menus always,
+     * plus SUBSCRIPTION menus matching the plan's enabled features minus any
+     * explicitly disabled feature overrides), records them as the organization's
+     * "available modules" cache, and grants full permissions on the entitled
+     * leaf (PAGE) menus to the Owner and Admin roles only. No other role gets
+     * automatic permissions — this matches the approved Workflow 04 architecture.
+     * <p>
+     * Uses raw JDBC against fully-qualified "{schema}"."table" identifiers rather
+     * than JPA/TenantContext switching, because the enclosing {@code provision()}
+     * transaction already holds one Hibernate session bound to the schema active
+     * when it began; flipping {@code TenantContext} mid-transaction does not
+     * reliably re-route JPA repository calls to the tenant schema (see
+     * {@link #copyPlatformRows} for the same established pattern).
+     */
+    private void seedTenantMenuEntitlementsAndPermissions(
+            String schemaName,
+            Organization organization,
+            SubscriptionPlan plan,
+            List<Long> disabledFeatureIds) {
+        if (schemaName == null || schemaName.isBlank()) {
+            return;
+        }
+
+        Set<Long> enabledFeatureIds = subscriptionPlanFeatureRepository
+                .findBySubscriptionPlan_IdAndEnabledTrueAndActiveTrue(plan.getId())
+                .stream()
+                .map(spf -> spf.getFeature().getId())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        if (disabledFeatureIds != null) {
+            enabledFeatureIds.removeAll(disabledFeatureIds);
+        }
+        String featureIdList = enabledFeatureIds.isEmpty()
+                ? "-1"
+                : enabledFeatureIds.stream().map(String::valueOf)
+                        .collect(java.util.stream.Collectors.joining(","));
+
+        // Resolve top-level CORE menus + top-level SUBSCRIPTION menus matching the
+        // plan's enabled features, then expand to all descendants — all in one query.
+        String entitledMenusCte =
+                "WITH RECURSIVE entitled AS (" +
+                        "SELECT id, menu_type FROM \"" + schemaName + "\".\"menus\" " +
+                        "WHERE parent_menu_id IS NULL AND active = true " +
+                        "AND (menu_scope = 'CORE' OR (menu_scope = 'SUBSCRIPTION' AND feature_id IN (" + featureIdList + "))) " +
+                        "UNION ALL " +
+                        "SELECT m.id, m.menu_type FROM \"" + schemaName + "\".\"menus\" m " +
+                        "INNER JOIN entitled e ON m.parent_menu_id = e.id " +
+                        "WHERE m.active = true" +
+                        ") ";
+
+        List<Long> entitledMenuIds = jdbcTemplate.query(entitledMenusCte + "SELECT id FROM entitled",
+                (rs, rowNum) -> rs.getLong("id"));
+
+        if (entitledMenuIds.isEmpty()) {
+            log.warn("No entitled menus resolved for organization {} on plan {} (schema={}); sidebar will be empty",
+                    organization.getOrganizationCode(), plan.getPlanCode(), schemaName);
+            return;
+        }
+
+        String menuIdList = entitledMenuIds.stream().map(String::valueOf)
+                .collect(java.util.stream.Collectors.joining(","));
+
+        // "Available modules" cache — every entitled menu (MODULE and PAGE alike).
+        jdbcTemplate.execute(
+                "INSERT INTO \"" + schemaName + "\".\"organization_modules\" " +
+                        "(organization_id, menu_id, enabled, created_on, version) " +
+                        "SELECT " + organization.getId() + ", id, true, now(), 0 " +
+                        "FROM \"" + schemaName + "\".\"menus\" WHERE id IN (" + menuIdList + ") " +
+                        "ON CONFLICT (organization_id, menu_id) DO NOTHING");
+
+        // Full access on entitled leaf (PAGE) menus for Owner and Admin roles only.
+        jdbcTemplate.execute(
+                "INSERT INTO \"" + schemaName + "\".\"role_permissions\" " +
+                        "(organization_id, role_id, menu_id, can_view, can_manage, can_approve, created_on, version) " +
+                        "SELECT " + organization.getId() + ", r.id, m.id, true, true, true, now(), 0 " +
+                        "FROM \"" + schemaName + "\".\"roles\" r " +
+                        "CROSS JOIN \"" + schemaName + "\".\"menus\" m " +
+                        "WHERE r.role_code IN ('" + ROLE_ORG_OWNER_CODE + "', '" + ROLE_ORG_ADMIN_CODE + "') " +
+                        "AND m.id IN (" + menuIdList + ") AND m.menu_type = 'PAGE' " +
+                        "ON CONFLICT (organization_id, role_id, menu_id) DO NOTHING");
+
+        log.info("Seeded {} entitled menus and default Owner/Admin permissions for organization {} (schema={})",
+                entitledMenuIds.size(), organization.getOrganizationCode(), schemaName);
     }
 
     private void sendProvisioningEmails(

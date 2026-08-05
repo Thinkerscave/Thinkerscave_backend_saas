@@ -155,6 +155,38 @@ public class EmailService {
         );
     }
 
+    public String buildAdminPasswordResetEmailBody(
+            String userName,
+            String loginUrl,
+            String username,
+            String temporaryPassword) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f6fb; padding: 24px;">
+                  <div style="max-width: 640px; margin: auto; background: #fff; border-radius: 10px; padding: 28px; border: 1px solid #e5e7eb;">
+                    <h2 style="margin: 0 0 8px; color: #0f172a;">Your ThinkersCave Password Has Been Reset</h2>
+                    <p style="margin: 0 0 18px; color: #334155;">Hello %s, an administrator has reset your account password.</p>
+                    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; margin-bottom: 16px;">
+                      <p style="margin: 0 0 6px;"><strong>Login URL:</strong> <a href="%s">%s</a></p>
+                      <p style="margin: 0 0 6px;"><strong>Username:</strong> %s</p>
+                      <p style="margin: 0;"><strong>Temporary Password:</strong> %s</p>
+                    </div>
+                    <p style="margin: 0 0 8px; color: #334155;">On next login, you will be prompted to change this password before accessing the dashboard.</p>
+                    <p style="margin: 0; color: #64748b; font-size: 12px;">If you did not expect this email, contact your organization administrator immediately.</p>
+                  </div>
+                </body>
+                </html>
+                """.formatted(
+                userName != null ? userName : "there",
+                loginUrl,
+                loginUrl,
+                username,
+                temporaryPassword
+        );
+    }
+
     public String buildOrganizationAdminWelcomeEmailBody(
             String adminName,
             String organizationName,

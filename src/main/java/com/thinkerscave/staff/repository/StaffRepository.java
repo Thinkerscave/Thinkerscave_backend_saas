@@ -27,12 +27,12 @@ public interface StaffRepository extends JpaRepository<Staff, Long> {
             WHERE (:staffType IS NULL OR s.staffType = :staffType)
               AND (:employmentCategory IS NULL OR s.employmentCategory = :employmentCategory)
               AND (:employmentStatus IS NULL OR s.employmentStatus = :employmentStatus)
-              AND (:designation IS NULL OR LOWER(s.designation) LIKE LOWER(CONCAT('%', :designation, '%')))
+              AND (:designation IS NULL OR LOWER(s.designation) LIKE LOWER(CONCAT('%', CAST(:designation AS string), '%')))
               AND (:keyword IS NULL OR
-                   LOWER(s.firstName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
-                   LOWER(s.lastName) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
-                   LOWER(s.staffCode) LIKE LOWER(CONCAT('%', :keyword, '%')) OR
-                   LOWER(s.email) LIKE LOWER(CONCAT('%', :keyword, '%')))
+                   LOWER(s.firstName) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR
+                   LOWER(s.lastName) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR
+                   LOWER(s.staffCode) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR
+                   LOWER(s.email) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')))
               AND s.active = true
             """)
     Page<Staff> searchStaff(
