@@ -31,4 +31,8 @@ public interface ApplicationAdmissionService {
     ApplicationAdmissionResponse reject(Long applicationId, String comments);
 
     ApplicationProgressResponse getProgress(Long applicationId);
+
+    ApplicationAdmissionResponse archive(Long applicationId);
+
+    ApplicationAdmissionResponse unarchive(Long applicationId);
 }

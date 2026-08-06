@@ -65,20 +65,17 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
 
     @Override
     public Page<ApplicationAdmissionResponse> getAll(Pageable pageable) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        return repository.findByOrganizationIdOrderByCreatedOnDesc(orgId, pageable).map(this::toResponse);
+        return repository.findByOrderByCreatedOnDesc(pageable).map(this::toResponse);
     }
 
     @Override
     public Page<ApplicationAdmissionResponse> getByStatus(ApplicationStatus status, Pageable pageable) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        return repository.findByOrganizationIdAndStatusOrderByCreatedOnDesc(orgId, status, pageable).map(this::toResponse);
+        return repository.findByStatusOrderByCreatedOnDesc(status, pageable).map(this::toResponse);
     }
 
     @Override
     public Page<ApplicationAdmissionResponse> search(ApplicationSearchRequest request, Pageable pageable) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        return repository.findAll(ApplicationAdmissionSpecification.filter(orgId, request), pageable)
+        return repository.findAll(ApplicationAdmissionSpecification.filter(request), pageable)
                 .map(this::toResponse);
     }
 
@@ -148,9 +145,7 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     // ─── Helpers ─────────────────────────────────────────────────────────────
 
     private ApplicationAdmission buildApplication(ApplicationAdmissionRequest request) {
-        Long orgId = OrganizationContext.getOrganizationId();
         ApplicationAdmission app = new ApplicationAdmission();
-        app.setOrganizationId(orgId);
         app.setApplicationNumber(generateApplicationNumber());
         mapRequest(request, app);
         return app;
@@ -172,13 +167,9 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     }
 
     private ApplicationAdmission getApplication(Long applicationId) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        ApplicationAdmission app = repository.findById(applicationId)
+        // Schema-per-tenant: Automatically scoped to current tenant schema
+        return repository.findById(applicationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Application not found: " + applicationId));
-        if (!orgId.equals(app.getOrganizationId())) {
-            throw new ResourceNotFoundException("Application not found: " + applicationId);
-        }
-        return app;
     }
 
     private void validateStatusChange(ApplicationStatus current, ApplicationStatus target) {
@@ -228,5 +219,36 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    @Override
+    @Transactional
+    public ApplicationAdmissionResponse archive(Long applicationId) {
+        ApplicationAdmission app = getApplication(applicationId);
+        
+        // Only DRAFT and SUBMITTED can be archived
+        if (app.getStatus() != ApplicationStatus.DRAFT && app.getStatus() != ApplicationStatus.SUBMITTED) {
+            throw new IllegalStateException("Only DRAFT or SUBMITTED applications can be archived. Current status: " + app.getStatus());
+        }
+        
+        if (app.isArchived()) {
+            throw new IllegalStateException("Application is already archived");
+        }
+        
+        app.setArchived(true);
+        return toResponse(repository.save(app));
+    }
+
+    @Override
+    @Transactional
+    public ApplicationAdmissionResponse unarchive(Long applicationId) {
+        ApplicationAdmission app = getApplication(applicationId);
+        
+        if (!app.isArchived()) {
+            throw new IllegalStateException("Application is not archived");
+        }
+        
+        app.setArchived(false);
+        return toResponse(repository.save(app));
     }
 }

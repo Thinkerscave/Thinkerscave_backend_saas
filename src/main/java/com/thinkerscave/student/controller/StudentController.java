@@ -51,7 +51,7 @@ public class StudentController {
 	private final AcademicsLookupService academicsLookupService;
 
 	@GetMapping("/import/template")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	@Operation(summary = "Download Student Import Template")
 	public ResponseEntity<Resource> downloadStudentImportTemplate() {
 
@@ -66,7 +66,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Register a new student with documents")
 	@PostMapping(value = "/registerStudent")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF') or hasAuthority('STUDENT_ADMISSIONS_ADD')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF') or hasAuthority('STUDENT_ADMISSIONS_ADD')")
 
 	public ResponseEntity<ApiResponse<StudentResponseDTO>> uploadStudentWithDocuments(
 			@Valid @RequestPart("studentData") StudentCreateRequest student,
@@ -86,7 +86,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Register a new student without file uploads")
 	@PostMapping
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF') or hasAuthority('STUDENT_ADMISSIONS_ADD')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF') or hasAuthority('STUDENT_ADMISSIONS_ADD')")
 	public ResponseEntity<ApiResponse<StudentResponseDTO>> createStudent(
 			@Valid @RequestBody StudentCreateRequest student) throws IOException {
 		log.info("Received JSON request to register student: {} {}", student.getFirstName(), student.getLastName());
@@ -96,7 +96,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Get all students by organization")
 	@GetMapping("/getStudents")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<List<StudentResponseDTO>>> getAllStudents() {
 		log.info("Received request to get all students");
 		return ResponseEntity.ok(ApiResponse.success(studentService.getAllStudents()));
@@ -104,14 +104,14 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Get students (paginated)")
 	@GetMapping("/paged")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<Page<StudentResponseDTO>>> getAllStudentsPaged(Pageable pageable) {
 		return ResponseEntity.ok(ApiResponse.success(studentService.getAllStudents(pageable)));
 	}
 
 	@Operation(summary = "Student directory with pagination and filters")
 	@GetMapping
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<Page<StudentResponseDTO>>> getDirectory(
 			@RequestParam(required = false) String keyword,
 			@RequestParam(required = false) Long classId,
@@ -130,7 +130,7 @@ public class StudentController {
 
 	@Operation(summary = "Advanced student search")
 	@PostMapping("/search")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<Page<StudentResponseDTO>>> searchStudents(
 			@RequestBody(required = false) StudentSearchRequest request,
 			Pageable pageable) {
@@ -139,7 +139,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Get a student by ID")
 	@GetMapping("/{id}")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<StudentResponseDTO>> getStudentById(@PathVariable Long id) {
 		log.info("Received request to get student by id: {}", id);
 		return ResponseEntity.ok(ApiResponse.success(studentService.getStudentById(id)));
@@ -147,7 +147,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Update an existing student")
 	@PutMapping("/{id}")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<StudentResponseDTO>> updateStudent(@PathVariable Long id,
 			@Valid @RequestBody StudentCreateRequest dto) {
 		log.info("Received request to update student by id: {}", id);
@@ -157,7 +157,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Delete a student")
 	@DeleteMapping("/{id}")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<Void>> deleteStudent(@PathVariable Long id) {
 		log.info("Received request to delete student by id: {}", id);
 		studentService.deleteStudent(id);
@@ -166,7 +166,7 @@ public class StudentController {
 
 	@Operation(summary = "Update student status")
 	@PatchMapping("/{id}/status")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<StudentResponseDTO>> updateStudentStatus(
 			@PathVariable Long id,
 			@Valid @RequestBody StudentStatusUpdateRequest request) {
@@ -176,7 +176,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Get Student Profile 360")
 	@GetMapping("/{id}/profile-360")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
 	public ResponseEntity<ApiResponse<com.thinkerscave.student.dto.StudentProfileResponse>> getProfile360(
 			@PathVariable Long id) {
 		log.info("Received request to get profile 360 for student id: {}", id);
@@ -185,7 +185,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Update personal information")
 	@PutMapping("/{id}/personal")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<StudentResponseDTO>> updatePersonal(@PathVariable Long id,
 			@Valid @RequestBody StudentCreateRequest dto) {
 		log.info("Received request to update personal info for student id: {}", id);
@@ -195,7 +195,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Update medical information")
 	@PutMapping("/{id}/medical")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<StudentResponseDTO>> updateMedical(@PathVariable Long id,
 			@Valid @RequestBody com.thinkerscave.student.dto.MedicalDTO dto) {
 		log.info("Received request to update medical info for student id: {}", id);
@@ -205,7 +205,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Get student timeline")
 	@GetMapping("/{id}/timeline")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
 	public ResponseEntity<ApiResponse<List<com.thinkerscave.student.dto.TimelineDTO>>> getTimeline(
 			@PathVariable Long id) {
 		log.info("Received request to get timeline for student id: {}", id);
@@ -214,7 +214,7 @@ public class StudentController {
 
 	@Operation(summary = "Add student timeline entry")
 	@PostMapping("/{id}/timeline")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<TimelineDTO>> addTimelineEntry(
 			@PathVariable Long id,
 			@Valid @RequestBody TimelineCreateRequest request) {
@@ -228,7 +228,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Get student documents")
 	@GetMapping("/{id}/documents")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
 	public ResponseEntity<ApiResponse<List<com.thinkerscave.student.dto.StudentDocumentDTO>>> getStudentDocuments(
 			@PathVariable Long id) {
 		log.info("Received request to get documents for student id: {}", id);
@@ -237,7 +237,7 @@ public class StudentController {
 
 	@io.swagger.v3.oas.annotations.Operation(summary = "Download a student document")
 	@GetMapping("/document/{docId}/download")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF') or hasAuthority('STUDENT_ADMISSIONS_VIEW')")
 	public ResponseEntity<Resource> downloadDocument(@PathVariable Long docId) {
 		log.info("Received request to download document id: {}", docId);
 		Resource file = studentService.downloadDocument(docId);
@@ -249,7 +249,7 @@ public class StudentController {
 
 	@Operation(summary = "Bulk import students from Excel")
 	@PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<StudentImportJobResponse>> importStudents(@RequestPart("file") MultipartFile file) {
 		StudentImportJobResponse response = studentExcelService.importStudents(file);
 		return ResponseEntity.status(202).body(ApiResponse.success("Student import job submitted", response));
@@ -257,7 +257,7 @@ public class StudentController {
 
 	@Operation(summary = "Get student import job summary")
 	@GetMapping("/import/{jobId}")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<com.thinkerscave.student.dto.BulkUploadResponse>> getImportSummary(
 			@PathVariable String jobId) {
 		return ResponseEntity.ok(ApiResponse.success("Import summary loaded", studentExcelService.getImportSummary(jobId)));
@@ -265,7 +265,7 @@ public class StudentController {
 
 	@Operation(summary = "Download student import validation report")
 	@GetMapping("/import/{jobId}/errors")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<Resource> downloadImportErrors(@PathVariable String jobId) {
 		Resource resource = studentExcelService.downloadValidationReport(jobId);
 		return ResponseEntity.ok()
@@ -276,7 +276,7 @@ public class StudentController {
 
 	@Operation(summary = "Read-only alumni directory")
 	@GetMapping("/alumni")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<List<StudentResponseDTO>>> getAlumni(
 			@RequestParam(required = false) String keyword) {
 		StudentSearchRequest search = new StudentSearchRequest();
@@ -288,7 +288,7 @@ public class StudentController {
 
 	@Operation(summary = "Alumni profile")
 	@GetMapping("/alumni/{studentId}")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<com.thinkerscave.student.dto.StudentProfileResponse>> getAlumniProfile(
 			@PathVariable Long studentId) {
 		StudentResponseDTO student = studentService.getStudentById(studentId);

@@ -39,7 +39,7 @@ public class StudentParentController {
 
     @GetMapping
     @Operation(summary = "Get all parents/guardians for a student")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<List<ParentDTO>>> getParents(@PathVariable Long studentId) {
         List<ParentDTO> parents = studentParentRepository.findByStudentStudentId(studentId)
                 .stream()
@@ -50,7 +50,7 @@ public class StudentParentController {
 
     @PostMapping
     @Operation(summary = "Add a parent/guardian to a student")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Transactional
     public ResponseEntity<ApiResponse<ParentDTO>> addParent(
             @PathVariable Long studentId,
@@ -89,7 +89,7 @@ public class StudentParentController {
 
     @PutMapping("/{parentId}")
     @Operation(summary = "Update parent information")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Transactional
     public ResponseEntity<ApiResponse<ParentDTO>> updateParent(
             @PathVariable Long studentId,

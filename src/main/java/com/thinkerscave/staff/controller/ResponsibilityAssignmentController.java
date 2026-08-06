@@ -23,7 +23,7 @@ public class ResponsibilityAssignmentController {
     private final ResponsibilityAssignmentService assignmentService;
 
     @PostMapping("/api/v1/staff/responsibility-assignments")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Assign a responsibility to a staff member")
     public ResponseEntity<ApiResponse<Map<String, Long>>> assignResponsibility(
             @Valid @RequestBody ResponsibilityAssignmentRequest request) {
@@ -33,7 +33,7 @@ public class ResponsibilityAssignmentController {
     }
 
     @PatchMapping("/api/v1/staff/responsibility-assignments/{id}/deactivate")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Remove (deactivate) a responsibility assignment")
     public ResponseEntity<ApiResponse<Void>> removeAssignment(@PathVariable Long id) {
         assignmentService.removeAssignment(id);
@@ -41,7 +41,7 @@ public class ResponsibilityAssignmentController {
     }
 
     @GetMapping("/api/v1/staff/{staffId}/responsibilities")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Get all responsibilities for a staff member")
     public ResponseEntity<ApiResponse<List<ResponsibilityAssignmentResponse>>> getStaffResponsibilities(
             @PathVariable Long staffId) {

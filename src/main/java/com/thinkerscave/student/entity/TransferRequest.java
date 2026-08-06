@@ -32,9 +32,6 @@ public class TransferRequest extends Auditable {
     @EqualsAndHashCode.Include
     private Long id;
 
-    @Column(name = "organization_id", nullable = false)
-    private Long organizationId;
-
     @Column(name = "request_number", nullable = false, length = 32)
     private String requestNumber;
 

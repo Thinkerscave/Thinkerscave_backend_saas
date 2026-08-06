@@ -36,9 +36,6 @@ public class StudentDocument {
     @JoinColumn(name = "student_id", nullable = false)
     private Student student;
 
-    @Column(name = "organization_id")
-    private Long organizationId;
-
     @Column(name = "created_by", nullable = false, length = 50)
     private String createdBy;
 }

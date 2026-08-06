@@ -29,11 +29,11 @@ public class StudentMovementController {
     private final StudentEnrollmentRepository studentEnrollmentRepository;
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<java.util.List<com.thinkerscave.student.dto.TransferRequestDTO>>> listTransfers() {
-        Long orgId = OrganizationContext.getOrganizationId();
+        // Tenant isolation via schema - no organizationId filter needed
         java.util.List<com.thinkerscave.student.dto.TransferRequestDTO> dtoList = transferRequestRepository
-            .findAllWithEnrollmentByOrganizationId(orgId)
+            .findAll()
                 .stream()
                 .map(this::mapToDTO)
                 .collect(Collectors.toList());
@@ -41,10 +41,10 @@ public class StudentMovementController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<com.thinkerscave.student.dto.TransferRequestDTO>> createTransfer(
             @RequestBody com.thinkerscave.student.dto.TransferRequestDTO dto) {
-        Long orgId = OrganizationContext.getOrganizationId();
+        // Tenant isolation via schema - no organizationId needed
         com.thinkerscave.student.entity.TransferRequest req = new com.thinkerscave.student.entity.TransferRequest();
         req.setRequestNumber("TRF-" + System.currentTimeMillis());
         req.setStudentId(dto.getStudentId());
@@ -52,7 +52,6 @@ public class StudentMovementController {
         req.setDestinationSchool(dto.getDestinationSchool());
         req.setRequestedOn(java.time.LocalDate.now());
         req.setStatus(TransferStatus.REQUESTED);
-        req.setOrganizationId(orgId);
 
         req.setEnrollment(studentEnrollmentRepository.findById(dto.getEnrollmentId())
                 .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found: " + dto.getEnrollmentId())));
@@ -62,7 +61,7 @@ public class StudentMovementController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<com.thinkerscave.student.dto.TransferRequestDTO>> transitionTransferStatus(
             @PathVariable Long id,
             @Valid @RequestBody TransferStatusUpdateRequest request) {
@@ -87,7 +86,7 @@ public class StudentMovementController {
     }
 
     @GetMapping("/{id}/certificate")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getTransferCertificate(@PathVariable Long id) {
         com.thinkerscave.student.entity.TransferRequest req = transferRequestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Transfer request not found: " + id));

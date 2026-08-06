@@ -61,16 +61,11 @@ public class DashboardService {
         }
 
         // Admission KPIs
-        long openInquiries = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(
-                orgId, InquiryStatus.NEW) +
-                inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(
-                        orgId, InquiryStatus.INTERESTED) +
-                inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(
-                        orgId, InquiryStatus.COUNSELING);
-        long pendingApps = applicationRepository.countByOrganizationIdAndStatus(
-                orgId, ApplicationStatus.UNDER_REVIEW);
-        long newInquiriesToday = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(
-                orgId, InquiryStatus.NEW);
+        long openInquiries = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.NEW) +
+                inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.INTERESTED) +
+                inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.COUNSELING);
+        long pendingApps = applicationRepository.countByStatus(ApplicationStatus.UNDER_REVIEW);
+        long newInquiriesToday = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.NEW);
 
         // Active users
         long activeUsers = userRepository.countByOrganizationIdAndStatus(

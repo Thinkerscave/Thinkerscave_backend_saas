@@ -26,7 +26,7 @@ public class ResponsibilityController {
     private final ResponsibilityService responsibilityService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Create a new responsibility")
     public ResponseEntity<ApiResponse<Map<String, Long>>> createResponsibility(
             @Valid @RequestBody ResponsibilityRequest request) {
@@ -36,7 +36,7 @@ public class ResponsibilityController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update responsibility")
     public ResponseEntity<ApiResponse<Void>> updateResponsibility(
             @PathVariable Long id,
@@ -46,7 +46,7 @@ public class ResponsibilityController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Get all active responsibilities")
     public ResponseEntity<ApiResponse<List<ResponsibilityResponse>>> getResponsibilityList() {
         return ResponseEntity.ok(ApiResponse.success("Responsibilities retrieved",
@@ -54,7 +54,7 @@ public class ResponsibilityController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Get responsibility by ID")
     public ResponseEntity<ApiResponse<ResponsibilityResponse>> getResponsibilityById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Responsibility retrieved",
@@ -62,7 +62,7 @@ public class ResponsibilityController {
     }
 
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Activate a responsibility")
     public ResponseEntity<ApiResponse<Void>> activateResponsibility(@PathVariable Long id) {
         responsibilityService.activateResponsibility(id);
@@ -70,7 +70,7 @@ public class ResponsibilityController {
     }
 
     @PatchMapping("/{id}/deactivate")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Deactivate a responsibility")
     public ResponseEntity<ApiResponse<Void>> deactivateResponsibility(@PathVariable Long id) {
         responsibilityService.deactivateResponsibility(id);

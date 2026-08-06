@@ -131,7 +131,7 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
             long totalStaff = staffRepository.countByActive(true);
             long presentToday = studentAttendanceRepository.countByOrganizationIdAndAttendanceDateAndStatus(
                     orgId, LocalDate.now(), StudentAttendanceStatus.PRESENT);
-            long pendingAdmissions = applicationAdmissionRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.UNDER_REVIEW);
+            long pendingAdmissions = applicationAdmissionRepository.countByStatus(ApplicationStatus.UNDER_REVIEW);
 
             return KpiGridData.builder().items(List.of(
                     KpiItem.builder().label("Students").value(String.valueOf(totalStudents)).icon("pi-users").tone("primary").build(),
@@ -171,7 +171,7 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
     private WidgetDTO<ChartData> admissionTrendChart() {
         return safeWidget("admission-trend", WidgetType.CHART, "Admission trend", "Inquiries, last 6 months", 2, DataMode.LIVE, () -> {
             Long orgId = OrganizationContext.getOrganizationId();
-            var timestamps = inquiryRepository.findByOrganizationIdAndDeletedFalseOrderByCreatedOnDesc(orgId, PageRequest.of(0, 500))
+            var timestamps = inquiryRepository.findByDeletedFalseOrderByCreatedOnDesc(PageRequest.of(0, 500))
                     .getContent().stream().map(Inquiry::getCreatedOn).collect(Collectors.toList());
             return ChartBucketUtil.monthlyCounts(timestamps, 6, "Inquiries", "bar");
         });
@@ -189,7 +189,7 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
     private WidgetDTO<PendingTasksData> todaysTasks() {
         return safeWidget("todays-tasks", WidgetType.PENDING_TASKS, "Today's tasks", 2, DataMode.LIVE, () -> {
             Long orgId = OrganizationContext.getOrganizationId();
-            long pendingApps = applicationAdmissionRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.UNDER_REVIEW);
+            long pendingApps = applicationAdmissionRepository.countByStatus(ApplicationStatus.UNDER_REVIEW);
             long pendingAttendanceClasses = studentAttendanceRepository.countClassesWithPendingAttendance(orgId, LocalDate.now());
             return PendingTasksData.builder().items(List.of(
                     TaskItem.builder().title(pendingAttendanceClasses + " classes haven't marked today's attendance").priority("high").completed(false).link("/app/attendance/students").build(),
@@ -202,7 +202,7 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
     private WidgetDTO<RecentRecordsData> recentAdmissions() {
         return safeWidget("recent-admissions", WidgetType.RECENT_RECORDS, "Recent admissions", 2, DataMode.LIVE, () -> {
             Long orgId = OrganizationContext.getOrganizationId();
-            var apps = applicationAdmissionRepository.findByOrganizationIdOrderByCreatedOnDesc(orgId, PageRequest.of(0, 5)).getContent();
+            var apps = applicationAdmissionRepository.findByOrderByCreatedOnDesc(PageRequest.of(0, 5)).getContent();
             return RecentRecordsData.builder()
                     .columns(List.of("Applicant", "Class", "Status"))
                     .items(apps.stream().map(a -> RecordItem.builder()

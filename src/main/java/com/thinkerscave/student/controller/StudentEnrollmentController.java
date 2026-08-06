@@ -39,7 +39,7 @@ public class StudentEnrollmentController {
 
     @GetMapping
     @Operation(summary = "Get enrollment history for a student")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<List<EnrollmentDTO>>> getEnrollments(@PathVariable Long studentId) {
         List<EnrollmentDTO> dtos = enrollmentRepository
                 .findByStudentStudentIdOrderByEnrollmentIdDesc(studentId)
@@ -51,7 +51,7 @@ public class StudentEnrollmentController {
 
     @GetMapping("/active")
     @Operation(summary = "Get current active enrollment for a student")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<EnrollmentDTO>> getActiveEnrollment(@PathVariable Long studentId) {
         EnrollmentDTO dto = enrollmentRepository.findByStudentStudentIdAndActiveTrue(studentId)
                 .map(this::toDTO)
@@ -62,7 +62,7 @@ public class StudentEnrollmentController {
 
     @PostMapping
     @Operation(summary = "Create or update enrollment for a student (change class/section)")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<EnrollmentDTO>> updateEnrollment(
             @PathVariable Long studentId,
             @Valid @RequestBody EnrollmentUpdateRequest request) {
@@ -95,7 +95,7 @@ public class StudentEnrollmentController {
 
     @GetMapping("/class/{classId}/students")
     @Operation(summary = "Get all active students in a class/section")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<List<EnrollmentDTO>>> getStudentsByClass(
             @PathVariable Long studentId,
             @PathVariable Long classId,

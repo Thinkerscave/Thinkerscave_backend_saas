@@ -23,7 +23,7 @@ public class SalaryStructureController {
     private final SalaryStructureService salaryStructureService;
 
     @PostMapping("/api/v1/staff/salary-structures")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Create salary structure for a staff member")
     public ResponseEntity<ApiResponse<Map<String, Object>>> createSalaryStructure(
             @Valid @RequestBody SalaryStructureRequest request) {
@@ -35,7 +35,7 @@ public class SalaryStructureController {
     }
 
     @PutMapping("/api/v1/staff/salary-structures/{id}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update salary structure")
     public ResponseEntity<ApiResponse<Void>> updateSalaryStructure(
             @PathVariable Long id,
@@ -45,7 +45,7 @@ public class SalaryStructureController {
     }
 
     @GetMapping("/api/v1/staff/{staffId}/salary-structure")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Get current active salary structure for a staff member")
     public ResponseEntity<ApiResponse<SalaryStructureResponse>> getCurrentSalaryStructure(
             @PathVariable Long staffId) {
@@ -54,7 +54,7 @@ public class SalaryStructureController {
     }
 
     @GetMapping("/api/v1/staff/{staffId}/salary-history")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Get salary history for a staff member")
     public ResponseEntity<ApiResponse<List<SalaryStructureResponse>>> getSalaryHistory(
             @PathVariable Long staffId) {

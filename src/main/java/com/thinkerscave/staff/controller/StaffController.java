@@ -31,7 +31,7 @@ public class StaffController {
     private final StaffService staffService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Create a new staff member")
     public ResponseEntity<ApiResponse<StaffCreateResponse>> createStaff(
             @Valid @RequestBody StaffCreateRequest request) {
@@ -40,7 +40,7 @@ public class StaffController {
     }
 
     @PutMapping("/{staffId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Update staff details")
     public ResponseEntity<ApiResponse<Void>> updateStaff(
             @PathVariable Long staffId,
@@ -50,14 +50,14 @@ public class StaffController {
     }
 
     @GetMapping("/{staffId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Get staff 360 profile details")
     public ResponseEntity<ApiResponse<StaffDetailResponse>> getStaffDetail(@PathVariable Long staffId) {
         return ResponseEntity.ok(ApiResponse.success("Staff details retrieved", staffService.getStaffDetail(staffId)));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Get paginated staff list with filters")
     public ResponseEntity<ApiResponse<Page<StaffSummaryResponse>>> getStaffList(
             @RequestParam(required = false) StaffType staffType,
@@ -72,14 +72,14 @@ public class StaffController {
     }
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Get staff dashboard KPI metrics")
     public ResponseEntity<ApiResponse<StaffDashboardResponse>> getDashboard() {
         return ResponseEntity.ok(ApiResponse.success("Dashboard metrics retrieved", staffService.getDashboard()));
     }
 
     @PatchMapping("/{staffId}/activate")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Activate a staff member")
     public ResponseEntity<ApiResponse<Void>> activateStaff(@PathVariable Long staffId) {
         staffService.activateStaff(staffId);
@@ -87,7 +87,7 @@ public class StaffController {
     }
 
     @PatchMapping("/{staffId}/deactivate")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Deactivate a staff member")
     public ResponseEntity<ApiResponse<Void>> deactivateStaff(@PathVariable Long staffId) {
         staffService.deactivateStaff(staffId);
@@ -95,7 +95,7 @@ public class StaffController {
     }
 
     @DeleteMapping("/{staffId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Soft delete a staff member")
     public ResponseEntity<ApiResponse<Void>> deleteStaff(@PathVariable Long staffId) {
         staffService.deleteStaff(staffId);

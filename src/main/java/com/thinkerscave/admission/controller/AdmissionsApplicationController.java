@@ -34,28 +34,30 @@ public class AdmissionsApplicationController {
 
     @PostMapping("/draft")
     @Operation(summary = "Save application draft")
-    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> saveDraft(@Valid @RequestBody ApplicationAdmissionRequest request) {
         return ResponseEntity.ok(ApiResponse.created("Draft saved", applicationService.saveDraft(request)));
     }
 
     @PostMapping("/submit")
-    @Operation(summary = "Submit application")
-    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @Operation(summary = "Submit application", 
+               description = "Supports both inquiry-based and direct admission paths. " +
+                           "For inquiry-based: provide inquiryId. For direct admission: leave inquiryId null.")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> submit(@Valid @RequestBody ApplicationAdmissionRequest request) {
         return ResponseEntity.ok(ApiResponse.created("Application submitted", applicationService.submit(request)));
     }
 
     @GetMapping
     @Operation(summary = "List applications")
-    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<Page<ApplicationAdmissionResponse>>> list(Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Applications loaded", applicationService.getAll(pageable)));
     }
 
     @PostMapping("/search")
     @Operation(summary = "Search applications")
-    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<Page<ApplicationAdmissionResponse>>> search(
             @RequestBody(required = false) ApplicationSearchRequest request,
             Pageable pageable) {
@@ -64,14 +66,14 @@ public class AdmissionsApplicationController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get application detail")
-    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Application loaded", applicationService.getById(id)));
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Update application")
-    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> update(
             @PathVariable Long id,
             @Valid @RequestBody ApplicationAdmissionRequest request) {
@@ -80,7 +82,7 @@ public class AdmissionsApplicationController {
 
     @PostMapping("/{id}/approve")
     @Operation(summary = "Approve application")
-    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> approve(
             @PathVariable Long id,
             @RequestParam(required = false) String remarks) {
@@ -89,7 +91,7 @@ public class AdmissionsApplicationController {
 
     @PostMapping("/{id}/reject")
     @Operation(summary = "Reject application")
-    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> reject(
             @PathVariable Long id,
             @RequestParam(required = false) String remarks) {
@@ -98,7 +100,7 @@ public class AdmissionsApplicationController {
 
     @PutMapping("/{id}/status")
     @Operation(summary = "Update application status")
-    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> updateStatus(
             @PathVariable Long id,
             @RequestParam ApplicationStatus status,
@@ -108,8 +110,22 @@ public class AdmissionsApplicationController {
 
     @GetMapping("/{id}/progress")
     @Operation(summary = "Get wizard progress")
-    @PreAuthorize("hasAnyAuthority('ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','PRINCIPAL','HR_MANAGER','STAFF')")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<ApplicationProgressResponse>> progress(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Application progress loaded", applicationService.getProgress(id)));
+    }
+
+    @PostMapping("/{id}/archive")
+    @Operation(summary = "Archive application (DRAFT/SUBMITTED only)")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> archive(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Application archived", applicationService.archive(id)));
+    }
+
+    @PostMapping("/{id}/unarchive")
+    @Operation(summary = "Unarchive application")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> unarchive(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Application unarchived", applicationService.unarchive(id)));
     }
 }

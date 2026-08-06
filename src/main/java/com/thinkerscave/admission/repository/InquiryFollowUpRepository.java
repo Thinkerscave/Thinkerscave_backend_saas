@@ -19,27 +19,19 @@ public interface InquiryFollowUpRepository extends JpaRepository<InquiryFollowUp
         SELECT f
         FROM InquiryFollowUp f
         JOIN f.inquiry i
-        WHERE i.organizationId = :orgId AND i.deleted = false
+        WHERE i.deleted = false
           AND f.nextFollowUpDate = :date
         ORDER BY f.nextFollowUpDate ASC, f.followUpDate DESC
         """)
-    List<InquiryFollowUp> findDueOnDate(@Param("orgId") Long orgId, @Param("date") LocalDate date);
+    List<InquiryFollowUp> findDueOnDate(@Param("date") LocalDate date);
 
     @Query("""
         SELECT f
         FROM InquiryFollowUp f
         JOIN f.inquiry i
-        WHERE i.organizationId = :orgId AND i.deleted = false
+        WHERE i.deleted = false
           AND f.nextFollowUpDate < :date
         ORDER BY f.nextFollowUpDate ASC, f.followUpDate DESC
         """)
-    List<InquiryFollowUp> findOverdue(@Param("orgId") Long orgId, @Param("date") LocalDate date);
-
-    @Query("""
-        SELECT f
-        FROM InquiryFollowUp f
-        JOIN f.inquiry i
-        WHERE f.followUpId = :followUpId AND i.organizationId = :orgId AND i.deleted = false
-        """)
-    Optional<InquiryFollowUp> findScopedById(@Param("followUpId") Long followUpId, @Param("orgId") Long orgId);
+    List<InquiryFollowUp> findOverdue(@Param("date") LocalDate date);
 }

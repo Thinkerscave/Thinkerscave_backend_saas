@@ -25,11 +25,10 @@ public class AdmissionReportServiceImpl implements AdmissionReportService {
 
     @Override
     public Map<String, Object> overview() {
-        Long orgId = OrganizationContext.getOrganizationId();
-        long totalLeads = inquiryRepository.countByOrganizationIdAndDeletedFalse(orgId);
-        long interested = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.INTERESTED);
-        long submitted = applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.SUBMITTED);
-        long approved = applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.APPROVED);
+        long totalLeads = inquiryRepository.countByDeletedFalse();
+        long interested = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.INTERESTED);
+        long submitted = applicationRepository.countByStatus(ApplicationStatus.SUBMITTED);
+        long approved = applicationRepository.countByStatus(ApplicationStatus.APPROVED);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("totalLeads", totalLeads);
@@ -42,21 +41,20 @@ public class AdmissionReportServiceImpl implements AdmissionReportService {
 
     @Override
     public Map<String, Long> funnel() {
-        Long orgId = OrganizationContext.getOrganizationId();
         Map<String, Long> funnel = new LinkedHashMap<>();
-        funnel.put("NEW", inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.NEW));
-        funnel.put("CONTACTED", inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.CONTACTED));
-        funnel.put("INTERESTED", inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.INTERESTED));
-        funnel.put("APPLICATION_SUBMITTED", applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.SUBMITTED));
-        funnel.put("APPROVED", applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.APPROVED));
-        funnel.put("ENROLLED", applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.ENROLLED));
+        funnel.put("NEW", inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.NEW));
+        funnel.put("CONTACTED", inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.CONTACTED));
+        funnel.put("INTERESTED", inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.INTERESTED));
+        funnel.put("APPLICATION_SUBMITTED", applicationRepository.countByStatus(ApplicationStatus.SUBMITTED));
+        funnel.put("APPROVED", applicationRepository.countByStatus(ApplicationStatus.APPROVED));
+        funnel.put("ENROLLED", applicationRepository.countByStatus(ApplicationStatus.ENROLLED));
         return funnel;
     }
 
     @Override
     public List<Map<String, Object>> counselorPerformance() {
         List<Map<String, Object>> rows = new ArrayList<>();
-        for (Object[] row : inquiryRepository.countByCounselorForOrg(OrganizationContext.getOrganizationId())) {
+        for (Object[] row : inquiryRepository.countByCounselor()) {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("counselorId", row[0]);
             data.put("leadCount", ((Number) row[1]).longValue());
@@ -68,7 +66,7 @@ public class AdmissionReportServiceImpl implements AdmissionReportService {
     @Override
     public Map<String, Long> sourceAnalysis() {
         Map<String, Long> source = new LinkedHashMap<>();
-        for (Object[] row : inquiryRepository.countBySourceForOrg(OrganizationContext.getOrganizationId())) {
+        for (Object[] row : inquiryRepository.countBySource()) {
             source.put(String.valueOf(row[0]), ((Number) row[1]).longValue());
         }
         return source;

@@ -17,58 +17,57 @@ import java.util.Optional;
 @Repository
 public interface InquiryRepository extends JpaRepository<Inquiry, Long>, JpaSpecificationExecutor<Inquiry> {
 
-    Optional<Inquiry> findByInquiryIdAndOrganizationIdAndDeletedFalse(Long id, Long orgId);
+    // Schema-per-tenant: No organizationId filtering needed
+    // Tenant isolation handled by schema context
 
-    Page<Inquiry> findByOrganizationIdAndDeletedFalseOrderByCreatedOnDesc(Long orgId, Pageable pageable);
+    Optional<Inquiry> findByInquiryIdAndDeletedFalse(Long id);
 
-    List<Inquiry> findByOrganizationIdAndStatusAndDeletedFalseOrderByCreatedOnDesc(Long orgId, InquiryStatus status);
+    Page<Inquiry> findByDeletedFalseOrderByCreatedOnDesc(Pageable pageable);
 
-    List<Inquiry> findByOrganizationIdAndDeletedFalseAndNextFollowUpDateLessThanEqualOrderByNextFollowUpDateAsc(
-            Long orgId, LocalDate today);
+    List<Inquiry> findByStatusAndDeletedFalseOrderByCreatedOnDesc(InquiryStatus status);
 
-    boolean existsByMobileNumberAndOrganizationIdAndDeletedFalse(String mobileNumber, Long orgId);
+    List<Inquiry> findByDeletedFalseAndNextFollowUpDateLessThanEqualOrderByNextFollowUpDateAsc(LocalDate today);
 
-        boolean existsByInquiryIdAndOrganizationIdAndDeletedFalse(Long inquiryId, Long orgId);
+    boolean existsByMobileNumberAndDeletedFalse(String mobileNumber);
+
+    boolean existsByInquiryIdAndDeletedFalse(Long inquiryId);
 
     @Query("""
             SELECT i.status, COUNT(i)
             FROM Inquiry i
-            WHERE i.organizationId = :orgId AND i.deleted = false
+            WHERE i.deleted = false
             GROUP BY i.status
             """)
-    List<Object[]> countByStatusForOrg(@Param("orgId") Long orgId);
+    List<Object[]> countByStatus();
 
-        @Query("""
+    @Query("""
             SELECT COALESCE(i.inquirySource, 'Unknown'), COUNT(i)
             FROM Inquiry i
-            WHERE i.organizationId = :orgId AND i.deleted = false
+            WHERE i.deleted = false
             GROUP BY i.inquirySource
             """)
-        List<Object[]> countBySourceForOrg(@Param("orgId") Long orgId);
+    List<Object[]> countBySource();
 
-        @Query("""
+    @Query("""
             SELECT i.assignedCounselorId, COUNT(i)
             FROM Inquiry i
-            WHERE i.organizationId = :orgId AND i.deleted = false
+            WHERE i.deleted = false
             GROUP BY i.assignedCounselorId
             """)
-        List<Object[]> countByCounselorForOrg(@Param("orgId") Long orgId);
+    List<Object[]> countByCounselor();
 
-    long countByOrganizationIdAndDeletedFalse(Long orgId);
+    long countByDeletedFalse();
 
-    long countByOrganizationIdAndStatusAndDeletedFalse(Long orgId, InquiryStatus status);
+    long countByStatusAndDeletedFalse(InquiryStatus status);
 
     @Query("""
             SELECT i FROM Inquiry i
-            WHERE i.organizationId = :orgId AND i.deleted = false AND (
+            WHERE i.deleted = false AND (
                 LOWER(i.name) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR
                 LOWER(i.mobileNumber) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')) OR
                 LOWER(COALESCE(i.email, '')) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
             )
             ORDER BY i.createdOn DESC
             """)
-    Page<Inquiry> searchByOrganization(
-            @Param("orgId") Long orgId,
-            @Param("keyword") String keyword,
-            Pageable pageable);
+    Page<Inquiry> search(@Param("keyword") String keyword, Pageable pageable);
 }

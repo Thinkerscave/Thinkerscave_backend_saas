@@ -16,16 +16,6 @@ import java.util.List;
 public interface TransferRequestRepository
         extends JpaRepository<TransferRequest, Long>, JpaSpecificationExecutor<TransferRequest> {
 
-    Page<TransferRequest> findByOrganizationId(Long organizationId, Pageable pageable);
-
-    List<TransferRequest> findByOrganizationIdAndStudentId(Long organizationId, Long studentId);
-
-    @Query("""
-            SELECT tr
-            FROM TransferRequest tr
-            LEFT JOIN FETCH tr.enrollment e
-            WHERE tr.organizationId = :organizationId
-            ORDER BY tr.id DESC
-            """)
-    List<TransferRequest> findAllWithEnrollmentByOrganizationId(@Param("organizationId") Long organizationId);
+    // Tenant isolation via schema - no organizationId filter needed
+    List<TransferRequest> findByStudentId(Long studentId);
 }
