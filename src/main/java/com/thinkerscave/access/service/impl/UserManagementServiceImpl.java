@@ -294,6 +294,13 @@ public class UserManagementServiceImpl implements UserManagementService {
     }
 
     private void assertBelongsToOrg(User user, Long organizationId) {
+        // Handle null organizationId (for ORGANIZATION_OWNER users in public schema)
+        if (organizationId == null && user.getOrganizationId() == null) {
+            return; // Both null - valid for public schema users
+        }
+        if (organizationId == null || user.getOrganizationId() == null) {
+            throw new ResourceNotFoundException("User not found in this organization");
+        }
         if (!user.getOrganizationId().equals(organizationId)) {
             throw new ResourceNotFoundException("User not found in this organization");
         }

@@ -97,8 +97,9 @@ public class OrganizationFilter extends OncePerRequestFilter {
                 }
             }
 
-            // Resolve from the user's record
-            Optional<User> userOpt = userRepository.findByUsername(username);
+            // Resolve from the user's record (auth name may be username or email)
+            Optional<User> userOpt = userRepository.findByUsername(username)
+                    .or(() -> userRepository.findByEmail(username));
             if (userOpt.isPresent()) {
                 Long orgId = userOpt.get().getOrganizationId();
                 OrganizationContext.setOrganizationId(orgId);

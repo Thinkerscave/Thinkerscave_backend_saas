@@ -13,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.EnumSet;
@@ -30,7 +29,6 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 @Slf4j
 public class DashboardOrchestrationService {
 
@@ -45,6 +43,12 @@ public class DashboardOrchestrationService {
     private final ParentDashboardProvider parentDashboardProvider;
     private final DefaultDashboardProvider defaultDashboardProvider;
 
+    /**
+     * Intentionally not class-transactional: individual widgets catch SQL/data
+     * errors and return ERROR cards. An outer read-only transaction would be
+     * marked rollback-only by the first widget failure and then fail the whole
+     * workspace response with UnexpectedRollbackException.
+     */
     public DashboardResponse getWorkspace() {
         User user = currentUser();
         DashboardType type = resolveDashboardType(user);
@@ -106,7 +110,9 @@ public class DashboardOrchestrationService {
     private User currentUser() {
         try {
             String username = SecurityContextHolder.getContext().getAuthentication().getName();
-            return userRepository.findByUsername(username).orElse(null);
+            return userRepository.findByUsername(username)
+                    .or(() -> userRepository.findByEmail(username))
+                    .orElse(null);
         } catch (Exception e) {
             return null;
         }

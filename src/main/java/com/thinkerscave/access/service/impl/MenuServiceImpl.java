@@ -148,7 +148,8 @@ public class MenuServiceImpl implements MenuService {
                         .filter(p -> Boolean.TRUE.equals(p.getCanView()))
                         .collect(Collectors.toMap(
                                 com.thinkerscave.access.dto.response.EffectivePermissionResponse::getMenuId,
-                                p -> p));
+                                p -> p,
+                                (existing, ignored) -> existing));
 
         // Fetch all active menus in a single query and group children by parent id in-memory
         // to avoid an N+1 query pattern (one query per menu node) which caused the sidebar
