@@ -16,6 +16,7 @@ import com.thinkerscave.academics.service.AcademicStructureService;
 import com.thinkerscave.shared.exceptions.AlreadyExistsException;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.student.repository.StudentEnrollmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     private final ClassRepository classRepository;
     private final SectionRepository sectionRepository;
     private final AcademicYearRepository academicYearRepository;
+    private final StudentEnrollmentRepository studentEnrollmentRepository;
 
     // ---- Class operations ----
 
@@ -90,6 +92,9 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         AcademicClass cls = findClassById(classId);
         if (sectionRepository.existsByAcademicClass_ClassId(classId)) {
             throw new BadRequestException("Cannot deactivate class with existing sections. Deactivate sections first.");
+        }
+        if (studentEnrollmentRepository.existsByClassEntityClassIdAndActiveTrue(classId)) {
+            throw new BadRequestException("Cannot deactivate class with active student enrollments");
         }
         cls.setActive(false);
         classRepository.save(cls);

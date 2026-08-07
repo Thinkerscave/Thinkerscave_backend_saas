@@ -18,6 +18,7 @@ public interface StudentEnrollmentRepository extends JpaRepository<StudentEnroll
 	/** Eagerly fetches class + section + year to avoid LazyInitializationException. */
 	@Query("""
 			SELECT e FROM StudentEnrollment e
+			LEFT JOIN FETCH e.academicYear
 			LEFT JOIN FETCH e.classEntity c
 			LEFT JOIN FETCH c.academicYear
 			LEFT JOIN FETCH e.section
@@ -25,9 +26,19 @@ public interface StudentEnrollmentRepository extends JpaRepository<StudentEnroll
 			""")
 	Optional<StudentEnrollment> findActiveWithClassByStudentId(@Param("studentId") Long studentId);
 
-	List<StudentEnrollment> findByStudentStudentIdOrderByEnrollmentIdDesc(Long studentId);
+	@Query("""
+			SELECT e FROM StudentEnrollment e
+			LEFT JOIN FETCH e.academicYear
+			LEFT JOIN FETCH e.classEntity
+			LEFT JOIN FETCH e.section
+			WHERE e.student.studentId = :studentId
+			ORDER BY e.enrollmentId DESC
+			""")
+	List<StudentEnrollment> findHistoryWithDetailsByStudentId(@Param("studentId") Long studentId);
 
 	List<StudentEnrollment> findByClassEntityClassIdAndActiveTrueOrderByStudentFirstNameAsc(Long classId);
+
+	boolean existsByClassEntityClassIdAndActiveTrue(Long classId);
 
 	List<StudentEnrollment> findByClassEntityClassIdAndSectionSectionIdAndActiveTrueOrderByRollNumber(
 			Long classId, Long sectionId);

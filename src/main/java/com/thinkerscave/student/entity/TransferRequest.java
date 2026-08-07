@@ -17,7 +17,6 @@ import java.time.LocalDate;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Table(name = "transfer_request",
         indexes = {
-                @Index(name = "idx_transfer_org", columnList = "organization_id"),
                 @Index(name = "idx_transfer_student", columnList = "student_id"),
                 @Index(name = "idx_transfer_status", columnList = "status")
         })

@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 @Tag(name = "Student Enrollment", description = "APIs for managing student class/section enrollment")
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true)
 public class StudentEnrollmentController {
 
     private final StudentEnrollmentRepository enrollmentRepository;
@@ -42,7 +44,7 @@ public class StudentEnrollmentController {
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<List<EnrollmentDTO>>> getEnrollments(@PathVariable Long studentId) {
         List<EnrollmentDTO> dtos = enrollmentRepository
-                .findByStudentStudentIdOrderByEnrollmentIdDesc(studentId)
+                .findHistoryWithDetailsByStudentId(studentId)
                 .stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -53,7 +55,7 @@ public class StudentEnrollmentController {
     @Operation(summary = "Get current active enrollment for a student")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<EnrollmentDTO>> getActiveEnrollment(@PathVariable Long studentId) {
-        EnrollmentDTO dto = enrollmentRepository.findByStudentStudentIdAndActiveTrue(studentId)
+        EnrollmentDTO dto = enrollmentRepository.findActiveWithClassByStudentId(studentId)
                 .map(this::toDTO)
                 .orElseThrow(() -> new com.thinkerscave.shared.exceptions.ResourceNotFoundException(
                         "No active enrollment found for student: " + studentId));
@@ -63,6 +65,7 @@ public class StudentEnrollmentController {
     @PostMapping
     @Operation(summary = "Create or update enrollment for a student (change class/section)")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @Transactional
     public ResponseEntity<ApiResponse<EnrollmentDTO>> updateEnrollment(
             @PathVariable Long studentId,
             @Valid @RequestBody EnrollmentUpdateRequest request) {

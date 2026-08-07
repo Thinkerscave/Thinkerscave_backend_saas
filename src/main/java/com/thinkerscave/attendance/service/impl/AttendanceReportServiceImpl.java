@@ -9,6 +9,7 @@ import com.thinkerscave.attendance.dto.response.StaffAttendanceSummaryResponse;
 import com.thinkerscave.attendance.dto.response.StudentHistoryResponse;
 import com.thinkerscave.attendance.entity.StudentAttendance;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
+import com.thinkerscave.attendance.repository.AttendanceSettingRepository;
 import com.thinkerscave.attendance.repository.StaffAttendanceRepository;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceReportService;
@@ -19,7 +20,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -30,6 +34,7 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
 
     private final StudentAttendanceRepository studentAttendanceRepository;
     private final StaffAttendanceRepository staffAttendanceRepository;
+    private final AttendanceSettingRepository attendanceSettingRepository;
 
     @Override
     public AttendanceSummaryReportResponse getSummaryReport(AttendanceReportRequest request) {
@@ -53,8 +58,13 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
                         .build())
                 .collect(Collectors.toList());
 
-        // Defaulter list
-        double threshold = request.getDefaulterThreshold() != null ? request.getDefaulterThreshold() : 75.0;
+        // Defaulter list — prefer request threshold, else org minStudentAttendancePercent, else 75
+        double threshold = request.getDefaulterThreshold() != null
+                ? request.getDefaulterThreshold()
+                : attendanceSettingRepository.findByOrganizationId(orgId)
+                        .map(s -> s.getMinStudentAttendancePercent() != null
+                                ? s.getMinStudentAttendancePercent().doubleValue() : 75.0)
+                        .orElse(75.0);
         List<Object[]> defaulterRows = studentAttendanceRepository.getDefaulterList(
                 orgId, request.getFromDate(), request.getToDate(), threshold);
 
@@ -73,6 +83,9 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
                         .build())
                 .collect(Collectors.toList());
 
+        List<MonthlyTrendRow> monthlyTrend = buildMonthlyTrend(
+                orgId, request.getFromDate(), request.getToDate());
+
         long totalStudents = classWiseSummary.stream()
                 .mapToLong(ClassSummaryRow::getTotalStudents).sum();
         double overallPercent = classWiseSummary.isEmpty() ? 0.0
@@ -86,9 +99,59 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
                 .totalStudents(totalStudents)
                 .overallPercent(Math.round(overallPercent * 100.0) / 100.0)
                 .classWiseSummary(classWiseSummary)
-                .monthlyTrend(List.of())
+                .monthlyTrend(monthlyTrend)
                 .defaulters(defaulters)
                 .build();
+    }
+
+    private List<MonthlyTrendRow> buildMonthlyTrend(Long orgId, java.time.LocalDate from, java.time.LocalDate to) {
+        // row: [0]=year, [1]=month, [2]=status, [3]=count
+        List<Object[]> rows = studentAttendanceRepository.getMonthlyStatusBreakdown(orgId, from, to);
+        Map<String, MonthlyAccumulator> byMonth = new LinkedHashMap<>();
+
+        for (Object[] row : rows) {
+            int year = ((Number) row[0]).intValue();
+            int month = ((Number) row[1]).intValue();
+            String status = row[2] instanceof StudentAttendanceStatus
+                    ? ((StudentAttendanceStatus) row[2]).name()
+                    : String.valueOf(row[2]);
+            long count = ((Number) row[3]).longValue();
+            String key = year + "-" + month;
+            MonthlyAccumulator acc = byMonth.computeIfAbsent(key, k -> new MonthlyAccumulator(year, month));
+            acc.statusBreakdown.merge(status, count, Long::sum);
+            acc.total += count;
+            if (StudentAttendanceStatus.PRESENT.name().equals(status)
+                    || StudentAttendanceStatus.LATE.name().equals(status)) {
+                acc.presentLike += count;
+            }
+        }
+
+        List<MonthlyTrendRow> trend = new ArrayList<>();
+        for (MonthlyAccumulator acc : byMonth.values()) {
+            double pct = acc.total > 0
+                    ? Math.round((acc.presentLike * 100.0 / acc.total) * 100.0) / 100.0
+                    : 0.0;
+            trend.add(MonthlyTrendRow.builder()
+                    .year(acc.year)
+                    .month(acc.month)
+                    .avgAttendancePercent(pct)
+                    .statusBreakdown(acc.statusBreakdown)
+                    .build());
+        }
+        return trend;
+    }
+
+    private static final class MonthlyAccumulator {
+        final int year;
+        final int month;
+        long total;
+        long presentLike;
+        final Map<String, Long> statusBreakdown = new LinkedHashMap<>();
+
+        MonthlyAccumulator(int year, int month) {
+            this.year = year;
+            this.month = month;
+        }
     }
 
     @Override

@@ -100,6 +100,34 @@ public interface StudentAttendanceRepository extends JpaRepository<StudentAttend
             """)
     long countClassesWithPendingAttendance(@Param("orgId") Long orgId, @Param("date") LocalDate date);
 
+    @Query("""
+            SELECT ac.classId, ac.className
+            FROM AcademicClass ac
+            WHERE ac.active = true
+              AND NOT EXISTS (
+                SELECT 1 FROM StudentAttendance sa2
+                WHERE sa2.organizationId = :orgId
+                  AND sa2.classId = ac.classId
+                  AND sa2.attendanceDate = :date
+              )
+            ORDER BY ac.className
+            """)
+    List<Object[]> findClassesWithPendingAttendance(@Param("orgId") Long orgId, @Param("date") LocalDate date);
+
+    @Query("""
+            SELECT YEAR(sa.attendanceDate), MONTH(sa.attendanceDate), sa.status, COUNT(sa)
+            FROM StudentAttendance sa
+            WHERE sa.organizationId = :orgId
+              AND sa.attendanceDate BETWEEN :from AND :to
+            GROUP BY YEAR(sa.attendanceDate), MONTH(sa.attendanceDate), sa.status
+            ORDER BY YEAR(sa.attendanceDate), MONTH(sa.attendanceDate)
+            """)
+    List<Object[]> getMonthlyStatusBreakdown(@Param("orgId") Long orgId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    Optional<StudentAttendance> findByOrganizationIdAndAttendanceId(Long organizationId, Long attendanceId);
+
     // ─── Copy from previous day ───────────────────────────────────────────
 
     List<StudentAttendance> findByOrganizationIdAndClassIdAndSectionIdAndAttendanceDateBetweenOrderByRollNumber(

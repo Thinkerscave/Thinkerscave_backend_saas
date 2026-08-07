@@ -6,7 +6,10 @@ import com.thinkerscave.attendance.dto.AttendanceRosterRecord;
 import com.thinkerscave.attendance.entity.StudentAttendance;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
+import com.thinkerscave.attendance.service.AttendanceFreezeService;
 import com.thinkerscave.shared.context.OrganizationContext;
+import com.thinkerscave.shared.exceptions.BadRequestException;
+import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.student.repository.StudentEnrollmentRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +46,7 @@ public class AttendanceRosterController {
     private final AcademicYearRepository academicYearRepository;
     private final SectionRepository sectionRepository;
     private final StudentEnrollmentRepository studentEnrollmentRepository;
+    private final AttendanceFreezeService attendanceFreezeService;
 
     // ─────────────────────────────────────────────────────────────────────────
     // GET  /api/v1/attendance?date=&type=
@@ -50,7 +54,7 @@ public class AttendanceRosterController {
 
     @GetMapping
     @Operation(summary = "Get all attendance records for a date and type (CLASS or STAFF)")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF')")
     public ResponseEntity<List<AttendanceRosterRecord>> getAttendanceByDateAndType(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @RequestParam(defaultValue = "CLASS") String type) {
@@ -75,7 +79,7 @@ public class AttendanceRosterController {
 
     @GetMapping("/class/{classId}")
     @Operation(summary = "Get attendance records for a specific class on a date")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF')")
     public ResponseEntity<List<AttendanceRosterRecord>> getAttendanceByClass(
             @PathVariable Long classId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -101,6 +105,7 @@ public class AttendanceRosterController {
 
         Long orgId = OrganizationContext.getOrganizationId();
         LocalDate date = LocalDate.parse(payload.getAttendanceDate());
+        validateNotFrozen(orgId, date);
 
         try {
             StudentAttendance attendance = studentAttendanceRepository
@@ -142,12 +147,14 @@ public class AttendanceRosterController {
 
         Long orgId = OrganizationContext.getOrganizationId();
 
-        StudentAttendance attendance = studentAttendanceRepository.findById(id)
-                .orElseGet(StudentAttendance::new);
+        StudentAttendance attendance = studentAttendanceRepository
+                .findByOrganizationIdAndAttendanceId(orgId, id)
+                .orElseThrow(() -> new ResourceNotFoundException("Attendance record not found: " + id));
 
         LocalDate date = payload.getAttendanceDate() != null
                 ? LocalDate.parse(payload.getAttendanceDate())
                 : attendance.getAttendanceDate();
+        validateNotFrozen(orgId, date);
 
         populateAttendance(attendance, payload, orgId, date);
         attendance = studentAttendanceRepository.save(attendance);
@@ -247,6 +254,12 @@ public class AttendanceRosterController {
                 .sectionName(a.getSectionName())
                 .remarks(a.getRemarks())
                 .build();
+    }
+
+    private void validateNotFrozen(Long orgId, LocalDate date) {
+        if (attendanceFreezeService.isDateFrozen(orgId, date)) {
+            throw new BadRequestException("Attendance is frozen for date: " + date);
+        }
     }
 
     private String currentUser() {
