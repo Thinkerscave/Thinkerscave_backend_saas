@@ -80,7 +80,6 @@ public class ProvisionServiceImpl implements ProvisionService {
 
     private static final String ROLE_ORG_ADMIN_CODE = "ROLE_ADMIN";
     private static final String ROLE_ORG_OWNER_CODE = "ROLE_OWNER";
-    private static final String ROLE_PARENT_CODE = "ROLE_PARENT";
     private static final List<String> REQUIRED_TENANT_TABLES = List.of(
             "users", "roles", "user_roles", "tenant_registry", "organizations"
     );
@@ -810,19 +809,6 @@ public class ProvisionServiceImpl implements ProvisionService {
                         "FROM \"" + schemaName + "\".\"roles\" r " +
                         "CROSS JOIN \"" + schemaName + "\".\"menus\" m " +
                         "WHERE r.role_code IN ('" + ROLE_ORG_OWNER_CODE + "', '" + ROLE_ORG_ADMIN_CODE + "') " +
-                        "AND m.id IN (" + menuIdList + ") AND m.menu_type = 'PAGE' " +
-                        "ON CONFLICT (organization_id, role_id, menu_id) DO NOTHING");
-
-                // Parent role gets view-only access for a minimal demo navigation.
-                jdbcTemplate.execute(
-                    "INSERT INTO \"" + schemaName + "\".\"role_permissions\" " +
-                        "(organization_id, role_id, menu_id, can_view, can_manage, can_approve, created_on, version) " +
-                        "SELECT " + organization.getId() + ", r.id, m.id, true, false, false, now(), 0 " +
-                        "FROM \"" + schemaName + "\".\"roles\" r " +
-                        "INNER JOIN \"" + schemaName + "\".\"menus\" m ON m.menu_code IN (" +
-                        "'DASHBOARD','STUDENTS','STUDENTS_DIRECTORY','ATTENDANCE','ATTENDANCE_STUDENTS'," +
-                        "'COMMUNICATION','COMMUNICATION_NOTICES','FEE_MANAGEMENT','FEE_MY_FEES') " +
-                        "WHERE r.role_code = '" + ROLE_PARENT_CODE + "' " +
                         "AND m.id IN (" + menuIdList + ") AND m.menu_type = 'PAGE' " +
                         "ON CONFLICT (organization_id, role_id, menu_id) DO NOTHING");
 
