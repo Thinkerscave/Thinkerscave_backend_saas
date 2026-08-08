@@ -47,14 +47,31 @@ jobs:
     needs: build-and-push
     permissions:
       packages: read
+    env:
+      SSH_PORT: ${{ secrets.SERVER_PORT || '22' }}
 
     steps:
+      - name: Preflight SSH connectivity check
+        run: |
+          set -e
+          echo "Checking SSH reachability to ${SERVER_HOST}:${SSH_PORT}"
+          timeout 10 bash -c "cat < /dev/null > /dev/tcp/${SERVER_HOST}/${SSH_PORT}" && echo "SSH port reachable" || {
+            echo "SSH port is not reachable from GitHub runner."
+            echo "Check: SERVER_HOST/SERVER_PORT secrets, firewall rules, cloud security group, and ISP-level blocks."
+            exit 1
+          }
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+
       - name: Pull & restart on server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
+          port: ${{ env.SSH_PORT }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          timeout: 60s
+          command_timeout: 20m
           envs: GHCR_TOKEN,GHCR_USER,IMAGE
           script: |
             set -e
