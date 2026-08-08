@@ -11,6 +11,8 @@ public interface SubscriptionPlanFeatureRepository extends JpaRepository<Subscri
 
     List<SubscriptionPlanFeature> findBySubscriptionPlan_IdAndActiveTrueOrderByDisplayOrderAsc(Long planId);
 
+    List<SubscriptionPlanFeature> findBySubscriptionPlan_IdAndEnabledTrueAndActiveTrue(Long planId);
+
     boolean existsBySubscriptionPlan_IdAndFeature_Id(Long planId, Long featureId);
 
     boolean existsBySubscriptionPlan_IdAndFeature_IdAndIdNot(Long planId, Long featureId, Long id);

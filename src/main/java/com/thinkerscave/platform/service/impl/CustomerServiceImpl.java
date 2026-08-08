@@ -26,7 +26,7 @@ import com.thinkerscave.platform.repository.CustomerRepository;
 import com.thinkerscave.platform.repository.OrganizationRepository;
 import com.thinkerscave.platform.repository.OrganizationSubscriptionRepository;
 import com.thinkerscave.platform.service.CustomerService;
-import com.thinkerscave.security.service.EmailService;
+import com.thinkerscave.security.service.OutboundMessageService;
 import com.thinkerscave.shared.enums.CodeType;
 import com.thinkerscave.shared.exceptions.AlreadyExistsException;
 import com.thinkerscave.shared.exceptions.BadRequestException;
@@ -63,7 +63,7 @@ public class CustomerServiceImpl implements CustomerService {
     private final CodeGeneratorService codeGeneratorService;
     private final UserService userService;
     private final RoleRepository roleRepository;
-    private final EmailService emailService;
+    private final OutboundMessageService outboundMessageService;
 
     @Value("${app.platform.login-url:http://localhost:4200/auth/login}")
     private String platformLoginUrl;
@@ -178,6 +178,11 @@ public class CustomerServiceImpl implements CustomerService {
             throw new AlreadyExistsException("Customer email already exists: " + email);
         }
 
+        String mobileNumber = normalizePhone(request.getMobileNumber());
+        if (customerRepository.existsByMobileNumber(mobileNumber)) {
+            throw new AlreadyExistsException("Customer mobile number already exists: " + mobileNumber);
+        }
+
         String code = codeGeneratorService.generate(CodeType.CUSTOMER);
         Customer customer = Customer.builder()
                 .customerCode(code)
@@ -223,6 +228,11 @@ public class CustomerServiceImpl implements CustomerService {
         String email = normalizeEmail(request.getBusinessEmail());
         if (customerRepository.existsByBusinessEmailAndIdNot(email, id)) {
             throw new AlreadyExistsException("Customer email already exists: " + email);
+        }
+
+        String mobileNumber = normalizePhone(request.getMobileNumber());
+        if (customerRepository.existsByMobileNumberAndIdNot(mobileNumber, id)) {
+            throw new AlreadyExistsException("Customer mobile number already exists: " + mobileNumber);
         }
 
         customer.setCustomerName(request.getCustomerName().trim());
@@ -449,20 +459,37 @@ public class CustomerServiceImpl implements CustomerService {
 
     private void sendCustomerWelcomeEmail(Customer customer, CustomerContact primary, User owner, String temporaryPassword) {
         try {
-            String subject = "Welcome to ThinkersCave";
             String ownerName = primary != null ? primary.getFullName() : owner.getDisplayName();
-            String html = emailService.buildCustomerWelcomeEmailBody(
+            String mobile = firstNonBlank(
+                    owner.getMobileNumber(),
+                    primary != null ? primary.getMobileNumber() : null,
+                    customer.getMobileNumber());
+            outboundMessageService.sendCustomerWelcome(
+                    owner.getEmail(),
+                    mobile,
                     customer.getCustomerName(),
                     ownerName,
                     platformLoginUrl,
                     owner.getUsername(),
                     temporaryPassword);
-            emailService.sendHtmlEmail(owner.getEmail(), subject, html);
-            log.info("Customer welcome email queued: customerCode={} email={}", customer.getCustomerCode(), owner.getEmail());
+            log.info("Customer welcome notified: customerCode={} email={} mobile={}",
+                    customer.getCustomerCode(), owner.getEmail(), mobile);
         } catch (Exception ex) {
-            log.error("Customer welcome email failed: customerCode={} reason={}",
+            log.error("Customer welcome notification failed: customerCode={} reason={}",
                     customer.getCustomerCode(), ex.getMessage(), ex);
         }
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     private static String[] splitContactName(String fullName) {

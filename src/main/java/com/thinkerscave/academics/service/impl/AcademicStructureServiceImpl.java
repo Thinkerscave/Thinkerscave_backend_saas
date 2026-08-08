@@ -16,6 +16,7 @@ import com.thinkerscave.academics.service.AcademicStructureService;
 import com.thinkerscave.shared.exceptions.AlreadyExistsException;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.student.repository.StudentEnrollmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     private final ClassRepository classRepository;
     private final SectionRepository sectionRepository;
     private final AcademicYearRepository academicYearRepository;
+    private final StudentEnrollmentRepository studentEnrollmentRepository;
 
     // ---- Class operations ----
 
@@ -44,6 +46,9 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
                 .orElseThrow(() -> new ResourceNotFoundException("Academic year not found: " + request.getAcademicYearId()));
         if (classRepository.existsByAcademicYear_AcademicYearIdAndClassCode(request.getAcademicYearId(), request.getClassCode())) {
             throw new AlreadyExistsException("Class code '" + request.getClassCode() + "' already exists for this academic year");
+        }
+        if (classRepository.existsByAcademicYear_AcademicYearIdAndClassNameIgnoreCase(request.getAcademicYearId(), request.getClassName())) {
+            throw new AlreadyExistsException("Class name '" + request.getClassName() + "' already exists for this academic year");
         }
         AcademicClass cls = new AcademicClass();
         cls.setAcademicYear(year);
@@ -59,6 +64,10 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         if (classRepository.existsByAcademicYear_AcademicYearIdAndClassCodeAndClassIdNot(
                 cls.getAcademicYear().getAcademicYearId(), request.getClassCode(), classId)) {
             throw new AlreadyExistsException("Class code '" + request.getClassCode() + "' already exists for this academic year");
+        }
+        if (classRepository.existsByAcademicYear_AcademicYearIdAndClassNameIgnoreCaseAndClassIdNot(
+                cls.getAcademicYear().getAcademicYearId(), request.getClassName(), classId)) {
+            throw new AlreadyExistsException("Class name '" + request.getClassName() + "' already exists for this academic year");
         }
         mapClassRequest(request, cls);
         return toClassResponse(classRepository.save(cls));
@@ -83,6 +92,9 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         AcademicClass cls = findClassById(classId);
         if (sectionRepository.existsByAcademicClass_ClassId(classId)) {
             throw new BadRequestException("Cannot deactivate class with existing sections. Deactivate sections first.");
+        }
+        if (studentEnrollmentRepository.existsByClassEntityClassIdAndActiveTrue(classId)) {
+            throw new BadRequestException("Cannot deactivate class with active student enrollments");
         }
         cls.setActive(false);
         classRepository.save(cls);

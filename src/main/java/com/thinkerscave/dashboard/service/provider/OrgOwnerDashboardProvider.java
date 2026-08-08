@@ -22,6 +22,10 @@ import com.thinkerscave.dashboard.enums.WidgetType;
 import com.thinkerscave.dashboard.service.SampleWidgetFactory;
 import com.thinkerscave.dashboard.util.ChartBucketUtil;
 import com.thinkerscave.dashboard.util.RoleLabels;
+import com.thinkerscave.onboarding.dto.OnboardingChecklistItemResponse;
+import com.thinkerscave.onboarding.dto.OnboardingChecklistResponse;
+import com.thinkerscave.onboarding.service.OnboardingService;
+import com.thinkerscave.platform.repository.OrganizationRepository;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.staff.entity.Staff;
 import com.thinkerscave.staff.repository.StaffRepository;
@@ -54,6 +58,8 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
     private final AuditLogRepository auditLogRepository;
     private final AcademicCalendarEventRepository academicCalendarEventRepository;
     private final SampleWidgetFactory sampleWidgetFactory;
+    private final OnboardingService onboardingService;
+    private final OrganizationRepository organizationRepository;
 
     @Override
     public List<WidgetDTO<?>> getWidgets(User user) {
@@ -74,14 +80,52 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
     }
 
     private WidgetDTO<WelcomeHeaderData> welcomeHeader(User user) {
-        return safeWidget("welcome-header", WidgetType.WELCOME_HEADER, "Welcome", 4, DataMode.LIVE, () ->
-                WelcomeHeaderData.builder()
-                        .displayName(user != null ? displayName(user) : "Owner")
-                        .roleLabel(RoleLabels.of(com.thinkerscave.access.enums.RoleType.ORGANIZATION_OWNER))
-                        .greeting(RoleLabels.greeting())
-                        .avatarUrl(user != null ? user.getProfileImageUrl() : null)
-                        .todayLabel(LocalDate.now().toString())
-                        .build());
+        return safeWidget("welcome-header", WidgetType.WELCOME_HEADER, "Welcome", 4, DataMode.LIVE, () -> {
+            WelcomeHeaderData.WelcomeHeaderDataBuilder builder = WelcomeHeaderData.builder()
+                    .displayName(user != null ? displayName(user) : "Owner")
+                    .roleLabel(RoleLabels.of(com.thinkerscave.access.enums.RoleType.ORGANIZATION_OWNER))
+                    .organizationName(resolveOrganizationName())
+                    .greeting(RoleLabels.greeting())
+                    .avatarUrl(user != null ? user.getProfileImageUrl() : null)
+                    .todayLabel(LocalDate.now().toString());
+            applySetupGuide(builder);
+            return builder.build();
+        });
+    }
+
+    private void applySetupGuide(WelcomeHeaderData.WelcomeHeaderDataBuilder builder) {
+        try {
+            OnboardingChecklistResponse checklist = onboardingService.getChecklist();
+            boolean showGuide = !checklist.isSetupComplete();
+            builder.setupComplete(checklist.isSetupComplete())
+                    .showSetupGuide(showGuide)
+                    .setupProgressPercent(checklist.getProgressPercent())
+                    .recommendedNextLabel(showGuide ? checklist.getRecommendedNextLabel() : null)
+                    .recommendedNextRoute(showGuide ? checklist.getRecommendedNextRoute() : null)
+                    .setupChecklist(showGuide ? checklist.getItems().stream()
+                            .filter(OnboardingChecklistItemResponse::isAvailable)
+                            .map(i -> WelcomeHeaderData.SetupChecklistItem.builder()
+                                    .key(i.getKey())
+                                    .label(i.getLabel())
+                                    .completed(i.isCompleted())
+                                    .requiredForCompletion(i.isRequiredForCompletion())
+                                    .available(i.isAvailable())
+                                    .route(i.getRoute())
+                                    .build())
+                            .collect(Collectors.toList()) : null);
+        } catch (Exception ex) {
+            builder.showSetupGuide(false).setupComplete(false);
+        }
+    }
+
+    private String resolveOrganizationName() {
+        Long orgId = OrganizationContext.getOrganizationId();
+        if (orgId == null || orgId <= 0) {
+            return null;
+        }
+        return organizationRepository.findById(orgId)
+                .map(org -> org.getOrganizationName())
+                .orElse(null);
     }
 
     private WidgetDTO<KpiGridData> kpiGrid() {
@@ -91,7 +135,7 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
             long totalStaff = staffRepository.countByActive(true);
             long presentToday = studentAttendanceRepository.countByOrganizationIdAndAttendanceDateAndStatus(
                     orgId, LocalDate.now(), StudentAttendanceStatus.PRESENT);
-            long newAdmissionsToday = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.NEW);
+            long newAdmissionsToday = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.NEW);
 
             return KpiGridData.builder().items(List.of(
                     KpiItem.builder().label("Students").value(String.valueOf(totalStudents)).icon("pi-users").tone("primary").build(),
@@ -126,7 +170,7 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
     private WidgetDTO<ChartData> admissionTrendChart() {
         return safeWidget("admission-trend", WidgetType.CHART, "Admission trend", "Inquiries, last 6 months", 2, DataMode.LIVE, () -> {
             Long orgId = OrganizationContext.getOrganizationId();
-            var timestamps = inquiryRepository.findByOrganizationIdAndDeletedFalseOrderByCreatedOnDesc(orgId, PageRequest.of(0, 500))
+            var timestamps = inquiryRepository.findByDeletedFalseOrderByCreatedOnDesc(PageRequest.of(0, 500))
                     .getContent().stream().map(Inquiry::getCreatedOn).collect(Collectors.toList());
             return ChartBucketUtil.monthlyCounts(timestamps, 6, "Inquiries", "bar");
         });
@@ -141,7 +185,7 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
     private WidgetDTO<RecentRecordsData> recentAdmissions() {
         return safeWidget("recent-admissions", WidgetType.RECENT_RECORDS, "Recent admissions", 2, DataMode.LIVE, () -> {
             Long orgId = OrganizationContext.getOrganizationId();
-            var apps = applicationAdmissionRepository.findByOrganizationIdOrderByCreatedOnDesc(orgId, PageRequest.of(0, 5)).getContent();
+            var apps = applicationAdmissionRepository.findByOrderByCreatedOnDesc(PageRequest.of(0, 5)).getContent();
             return RecentRecordsData.builder()
                     .columns(List.of("Applicant", "Status", "Date"))
                     .items(apps.stream().map(a -> RecordItem.builder()
@@ -158,8 +202,8 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
     private WidgetDTO<PendingTasksData> pendingApprovals() {
         return safeWidget("pending-approvals", WidgetType.PENDING_TASKS, "Pending approvals", 2, DataMode.LIVE, () -> {
             Long orgId = OrganizationContext.getOrganizationId();
-            long pendingApps = applicationAdmissionRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.UNDER_REVIEW);
-            long docsPending = applicationAdmissionRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.DOCUMENTS_PENDING);
+            long pendingApps = applicationAdmissionRepository.countByStatus(ApplicationStatus.UNDER_REVIEW);
+            long docsPending = applicationAdmissionRepository.countByStatus(ApplicationStatus.DOCUMENTS_PENDING);
             return PendingTasksData.builder().items(List.of(
                     TaskItem.builder().title(pendingApps + " admission applications awaiting review").priority("high").completed(false).link("/app/admission/applications").build(),
                     TaskItem.builder().title(docsPending + " applications pending documents").priority("medium").completed(false).link("/app/admission/applications").build(),

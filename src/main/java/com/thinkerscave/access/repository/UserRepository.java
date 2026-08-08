@@ -17,6 +17,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Optional<User> findByEmail(String email);
 
+    @Query("SELECT u FROM User u WHERE LOWER(u.email) = LOWER(:email)")
+    Optional<User> findByEmailIgnoreCase(@Param("email") String email);
+
     Optional<User> findByUsername(String username);
 
     Optional<User> findByUsernameAndOrganizationId(String username, Long organizationId);
@@ -40,9 +43,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     long countByOrganizationIdAndStatus(Long organizationId, UserStatus status);
 
     @Query("SELECT u FROM User u WHERE u.organizationId = :orgId AND " +
-           "(LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(u.firstName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
-           " LOWER(u.lastName) LIKE LOWER(CONCAT('%', :search, '%')))")
+           "(LOWER(u.username) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) OR " +
+           " LOWER(u.email) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) OR " +
+           " LOWER(u.firstName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) OR " +
+           " LOWER(u.lastName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))")
     Page<User> searchByOrganization(@Param("orgId") Long orgId, @Param("search") String search, Pageable pageable);
 }

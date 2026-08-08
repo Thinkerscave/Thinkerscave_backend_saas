@@ -1,6 +1,6 @@
 package com.thinkerscave.onboarding.controller;
 
-import com.thinkerscave.onboarding.dto.OnboardingChecklistItemResponse;
+import com.thinkerscave.onboarding.dto.OnboardingChecklistResponse;
 import com.thinkerscave.onboarding.service.OnboardingService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -11,8 +11,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/onboarding")
@@ -25,7 +23,7 @@ public class OnboardingController {
     @GetMapping("/checklist")
     @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Get organization setup checklist completion status")
-    public ResponseEntity<ApiResponse<List<OnboardingChecklistItemResponse>>> checklist() {
+    public ResponseEntity<ApiResponse<OnboardingChecklistResponse>> checklist() {
         return ResponseEntity.ok(ApiResponse.success("Onboarding checklist loaded", onboardingService.getChecklist()));
     }
 }

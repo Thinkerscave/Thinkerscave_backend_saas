@@ -15,6 +15,16 @@ public interface JwtService {
 
     String generateRefreshToken(String username);
 
+    /**
+     * Issues a refresh token whose lifetime depends on "remember this device".
+     */
+    String generateRefreshToken(String username, boolean rememberMe);
+
+    /**
+     * Reads the remember-me claim from a refresh token. Returns null when absent (legacy tokens).
+     */
+    Boolean extractRememberMe(String token);
+
     String extractUsername(String token);
 
     Long extractUserId(String token);
@@ -22,6 +32,12 @@ public interface JwtService {
     Long extractOrganizationId(String token);
 
     String extractRoleType(String token);
+
+    /**
+     * Returns true when the access token requires a mandatory first-login password change.
+     * Absent or null claims are treated as false (legacy tokens).
+     */
+    boolean extractFirstTimeLogin(String token);
 
     Date extractExpiration(String token);
 

@@ -10,6 +10,7 @@ import com.thinkerscave.attendance.dto.response.StudentHistoryResponse;
 import com.thinkerscave.attendance.entity.StudentAttendance;
 import com.thinkerscave.attendance.entity.StudentPeriodAttendance;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
+import com.thinkerscave.attendance.repository.AttendanceSettingRepository;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
 import com.thinkerscave.attendance.repository.StudentPeriodAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceFreezeService;
@@ -38,6 +39,7 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
     private final StudentAttendanceRepository studentAttendanceRepository;
     private final StudentPeriodAttendanceRepository studentPeriodAttendanceRepository;
     private final AttendanceFreezeService attendanceFreezeService;
+    private final AttendanceSettingRepository attendanceSettingRepository;
 
     @Override
     @Transactional
@@ -79,11 +81,24 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
         validateNotFrozen(orgId, targetDate);
 
         LocalDate previousDay = targetDate.minusDays(1);
-        List<StudentAttendance> previous = studentAttendanceRepository
-                .findByOrganizationIdAndClassIdAndSectionIdAndAttendanceDateOrderByRollNumber(orgId, classId, sectionId, previousDay);
+        List<StudentAttendance> previous = sectionId != null
+                ? studentAttendanceRepository
+                        .findByOrganizationIdAndClassIdAndSectionIdAndAttendanceDateOrderByRollNumber(
+                                orgId, classId, sectionId, previousDay)
+                : studentAttendanceRepository
+                        .findByOrganizationIdAndClassIdAndAttendanceDateOrderByRollNumber(
+                                orgId, classId, previousDay);
 
         if (previous.isEmpty()) {
             throw new BadRequestException("No attendance found for previous day: " + previousDay);
+        }
+
+        // Honor org setting — copy is a no-op when disabled
+        boolean allowCopy = attendanceSettingRepository.findByOrganizationId(orgId)
+                .map(s -> Boolean.TRUE.equals(s.getAllowCopyPrevious()))
+                .orElse(true);
+        if (!allowCopy) {
+            throw new BadRequestException("Copy from previous day is disabled in attendance settings");
         }
 
         String markedBy = currentUser();

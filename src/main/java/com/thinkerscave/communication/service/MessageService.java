@@ -11,11 +11,15 @@ public interface MessageService {
 
     MessageThreadResponse createThread(MessageThreadRequest request);
 
-    Page<MessageThreadResponse> getMyThreads(Long userId, Pageable pageable);
+    /** Lists open threads for the authenticated user (identity from security context). */
+    Page<MessageThreadResponse> getMyThreads(Pageable pageable);
 
-    MessageResponse sendMessage(Long threadId, MessageRequest request, Long senderUserId);
+    /** Sends a message as the authenticated user; caller must be a participant. */
+    MessageResponse sendMessage(Long threadId, MessageRequest request);
 
+    /** Lists messages; caller must be a participant of the thread. */
     Page<MessageResponse> getMessages(Long threadId, Pageable pageable);
 
+    /** Closes a thread in the caller's organization (admin/staff roles via controller). */
     void closeThread(Long threadId);
 }

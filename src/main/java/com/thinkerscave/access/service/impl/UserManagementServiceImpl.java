@@ -9,11 +9,13 @@ import com.thinkerscave.access.mapper.UserMapper;
 import com.thinkerscave.access.repository.*;
 import com.thinkerscave.access.service.PermissionService;
 import com.thinkerscave.access.service.UserManagementService;
+import com.thinkerscave.security.service.OutboundMessageService;
 import com.thinkerscave.shared.enums.CodeType;
 import com.thinkerscave.shared.exceptions.*;
 import com.thinkerscave.shared.service.CodeGeneratorService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -38,6 +40,10 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final CodeGeneratorService codeGeneratorService;
     private final PasswordEncoder passwordEncoder;
     private final PermissionService permissionService;
+    private final OutboundMessageService outboundMessageService;
+
+    @Value("${app.platform.login-url:http://localhost:4200/auth/login}")
+    private String platformLoginUrl;
 
     @Override
     @Transactional
@@ -176,7 +182,9 @@ public class UserManagementServiceImpl implements UserManagementService {
         user.setPasswordChangedAt(LocalDateTime.now());
         userRepository.save(user);
         log.info("Password reset for user: id={}, org={}", userId, organizationId);
-        // TODO: send email with tempPassword
+        outboundMessageService.sendAdminPasswordReset(
+                user.getEmail(), user.getMobileNumber(), user.getFirstName(),
+                platformLoginUrl, user.getUsername(), tempPassword);
     }
 
     @Override
@@ -286,6 +294,13 @@ public class UserManagementServiceImpl implements UserManagementService {
     }
 
     private void assertBelongsToOrg(User user, Long organizationId) {
+        // Handle null organizationId (for ORGANIZATION_OWNER users in public schema)
+        if (organizationId == null && user.getOrganizationId() == null) {
+            return; // Both null - valid for public schema users
+        }
+        if (organizationId == null || user.getOrganizationId() == null) {
+            throw new ResourceNotFoundException("User not found in this organization");
+        }
         if (!user.getOrganizationId().equals(organizationId)) {
             throw new ResourceNotFoundException("User not found in this organization");
         }

@@ -1,6 +1,8 @@
 package com.thinkerscave.access.entity;
 
+import com.thinkerscave.access.enums.MenuScope;
 import com.thinkerscave.access.enums.MenuType;
+import com.thinkerscave.platform.entity.Feature;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import lombok.*;
@@ -116,6 +118,23 @@ public class Menu extends Auditable {
     @Builder.Default
     @Column(name = "default_page")
     private Boolean defaultPage = false;
+
+    /**
+     * Subscription entitlement scope. Set on top-level menus; children inherit
+     * their parent's entitlement for sidebar/permission purposes.
+     */
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "menu_scope", length = 20)
+    private MenuScope menuScope = MenuScope.SUBSCRIPTION;
+
+    /**
+     * Subscription plan feature that unlocks this menu (top-level menus only,
+     * null for PLATFORM/CORE scope and for child menus, which inherit from parent).
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "feature_id")
+    private Feature feature;
 
     /**
      * Role Permission Mapping.

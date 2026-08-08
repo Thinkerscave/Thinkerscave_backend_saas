@@ -20,4 +20,6 @@ public class AuthResponse {
     private String loginContext;
     private Boolean firstTimeLogin;
     private Boolean requirePasswordChange;
+    /** When true, refresh cookie/token should persist across browser restarts. */
+    private Boolean rememberMe;
 }

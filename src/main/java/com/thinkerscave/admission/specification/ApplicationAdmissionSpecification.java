@@ -12,10 +12,10 @@ public final class ApplicationAdmissionSpecification {
     private ApplicationAdmissionSpecification() {
     }
 
-    public static Specification<ApplicationAdmission> filter(Long organizationId, ApplicationSearchRequest request) {
+    public static Specification<ApplicationAdmission> filter(ApplicationSearchRequest request) {
         return (root, query, cb) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("organizationId"), organizationId));
+            // Schema-per-tenant: Automatically scoped to current tenant schema
 
             if (request == null) {
                 return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));

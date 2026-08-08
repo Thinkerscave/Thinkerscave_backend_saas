@@ -13,6 +13,8 @@ import com.thinkerscave.access.repository.LoginHistoryRepository;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.platform.entity.TenantRegistry;
 import com.thinkerscave.platform.entity.Organization;
+import com.thinkerscave.platform.enums.CustomerStatus;
+import com.thinkerscave.platform.enums.OrganizationStatus;
 import com.thinkerscave.platform.repository.OrganizationRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
 import com.thinkerscave.security.dto.LoginContext;
@@ -58,6 +60,8 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
     private final UserMapper userMapper;
+    private final PublicSchemaUserLookupService publicSchemaUserLookupService;
+    private final LoginFailureAuditService loginFailureAuditService;
 
     @org.springframework.beans.factory.annotation.Value("${app.security.lockout.max-failed-attempts:5}")
     private int defaultMaxFailedAttempts;
@@ -72,9 +76,16 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public AuthResponse login(LoginRequest request, LoginContext loginContext) {
         User user = resolveUserForLogin(request.getUsernameOrEmail(), loginContext);
+        // ORGANIZATION_OWNER accounts always live in "public"; if this is a tenant/institution
+        // login, the ambient transaction is bound to that tenant's schema, so `user` is
+        // detached from it — all writes for this user must run in their own "public"
+        // transaction instead (see PublicSchemaUserLookupService).
+        boolean crossSchemaUser = !loginContext.isPlatformLogin() && hasActiveRole(user, RoleType.ORGANIZATION_OWNER);
 
         if (Boolean.TRUE.equals(user.getAccountLocked())) {
-            recordLoginFailure(user, "Account locked");
+            if (!crossSchemaUser) {
+                loginFailureAuditService.recordLoginFailure(user.getId(), "Account locked");
+            }
             throw new BadRequestException("Account is locked due to too many failed login attempts. Contact an administrator.");
         }
 
@@ -82,8 +93,13 @@ public class AuthServiceImpl implements AuthService {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(user.getUsername(), request.getPassword()));
         } catch (AuthenticationException ex) {
-            recordLoginFailure(user, "Invalid password");
-            applyFailedLoginLockout(user, loginContext);
+            if (crossSchemaUser) {
+                runInPublicSchema(() -> publicSchemaUserLookupService.recordFailedLoginAndLockout(
+                        user.getId(), "Invalid password", resolveMaxFailedAttempts(user, loginContext)));
+            } else {
+                loginFailureAuditService.recordLoginFailure(user.getId(), "Invalid password");
+                loginFailureAuditService.applyFailedLoginLockout(user.getId(), resolveMaxFailedAttempts(user, loginContext));
+            }
             // Uniform message + small delay frustrates brute force without leaking account state
             sleepBriefly();
             throw new BadRequestException("Invalid credentials");
@@ -92,11 +108,6 @@ public class AuthServiceImpl implements AuthService {
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new BadRequestException("Account is not active");
         }
-
-        user.setFailedLoginAttempts(0);
-        user.setAccountLocked(false);
-        user.setLastLoginAt(LocalDateTime.now());
-        userRepository.save(user);
 
         String tenantId = loginContext.isPlatformLogin()
                 ? LoginContext.PLATFORM_TENANT
@@ -109,19 +120,30 @@ public class AuthServiceImpl implements AuthService {
         Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue, effectiveOrgId);
 
         String accessToken = jwtService.generateAccessToken(user.getUsername(), claims);
-        String refreshToken = jwtService.generateRefreshToken(user.getUsername());
+        boolean rememberMe = Boolean.TRUE.equals(request.getRememberMe());
+        String refreshToken = jwtService.generateRefreshToken(user.getUsername(), rememberMe);
 
-        UserSession session = UserSession.builder()
-                .user(user)
-                .refreshToken(refreshToken)
-                .deviceName(request.getDeviceName())
-                .ipAddress("")
-                .loginAt(LocalDateTime.now())
-                .status(SessionStatus.ACTIVE)
-                .build();
-        sessionRepository.save(session);
+        if (crossSchemaUser) {
+            runInPublicSchema(() -> publicSchemaUserLookupService.recordSuccessfulLogin(
+                    user.getId(), refreshToken, request.getDeviceName()));
+        } else {
+            user.setFailedLoginAttempts(0);
+            user.setAccountLocked(false);
+            user.setLastLoginAt(LocalDateTime.now());
+            userRepository.save(user);
 
-        recordLoginSuccess(user);
+            UserSession session = UserSession.builder()
+                    .user(user)
+                    .refreshToken(refreshToken)
+                    .deviceName(request.getDeviceName())
+                    .ipAddress("")
+                    .loginAt(LocalDateTime.now())
+                    .status(SessionStatus.ACTIVE)
+                    .build();
+            sessionRepository.save(session);
+
+            recordLoginSuccess(user);
+        }
 
         return AuthResponse.builder()
                 .accessToken(accessToken)
@@ -133,6 +155,7 @@ public class AuthServiceImpl implements AuthService {
                 .user(userMapper.toSummary(user))
                 .firstTimeLogin(user.getFirstTimeLogin())
                 .requirePasswordChange(Boolean.TRUE.equals(user.getFirstTimeLogin()))
+                .rememberMe(rememberMe)
                 .build();
     }
 
@@ -147,23 +170,70 @@ public class AuthServiceImpl implements AuthService {
         }
 
         TenantRegistry tenant = resolveTenantRegistry(loginContext);
-        Long organizationId = tenant.getOrganization().getId();
+        Organization organization = tenant.getOrganization();
+        Long organizationId = organization.getId();
 
         if (loginContext.getOrganizationId() != null && !organizationId.equals(loginContext.getOrganizationId())) {
             throw new BadRequestException("Organization does not match the selected institution");
         }
 
+        if (organization.getStatus() == OrganizationStatus.SUSPENDED) {
+            throw new BadRequestException("This organization has been suspended. Please contact support for assistance.");
+        }
+
+        if (organization.getCustomer() != null 
+                && organization.getCustomer().getStatus() == CustomerStatus.SUSPENDED) {
+            throw new BadRequestException("Account access has been suspended. Please contact support for assistance.");
+        }
+
+        // 1) Exact org match (platform catalog / correctly provisioned rows)
+        // 2) Tenant-schema users may have organization_id unset/0 — schema isolation already scopes them
+        // 3) ORGANIZATION_OWNER accounts live only in the public schema (they can own/switch
+        //    across multiple organizations). A single Hibernate session/transaction is bound
+        //    to one schema for its whole lifetime (see TenantIdentifierResolver) — flipping
+        //    TenantContext here would NOT re-route the ambient (tenant-schema) queries above,
+        //    so this lookup must run in a genuinely separate transaction/connection. The
+        //    tenant identifier for that new transaction is resolved the instant it is opened
+        //    (at proxy entry), so TenantContext must be switched to "public" BEFORE calling in.
         User user = findByUsernameOrEmailAndOrganization(usernameOrEmail, organizationId)
-            .orElseGet(() -> findByUsernameOrEmail(usernameOrEmail)
-                .filter(candidate -> hasActiveRole(candidate, RoleType.ORGANIZATION_OWNER)
-                    && organizationRepository.existsActiveOwnedOrganization(candidate.getId(), organizationId))
-                .orElseThrow(() -> new BadRequestException("Invalid credentials for the selected institution")));
+            .or(() -> findByUsernameOrEmail(usernameOrEmail)
+                .filter(candidate -> {
+                    Long candidateOrgId = candidate.getOrganizationId();
+                    return candidateOrgId == null || candidateOrgId <= 0 || organizationId.equals(candidateOrgId);
+                }))
+            .or(() -> lookupOwnerInPublicSchema(usernameOrEmail, organizationId))
+            .orElseThrow(() -> new BadRequestException("Invalid credentials for the selected institution"));
 
         if (hasActiveRole(user, RoleType.SUPER_ADMIN)) {
             throw new BadRequestException("Platform accounts must sign in through Thinkers Department");
         }
 
         return user;
+    }
+
+    private Optional<User> lookupOwnerInPublicSchema(String usernameOrEmail, Long organizationId) {
+        String previousTenant = TenantContext.getTenant();
+        try {
+            TenantContext.setTenant("public");
+            return publicSchemaUserLookupService.findActiveOwnerForOrganization(usernameOrEmail, organizationId);
+        } finally {
+            TenantContext.setTenant(previousTenant);
+        }
+    }
+
+    /**
+     * Runs the given action with {@link TenantContext} set to "public" — required before
+     * calling any {@code REQUIRES_NEW} method on {@link PublicSchemaUserLookupService} (see
+     * that class's Javadoc for why the switch must happen before, not inside, the call).
+     */
+    private void runInPublicSchema(Runnable action) {
+        String previousTenant = TenantContext.getTenant();
+        try {
+            TenantContext.setTenant("public");
+            action.run();
+        } finally {
+            TenantContext.setTenant(previousTenant);
+        }
     }
 
     private TenantRegistry resolveTenantRegistry(LoginContext loginContext) {
@@ -201,6 +271,9 @@ public class AuthServiceImpl implements AuthService {
         claims.put("userCode", user.getUserCode());
         claims.put("tenant", tenantId);
         claims.put("loginContext", loginContext);
+        boolean firstTimeLogin = Boolean.TRUE.equals(user.getFirstTimeLogin());
+        claims.put("firstTimeLogin", firstTimeLogin);
+        claims.put("requirePasswordChange", firstTimeLogin);
 
         UserRole primaryRole = user.getUserRoles().stream()
                 .filter(ur -> Boolean.TRUE.equals(ur.getPrimaryRole()) && Boolean.TRUE.equals(ur.getActive()))
@@ -253,26 +326,33 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse refreshToken(String refreshToken) {
-        UserSession session = sessionRepository.findByRefreshToken(refreshToken)
-                .orElseThrow(() -> new BadRequestException("Invalid refresh token"));
+    public AuthResponse refreshToken(String refreshToken, String preferredTenant, Long preferredOrgId) {
+        ResolvedRefreshSession resolved = resolveRefreshSession(refreshToken);
+        UserSession session = resolved.session();
+        User user = resolved.user();
 
         if (session.getStatus() != SessionStatus.ACTIVE) {
             throw new BadRequestException("Session is no longer active");
         }
 
-        User user = session.getUser();
-        String tenantId = resolveTenantForUser(user);
+        String tenantId = resolveTenantForRefresh(user, preferredTenant);
+        Long effectiveOrgId = resolveOrgForRefresh(user, preferredOrgId, tenantId);
         String loginContextValue = hasActiveRole(user, RoleType.SUPER_ADMIN)
                 ? LoginContext.PLATFORM
                 : LoginContext.TENANT;
-        Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue, user.getOrganizationId());
+        Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue, effectiveOrgId);
 
         String newAccessToken = jwtService.generateAccessToken(user.getUsername(), claims);
-        String newRefreshToken = jwtService.generateRefreshToken(user.getUsername());
+        Boolean rememberMe = jwtService.extractRememberMe(refreshToken);
+        boolean remember = Boolean.TRUE.equals(rememberMe);
+        String newRefreshToken = jwtService.generateRefreshToken(user.getUsername(), remember);
 
-        session.setRefreshToken(newRefreshToken);
-        sessionRepository.save(session);
+        if (resolved.publicSchemaSession()) {
+            runInPublicSchema(() -> publicSchemaUserLookupService.rotateRefreshToken(session.getId(), newRefreshToken));
+        } else {
+            session.setRefreshToken(newRefreshToken);
+            sessionRepository.save(session);
+        }
 
         return AuthResponse.builder()
                 .accessToken(newAccessToken)
@@ -284,8 +364,87 @@ public class AuthServiceImpl implements AuthService {
                 .user(userMapper.toSummary(user))
                 .firstTimeLogin(user.getFirstTimeLogin())
                 .requirePasswordChange(Boolean.TRUE.equals(user.getFirstTimeLogin()))
+                .rememberMe(rememberMe)
                 .build();
     }
+
+    private ResolvedRefreshSession resolveRefreshSession(String refreshToken) {
+        Optional<UserSession> ambient = sessionRepository.findByRefreshToken(refreshToken);
+        if (ambient.isPresent()) {
+            UserSession session = ambient.get();
+            return new ResolvedRefreshSession(session, initializeUserRoles(session.getUser()), false);
+        }
+        String previousTenant = TenantContext.getTenant();
+        try {
+            TenantContext.setTenant("public");
+            UserSession session = publicSchemaUserLookupService.findSessionByRefreshToken(refreshToken)
+                    .orElseThrow(() -> new BadRequestException("Invalid refresh token"));
+            return new ResolvedRefreshSession(session, initializeUserRoles(session.getUser()), true);
+        } finally {
+            TenantContext.setTenant(previousTenant);
+        }
+    }
+
+    private User initializeUserRoles(User user) {
+        // Detached public-schema user must have roles initialized before role checks.
+        user.getUserRoles().forEach(ur -> ur.getRole().getRoleType());
+        return user;
+    }
+
+    private String resolveTenantForRefresh(User user, String preferredTenant) {
+        String fallback = resolveTenantForUser(user);
+        if (preferredTenant == null || preferredTenant.isBlank()) {
+            return fallback;
+        }
+        String normalizedPreferred = preferredTenant.trim().toLowerCase().replace('-', '_');
+        if (normalizedPreferred.equalsIgnoreCase(fallback)
+                || LoginContext.PLATFORM_TENANT.equalsIgnoreCase(normalizedPreferred)) {
+            return normalizedPreferred;
+        }
+        if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
+            boolean switchable = organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+                    .map(Organization::getTenantRegistry)
+                    .filter(tr -> tr != null && tr.getTenantIdentifier() != null)
+                    .map(tr -> tr.getTenantIdentifier().trim().toLowerCase().replace('-', '_'))
+                    .anyMatch(normalizedPreferred::equals);
+            if (switchable) {
+                return normalizedPreferred;
+            }
+        }
+        return fallback;
+    }
+
+    private Long resolveOrgForRefresh(User user, Long preferredOrgId, String tenantId) {
+        if (hasActiveRole(user, RoleType.SUPER_ADMIN)) {
+            return null;
+        }
+        if (preferredOrgId != null && preferredOrgId > 0) {
+            if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
+                boolean owned = organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+                        .anyMatch(org -> preferredOrgId.equals(org.getId()));
+                if (owned) {
+                    return preferredOrgId;
+                }
+            } else if (preferredOrgId.equals(user.getOrganizationId())) {
+                return preferredOrgId;
+            }
+        }
+        if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
+            return organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+                    .filter(org -> org.getTenantRegistry() != null
+                            && tenantId != null
+                            && tenantId.equalsIgnoreCase(org.getTenantRegistry().getTenantIdentifier()))
+                    .map(Organization::getId)
+                    .findFirst()
+                    .orElseGet(() -> organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+                            .map(Organization::getId)
+                            .findFirst()
+                            .orElse(user.getOrganizationId()));
+        }
+        return user.getOrganizationId();
+    }
+
+    private record ResolvedRefreshSession(UserSession session, User user, boolean publicSchemaSession) {}
 
     @Override
     @Transactional
@@ -328,32 +487,6 @@ public class AuthServiceImpl implements AuthService {
                 .loginTime(LocalDateTime.now())
                 .build();
         loginHistoryRepository.save(history);
-    }
-
-    private void recordLoginFailure(User user, String reason) {
-        LoginHistory history = LoginHistory.builder()
-                .user(user)
-                .status(LoginStatus.FAILED)
-                .loginTime(LocalDateTime.now())
-                .failureReason(reason)
-                .build();
-        loginHistoryRepository.save(history);
-    }
-
-    private void incrementFailedAttempts(User user) {
-        user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
-        userRepository.save(user);
-    }
-
-    private void applyFailedLoginLockout(User user, LoginContext loginContext) {
-        incrementFailedAttempts(user);
-        int maxAttempts = resolveMaxFailedAttempts(user, loginContext);
-        if (user.getFailedLoginAttempts() != null && user.getFailedLoginAttempts() >= maxAttempts) {
-            user.setAccountLocked(true);
-            userRepository.save(user);
-            log.warn("Account locked after {} failed login attempts (userId={})",
-                    user.getFailedLoginAttempts(), user.getId());
-        }
     }
 
     private int resolveMaxFailedAttempts(User user, LoginContext loginContext) {

@@ -3,6 +3,7 @@ package com.thinkerscave.access.service.impl;
 import com.thinkerscave.access.dto.request.*;
 import com.thinkerscave.access.dto.response.*;
 import com.thinkerscave.access.entity.*;
+import com.thinkerscave.access.enums.MenuScope;
 import com.thinkerscave.access.mapper.RoleMapper;
 import com.thinkerscave.access.repository.*;
 import com.thinkerscave.access.service.RoleService;
@@ -29,6 +30,7 @@ public class RoleServiceImpl implements RoleService {
     private final RolePermissionRepository rolePermissionRepository;
     private final MenuRepository menuRepository;
     private final OrganizationRepository organizationRepository;
+    private final OrganizationModuleRepository organizationModuleRepository;
     private final RoleMapper roleMapper;
     private final UserRoleRepository userRoleRepository;
 
@@ -85,7 +87,9 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional(readOnly = true)
     public List<RoleResponse> getAllActiveRoles() {
-        return roleMapper.toResponseList(roleRepository.findByActiveTrueOrderByDisplayOrderAsc());
+        List<RoleResponse> responses = roleMapper.toResponseList(roleRepository.findByActiveTrueOrderByDisplayOrderAsc());
+        responses.forEach(res -> res.setActiveUserCount(userRoleRepository.countActiveUsersByRole(res.getId())));
+        return responses;
     }
 
     @Override
@@ -139,7 +143,10 @@ public class RoleServiceImpl implements RoleService {
         Role role = findRoleById(roleId);
         Organization org = findOrganization(organizationId);
 
-        List<Menu> allMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc();
+        List<Long> enabledMenuIds = organizationModuleRepository.findEnabledMenuIds(organizationId);
+        List<Menu> allMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
+                .filter(menu -> menu.getMenuScope() == MenuScope.PLATFORM || enabledMenuIds.contains(menu.getId()))
+                .toList();
         List<RolePermission> assigned = rolePermissionRepository.findByRole_IdAndOrganization_Id(roleId, organizationId);
 
         List<PermissionMatrixResponse.PermissionRow> rows = allMenus.stream().map(menu -> {

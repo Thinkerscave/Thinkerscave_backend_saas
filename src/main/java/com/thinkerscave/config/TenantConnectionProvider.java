@@ -38,11 +38,18 @@ public class TenantConnectionProvider implements MultiTenantConnectionProvider<S
         Connection connection = dataSource.getConnection();
         try {
             schemaSwitcher.switchToTenant(connection, tenantIdentifier);
+            return connection;
         } catch (SQLException ex) {
-            log.warn("Cannot switch to tenant='{}' (schema='{}'): {}. Using default connection.",
+            log.error("Cannot switch to tenant='{}' (schema='{}'): {}",
                     tenantIdentifier, schemaSwitcher.resolvePhysicalSchema(tenantIdentifier), ex.getMessage());
+            try {
+                connection.close();
+            } catch (SQLException closeEx) {
+                ex.addSuppressed(closeEx);
+            }
+            // Fail closed — never fall back to the platform catalog for tenant work.
+            throw ex;
         }
-        return connection;
     }
 
     @Override

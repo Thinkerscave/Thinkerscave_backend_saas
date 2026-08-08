@@ -14,8 +14,8 @@ import java.time.LocalDateTime;
 /**
  * Prospective student inquiry — one record per lead/prospect.
  * <p>
- * organizationId scopes data to the tenant. Status workflow drives the
- * admission funnel from NEW → CONVERTED or LOST.
+ * Multi-tenant isolation handled by schema context (schema-per-tenant architecture).
+ * Status workflow drives the admission funnel from NEW → CONVERTED or LOST.
  */
 @Entity
 @Getter
@@ -24,7 +24,7 @@ import java.time.LocalDateTime;
 @Table(
         name = "inquiry",
         indexes = {
-                @Index(name = "idx_inq_org_status", columnList = "organization_id, status"),
+                @Index(name = "idx_inq_status", columnList = "status"),
                 @Index(name = "idx_inq_mobile", columnList = "mobile_number"),
                 @Index(name = "idx_inq_counselor", columnList = "assigned_counselor_id")
         }
@@ -36,9 +36,6 @@ public class Inquiry extends Auditable {
     @Column(name = "inquiry_id")
     @EqualsAndHashCode.Include
     private Long inquiryId;
-
-    @Column(name = "organization_id", nullable = false)
-    private Long organizationId;
 
     // ─── Prospect Details ──────────────────────────────────────────────────
 

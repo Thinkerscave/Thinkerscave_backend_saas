@@ -8,6 +8,8 @@ import com.thinkerscave.access.service.UserService;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
 import com.thinkerscave.academics.repository.ClassRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
+import com.thinkerscave.audit.enums.AuditEventType;
+import com.thinkerscave.audit.service.AuditWriteService;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.shared.storage.LocalFileStorageService;
 import com.thinkerscave.student.dto.EnrollmentDTO;
@@ -82,6 +84,7 @@ public class StudentServiceImpl implements StudentService {
     private final StudentParentRepository studentParentRepository;
     private final StudentTimelineRepository studentTimelineRepository;
     private final StudentDocumentRepository studentDocumentRepository;
+    private final AuditWriteService auditWriteService;
 
     @Override
     @Transactional
@@ -201,6 +204,12 @@ public class StudentServiceImpl implements StudentService {
 
         addTimelineEvent(student, StudentTimelineEventType.STUDENT_CREATED,
                 "Student Admitted", "Student successfully registered in system.");
+        auditWriteService.record(
+                AuditEventType.CREATE,
+                "STUDENT_CREATE",
+                "Student",
+                String.valueOf(student.getStudentId()),
+                "Student created: " + studentCode);
 
         return mapToResponseDTO(student);
     }
@@ -225,6 +234,12 @@ public class StudentServiceImpl implements StudentService {
         studentRepository.save(student);
         addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED,
                 "Student Updated", "Student profile details were updated.");
+        auditWriteService.record(
+                AuditEventType.UPDATE,
+                "STUDENT_UPDATE",
+                "Student",
+                String.valueOf(student.getStudentId()),
+                "Student profile updated: " + student.getStudentCode());
         return mapToResponseDTO(student);
     }
 
@@ -395,6 +410,12 @@ public class StudentServiceImpl implements StudentService {
         studentRepository.save(student);
         addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED,
                 "Student Deactivated", "Student status changed to inactive.");
+        auditWriteService.record(
+                AuditEventType.STATE_CHANGE,
+                "STUDENT_DEACTIVATE",
+                "Student",
+                String.valueOf(student.getStudentId()),
+                "Student deactivated: " + student.getStudentCode());
     }
 
     @Override
@@ -409,6 +430,12 @@ public class StudentServiceImpl implements StudentService {
                 : StudentTimelineEventType.STUDENT_UPDATED;
         addTimelineEvent(student, timelineEvent,
                 "Status Updated", "Student status updated to " + status.name() + ".");
+        auditWriteService.record(
+                AuditEventType.STATE_CHANGE,
+                "STUDENT_STATUS_CHANGE",
+                "Student",
+                String.valueOf(student.getStudentId()),
+                "Student status changed to " + status.name() + ": " + student.getStudentCode());
 
         return mapToResponseDTO(student);
     }

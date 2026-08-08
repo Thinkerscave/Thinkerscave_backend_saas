@@ -1,5 +1,7 @@
 package com.thinkerscave.security.controller;
 
+import com.thinkerscave.platform.dto.response.PublicOrganizationOptionResponse;
+import com.thinkerscave.platform.service.OrganizationService;
 import com.thinkerscave.security.dto.LoginContext;
 import com.thinkerscave.security.dto.request.LoginRequest;
 import com.thinkerscave.security.dto.request.OtpResetPasswordRequest;
@@ -19,6 +21,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+
+import java.util.List;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,6 +35,17 @@ public class AuthController {
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
     private final RefreshTokenCookieHelper refreshTokenCookieHelper;
+    private final OrganizationService organizationService;
+
+    @GetMapping("/organizations")
+    @Operation(summary = "List all active organizations for workspace selection",
+            description = "Public endpoint (no auth required) for the org-select login screen")
+    public ResponseEntity<ApiResponse<List<PublicOrganizationOptionResponse>>> getPublicOrganizations(
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Organizations loaded",
+                organizationService.listPublicOrganizations(search)));
+    }
 
     @PostMapping("/login")
     @Operation(summary = "Login with username/email and password")
@@ -56,8 +71,23 @@ public class AuthController {
         if (!StringUtils.hasText(token)) {
             throw new BadRequestException("Refresh token is required");
         }
-        AuthResponse authResponse = authService.refreshToken(token);
+        AuthResponse authResponse = authService.refreshToken(
+                token,
+                httpRequest.getHeader("X-Tenant-ID"),
+                parsePositiveLong(httpRequest.getHeader("X-Organization-ID")));
         return ResponseEntity.ok(ApiResponse.success("Token refreshed", applyRefreshCookie(authResponse, httpResponse)));
+    }
+
+    private Long parsePositiveLong(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        try {
+            long value = Long.parseLong(raw.trim());
+            return value > 0 ? value : null;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     @PostMapping("/logout")
@@ -81,7 +111,8 @@ public class AuthController {
     private AuthResponse applyRefreshCookie(AuthResponse authResponse, HttpServletResponse httpResponse) {
         if (refreshTokenCookieHelper.isEnabled() && authResponse != null
                 && StringUtils.hasText(authResponse.getRefreshToken())) {
-            refreshTokenCookieHelper.setRefreshTokenCookie(httpResponse, authResponse.getRefreshToken());
+            refreshTokenCookieHelper.setRefreshTokenCookie(
+                    httpResponse, authResponse.getRefreshToken(), authResponse.getRememberMe());
             authResponse.setRefreshToken(null);
         }
         return authResponse;

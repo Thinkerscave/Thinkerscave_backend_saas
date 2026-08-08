@@ -59,6 +59,20 @@ public class StaffSalaryStructure extends Auditable {
     @Column(name = "other_allowance", precision = 12, scale = 2)
     private BigDecimal otherAllowance = BigDecimal.ZERO;
 
+    /** Employee PF contribution (fixed monthly amount for Phase-1). */
+    @Column(name = "pf_employee", precision = 12, scale = 2)
+    private BigDecimal pfEmployee = BigDecimal.ZERO;
+
+    /** Employee ESI contribution (fixed monthly amount for Phase-1). */
+    @Column(name = "esi_employee", precision = 12, scale = 2)
+    private BigDecimal esiEmployee = BigDecimal.ZERO;
+
+    @Column(name = "professional_tax", precision = 12, scale = 2)
+    private BigDecimal professionalTax = BigDecimal.ZERO;
+
+    @Column(name = "other_deduction", precision = 12, scale = 2)
+    private BigDecimal otherDeduction = BigDecimal.ZERO;
+
     @Column(name = "gross_salary", precision = 12, scale = 2)
     private BigDecimal grossSalary = BigDecimal.ZERO;
 

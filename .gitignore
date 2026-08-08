@@ -1,4 +1,4 @@
-HELP.md
+# Maven build output
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
@@ -32,11 +32,28 @@ build/
 ### VS Code ###
 .vscode/
 
-### Environment Variables ###
-###.env ###
-
-### Local Configuration ###
-local.properties
+### Environment / secrets ###
 .env
-.log
-.sh
+.env.local
+.env.*.local
+!.env.example
+
+### Logs ###
+Logs/
+logs/
+*.log
+*.log.*
+
+### Runtime / local data ###
+uploads/
+*.pid
+hs_err_pid*
+replay_pid*
+
+### Local configuration ###
+local.properties
+
+### System files ###
+.DS_Store
+Thumbs.db
+desktop.ini

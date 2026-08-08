@@ -13,6 +13,8 @@ import java.util.List;
 /**
  * Formal application for admission, submitted after initial inquiry.
  * Links to the originating Inquiry where applicable.
+ * 
+ * Schema-per-tenant multi-tenancy: Automatically scoped to tenant by schema context.
  */
 @Entity
 @Getter
@@ -21,7 +23,7 @@ import java.util.List;
 @Table(
         name = "application_admission",
         indexes = {
-                @Index(name = "idx_app_org_status", columnList = "organization_id, status"),
+                @Index(name = "idx_app_status", columnList = "status"),
                 @Index(name = "idx_app_inquiry", columnList = "inquiry_id"),
                 @Index(name = "idx_app_number", columnList = "application_number", unique = true)
         }
@@ -36,9 +38,6 @@ public class ApplicationAdmission extends Auditable {
 
     @Column(name = "application_number", unique = true, nullable = false, length = 30)
     private String applicationNumber;
-
-    @Column(name = "organization_id", nullable = false)
-    private Long organizationId;
 
     /** Optional link back to the originating inquiry */
     @Column(name = "inquiry_id")
@@ -92,6 +91,9 @@ public class ApplicationAdmission extends Auditable {
 
     @Column(name = "internal_comments", columnDefinition = "TEXT")
     private String internalComments;
+
+    @Column(name = "archived", nullable = false)
+    private boolean archived = false;
 
     // ─── Documents (stored as file paths / URLs) ───────────────────────────
 

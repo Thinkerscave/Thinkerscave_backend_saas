@@ -1,5 +1,7 @@
 package com.thinkerscave.communication.service.impl;
 
+import com.thinkerscave.access.entity.User;
+import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.communication.dto.request.MessageRequest;
 import com.thinkerscave.communication.dto.request.MessageThreadRequest;
 import com.thinkerscave.communication.dto.response.MessageResponse;
@@ -9,17 +11,23 @@ import com.thinkerscave.communication.entity.MessageThread;
 import com.thinkerscave.communication.repository.MessageRepository;
 import com.thinkerscave.communication.repository.MessageThreadRepository;
 import com.thinkerscave.communication.service.MessageService;
+import com.thinkerscave.communication.util.ParticipantCsv;
 import com.thinkerscave.shared.context.OrganizationContext;
+import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.stream.Collectors;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -29,48 +37,57 @@ public class MessageServiceImpl implements MessageService {
 
     private final MessageThreadRepository threadRepository;
     private final MessageRepository messageRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
     public MessageThreadResponse createThread(MessageThreadRequest request) {
         Long orgId = OrganizationContext.getOrganizationId();
+        Long currentUserId = requireCurrentUserId();
+
+        Set<Long> participants = new LinkedHashSet<>();
+        if (request.getParticipantUserIds() != null) {
+            participants.addAll(request.getParticipantUserIds());
+        }
+        participants.add(currentUserId);
+
         MessageThread thread = new MessageThread();
         thread.setOrganizationId(orgId);
         thread.setSubject(request.getSubject());
-        thread.setParticipantUserIdsCsv(
-                request.getParticipantUserIds().stream()
-                        .map(String::valueOf).collect(Collectors.joining(",")));
+        thread.setParticipantUserIdsCsv(ParticipantCsv.join(participants));
         thread.setClosed(false);
         return toThreadResponse(threadRepository.save(thread));
     }
 
     @Override
-    public Page<MessageThreadResponse> getMyThreads(Long userId, Pageable pageable) {
+    public Page<MessageThreadResponse> getMyThreads(Pageable pageable) {
         Long orgId = OrganizationContext.getOrganizationId();
-        return threadRepository.findActiveThreadsForUser(orgId, String.valueOf(userId), pageable)
+        Long currentUserId = requireCurrentUserId();
+        return threadRepository.findActiveThreadsForUser(orgId, String.valueOf(currentUserId), pageable)
                 .map(this::toThreadResponse);
     }
 
     @Override
     @Transactional
-    public MessageResponse sendMessage(Long threadId, MessageRequest request, Long senderUserId) {
+    public MessageResponse sendMessage(Long threadId, MessageRequest request) {
         Long orgId = OrganizationContext.getOrganizationId();
-        MessageThread thread = threadRepository.findByThreadIdAndOrganizationId(threadId, orgId)
-                .orElseThrow(() -> new ResourceNotFoundException("Thread not found: " + threadId));
+        Long currentUserId = requireCurrentUserId();
+        MessageThread thread = requireThreadInOrg(threadId, orgId);
+        requireParticipant(thread, currentUserId);
+
         if (thread.isClosed()) {
-            throw new IllegalStateException("Cannot send message to a closed thread");
+            throw new BadRequestException("Cannot send message to a closed thread");
         }
 
         Message message = new Message();
         message.setMessageThreadId(threadId);
-        message.setSenderUserId(senderUserId);
+        message.setSenderUserId(currentUserId);
         message.setBody(request.getBody());
         message.setAttachmentUrl(request.getAttachmentUrl());
         message.setSentAt(Instant.now());
         message.setDeleted(false);
         message = messageRepository.save(message);
 
-        // Update thread last message timestamp
         thread.setLastMessageAt(message.getSentAt());
         threadRepository.save(thread);
 
@@ -79,6 +96,11 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     public Page<MessageResponse> getMessages(Long threadId, Pageable pageable) {
+        Long orgId = OrganizationContext.getOrganizationId();
+        Long currentUserId = requireCurrentUserId();
+        MessageThread thread = requireThreadInOrg(threadId, orgId);
+        requireParticipant(thread, currentUserId);
+
         return messageRepository
                 .findByMessageThreadIdAndDeletedFalseOrderBySentAtAsc(threadId, pageable)
                 .map(this::toMessageResponse);
@@ -88,13 +110,37 @@ public class MessageServiceImpl implements MessageService {
     @Transactional
     public void closeThread(Long threadId) {
         Long orgId = OrganizationContext.getOrganizationId();
-        MessageThread thread = threadRepository.findByThreadIdAndOrganizationId(threadId, orgId)
-                .orElseThrow(() -> new ResourceNotFoundException("Thread not found: " + threadId));
+        MessageThread thread = requireThreadInOrg(threadId, orgId);
         thread.setClosed(true);
         threadRepository.save(thread);
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────────
+    // ─── Auth / membership helpers ───────────────────────────────────────────
+
+    Long requireCurrentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null || !auth.isAuthenticated()) {
+            throw new AccessDeniedException("Authentication required");
+        }
+        String username = auth.getName();
+        User user = userRepository.findByUsername(username)
+                .or(() -> userRepository.findByEmail(username))
+                .orElseThrow(() -> new AccessDeniedException("Authenticated user not found: " + username));
+        return user.getId();
+    }
+
+    private MessageThread requireThreadInOrg(Long threadId, Long orgId) {
+        return threadRepository.findByThreadIdAndOrganizationId(threadId, orgId)
+                .orElseThrow(() -> new ResourceNotFoundException("Thread not found: " + threadId));
+    }
+
+    private void requireParticipant(MessageThread thread, Long userId) {
+        if (!ParticipantCsv.contains(thread.getParticipantUserIdsCsv(), userId)) {
+            throw new AccessDeniedException("Not a participant of this thread");
+        }
+    }
+
+    // ─── Mappers ─────────────────────────────────────────────────────────────
 
     private MessageThreadResponse toThreadResponse(MessageThread t) {
         return MessageThreadResponse.builder()

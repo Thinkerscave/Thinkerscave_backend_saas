@@ -59,10 +59,9 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public InquiryResponse create(InquiryRequest request) {
-        Long orgId = OrganizationContext.getOrganizationId();
+        // Schema-per-tenant: No need to set organizationId
         Inquiry inquiry = new Inquiry();
         mapRequest(request, inquiry);
-        inquiry.setOrganizationId(orgId);
         inquiry.setStatus(InquiryStatus.NEW);
         inquiry.setDeleted(false);
         return toResponse(inquiryRepository.save(inquiry));
@@ -71,54 +70,49 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public InquiryResponse update(Long inquiryId, InquiryRequest request) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        Inquiry inquiry = getInquiry(inquiryId, orgId);
+        Inquiry inquiry = getInquiry(inquiryId);
         mapRequest(request, inquiry);
         return toResponse(inquiryRepository.save(inquiry));
     }
 
     @Override
     public InquiryResponse getById(Long inquiryId) {
-        return toResponse(getInquiry(inquiryId, OrganizationContext.getOrganizationId()));
+        return toResponse(getInquiry(inquiryId));
     }
 
     @Override
     public Page<InquiryResponse> getAll(Pageable pageable) {
-        Long orgId = OrganizationContext.getOrganizationId();
+        // Schema context automatically isolates to tenant
         return inquiryRepository
-                .findByOrganizationIdAndDeletedFalseOrderByCreatedOnDesc(orgId, pageable)
+                .findByDeletedFalseOrderByCreatedOnDesc(pageable)
                 .map(this::toResponse);
     }
 
     @Override
     public Page<InquiryResponse> search(LeadSearchRequest request, Pageable pageable) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        return inquiryRepository.findAll(InquirySpecification.filter(orgId, request), pageable)
+        // Schema-per-tenant: Automatically scoped to current tenant schema
+        return inquiryRepository.findAll(InquirySpecification.filter(request), pageable)
                 .map(this::toResponse);
     }
 
     @Override
     public List<InquiryResponse> getByStatus(InquiryStatus status) {
-        Long orgId = OrganizationContext.getOrganizationId();
         return inquiryRepository
-                .findByOrganizationIdAndStatusAndDeletedFalseOrderByCreatedOnDesc(orgId, status)
+                .findByStatusAndDeletedFalseOrderByCreatedOnDesc(status)
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Override
     public List<InquiryResponse> getPendingFollowUps() {
-        Long orgId = OrganizationContext.getOrganizationId();
         return inquiryRepository
-                .findByOrganizationIdAndDeletedFalseAndNextFollowUpDateLessThanEqualOrderByNextFollowUpDateAsc(
-                        orgId, LocalDate.now())
+                .findByDeletedFalseAndNextFollowUpDateLessThanEqualOrderByNextFollowUpDateAsc(LocalDate.now())
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     @Override
     @Transactional
     public void softDelete(Long inquiryId) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        Inquiry inquiry = getInquiry(inquiryId, orgId);
+        Inquiry inquiry = getInquiry(inquiryId);
         inquiry.setDeleted(true);
         inquiryRepository.save(inquiry);
     }
@@ -126,8 +120,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public InquiryResponse updateStatus(Long inquiryId, InquiryStatus newStatus) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        Inquiry inquiry = getInquiry(inquiryId, orgId);
+        Inquiry inquiry = getInquiry(inquiryId);
         inquiry.setStatus(newStatus);
         return toResponse(inquiryRepository.save(inquiry));
     }
@@ -135,8 +128,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public InquiryResponse markLost(Long inquiryId, String reason) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        Inquiry inquiry = getInquiry(inquiryId, orgId);
+        Inquiry inquiry = getInquiry(inquiryId);
         inquiry.setStatus(InquiryStatus.LOST);
         if (reason != null && !reason.isBlank()) {
             String existing = inquiry.getComments() == null ? "" : inquiry.getComments().trim();
@@ -148,8 +140,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public InquiryResponse assignCounselor(Long inquiryId, Long counselorId) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        Inquiry inquiry = getInquiry(inquiryId, orgId);
+        Inquiry inquiry = getInquiry(inquiryId);
         inquiry.setAssignedCounselorId(counselorId);
         return toResponse(inquiryRepository.save(inquiry));
     }
@@ -157,17 +148,15 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public ApplicationAdmissionResponse convertToApplication(Long inquiryId) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        Inquiry inquiry = getInquiry(inquiryId, orgId);
+        Inquiry inquiry = getInquiry(inquiryId);
 
-        if (applicationRepository.existsByInquiryIdAndOrganizationId(inquiryId, orgId)) {
-            ApplicationAdmission existing = applicationRepository.findByInquiryIdAndOrganizationId(inquiryId, orgId)
+        if (applicationRepository.existsByInquiryId(inquiryId)) {
+            ApplicationAdmission existing = applicationRepository.findByInquiryId(inquiryId)
                     .orElseThrow(() -> new ResourceNotFoundException("Application not found for inquiry: " + inquiryId));
             return toApplicationResponse(existing);
         }
 
         ApplicationAdmission app = new ApplicationAdmission();
-        app.setOrganizationId(orgId);
         app.setInquiryId(inquiry.getInquiryId());
         app.setApplicationNumber(generateApplicationNumber());
         app.setApplicantName(inquiry.getName());
@@ -188,8 +177,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public FollowUpResponse addFollowUp(Long inquiryId, FollowUpRequest request) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        Inquiry inquiry = getInquiry(inquiryId, orgId);
+        Inquiry inquiry = getInquiry(inquiryId);
 
         InquiryFollowUp followUp = new InquiryFollowUp();
         followUp.setInquiry(inquiry);
@@ -219,23 +207,20 @@ public class InquiryServiceImpl implements InquiryService {
 
     @Override
     public List<FollowUpResponse> getTodayFollowUps() {
-        Long orgId = OrganizationContext.getOrganizationId();
-        return followUpRepository.findDueOnDate(orgId, LocalDate.now())
+        return followUpRepository.findDueOnDate(LocalDate.now())
                 .stream().map(this::toFollowUpResponse).collect(Collectors.toList());
     }
 
     @Override
     public List<FollowUpResponse> getOverdueFollowUps() {
-        Long orgId = OrganizationContext.getOrganizationId();
-        return followUpRepository.findOverdue(orgId, LocalDate.now())
+        return followUpRepository.findOverdue(LocalDate.now())
                 .stream().map(this::toFollowUpResponse).collect(Collectors.toList());
     }
 
     @Override
     @Transactional
     public FollowUpResponse updateFollowUp(Long followUpId, FollowUpRequest request) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        InquiryFollowUp followUp = followUpRepository.findScopedById(followUpId, orgId)
+        InquiryFollowUp followUp = followUpRepository.findById(followUpId)
                 .orElseThrow(() -> new ResourceNotFoundException("Follow-up not found: " + followUpId));
 
         if (request.getFollowUpType() != null) {
@@ -263,8 +248,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public FollowUpResponse completeFollowUp(Long followUpId) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        InquiryFollowUp followUp = followUpRepository.findScopedById(followUpId, orgId)
+        InquiryFollowUp followUp = followUpRepository.findById(followUpId)
                 .orElseThrow(() -> new ResourceNotFoundException("Follow-up not found: " + followUpId));
 
         Inquiry inquiry = followUp.getInquiry();
@@ -281,8 +265,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public CounselingNoteResponse addCounselingNote(Long inquiryId, CounselingNoteRequest request) {
-        Long orgId = OrganizationContext.getOrganizationId();
-        Inquiry inquiry = getInquiry(inquiryId, orgId);
+        Inquiry inquiry = getInquiry(inquiryId);
 
         CounselingNote note = new CounselingNote();
         note.setInquiry(inquiry);
@@ -304,26 +287,24 @@ public class InquiryServiceImpl implements InquiryService {
 
     @Override
     public AdmissionKpiResponse getKpi() {
-        Long orgId = OrganizationContext.getOrganizationId();
-
-        long total = inquiryRepository.countByOrganizationIdAndDeletedFalse(orgId);
-        long newCount = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.NEW);
-        long converted = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.CONVERTED);
-        long lost = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.LOST);
+        long total = inquiryRepository.countByDeletedFalse();
+        long newCount = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.NEW);
+        long converted = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.CONVERTED);
+        long lost = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.LOST);
         long pending = inquiryRepository
-                .findByOrganizationIdAndDeletedFalseAndNextFollowUpDateLessThanEqualOrderByNextFollowUpDateAsc(orgId, LocalDate.now())
+                .findByDeletedFalseAndNextFollowUpDateLessThanEqualOrderByNextFollowUpDateAsc(LocalDate.now())
                 .size();
 
         // Status breakdown
         Map<String, Long> breakdown = new HashMap<>();
-        inquiryRepository.countByStatusForOrg(orgId)
+        inquiryRepository.countByStatus()
                 .forEach(row -> breakdown.put(String.valueOf(row[0]), ((Number) row[1]).longValue()));
 
-        long totalApps = applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.SUBMITTED)
-                + applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.UNDER_REVIEW)
-                + applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.APPROVED)
-                + applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.REJECTED)
-                + applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.DRAFT);
+        long totalApps = applicationRepository.countByStatus(ApplicationStatus.SUBMITTED)
+                + applicationRepository.countByStatus(ApplicationStatus.UNDER_REVIEW)
+                + applicationRepository.countByStatus(ApplicationStatus.APPROVED)
+                + applicationRepository.countByStatus(ApplicationStatus.REJECTED)
+                + applicationRepository.countByStatus(ApplicationStatus.DRAFT);
 
         return AdmissionKpiResponse.builder()
                 .totalInquiries(total)
@@ -333,30 +314,29 @@ public class InquiryServiceImpl implements InquiryService {
                 .lostInquiries(lost)
                 .pendingFollowUps(pending)
                 .totalApplications(totalApps)
-                .draftApplications(applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.DRAFT))
-                .pendingApplications(applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.UNDER_REVIEW))
-                .approvedApplications(applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.APPROVED))
-                .rejectedApplications(applicationRepository.countByOrganizationIdAndStatus(orgId, ApplicationStatus.REJECTED))
+                .draftApplications(applicationRepository.countByStatus(ApplicationStatus.DRAFT))
+                .pendingApplications(applicationRepository.countByStatus(ApplicationStatus.UNDER_REVIEW))
+                .approvedApplications(applicationRepository.countByStatus(ApplicationStatus.APPROVED))
+                .rejectedApplications(applicationRepository.countByStatus(ApplicationStatus.REJECTED))
                 .inquiryStatusBreakdown(breakdown)
                 .build();
     }
 
-            @Override
-            public InquiryWorkspaceKpiResponse getWorkspaceKpi() {
-            Long orgId = OrganizationContext.getOrganizationId();
-            long newInquiries = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.NEW);
-            long todayFollowUps = inquiryRepository
-                .findByOrganizationIdAndDeletedFalseAndNextFollowUpDateLessThanEqualOrderByNextFollowUpDateAsc(orgId, LocalDate.now())
+        @Override
+        public InquiryWorkspaceKpiResponse getWorkspaceKpi() {
+        long newInquiries = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.NEW);
+        long todayFollowUps = inquiryRepository
+            .findByDeletedFalseAndNextFollowUpDateLessThanEqualOrderByNextFollowUpDateAsc(LocalDate.now())
                 .stream()
                 .filter(i -> LocalDate.now().equals(i.getNextFollowUpDate()))
                 .count();
-            long interested = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.INTERESTED);
-            long admissionReady = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.READY_FOR_ADMISSION);
-            long futureProspects = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.CONTACTED)
-                + inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.FOLLOW_UP_REQUIRED)
-                + inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.FOLLOW_UP);
-            long closed = inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.CLOSED)
-                + inquiryRepository.countByOrganizationIdAndStatusAndDeletedFalse(orgId, InquiryStatus.LOST);
+            long interested = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.INTERESTED);
+            long admissionReady = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.READY_FOR_ADMISSION);
+            long futureProspects = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.CONTACTED)
+                + inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.FOLLOW_UP_REQUIRED)
+                + inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.FOLLOW_UP);
+            long closed = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.CLOSED)
+                + inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.LOST);
             return InquiryWorkspaceKpiResponse.builder()
                 .newInquiries(newInquiries)
                 .todaysFollowUps(todayFollowUps)
@@ -367,18 +347,17 @@ public class InquiryServiceImpl implements InquiryService {
                 .build();
             }
 
-            @Override
-            public InquiryQuickActionResponse getQuickActions() {
-            Long orgId = OrganizationContext.getOrganizationId();
-            LocalDate today = LocalDate.now();
-            long overdue = followUpRepository.findOverdue(orgId, today).size();
-            long dueToday = followUpRepository.findDueOnDate(orgId, today).size();
-            long dueTomorrow = followUpRepository.findDueOnDate(orgId, today.plusDays(1)).size();
-            long dueThisWeek = followUpRepository.findDueOnDate(orgId, today.plusDays(2)).size()
-                + followUpRepository.findDueOnDate(orgId, today.plusDays(3)).size()
-                + followUpRepository.findDueOnDate(orgId, today.plusDays(4)).size()
-                + followUpRepository.findDueOnDate(orgId, today.plusDays(5)).size()
-                + followUpRepository.findDueOnDate(orgId, today.plusDays(6)).size();
+        @Override
+        public InquiryQuickActionResponse getQuickActions() {
+        LocalDate today = LocalDate.now();
+        long overdue = followUpRepository.findOverdue(today).size();
+        long dueToday = followUpRepository.findDueOnDate(today).size();
+            long dueTomorrow = followUpRepository.findDueOnDate(today.plusDays(1)).size();
+            long dueThisWeek = followUpRepository.findDueOnDate(today.plusDays(2)).size()
+                + followUpRepository.findDueOnDate(today.plusDays(3)).size()
+                + followUpRepository.findDueOnDate(today.plusDays(4)).size()
+                + followUpRepository.findDueOnDate(today.plusDays(5)).size()
+                + followUpRepository.findDueOnDate(today.plusDays(6)).size();
             return InquiryQuickActionResponse.builder()
                 .overdue(overdue)
                 .dueToday(dueToday)
@@ -398,10 +377,9 @@ public class InquiryServiceImpl implements InquiryService {
                 .build();
             }
 
-            @Override
-            public List<InquiryTimelineItemResponse> getTimeline(Long inquiryId) {
-            Long orgId = OrganizationContext.getOrganizationId();
-            Inquiry inquiry = getInquiry(inquiryId, orgId);
+        @Override
+        public List<InquiryTimelineItemResponse> getTimeline(Long inquiryId) {
+        Inquiry inquiry = getInquiry(inquiryId);
 
             List<InquiryTimelineItemResponse> timeline = new ArrayList<>();
             timeline.add(InquiryTimelineItemResponse.builder()
@@ -439,8 +417,9 @@ public class InquiryServiceImpl implements InquiryService {
 
     // ─── Private helpers ──────────────────────────────────────────────────────
 
-    private Inquiry getInquiry(Long inquiryId, Long orgId) {
-        return inquiryRepository.findByInquiryIdAndOrganizationIdAndDeletedFalse(inquiryId, orgId)
+    private Inquiry getInquiry(Long inquiryId) {
+        // Schema-per-tenant: Automatically scoped to current tenant schema
+        return inquiryRepository.findByInquiryIdAndDeletedFalse(inquiryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inquiry not found: " + inquiryId));
     }
 

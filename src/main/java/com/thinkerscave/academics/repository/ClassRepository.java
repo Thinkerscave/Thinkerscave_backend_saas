@@ -16,6 +16,10 @@ public interface ClassRepository extends JpaRepository<AcademicClass, Long> {
 
     boolean existsByAcademicYear_AcademicYearIdAndClassCodeAndClassIdNot(Long yearId, String classCode, Long classId);
 
+    boolean existsByAcademicYear_AcademicYearIdAndClassNameIgnoreCase(Long yearId, String className);
+
+    boolean existsByAcademicYear_AcademicYearIdAndClassNameIgnoreCaseAndClassIdNot(Long yearId, String className, Long classId);
+
     Optional<AcademicClass> findByAcademicYear_AcademicYearIdAndClassCodeIgnoreCase(Long yearId, String classCode);
 
     Optional<AcademicClass> findByAcademicYear_AcademicYearIdAndClassNameIgnoreCase(Long yearId, String className);

@@ -96,6 +96,10 @@ public class SalaryStructureServiceImpl implements SalaryStructureService {
         s.setSpecialAllowance(orZero(req.getSpecialAllowance()));
         s.setTransportAllowance(orZero(req.getTransportAllowance()));
         s.setOtherAllowance(orZero(req.getOtherAllowance()));
+        s.setPfEmployee(orZero(req.getPfEmployee()));
+        s.setEsiEmployee(orZero(req.getEsiEmployee()));
+        s.setProfessionalTax(orZero(req.getProfessionalTax()));
+        s.setOtherDeduction(orZero(req.getOtherDeduction()));
         s.setBankName(req.getBankName());
         s.setAccountHolderName(req.getAccountHolderName());
         s.setAccountNumber(req.getAccountNumber());
@@ -110,6 +114,13 @@ public class SalaryStructureServiceImpl implements SalaryStructureService {
                 .add(orZero(s.getSpecialAllowance()))
                 .add(orZero(s.getTransportAllowance()))
                 .add(orZero(s.getOtherAllowance()));
+    }
+
+    private BigDecimal calculateStatutoryDeductions(StaffSalaryStructure s) {
+        return orZero(s.getPfEmployee())
+                .add(orZero(s.getEsiEmployee()))
+                .add(orZero(s.getProfessionalTax()))
+                .add(orZero(s.getOtherDeduction()));
     }
 
     private BigDecimal orZero(BigDecimal val) {
@@ -129,6 +140,11 @@ public class SalaryStructureServiceImpl implements SalaryStructureService {
                 .specialAllowance(s.getSpecialAllowance())
                 .transportAllowance(s.getTransportAllowance())
                 .otherAllowance(s.getOtherAllowance())
+                .pfEmployee(s.getPfEmployee())
+                .esiEmployee(s.getEsiEmployee())
+                .professionalTax(s.getProfessionalTax())
+                .otherDeduction(s.getOtherDeduction())
+                .totalStatutoryDeductions(calculateStatutoryDeductions(s))
                 .grossSalary(s.getGrossSalary())
                 .bankName(s.getBankName())
                 .accountHolderName(s.getAccountHolderName())

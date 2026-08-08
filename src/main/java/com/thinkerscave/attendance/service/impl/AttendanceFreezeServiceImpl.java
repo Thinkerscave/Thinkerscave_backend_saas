@@ -4,6 +4,7 @@ import com.thinkerscave.attendance.dto.request.AttendanceFreezeRequest;
 import com.thinkerscave.attendance.dto.response.AttendanceFreezeResponse;
 import com.thinkerscave.attendance.entity.AttendanceFreeze;
 import com.thinkerscave.attendance.repository.AttendanceFreezeRepository;
+import com.thinkerscave.attendance.repository.AttendanceSettingRepository;
 import com.thinkerscave.attendance.service.AttendanceFreezeService;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.BadRequestException;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 public class AttendanceFreezeServiceImpl implements AttendanceFreezeService {
 
     private final AttendanceFreezeRepository attendanceFreezeRepository;
+    private final AttendanceSettingRepository attendanceSettingRepository;
 
     @Override
     @Transactional
@@ -69,7 +71,18 @@ public class AttendanceFreezeServiceImpl implements AttendanceFreezeService {
 
     @Override
     public boolean isDateFrozen(Long organizationId, LocalDate date) {
-        return attendanceFreezeRepository.isDateFrozen(organizationId, date);
+        if (attendanceFreezeRepository.isDateFrozen(organizationId, date)) {
+            return true;
+        }
+        // Rolling window: dates older than freezeAfterDays are locked (0 = disabled)
+        Integer freezeAfterDays = attendanceSettingRepository.findByOrganizationId(organizationId)
+                .map(s -> s.getFreezeAfterDays())
+                .orElse(0);
+        if (freezeAfterDays == null || freezeAfterDays <= 0 || date == null) {
+            return false;
+        }
+        LocalDate cutoff = LocalDate.now().minusDays(freezeAfterDays);
+        return date.isBefore(cutoff);
     }
 
     private AttendanceFreezeResponse toResponse(AttendanceFreeze freeze) {

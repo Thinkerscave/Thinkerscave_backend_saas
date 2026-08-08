@@ -148,10 +148,21 @@ public class MenuServiceImpl implements MenuService {
                         .filter(p -> Boolean.TRUE.equals(p.getCanView()))
                         .collect(Collectors.toMap(
                                 com.thinkerscave.access.dto.response.EffectivePermissionResponse::getMenuId,
-                                p -> p));
+                                p -> p,
+                                (existing, ignored) -> existing));
 
-        List<Menu> allMenus = menuRepository.findByActiveTrueAndParentMenuIsNullOrderByDisplayOrderAsc();
-        return buildSidebarTree(allMenus, permMap, organizationId);
+        // Fetch all active menus in a single query and group children by parent id in-memory
+        // to avoid an N+1 query pattern (one query per menu node) which caused the sidebar
+        // endpoint to take 50+ seconds against a remote/high-latency database.
+        List<Menu> allActiveMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc();
+        Map<Long, List<Menu>> childrenByParentId = allActiveMenus.stream()
+                .filter(m -> m.getParentMenu() != null)
+                .collect(Collectors.groupingBy(m -> m.getParentMenu().getId()));
+        List<Menu> topLevelMenus = allActiveMenus.stream()
+                .filter(m -> m.getParentMenu() == null)
+                .toList();
+
+        return buildSidebarTree(topLevelMenus, permMap, organizationId, childrenByParentId);
     }
 
     // ─── Tree Builders ────────────────────────────────────────────────────
@@ -181,14 +192,15 @@ public class MenuServiceImpl implements MenuService {
 
     private List<SidebarItemResponse> buildSidebarTree(List<Menu> parents,
             Map<Long, com.thinkerscave.access.dto.response.EffectivePermissionResponse> permMap,
-            Long organizationId) {
+            Long organizationId,
+            Map<Long, List<Menu>> childrenByParentId) {
         List<SidebarItemResponse> result = new ArrayList<>();
         for (Menu parent : parents) {
             if (!Boolean.TRUE.equals(parent.getShowInSidebar())) continue;
 
             com.thinkerscave.access.dto.response.EffectivePermissionResponse perm = permMap.get(parent.getId());
-            List<Menu> children = menuRepository.findByParentMenu_IdAndActiveTrue(parent.getId());
-            List<SidebarItemResponse> childNodes = buildSidebarTree(children, permMap, organizationId);
+            List<Menu> children = childrenByParentId.getOrDefault(parent.getId(), List.of());
+            List<SidebarItemResponse> childNodes = buildSidebarTree(children, permMap, organizationId, childrenByParentId);
 
             boolean hasAccess = perm != null || !childNodes.isEmpty();
             if (!hasAccess) continue;

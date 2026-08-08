@@ -12,10 +12,10 @@ public final class InquirySpecification {
     private InquirySpecification() {
     }
 
-    public static Specification<Inquiry> filter(Long organizationId, LeadSearchRequest request) {
+    public static Specification<Inquiry> filter(LeadSearchRequest request) {
         return (root, query, cb) -> {
             List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("organizationId"), organizationId));
+            // Schema-per-tenant: Automatically scoped to current tenant schema
             predicates.add(cb.isFalse(root.get("deleted")));
 
             if (request == null) {

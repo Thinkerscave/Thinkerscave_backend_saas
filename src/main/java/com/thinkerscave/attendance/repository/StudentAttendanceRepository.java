@@ -86,6 +86,20 @@ public interface StudentAttendanceRepository extends JpaRepository<StudentAttend
             """)
     List<Object[]> getClassWiseSummaryForDate(@Param("orgId") Long orgId, @Param("date") LocalDate date);
 
+    @Query("""
+            SELECT sa.classId, sa.className, sa.sectionId, sa.sectionName,
+                   COUNT(sa) as total,
+                   SUM(CASE WHEN sa.status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) as presentCount
+            FROM StudentAttendance sa
+            WHERE sa.organizationId = :orgId
+              AND sa.attendanceDate BETWEEN :from AND :to
+            GROUP BY sa.classId, sa.className, sa.sectionId, sa.sectionName
+            ORDER BY sa.className, sa.sectionName
+            """)
+    List<Object[]> getClassWiseSummaryForRange(@Param("orgId") Long orgId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
     // ─── Dashboard ────────────────────────────────────────────────────────
 
     @Query("""
@@ -99,6 +113,34 @@ public interface StudentAttendanceRepository extends JpaRepository<StudentAttend
             ) AND ac.active = true
             """)
     long countClassesWithPendingAttendance(@Param("orgId") Long orgId, @Param("date") LocalDate date);
+
+    @Query("""
+            SELECT ac.classId, ac.className
+            FROM AcademicClass ac
+            WHERE ac.active = true
+              AND NOT EXISTS (
+                SELECT 1 FROM StudentAttendance sa2
+                WHERE sa2.organizationId = :orgId
+                  AND sa2.classId = ac.classId
+                  AND sa2.attendanceDate = :date
+              )
+            ORDER BY ac.className
+            """)
+    List<Object[]> findClassesWithPendingAttendance(@Param("orgId") Long orgId, @Param("date") LocalDate date);
+
+    @Query("""
+            SELECT YEAR(sa.attendanceDate), MONTH(sa.attendanceDate), sa.status, COUNT(sa)
+            FROM StudentAttendance sa
+            WHERE sa.organizationId = :orgId
+              AND sa.attendanceDate BETWEEN :from AND :to
+            GROUP BY YEAR(sa.attendanceDate), MONTH(sa.attendanceDate), sa.status
+            ORDER BY YEAR(sa.attendanceDate), MONTH(sa.attendanceDate)
+            """)
+    List<Object[]> getMonthlyStatusBreakdown(@Param("orgId") Long orgId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
+    Optional<StudentAttendance> findByOrganizationIdAndAttendanceId(Long organizationId, Long attendanceId);
 
     // ─── Copy from previous day ───────────────────────────────────────────
 

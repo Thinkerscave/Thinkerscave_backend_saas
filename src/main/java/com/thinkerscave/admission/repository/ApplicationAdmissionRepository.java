@@ -13,18 +13,17 @@ import java.util.Optional;
 @Repository
 public interface ApplicationAdmissionRepository extends JpaRepository<ApplicationAdmission, Long>, JpaSpecificationExecutor<ApplicationAdmission> {
 
-    Optional<ApplicationAdmission> findByApplicationNumberAndOrganizationId(String appNumber, Long orgId);
+    Optional<ApplicationAdmission> findByApplicationNumber(String appNumber);
 
-    Page<ApplicationAdmission> findByOrganizationIdOrderByCreatedOnDesc(Long orgId, Pageable pageable);
+    Page<ApplicationAdmission> findByOrderByCreatedOnDesc(Pageable pageable);
 
-    Page<ApplicationAdmission> findByOrganizationIdAndStatusOrderByCreatedOnDesc(
-            Long orgId, ApplicationStatus status, Pageable pageable);
+    Page<ApplicationAdmission> findByStatusOrderByCreatedOnDesc(ApplicationStatus status, Pageable pageable);
 
-    long countByOrganizationIdAndStatus(Long orgId, ApplicationStatus status);
+    long countByStatus(ApplicationStatus status);
 
-    boolean existsByInquiryIdAndOrganizationId(Long inquiryId, Long orgId);
+    boolean existsByInquiryId(Long inquiryId);
 
-    Optional<ApplicationAdmission> findByInquiryIdAndOrganizationId(Long inquiryId, Long orgId);
+    Optional<ApplicationAdmission> findByInquiryId(Long inquiryId);
 
     boolean existsByApplicationNumber(String applicationNumber);
 }

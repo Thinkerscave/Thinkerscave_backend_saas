@@ -1,7 +1,9 @@
 package com.thinkerscave.attendance.service.impl;
 
 import com.thinkerscave.attendance.dto.response.AttendanceDashboardResponse;
+import com.thinkerscave.attendance.dto.response.AttendanceDashboardResponse.PendingClassInfo;
 import com.thinkerscave.attendance.enums.StaffAttendanceStatus;
+import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
 import com.thinkerscave.attendance.repository.StaffAttendanceRepository;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceDashboardService;
@@ -13,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -36,10 +39,24 @@ public class AttendanceDashboardServiceImpl implements AttendanceDashboardServic
         long studentsPresent = classSummaries.stream()
                 .mapToLong(row -> ((Number) row[5]).longValue())
                 .sum();
-        long studentsAbsent = studentsTotal - studentsPresent;
-        long studentsLate = 0L;  // period-level late stats require a separate query
+        long studentsLate = studentAttendanceRepository
+                .countByOrganizationIdAndAttendanceDateAndStatus(orgId, date, StudentAttendanceStatus.LATE);
+        long studentsAbsent = studentAttendanceRepository
+                .countByOrganizationIdAndAttendanceDateAndStatus(orgId, date, StudentAttendanceStatus.ABSENT);
+        if (studentsAbsent == 0 && studentsTotal > studentsPresent + studentsLate) {
+            studentsAbsent = studentsTotal - studentsPresent - studentsLate;
+        }
         double overallPercent = studentsTotal > 0
                 ? ((studentsPresent + studentsLate) * 100.0 / studentsTotal) : 0.0;
+
+        List<PendingClassInfo> pendingClasses = studentAttendanceRepository
+                .findClassesWithPendingAttendance(orgId, date)
+                .stream()
+                .map(row -> PendingClassInfo.builder()
+                        .classId(((Number) row[0]).longValue())
+                        .className((String) row[1])
+                        .build())
+                .collect(Collectors.toList());
 
         // Staff stats
         long staffPresent = staffAttendanceRepository
@@ -55,13 +72,13 @@ public class AttendanceDashboardServiceImpl implements AttendanceDashboardServic
                 .studentsPresent(studentsPresent)
                 .studentsAbsent(studentsAbsent)
                 .studentsLate(studentsLate)
-                .pendingClassCount(0L)
+                .pendingClassCount((long) pendingClasses.size())
                 .studentOverallPercent(Math.round(overallPercent * 100.0) / 100.0)
                 .staffPresent(staffPresent)
                 .staffAbsent(staffAbsent)
                 .staffLate(staffLate)
                 .staffOnLeave(staffOnLeave)
-                .pendingClasses(List.of())
+                .pendingClasses(pendingClasses)
                 .build();
     }
 }

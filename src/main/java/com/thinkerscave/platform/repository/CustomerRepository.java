@@ -19,6 +19,10 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     boolean existsByBusinessEmailAndIdNot(String businessEmail, Long id);
 
+    boolean existsByMobileNumber(String mobileNumber);
+
+    boolean existsByMobileNumberAndIdNot(String mobileNumber, Long id);
+
     boolean existsByCustomerCode(String customerCode);
 
     Optional<Customer> findByCustomerCode(String customerCode);
@@ -33,16 +37,16 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
             AND (:hasCreatedTo = false OR c.createdOn < :createdTo)
             AND (
                 :search IS NULL OR :search = ''
-                OR LOWER(c.customerName) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(c.businessEmail) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(c.customerCode) LIKE LOWER(CONCAT('%', :search, '%'))
-                OR LOWER(c.mobileNumber) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(c.customerName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                OR LOWER(c.businessEmail) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                OR LOWER(c.customerCode) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                OR LOWER(c.mobileNumber) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
                 OR EXISTS (
                     SELECT 1 FROM CustomerContact ct
                     WHERE ct.customer = c AND ct.active = true
                     AND (
-                        LOWER(COALESCE(ct.fullName, '')) LIKE LOWER(CONCAT('%', :search, '%'))
-                        OR LOWER(COALESCE(ct.email, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                        LOWER(COALESCE(ct.fullName, '')) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
+                        OR LOWER(COALESCE(ct.email, '')) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%'))
                     )
                 )
             )

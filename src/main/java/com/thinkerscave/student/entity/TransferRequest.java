@@ -17,7 +17,6 @@ import java.time.LocalDate;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Table(name = "transfer_request",
         indexes = {
-                @Index(name = "idx_transfer_org", columnList = "organization_id"),
                 @Index(name = "idx_transfer_student", columnList = "student_id"),
                 @Index(name = "idx_transfer_status", columnList = "status")
         })
@@ -31,9 +30,6 @@ public class TransferRequest extends Auditable {
     @Column(name = "id")
     @EqualsAndHashCode.Include
     private Long id;
-
-    @Column(name = "organization_id", nullable = false)
-    private Long organizationId;
 
     @Column(name = "request_number", nullable = false, length = 32)
     private String requestNumber;

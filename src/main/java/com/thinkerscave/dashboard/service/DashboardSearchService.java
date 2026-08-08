@@ -69,7 +69,7 @@ public class DashboardSearchService {
     }
 
     private List<DashboardSearchResultDTO> searchLeads(Long orgId, String keyword) {
-        return inquiryRepository.searchByOrganization(orgId, keyword, PageRequest.of(0, LIMIT))
+        return inquiryRepository.search(keyword, PageRequest.of(0, LIMIT))
                 .stream()
                 .map(this::toLeadResult)
                 .toList();

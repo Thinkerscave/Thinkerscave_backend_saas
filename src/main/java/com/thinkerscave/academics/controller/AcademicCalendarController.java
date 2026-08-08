@@ -39,18 +39,21 @@ public class AcademicCalendarController {
     }
 
     @GetMapping("/events/{eventId}")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
     @Operation(summary = "Get event by ID")
     public ResponseEntity<ApiResponse<CalendarEventResponse>> getById(@PathVariable Long eventId) {
         return ResponseEntity.ok(ApiResponse.success("Event found", calendarService.getById(eventId)));
     }
 
     @GetMapping("/years/{yearId}/events")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
     @Operation(summary = "Get events by academic year")
     public ResponseEntity<ApiResponse<List<CalendarEventResponse>>> getByYear(@PathVariable Long yearId) {
         return ResponseEntity.ok(ApiResponse.success("Events retrieved", calendarService.getEventsByYear(yearId)));
     }
 
     @GetMapping("/events/month")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
     @Operation(summary = "Get events by month")
     public ResponseEntity<ApiResponse<List<CalendarEventResponse>>> getByMonth(
             @RequestParam int year, @RequestParam int month) {
@@ -58,6 +61,7 @@ public class AcademicCalendarController {
     }
 
     @GetMapping("/events/upcoming")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
     @Operation(summary = "Get upcoming events")
     public ResponseEntity<ApiResponse<List<CalendarEventResponse>>> getUpcoming() {
         return ResponseEntity.ok(ApiResponse.success("Upcoming events retrieved", calendarService.getUpcomingEvents()));

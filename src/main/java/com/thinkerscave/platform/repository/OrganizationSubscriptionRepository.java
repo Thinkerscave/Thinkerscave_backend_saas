@@ -25,7 +25,7 @@ public interface OrganizationSubscriptionRepository extends JpaRepository<Organi
             SELECT s FROM OrganizationSubscription s
             WHERE s.active = true
             AND (:status IS NULL OR s.status = :status)
-            AND (:search IS NULL OR LOWER(s.organization.organizationName) LIKE LOWER(CONCAT('%', :search, '%')))
+            AND (:search IS NULL OR LOWER(s.organization.organizationName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))
             """)
     Page<OrganizationSubscription> searchSubscriptions(
             @Param("status") SubscriptionStatus status,

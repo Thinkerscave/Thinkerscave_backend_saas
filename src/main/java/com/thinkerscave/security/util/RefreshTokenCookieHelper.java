@@ -28,6 +28,10 @@ public class RefreshTokenCookieHelper {
     @Value("${app.auth.refresh-cookie.max-age-seconds:86400}")
     private long maxAgeSeconds;
 
+    /** Persistent cookie lifetime when "Remember this device" is checked (default 30 days). */
+    @Value("${app.auth.refresh-cookie.remember-me-max-age-seconds:2592000}")
+    private long rememberMeMaxAgeSeconds;
+
     @Value("${app.auth.refresh-cookie.secure:false}")
     private boolean secure;
 
@@ -46,10 +50,27 @@ public class RefreshTokenCookieHelper {
     }
 
     public void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
+        setRefreshTokenCookie(response, refreshToken, null);
+    }
+
+    /**
+     * @param rememberMe {@code true} = persistent cookie, {@code false} = browser-session cookie,
+     *                   {@code null} = configured default max-age (legacy refresh tokens).
+     */
+    public void setRefreshTokenCookie(HttpServletResponse response, String refreshToken, Boolean rememberMe) {
         if (!enabled || !StringUtils.hasText(refreshToken)) {
             return;
         }
-        response.addHeader(HttpHeaders.SET_COOKIE, buildCookie(refreshToken, maxAgeSeconds).toString());
+        long maxAge;
+        if (Boolean.TRUE.equals(rememberMe)) {
+            maxAge = rememberMeMaxAgeSeconds;
+        } else if (Boolean.FALSE.equals(rememberMe)) {
+            // Session cookie: discarded when the browser closes.
+            maxAge = -1;
+        } else {
+            maxAge = maxAgeSeconds;
+        }
+        response.addHeader(HttpHeaders.SET_COOKIE, buildCookie(refreshToken, maxAge).toString());
     }
 
     public void clearRefreshTokenCookie(HttpServletResponse response) {

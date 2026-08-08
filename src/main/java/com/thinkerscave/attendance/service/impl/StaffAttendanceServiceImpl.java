@@ -46,7 +46,6 @@ public class StaffAttendanceServiceImpl implements StaffAttendanceService {
         validateNotFrozen(orgId, request.getAttendanceDate());
 
         Staff staff = staffRepository.findById(request.getStaffId())
-                .filter(s -> s.getUser() != null && orgId.equals(s.getUser().getOrganizationId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + request.getStaffId()));
 
         StaffAttendance attendance = staffAttendanceRepository
@@ -81,7 +80,6 @@ public class StaffAttendanceServiceImpl implements StaffAttendanceService {
         validateNotFrozen(orgId, today);
 
         Staff staff = staffRepository.findById(request.getStaffId())
-                .filter(s -> s.getUser() != null && orgId.equals(s.getUser().getOrganizationId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + request.getStaffId()));
 
         StaffAttendance attendance = staffAttendanceRepository

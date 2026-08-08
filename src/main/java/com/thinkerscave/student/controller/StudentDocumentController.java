@@ -35,14 +35,14 @@ public class StudentDocumentController {
 
     @GetMapping
     @Operation(summary = "List student documents")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<List<StudentDocumentDTO>>> list(@RequestParam("studentId") Long studentId) {
         return ResponseEntity.ok(ApiResponse.success("Documents loaded", studentService.getStudentDocuments(studentId)));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Upload student document")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<StudentDocumentDTO>> upload(
             @RequestParam("studentId") Long studentId,
             @RequestPart("file") MultipartFile file,
@@ -53,7 +53,7 @@ public class StudentDocumentController {
 
     @GetMapping("/{id}/download")
     @Operation(summary = "Download document")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<Resource> download(@PathVariable Long id) {
         Resource file = studentService.downloadDocument(id);
         ContentDisposition disposition = ContentDisposition.attachment()
@@ -66,7 +66,7 @@ public class StudentDocumentController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete document")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','HR_MANAGER','PRINCIPAL','STAFF')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         studentService.deleteDocument(id);
         return ResponseEntity.ok(ApiResponse.success("Document deleted", null));
