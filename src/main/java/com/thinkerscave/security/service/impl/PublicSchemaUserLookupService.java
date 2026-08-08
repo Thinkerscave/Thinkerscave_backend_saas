@@ -73,6 +73,33 @@ public class PublicSchemaUserLookupService {
     }
 
     /**
+     * Owner/super-admin sessions are stored in the public schema. Refresh requests often arrive
+     * with a tenant {@code X-Tenant-ID}, so ambient session lookup misses them.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public Optional<UserSession> findSessionByRefreshToken(String refreshToken) {
+        return sessionRepository.findByRefreshToken(refreshToken)
+                .map(session -> {
+                    User user = session.getUser();
+                    user.getUserRoles().forEach(ur -> ur.getRole().getRoleType());
+                    if (user.getOrganizationId() != null) {
+                        // touch organizationId while session is open
+                        user.getOrganizationId();
+                    }
+                    return session;
+                });
+    }
+
+    /** Must be called with TenantContext already set to "public". */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public UserSession rotateRefreshToken(Long sessionId, String newRefreshToken) {
+        UserSession session = sessionRepository.findById(sessionId)
+                .orElseThrow(() -> new IllegalStateException("Session not found: " + sessionId));
+        session.setRefreshToken(newRefreshToken);
+        return sessionRepository.save(session);
+    }
+
+    /**
      * The returned entity outlives this REQUIRES_NEW transaction/session (it is used by
      * the caller after this method returns, at which point the session is already closed),
      * so lazy collections must be initialized here while the session is still open —

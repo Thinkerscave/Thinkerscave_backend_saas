@@ -39,6 +39,13 @@ public class SubscriptionPlanServiceImpl implements SubscriptionPlanService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<SubscriptionPlanResponse> getVisiblePublicPlans() {
+        return planRepository.findByActiveTrueAndVisibleTrueOrderByDisplayOrderAsc()
+                .stream().map(this::toPlanResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public SubscriptionPlanResponse getPlanById(Long id) {
         return toPlanResponse(findPlanById(id));
     }

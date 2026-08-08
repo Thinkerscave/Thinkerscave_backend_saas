@@ -8,9 +8,13 @@ import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.enums.MenuType;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.access.service.MenuService;
+import com.thinkerscave.security.service.impl.PublicSchemaUserLookupService;
+import com.thinkerscave.shared.context.OrganizationContext;
+import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
@@ -19,10 +23,16 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/access/menus")
@@ -32,6 +42,7 @@ public class MenuController {
 
     private final MenuService menuService;
     private final UserRepository userRepository;
+    private final PublicSchemaUserLookupService publicSchemaUserLookupService;
 
     @PostMapping
     @Operation(summary = "Create a new menu or page")
@@ -107,29 +118,92 @@ public class MenuController {
      * IDOR guard: a caller may only request their own sidebar (own user id + own
      * organization id) unless they hold an org-admin-level authority, in which case
      * they may still only view users within their own organization.
+     *
+     * <p>Organization Owners live in the public schema only — ambient tenant
+     * {@link UserRepository} lookups miss them, so we fall back to a public-schema
+     * lookup. Org scope is taken from the caller's row, {@link OrganizationContext},
+     * or the request's {@code X-Organization-ID} header.
      */
     private void assertCanViewSidebar(Long requestedUserId, Long requestedOrganizationId) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AccessDeniedException("Not authenticated");
         }
-        User caller = userRepository.findByUsername(authentication.getName())
-                .or(() -> userRepository.findByEmail(authentication.getName()))
+        User caller = resolveCaller(authentication.getName())
                 .orElseThrow(() -> new AccessDeniedException("Caller not resolvable"));
 
-        boolean isSelf = caller.getId().equals(requestedUserId)
-                && caller.getOrganizationId() != null
-                && caller.getOrganizationId().equals(requestedOrganizationId);
-        boolean isOrgAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ORGANIZATION_ADMIN") || a.getAuthority().equals("ORGANIZATION_OWNER")
-                        || a.getAuthority().equals("SUPER_ADMIN"));
+        boolean isOrgAdmin = hasAnyAuthority(authentication,
+                "ORGANIZATION_ADMIN", "ORGANIZATION_OWNER", "SUPER_ADMIN");
+        boolean sameUser = caller.getId().equals(requestedUserId);
+        boolean sameOrg = isOrganizationInScope(caller, requestedOrganizationId);
 
-        if (isSelf) {
+        if (sameUser && sameOrg) {
             return;
         }
-        if (isOrgAdmin && caller.getOrganizationId() != null && caller.getOrganizationId().equals(requestedOrganizationId)) {
+        if (isOrgAdmin && sameOrg) {
             return;
         }
         throw new AccessDeniedException("Not authorized to view this user's sidebar");
+    }
+
+    private Optional<User> resolveCaller(String usernameOrEmail) {
+        Optional<User> ambient = userRepository.findByUsername(usernameOrEmail)
+                .or(() -> userRepository.findByEmail(usernameOrEmail));
+        if (ambient.isPresent()) {
+            return ambient;
+        }
+        String previousTenant = TenantContext.getTenant();
+        try {
+            TenantContext.setTenant("public");
+            return publicSchemaUserLookupService.findAnyInPublicSchema(usernameOrEmail);
+        } finally {
+            TenantContext.setTenant(previousTenant);
+        }
+    }
+
+    private boolean isOrganizationInScope(User caller, Long requestedOrganizationId) {
+        if (requestedOrganizationId == null || requestedOrganizationId <= 0) {
+            return false;
+        }
+        Long callerOrgId = caller.getOrganizationId();
+        if (callerOrgId != null && callerOrgId > 0 && callerOrgId.equals(requestedOrganizationId)) {
+            return true;
+        }
+        Long contextOrgId = OrganizationContext.getOrganizationId();
+        if (contextOrgId != null && contextOrgId > 0 && contextOrgId.equals(requestedOrganizationId)) {
+            return true;
+        }
+        Long headerOrgId = resolveOrganizationIdFromHeader();
+        return headerOrgId != null && headerOrgId.equals(requestedOrganizationId);
+    }
+
+    private Long resolveOrganizationIdFromHeader() {
+        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attrs == null) {
+            return null;
+        }
+        HttpServletRequest request = attrs.getRequest();
+        String raw = request.getHeader("X-Organization-ID");
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        try {
+            long parsed = Long.parseLong(raw.trim());
+            return parsed > 0 ? parsed : null;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+
+    private boolean hasAnyAuthority(Authentication authentication, String... authorities) {
+        Collection<? extends GrantedAuthority> granted = authentication.getAuthorities();
+        for (String authority : authorities) {
+            for (GrantedAuthority ga : granted) {
+                if (authority.equals(ga.getAuthority())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

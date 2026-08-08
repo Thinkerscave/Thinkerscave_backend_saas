@@ -326,28 +326,33 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public AuthResponse refreshToken(String refreshToken) {
-        UserSession session = sessionRepository.findByRefreshToken(refreshToken)
-                .orElseThrow(() -> new BadRequestException("Invalid refresh token"));
+    public AuthResponse refreshToken(String refreshToken, String preferredTenant, Long preferredOrgId) {
+        ResolvedRefreshSession resolved = resolveRefreshSession(refreshToken);
+        UserSession session = resolved.session();
+        User user = resolved.user();
 
         if (session.getStatus() != SessionStatus.ACTIVE) {
             throw new BadRequestException("Session is no longer active");
         }
 
-        User user = session.getUser();
-        String tenantId = resolveTenantForUser(user);
+        String tenantId = resolveTenantForRefresh(user, preferredTenant);
+        Long effectiveOrgId = resolveOrgForRefresh(user, preferredOrgId, tenantId);
         String loginContextValue = hasActiveRole(user, RoleType.SUPER_ADMIN)
                 ? LoginContext.PLATFORM
                 : LoginContext.TENANT;
-        Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue, user.getOrganizationId());
+        Map<String, Object> claims = buildTokenClaims(user, tenantId, loginContextValue, effectiveOrgId);
 
         String newAccessToken = jwtService.generateAccessToken(user.getUsername(), claims);
         Boolean rememberMe = jwtService.extractRememberMe(refreshToken);
         boolean remember = Boolean.TRUE.equals(rememberMe);
         String newRefreshToken = jwtService.generateRefreshToken(user.getUsername(), remember);
 
-        session.setRefreshToken(newRefreshToken);
-        sessionRepository.save(session);
+        if (resolved.publicSchemaSession()) {
+            runInPublicSchema(() -> publicSchemaUserLookupService.rotateRefreshToken(session.getId(), newRefreshToken));
+        } else {
+            session.setRefreshToken(newRefreshToken);
+            sessionRepository.save(session);
+        }
 
         return AuthResponse.builder()
                 .accessToken(newAccessToken)
@@ -362,6 +367,84 @@ public class AuthServiceImpl implements AuthService {
                 .rememberMe(rememberMe)
                 .build();
     }
+
+    private ResolvedRefreshSession resolveRefreshSession(String refreshToken) {
+        Optional<UserSession> ambient = sessionRepository.findByRefreshToken(refreshToken);
+        if (ambient.isPresent()) {
+            UserSession session = ambient.get();
+            return new ResolvedRefreshSession(session, initializeUserRoles(session.getUser()), false);
+        }
+        String previousTenant = TenantContext.getTenant();
+        try {
+            TenantContext.setTenant("public");
+            UserSession session = publicSchemaUserLookupService.findSessionByRefreshToken(refreshToken)
+                    .orElseThrow(() -> new BadRequestException("Invalid refresh token"));
+            return new ResolvedRefreshSession(session, initializeUserRoles(session.getUser()), true);
+        } finally {
+            TenantContext.setTenant(previousTenant);
+        }
+    }
+
+    private User initializeUserRoles(User user) {
+        // Detached public-schema user must have roles initialized before role checks.
+        user.getUserRoles().forEach(ur -> ur.getRole().getRoleType());
+        return user;
+    }
+
+    private String resolveTenantForRefresh(User user, String preferredTenant) {
+        String fallback = resolveTenantForUser(user);
+        if (preferredTenant == null || preferredTenant.isBlank()) {
+            return fallback;
+        }
+        String normalizedPreferred = preferredTenant.trim().toLowerCase().replace('-', '_');
+        if (normalizedPreferred.equalsIgnoreCase(fallback)
+                || LoginContext.PLATFORM_TENANT.equalsIgnoreCase(normalizedPreferred)) {
+            return normalizedPreferred;
+        }
+        if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
+            boolean switchable = organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+                    .map(Organization::getTenantRegistry)
+                    .filter(tr -> tr != null && tr.getTenantIdentifier() != null)
+                    .map(tr -> tr.getTenantIdentifier().trim().toLowerCase().replace('-', '_'))
+                    .anyMatch(normalizedPreferred::equals);
+            if (switchable) {
+                return normalizedPreferred;
+            }
+        }
+        return fallback;
+    }
+
+    private Long resolveOrgForRefresh(User user, Long preferredOrgId, String tenantId) {
+        if (hasActiveRole(user, RoleType.SUPER_ADMIN)) {
+            return null;
+        }
+        if (preferredOrgId != null && preferredOrgId > 0) {
+            if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
+                boolean owned = organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+                        .anyMatch(org -> preferredOrgId.equals(org.getId()));
+                if (owned) {
+                    return preferredOrgId;
+                }
+            } else if (preferredOrgId.equals(user.getOrganizationId())) {
+                return preferredOrgId;
+            }
+        }
+        if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
+            return organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+                    .filter(org -> org.getTenantRegistry() != null
+                            && tenantId != null
+                            && tenantId.equalsIgnoreCase(org.getTenantRegistry().getTenantIdentifier()))
+                    .map(Organization::getId)
+                    .findFirst()
+                    .orElseGet(() -> organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+                            .map(Organization::getId)
+                            .findFirst()
+                            .orElse(user.getOrganizationId()));
+        }
+        return user.getOrganizationId();
+    }
+
+    private record ResolvedRefreshSession(UserSession session, User user, boolean publicSchemaSession) {}
 
     @Override
     @Transactional

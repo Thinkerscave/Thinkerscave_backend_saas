@@ -22,5 +22,7 @@ public interface SubscriptionPlanRepository extends JpaRepository<SubscriptionPl
 
     List<SubscriptionPlan> findByActiveTrueOrderByDisplayOrderAsc();
 
+    List<SubscriptionPlan> findByActiveTrueAndVisibleTrueOrderByDisplayOrderAsc();
+
     long countByActiveTrue();
 }

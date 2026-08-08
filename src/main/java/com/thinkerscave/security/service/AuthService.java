@@ -14,7 +14,12 @@ public interface AuthService {
 
     AuthResponse login(LoginRequest request, LoginContext loginContext);
 
-    AuthResponse refreshToken(String refreshToken);
+    /**
+     * @param preferredTenant optional {@code X-Tenant-ID} from the refresh request — preserved when
+     *                        valid for the user (avoids flipping Owners back to their first org)
+     * @param preferredOrgId  optional {@code X-Organization-ID} from the refresh request
+     */
+    AuthResponse refreshToken(String refreshToken, String preferredTenant, Long preferredOrgId);
 
     void logout(String refreshToken);
 

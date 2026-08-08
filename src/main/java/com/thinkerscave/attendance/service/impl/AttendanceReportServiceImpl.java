@@ -40,9 +40,10 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
     public AttendanceSummaryReportResponse getSummaryReport(AttendanceReportRequest request) {
         Long orgId = OrganizationContext.getOrganizationId();
 
-        // Class-wise summary
+        // Class-wise summary across the selected date range (not a single day)
         // row: [0]=classId, [1]=className, [2]=sectionId, [3]=sectionName, [4]=total, [5]=presentCount
-        List<Object[]> classRows = studentAttendanceRepository.getClassWiseSummaryForDate(orgId, request.getFromDate());
+        List<Object[]> classRows = studentAttendanceRepository.getClassWiseSummaryForRange(
+                orgId, request.getFromDate(), request.getToDate());
 
         List<ClassSummaryRow> classWiseSummary = classRows.stream()
                 .map(row -> ClassSummaryRow.builder()

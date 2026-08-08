@@ -11,6 +11,9 @@ public interface SubscriptionPlanService {
 
     List<SubscriptionPlanResponse> getAllPlans();
 
+    /** Active plans marked visible — for unauthenticated marketing/pricing surfaces. */
+    List<SubscriptionPlanResponse> getVisiblePublicPlans();
+
     SubscriptionPlanResponse getPlanById(Long id);
 
     SubscriptionPlanResponse createPlan(SubscriptionPlanRequest request);

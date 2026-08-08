@@ -71,8 +71,23 @@ public class AuthController {
         if (!StringUtils.hasText(token)) {
             throw new BadRequestException("Refresh token is required");
         }
-        AuthResponse authResponse = authService.refreshToken(token);
+        AuthResponse authResponse = authService.refreshToken(
+                token,
+                httpRequest.getHeader("X-Tenant-ID"),
+                parsePositiveLong(httpRequest.getHeader("X-Organization-ID")));
         return ResponseEntity.ok(ApiResponse.success("Token refreshed", applyRefreshCookie(authResponse, httpResponse)));
+    }
+
+    private Long parsePositiveLong(String raw) {
+        if (!StringUtils.hasText(raw)) {
+            return null;
+        }
+        try {
+            long value = Long.parseLong(raw.trim());
+            return value > 0 ? value : null;
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     @PostMapping("/logout")

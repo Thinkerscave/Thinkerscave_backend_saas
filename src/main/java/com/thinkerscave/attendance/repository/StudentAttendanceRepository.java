@@ -86,6 +86,20 @@ public interface StudentAttendanceRepository extends JpaRepository<StudentAttend
             """)
     List<Object[]> getClassWiseSummaryForDate(@Param("orgId") Long orgId, @Param("date") LocalDate date);
 
+    @Query("""
+            SELECT sa.classId, sa.className, sa.sectionId, sa.sectionName,
+                   COUNT(sa) as total,
+                   SUM(CASE WHEN sa.status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) as presentCount
+            FROM StudentAttendance sa
+            WHERE sa.organizationId = :orgId
+              AND sa.attendanceDate BETWEEN :from AND :to
+            GROUP BY sa.classId, sa.className, sa.sectionId, sa.sectionName
+            ORDER BY sa.className, sa.sectionName
+            """)
+    List<Object[]> getClassWiseSummaryForRange(@Param("orgId") Long orgId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to);
+
     // ─── Dashboard ────────────────────────────────────────────────────────
 
     @Query("""
