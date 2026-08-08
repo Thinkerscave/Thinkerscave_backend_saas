@@ -48,7 +48,8 @@ jobs:
     permissions:
       packages: read
     env:
-      SSH_PORT: ${{ secrets.SERVER_PORT || '22' }}
+      SSH_PORT: ${{ secrets.SSH_PORT || '22' }}
+      BACKEND_HOST_PORT: ${{ secrets.BACKEND_HOST_PORT || '8080' }}
 
     steps:
       - name: Preflight SSH connectivity check
@@ -72,7 +73,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           timeout: 60s
           command_timeout: 20m
-          envs: GHCR_TOKEN,GHCR_USER,IMAGE
+          envs: GHCR_TOKEN,GHCR_USER,IMAGE,BACKEND_HOST_PORT
           script: |
             set -e
 
@@ -103,10 +104,33 @@ jobs:
               --name thinkerscave-backend \
               --restart unless-stopped \
               --network web \
+              -p 127.0.0.1:${BACKEND_HOST_PORT}:8080 \
               --env-file /opt/thinkerscave/.env \
               -v /var/thinkerscave/uploads:/var/thinkerscave/uploads \
               -v /var/thinkerscave/logs:/app/Logs \
               "$IMAGE:latest"
+
+            echo "Waiting for backend health check..."
+            ok=0
+            for i in $(seq 1 30); do
+              if docker ps --filter "name=thinkerscave-backend" --filter "status=running" | grep -q thinkerscave-backend; then
+                if curl -fsS "http://127.0.0.1:${BACKEND_HOST_PORT}/actuator/health" >/dev/null 2>&1; then
+                  ok=1
+                  break
+                fi
+              fi
+              sleep 2
+            done
+
+            if [ "$ok" -ne 1 ]; then
+              echo "Backend did not become healthy. Recent container logs:"
+              docker logs --tail 200 thinkerscave-backend || true
+              echo "Container status:"
+              docker ps -a --filter "name=thinkerscave-backend" || true
+              exit 1
+            fi
+
+            echo "Backend health endpoint is responding."
 
             docker image prune -f
             echo "Backend deployed: $IMAGE:latest"
