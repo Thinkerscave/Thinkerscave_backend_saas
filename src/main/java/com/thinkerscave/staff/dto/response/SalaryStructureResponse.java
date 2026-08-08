@@ -25,6 +25,11 @@ public class SalaryStructureResponse {
     private BigDecimal specialAllowance;
     private BigDecimal transportAllowance;
     private BigDecimal otherAllowance;
+    private BigDecimal pfEmployee;
+    private BigDecimal esiEmployee;
+    private BigDecimal professionalTax;
+    private BigDecimal otherDeduction;
+    private BigDecimal totalStatutoryDeductions;
     private BigDecimal grossSalary;
     private String bankName;
     private String accountHolderName;

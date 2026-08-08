@@ -24,6 +24,10 @@ public class PayrollResponse {
     private Integer presentDays;
     private Integer leaveWithoutPayDays;
     private BigDecimal grossSalary;
+    private BigDecimal pfAmount;
+    private BigDecimal esiAmount;
+    private BigDecimal professionalTaxAmount;
+    private BigDecimal otherDeductionAmount;
     private BigDecimal totalDeductions;
     private BigDecimal netSalary;
     private PayrollStatus status;

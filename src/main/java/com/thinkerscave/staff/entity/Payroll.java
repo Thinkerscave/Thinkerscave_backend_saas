@@ -66,6 +66,19 @@ public class Payroll extends Auditable {
     @Column(name = "gross_salary", precision = 12, scale = 2)
     private BigDecimal grossSalary = BigDecimal.ZERO;
 
+    /** Snapshot of PF at generation time. */
+    @Column(name = "pf_amount", precision = 12, scale = 2)
+    private BigDecimal pfAmount = BigDecimal.ZERO;
+
+    @Column(name = "esi_amount", precision = 12, scale = 2)
+    private BigDecimal esiAmount = BigDecimal.ZERO;
+
+    @Column(name = "professional_tax_amount", precision = 12, scale = 2)
+    private BigDecimal professionalTaxAmount = BigDecimal.ZERO;
+
+    @Column(name = "other_deduction_amount", precision = 12, scale = 2)
+    private BigDecimal otherDeductionAmount = BigDecimal.ZERO;
+
     @Column(name = "total_deductions", precision = 12, scale = 2)
     private BigDecimal totalDeductions = BigDecimal.ZERO;
 

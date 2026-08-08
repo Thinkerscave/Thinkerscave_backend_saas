@@ -42,4 +42,19 @@ public interface StudentEnrollmentRepository extends JpaRepository<StudentEnroll
 
 	List<StudentEnrollment> findByClassEntityClassIdAndSectionSectionIdAndActiveTrueOrderByRollNumber(
 			Long classId, Long sectionId);
+
+	@Query("""
+			SELECT e FROM StudentEnrollment e
+			LEFT JOIN FETCH e.student
+			LEFT JOIN FETCH e.classEntity
+			LEFT JOIN FETCH e.section
+			LEFT JOIN FETCH e.academicYear
+			WHERE e.academicYear.academicYearId = :yearId
+			  AND e.active = true
+			  AND e.status = com.thinkerscave.student.enums.EnrollmentStatus.ACTIVE
+			ORDER BY e.student.firstName ASC
+			""")
+	List<StudentEnrollment> findActiveByAcademicYearId(@Param("yearId") Long yearId);
+
+	boolean existsByStudentStudentIdAndAcademicYearAcademicYearId(Long studentId, Long academicYearId);
 }

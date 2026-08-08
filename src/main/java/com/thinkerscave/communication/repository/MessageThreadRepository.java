@@ -17,11 +17,15 @@ public interface MessageThreadRepository extends JpaRepository<MessageThread, Lo
 
     Optional<MessageThread> findByThreadIdAndOrganizationId(Long threadId, Long orgId);
 
+    /**
+     * Exact participant token match — wraps CSV with commas so user {@code 1}
+     * does not match {@code 21} / {@code 100}.
+     */
     @Query("""
             SELECT t FROM MessageThread t
             WHERE t.organizationId = :orgId
               AND t.closed = false
-              AND t.participantUserIdsCsv LIKE %:userId%
+              AND CONCAT(',', t.participantUserIdsCsv, ',') LIKE CONCAT('%,', :userId, ',%')
             ORDER BY t.lastMessageAt DESC
             """)
     Page<MessageThread> findActiveThreadsForUser(@Param("orgId") Long orgId,

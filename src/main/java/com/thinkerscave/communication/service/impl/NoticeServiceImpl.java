@@ -8,6 +8,7 @@ import com.thinkerscave.communication.enums.NoticeStatus;
 import com.thinkerscave.communication.repository.NoticeAudienceRepository;
 import com.thinkerscave.communication.repository.NoticeRepository;
 import com.thinkerscave.communication.service.NoticeService;
+import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +32,7 @@ public class NoticeServiceImpl implements NoticeService {
 
     private final NoticeRepository noticeRepository;
     private final NoticeAudienceRepository audienceRepository;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional
@@ -91,6 +93,9 @@ public class NoticeServiceImpl implements NoticeService {
         notice.setStatus(NoticeStatus.PUBLISHED);
         if (notice.getPublishDate() == null) notice.setPublishDate(LocalDate.now());
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        userRepository.findByUsername(username)
+                .or(() -> userRepository.findByEmail(username))
+                .ifPresent(user -> notice.setPublishedByUserId(user.getId()));
         return toResponse(noticeRepository.save(notice));
     }
 

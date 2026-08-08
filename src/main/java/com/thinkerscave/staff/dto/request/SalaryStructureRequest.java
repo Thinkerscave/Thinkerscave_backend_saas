@@ -31,6 +31,11 @@ public class SalaryStructureRequest {
 
     private BigDecimal otherAllowance;
 
+    private BigDecimal pfEmployee;
+    private BigDecimal esiEmployee;
+    private BigDecimal professionalTax;
+    private BigDecimal otherDeduction;
+
     @Size(max = 150)
     private String bankName;
 
