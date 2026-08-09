@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/communication/notifications")
 @RequiredArgsConstructor
 @Tag(name = "Communication - Notifications", description = "Send and manage notifications")
-@PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF')")
+@PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF')")
 public class NotificationController {
 
     private final NotificationService notificationService;

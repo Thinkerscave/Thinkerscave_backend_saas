@@ -22,7 +22,7 @@ public class LoginHistoryController {
 
     @GetMapping("/users/{userId}")
     @Operation(summary = "Get login history for a specific user")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
     public ResponseEntity<ApiResponse<Page<LoginHistoryResponse>>> getUserHistory(
             @PathVariable Long userId,
             @RequestParam(required = false) LoginStatus status,
@@ -34,7 +34,7 @@ public class LoginHistoryController {
 
     @GetMapping("/organizations/{organizationId}")
     @Operation(summary = "Get login history for all users in an organization")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
     public ResponseEntity<ApiResponse<Page<LoginHistoryResponse>>> getOrgHistory(
             @PathVariable Long organizationId,
             @RequestParam(required = false) LoginStatus status,
