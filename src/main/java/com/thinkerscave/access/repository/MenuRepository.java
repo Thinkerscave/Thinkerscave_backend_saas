@@ -41,4 +41,6 @@ public interface MenuRepository extends JpaRepository<Menu, Long>, JpaSpecificat
     List<Menu> findByMenuScopeAndParentMenuIsNullAndActiveTrue(MenuScope menuScope);
 
     List<Menu> findByFeature_IdInAndParentMenuIsNullAndActiveTrue(List<Long> featureIds);
+
+    List<Menu> findByMenuCodeInAndActiveTrue(List<String> menuCodes);
 }

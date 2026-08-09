@@ -273,6 +273,8 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
      * @return the SUBSCRIPTION-scope features created, for plan-feature linking.
      */
     private List<Feature> seedOrganizationFacingCatalog() {
+                deactivateObsoleteOrganizationMenus();
+
         // ── CORE (always available, no subscription gating) ──────────────────
         ensureMenu("DASHBOARD", "Dashboard", "Organization dashboard", "/app", "dashboard",
                 MenuType.PAGE, null, 1, MenuScope.CORE, null);
@@ -325,12 +327,8 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "/app/students", "groups", MenuType.MODULE, null, 11, MenuScope.SUBSCRIPTION, studentsFeature);
         ensureMenu("STUDENTS_DIRECTORY", "Directory", "Student directory",
                 "/app/students/directory", "list", MenuType.PAGE, students, 1, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("STUDENTS_TRANSFERS", "Transfers", "Student transfers",
-                "/app/students/transfers", "sync", MenuType.PAGE, students, 2, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("STUDENTS_DOCUMENTS", "Documents", "Student documents",
-                "/app/students/documents", "folder", MenuType.PAGE, students, 3, MenuScope.SUBSCRIPTION, null);
         ensureMenu("STUDENTS_ALUMNI", "Alumni", "Student alumni",
-                "/app/students/alumni", "school", MenuType.PAGE, students, 4, MenuScope.SUBSCRIPTION, null);
+                "/app/students/alumni", "school", MenuType.PAGE, students, 2, MenuScope.SUBSCRIPTION, null);
 
         Feature staffFeature = ensureFeature("FEAT_STAFF", "STAFF_MODULE", "Staff",
                 "Staff", "ADMINISTRATION", 3);
@@ -344,10 +342,6 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "/app/staff/payroll", "credit_card", MenuType.PAGE, staff, 3, MenuScope.SUBSCRIPTION, null);
         ensureMenu("STAFF_LEAVE", "Leave & Availability", "Staff leave and availability",
                 "/app/staff/leave-availability", "event", MenuType.PAGE, staff, 4, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("STAFF_DOCUMENTS", "Documents", "Staff documents",
-                "/app/staff/documents", "folder", MenuType.PAGE, staff, 5, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("STAFF_ALUMNI", "Alumni", "Staff alumni",
-                "/app/staff/alumni", "school", MenuType.PAGE, staff, 6, MenuScope.SUBSCRIPTION, null);
 
         Feature attendanceFeature = ensureFeature("FEAT_ATTENDANCE", "ATTENDANCE_MODULE", "Attendance",
                 "Attendance", "ACADEMIC", 4);
@@ -368,30 +362,16 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "Admissions", "ADMINISTRATION", 5);
         Menu admissions = ensureMenu("ADMISSIONS", "Admissions", "Admissions CRM",
                 "/app/admissions", "person_add", MenuType.MODULE, null, 14, MenuScope.SUBSCRIPTION, admissionsFeature);
-        ensureMenu("ADMISSIONS_OVERVIEW", "Overview", "Admissions overview",
-                "/app/admissions/overview", "dashboard", MenuType.PAGE, admissions, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_LEADS", "Leads", "Admissions leads",
-                "/app/admissions/leads", "list", MenuType.PAGE, admissions, 2, MenuScope.SUBSCRIPTION, null);
+                "/app/admissions/leads", "list", MenuType.PAGE, admissions, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_FOLLOW_UPS", "Follow-ups", "Admissions follow-ups",
-                "/app/admissions/follow-ups", "event", MenuType.PAGE, admissions, 3, MenuScope.SUBSCRIPTION, null);
+                "/app/admissions/follow-ups", "event", MenuType.PAGE, admissions, 2, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_APPLICATIONS", "Applications", "Admissions applications",
-                "/app/admissions/applications", "description", MenuType.PAGE, admissions, 4, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("ADMISSIONS_ENROLLMENT", "Enrollment", "Admissions enrollment",
-                "/app/admissions/enrollment", "how_to_reg", MenuType.PAGE, admissions, 5, MenuScope.SUBSCRIPTION, null);
+                "/app/admissions/applications", "description", MenuType.PAGE, admissions, 3, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_REPORTS", "Reports", "Admissions reports",
-                "/app/admissions/reports", "bar_chart", MenuType.PAGE, admissions, 6, MenuScope.SUBSCRIPTION, null);
+                "/app/admissions/reports", "bar_chart", MenuType.PAGE, admissions, 4, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_SETTINGS", "Settings", "Admissions settings",
-                "/app/admissions/settings", "settings", MenuType.PAGE, admissions, 7, MenuScope.SUBSCRIPTION, null);
-
-        Feature examsFeature = ensureFeature("FEAT_EXAMS", "EXAMS_MODULE", "Examinations",
-                "Examinations", "ACADEMIC", 6);
-        ensureMenu("EXAMS", "Examinations", "Examinations", "/app/exams", "assignment",
-                MenuType.PAGE, null, 15, MenuScope.SUBSCRIPTION, examsFeature);
-
-        Feature enrollmentsFeature = ensureFeature("FEAT_ENROLLMENTS", "ENROLLMENTS_MODULE", "Enrollments",
-                "Enrollments", "ADMINISTRATION", 7);
-        ensureMenu("ENROLLMENTS", "Enrollments", "Enrollments", "/app/enrollments", "how_to_reg",
-                MenuType.PAGE, null, 16, MenuScope.SUBSCRIPTION, enrollmentsFeature);
+                "/app/admissions/settings", "settings", MenuType.PAGE, admissions, 5, MenuScope.SUBSCRIPTION, null);
 
         Feature promotionTransferFeature = ensureFeature("FEAT_PROMOTION_TRANSFER", "PROMOTION_TRANSFER_MODULE",
                 "Promotion & Transfer", "Promotion & Transfer", "ACADEMIC", 8);
@@ -429,38 +409,47 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "/app/fees", "credit_card", MenuType.MODULE, null, 20, MenuScope.SUBSCRIPTION, feeManagementFeature);
         ensureMenu("FEE_DASHBOARD", "Dashboard", "Fee dashboard",
                 "/app/fees/dashboard", "dashboard", MenuType.PAGE, feeManagement, 1, MenuScope.SUBSCRIPTION, null);
-        Menu feeSetup = ensureMenu("FEE_SETUP", "Setup", "Fee setup",
-                "/app/fees/setup", "settings", MenuType.MODULE, feeManagement, 2, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_SETUP_POLICY", "Fee Policy", "Fee policy",
-                "/app/fees/setup/policy", "description", MenuType.PAGE, feeSetup, 1, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_SETUP_HEADS", "Fee Heads", "Fee heads",
-                "/app/fees/setup/heads", "list", MenuType.PAGE, feeSetup, 2, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_SETUP_GROUPS", "Fee Groups", "Fee groups",
-                "/app/fees/setup/groups", "folder", MenuType.PAGE, feeSetup, 3, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_SETUP_STRUCTURE", "Fee Structure", "Fee structure",
-                "/app/fees/setup/structure", "account_tree", MenuType.PAGE, feeSetup, 4, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_CONTRACTS", "Contracts", "Fee contracts",
-                "/app/fees/contracts", "description", MenuType.PAGE, feeManagement, 3, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_LEDGER", "Ledger", "Fee ledger",
-                "/app/fees/ledger", "book", MenuType.PAGE, feeManagement, 4, MenuScope.SUBSCRIPTION, null);
         ensureMenu("FEE_PAYMENTS", "Payments", "Fee payments",
-                "/app/fees/payments", "credit_card", MenuType.PAGE, feeManagement, 5, MenuScope.SUBSCRIPTION, null);
+                "/app/fees/payments", "credit_card", MenuType.PAGE, feeManagement, 2, MenuScope.SUBSCRIPTION, null);
         ensureMenu("FEE_RECEIPTS", "Receipts", "Fee receipts",
-                "/app/fees/receipts", "receipt", MenuType.PAGE, feeManagement, 6, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_ADJUSTMENTS", "Adjustments & Concessions", "Fee adjustments and concessions",
-                "/app/fees/adjustments", "edit", MenuType.PAGE, feeManagement, 7, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_CONTROLS", "Controls", "Fee controls",
-                "/app/fees/controls", "tune", MenuType.PAGE, feeManagement, 8, MenuScope.SUBSCRIPTION, null);
+                "/app/fees/receipts", "receipt", MenuType.PAGE, feeManagement, 3, MenuScope.SUBSCRIPTION, null);
         ensureMenu("FEE_REPORTS", "Reports", "Fee reports",
-                "/app/fees/reports", "bar_chart", MenuType.PAGE, feeManagement, 9, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_AUDIT", "Audit Trail", "Fee audit trail",
-                "/app/fees/audit", "history", MenuType.PAGE, feeManagement, 10, MenuScope.SUBSCRIPTION, null);
+                "/app/fees/reports", "bar_chart", MenuType.PAGE, feeManagement, 4, MenuScope.SUBSCRIPTION, null);
         ensureMenu("FEE_MY_FEES", "My Fees", "My fees",
-                "/app/fees/my-fees", "credit_card", MenuType.PAGE, feeManagement, 11, MenuScope.SUBSCRIPTION, null);
+                "/app/fees/my-fees", "credit_card", MenuType.PAGE, feeManagement, 5, MenuScope.SUBSCRIPTION, null);
 
         return List.of(academicsFeature, studentsFeature, staffFeature, attendanceFeature, admissionsFeature,
-                examsFeature, enrollmentsFeature, promotionTransferFeature, responsibilitiesFeature,
+                promotionTransferFeature, responsibilitiesFeature,
                 communicationFeature, feeManagementFeature);
+    }
+
+    private void deactivateObsoleteOrganizationMenus() {
+        List<String> obsoleteCodes = List.of(
+                "STUDENTS_TRANSFERS",
+                "STUDENTS_DOCUMENTS",
+                "STAFF_DOCUMENTS",
+                "STAFF_ALUMNI",
+                "ADMISSIONS_OVERVIEW",
+                "ADMISSIONS_ENROLLMENT",
+                "EXAMS",
+                "ENROLLMENTS",
+                "FEE_SETUP",
+                "FEE_SETUP_POLICY",
+                "FEE_SETUP_HEADS",
+                "FEE_SETUP_GROUPS",
+                "FEE_SETUP_STRUCTURE",
+                "FEE_CONTRACTS",
+                "FEE_LEDGER",
+                "FEE_ADJUSTMENTS",
+                "FEE_CONTROLS",
+                "FEE_AUDIT"
+        );
+        menuRepository.findByMenuCodeInAndActiveTrue(obsoleteCodes)
+                .forEach(menu -> {
+                    menu.setActive(false);
+                    menu.setShowInSidebar(false);
+                    menuRepository.save(menu);
+                });
     }
 
     private Feature ensureFeature(String code, String key, String name, String module, String category, int order) {
