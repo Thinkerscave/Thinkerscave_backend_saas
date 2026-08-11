@@ -88,7 +88,7 @@ public class ProvisionOrganizationRequest {
     @Size(max = 100)
     private String country;
 
-    @Size(max = 500)
+    @Size(max = 350000)
     private String logoUrl;
 
     // ── Step 4: Admin User ────────────────────────────────────────────────────

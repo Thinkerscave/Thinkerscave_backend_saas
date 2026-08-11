@@ -56,6 +56,6 @@ public class OrganizationProfileUpdateRequest {
     @Size(max = 20)
     private String postalCode;
 
-    @Size(max = 500)
+    @Size(max = 350000)
     private String logoUrl;
 }

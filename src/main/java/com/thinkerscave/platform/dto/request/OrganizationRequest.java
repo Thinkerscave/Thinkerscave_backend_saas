@@ -68,7 +68,7 @@ public class OrganizationRequest {
     @Size(max = 50)
     private String language;
 
-    @Size(max = 500)
+    @Size(max = 350000)
     private String logoUrl;
 
     @Size(max = 1000)
