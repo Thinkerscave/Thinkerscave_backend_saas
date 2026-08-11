@@ -1,6 +1,7 @@
 package com.thinkerscave.platform.service;
 
 import com.thinkerscave.platform.dto.request.ProvisionOrganizationRequest;
+import com.thinkerscave.platform.dto.response.DomainAvailabilityResponse;
 import com.thinkerscave.platform.dto.response.ProvisioningJobResponse;
 import com.thinkerscave.platform.dto.response.ProvisioningResultResponse;
 import com.thinkerscave.platform.enums.ProvisionJobStatus;
@@ -10,6 +11,8 @@ import org.springframework.data.domain.Pageable;
 public interface ProvisionService {
 
     ProvisioningResultResponse provision(ProvisionOrganizationRequest request);
+
+    DomainAvailabilityResponse checkDomainAvailability(String subdomain);
 
     Page<ProvisioningJobResponse> getJobs(ProvisionJobStatus status, String search, Pageable pageable);
 

@@ -24,6 +24,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import com.thinkerscave.shared.constants.ErrorCodes;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 /**
@@ -206,13 +207,23 @@ public class GlobalExceptionHandler {
         public ResponseEntity<ApiError> handleAlreadyExists(
                 AlreadyExistsException ex,
                 HttpServletRequest request) {
+            String correlationId = MDC.get("correlationId");
+            List<ApiError.FieldError> fieldErrors = null;
+            if (ex.getField() != null && !ex.getField().isBlank()) {
+                fieldErrors = List.of(ApiError.FieldError.builder()
+                        .field(ex.getField())
+                        .message(ex.getMessage())
+                        .build());
+            }
 
             return ResponseEntity.status(HttpStatus.CONFLICT)
                     .body(ApiError.builder()
                             .status(409)
                             .code(ErrorCodes.ALREADY_EXISTS)
                             .message(ex.getMessage())
+                            .errors(fieldErrors)
                             .path(request.getRequestURI())
+                            .correlationId(correlationId)
                             .build());
         }
         
@@ -250,11 +261,24 @@ public class GlobalExceptionHandler {
                                 .body(ApiError.builder()
                                                 .status(400)
                                                 .code("VALIDATION_FAILED")
-                                                .message("Request validation failed")
+                                                .message(buildValidationSummary(fieldErrors))
                                                 .errors(fieldErrors)
                                                 .path(request.getRequestURI())
                                                 .correlationId(correlationId)
                                                 .build());
+        }
+
+        private String buildValidationSummary(List<ApiError.FieldError> fieldErrors) {
+                if (fieldErrors == null || fieldErrors.isEmpty()) {
+                        return "Request validation failed";
+                }
+                ApiError.FieldError first = fieldErrors.get(0);
+                String field = first.getField() != null ? first.getField() : "field";
+                String msg = first.getMessage() != null ? first.getMessage() : "is invalid";
+                if (fieldErrors.size() == 1) {
+                        return field + ": " + msg;
+                }
+                return field + ": " + msg + " (and " + (fieldErrors.size() - 1) + " more)";
         }
 
         @ExceptionHandler(IllegalArgumentException.class)
@@ -304,13 +328,33 @@ public class GlobalExceptionHandler {
         public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException ex,
                         HttpServletRequest request) {
                 String correlationId = MDC.get("correlationId");
-                log.warn("[{}] Data integrity violation: {}", correlationId, ex.getMostSpecificCause().getMessage());
+                String cause = ex.getMostSpecificCause() != null
+                                ? ex.getMostSpecificCause().getMessage()
+                                : ex.getMessage();
+                log.warn("[{}] Data integrity violation: {}", correlationId, cause);
+
+                String message = "A data conflict occurred. The record may already exist or references invalid data.";
+                String field = null;
+                String lower = cause != null ? cause.toLowerCase(Locale.ROOT) : "";
+                if (lower.contains("tenant_identifier") || lower.contains("schema_name")
+                                || lower.contains("sub_domain") || lower.contains("organization_domains")
+                                || lower.contains("tenant_registry")) {
+                        message = "This domain is already in use. Choose another domain.";
+                        field = "tenantSubdomain";
+                } else if (lower.contains("email") || lower.contains("username")) {
+                        message = "This email or username is already in use.";
+                        field = "adminEmail";
+                }
+
+                List<ApiError.FieldError> fieldErrors = field == null ? null : List.of(
+                                ApiError.FieldError.builder().field(field).message(message).build());
 
                 return ResponseEntity.status(HttpStatus.CONFLICT)
                                 .body(ApiError.builder()
                                                 .status(409)
                                                 .code("DATA_INTEGRITY_VIOLATION")
-                                                .message("A data conflict occurred. The record may already exist or references invalid data.")
+                                                .message(message)
+                                                .errors(fieldErrors)
                                                 .path(request.getRequestURI())
                                                 .correlationId(correlationId)
                                                 .build());

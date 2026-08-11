@@ -30,7 +30,7 @@ public class PermissionController {
 
     @GetMapping("/users/{userId}/permissions")
     @Operation(summary = "Get effective permissions for a user (role + override merged)")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
     public ResponseEntity<ApiResponse<List<EffectivePermissionResponse>>> getEffectivePermissions(
             @PathVariable Long userId,
             @RequestParam Long organizationId) {
@@ -39,7 +39,7 @@ public class PermissionController {
 
     @PutMapping("/users/{userId}/permissions")
     @Operation(summary = "Update user-level permission overrides (full replace)")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
     public ResponseEntity<ApiResponse<Void>> updateUserPermissions(
             @PathVariable Long userId,
             @RequestParam Long organizationId,
@@ -81,6 +81,11 @@ public class PermissionController {
                         || a.getAuthority().equals("SUPER_ADMIN"));
 
         if (isSelf) {
+            return;
+        }
+        boolean isSuperAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("SUPER_ADMIN"));
+        if (isSuperAdmin) {
             return;
         }
         if (isOrgAdmin && caller.getOrganizationId() != null && caller.getOrganizationId().equals(requestedOrganizationId)) {

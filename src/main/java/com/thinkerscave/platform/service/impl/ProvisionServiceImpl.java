@@ -7,6 +7,7 @@ import com.thinkerscave.access.repository.RoleRepository;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.access.service.UserService;
 import com.thinkerscave.platform.dto.request.ProvisionOrganizationRequest;
+import com.thinkerscave.platform.dto.response.DomainAvailabilityResponse;
 import com.thinkerscave.platform.dto.response.ProvisioningJobResponse;
 import com.thinkerscave.platform.dto.response.ProvisioningResultResponse;
 import com.thinkerscave.platform.entity.Customer;
@@ -45,6 +46,7 @@ import com.thinkerscave.platform.service.ProvisionService;
 import com.thinkerscave.security.service.OutboundMessageService;
 import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.enums.CodeType;
+import com.thinkerscave.shared.exceptions.AlreadyExistsException;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.shared.service.CodeGeneratorService;
@@ -83,6 +85,13 @@ public class ProvisionServiceImpl implements ProvisionService {
     private static final String ROLE_PARENT_CODE = "ROLE_PARENT";
     private static final List<String> REQUIRED_TENANT_TABLES = List.of(
             "users", "roles", "user_roles", "tenant_registry", "organizations"
+    );
+
+    /** Subdomains that must never be claimed by a customer workspace. */
+    private static final Set<String> RESERVED_SUBDOMAINS = Set.of(
+            "www", "api", "app", "admin", "platform", "public", "tenant", "mail",
+            "smtp", "ftp", "static", "assets", "cdn", "auth", "login", "support",
+            "help", "status", "docs", "thinkerscave", "localhost", "test", "staging"
     );
 
     private final CustomerRepository customerRepository;
@@ -143,6 +152,9 @@ public class ProvisionServiceImpl implements ProvisionService {
         LocalDateTime start = LocalDateTime.now();
         String provisionedBy = SecurityContextHolder.getContext().getAuthentication().getName();
         log.info("Starting provisioning by: {}", provisionedBy);
+
+        // ── Step 0: Fail fast on domain / tenant conflicts (user-facing errors) ─
+        assertDomainAvailable(resolveRequestedSubdomain(request));
 
         // ── Step 1: Validate ──────────────────────────────────────────────────
         SubscriptionPlan plan = planRepository.findById(request.getSubscriptionPlanId())
@@ -953,6 +965,74 @@ public class ProvisionServiceImpl implements ProvisionService {
             return normalized;
         }
         return "tenant_" + normalized;
+    }
+
+    private String resolveRequestedSubdomain(ProvisionOrganizationRequest request) {
+        if (request.getTenantSubdomain() != null && !request.getTenantSubdomain().isBlank()) {
+            return request.getTenantSubdomain();
+        }
+        return request.getOrganizationName();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DomainAvailabilityResponse checkDomainAvailability(String rawSubdomain) {
+        String subdomain = normalizeSubdomain(rawSubdomain);
+        String tenantId = normalizeTenantIdentifier(subdomain);
+        String preview = subdomain + ".thinkerscave.app";
+
+        if (rawSubdomain == null || rawSubdomain.isBlank()) {
+            return DomainAvailabilityResponse.builder()
+                    .subdomain(subdomain)
+                    .tenantIdentifier(tenantId)
+                    .previewDomain(preview)
+                    .available(false)
+                    .message("Domain is required.")
+                    .build();
+        }
+        if (subdomain.isBlank() || "tenant".equals(subdomain)) {
+            return DomainAvailabilityResponse.builder()
+                    .subdomain(subdomain)
+                    .tenantIdentifier(tenantId)
+                    .previewDomain(preview)
+                    .available(false)
+                    .message("Enter a valid domain using lowercase letters, numbers, and hyphens.")
+                    .build();
+        }
+        if (RESERVED_SUBDOMAINS.contains(subdomain)) {
+            return DomainAvailabilityResponse.builder()
+                    .subdomain(subdomain)
+                    .tenantIdentifier(tenantId)
+                    .previewDomain(preview)
+                    .available(false)
+                    .message("Domain \"" + subdomain + "\" is reserved. Choose another.")
+                    .build();
+        }
+        if (tenantRepository.existsByTenantIdentifier(tenantId)
+                || tenantRepository.existsBySchemaName(tenantId)
+                || domainRepository.existsBySubDomain(subdomain)) {
+            return DomainAvailabilityResponse.builder()
+                    .subdomain(subdomain)
+                    .tenantIdentifier(tenantId)
+                    .previewDomain(preview)
+                    .available(false)
+                    .message("Domain \"" + subdomain + "\" is already in use. Choose another.")
+                    .build();
+        }
+        return DomainAvailabilityResponse.builder()
+                .subdomain(subdomain)
+                .tenantIdentifier(tenantId)
+                .previewDomain(preview)
+                .available(true)
+                .message("Domain is available.")
+                .build();
+    }
+
+    private void assertDomainAvailable(String rawSubdomain) {
+        DomainAvailabilityResponse availability = checkDomainAvailability(rawSubdomain);
+        if (!availability.isAvailable()) {
+            throw new AlreadyExistsException(availability.getMessage(), "tenantSubdomain");
+        }
     }
 
     private ProvisioningJobResponse toJobResponse(ProvisioningJob j) {

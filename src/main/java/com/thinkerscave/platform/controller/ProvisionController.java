@@ -1,6 +1,7 @@
 package com.thinkerscave.platform.controller;
 
 import com.thinkerscave.platform.dto.request.ProvisionOrganizationRequest;
+import com.thinkerscave.platform.dto.response.DomainAvailabilityResponse;
 import com.thinkerscave.platform.dto.response.ProvisioningJobResponse;
 import com.thinkerscave.platform.dto.response.ProvisioningResultResponse;
 import com.thinkerscave.platform.enums.ProvisionJobStatus;
@@ -32,6 +33,16 @@ public class ProvisionController {
             @Valid @RequestBody ProvisionOrganizationRequest request) {
         return ResponseEntity.status(201)
                 .body(ApiResponse.created("Organization provisioned successfully", provisionService.provision(request)));
+    }
+
+    @GetMapping("/domain-availability")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @Operation(summary = "Check whether a workspace subdomain is available")
+    public ResponseEntity<ApiResponse<DomainAvailabilityResponse>> checkDomainAvailability(
+            @RequestParam String subdomain) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Domain availability checked",
+                provisionService.checkDomainAvailability(subdomain)));
     }
 
     @GetMapping("/jobs")

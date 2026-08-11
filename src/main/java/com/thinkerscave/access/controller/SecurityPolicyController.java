@@ -22,14 +22,14 @@ public class SecurityPolicyController {
 
     @GetMapping
     @Operation(summary = "Get security policy for an organization")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
     public ResponseEntity<ApiResponse<SecurityPolicyResponse>> getPolicy(@PathVariable Long organizationId) {
         return ResponseEntity.ok(ApiResponse.success(securityPolicyService.getPolicy(organizationId)));
     }
 
     @PutMapping
     @Operation(summary = "Create or update security policy")
-    @PreAuthorize("hasAuthority('ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_OWNER')")
     public ResponseEntity<ApiResponse<SecurityPolicyResponse>> upsertPolicy(
             @PathVariable Long organizationId,
             @Valid @RequestBody SecurityPolicyRequest request) {
@@ -39,7 +39,7 @@ public class SecurityPolicyController {
 
     @PostMapping("/reset")
     @Operation(summary = "Reset security policy to system defaults")
-    @PreAuthorize("hasAuthority('ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_OWNER')")
     public ResponseEntity<ApiResponse<Void>> reset(@PathVariable Long organizationId) {
         securityPolicyService.resetToDefaults(organizationId);
         return ResponseEntity.ok(ApiResponse.noContent("Security policy reset to defaults"));
