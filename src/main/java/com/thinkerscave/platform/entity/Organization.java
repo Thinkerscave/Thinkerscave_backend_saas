@@ -151,7 +151,7 @@ public class Organization extends Auditable {
     /**
      * Logo URL.
      */
-    @Column(name = "logo_url", length = 500)
+    @Column(name = "logo_url", columnDefinition = "TEXT")
     private String logoUrl;
 
     /**
