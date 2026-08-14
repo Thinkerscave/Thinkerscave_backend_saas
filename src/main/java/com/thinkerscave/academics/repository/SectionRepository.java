@@ -12,24 +12,37 @@ import java.util.Optional;
 @Repository
 public interface SectionRepository extends JpaRepository<AcademicSection, Long> {
 
-    boolean existsByAcademicClass_ClassIdAndSectionName(Long classId, String sectionName);
+    boolean existsByAcademicClass_ClassIdAndCodeIgnoreCase(Long classId, String code);
 
-    boolean existsByAcademicClass_ClassIdAndSectionNameAndSectionIdNot(Long classId, String name, Long sectionId);
+    boolean existsByAcademicClass_ClassIdAndCodeIgnoreCaseAndSectionIdNot(Long classId, String code, Long sectionId);
 
-    List<AcademicSection> findByAcademicClass_ClassIdAndActiveOrderBySectionNameAsc(Long classId, Boolean active);
+    boolean existsByAcademicClass_ClassIdAndNameIgnoreCase(Long classId, String name);
 
-    List<AcademicSection> findByAcademicClass_ClassIdOrderBySectionNameAsc(Long classId);
+    boolean existsByAcademicClass_ClassIdAndNameIgnoreCaseAndSectionIdNot(Long classId, String name, Long sectionId);
 
-    @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicClass WHERE s.academicClass.classId = :classId ORDER BY s.sectionName ASC")
-    List<AcademicSection> findWithClassByAcademicClass_ClassIdOrderBySectionNameAsc(@Param("classId") Long classId);
+    List<AcademicSection> findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(Long classId);
 
-    @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicClass WHERE s.academicClass.classId = :classId AND s.active = :active ORDER BY s.sectionName ASC")
-    List<AcademicSection> findWithClassByAcademicClass_ClassIdAndActiveOrderBySectionNameAsc(@Param("classId") Long classId, @Param("active") Boolean active);
+    List<AcademicSection> findByAcademicClass_ClassIdOrderByDisplayOrderAsc(Long classId);
+
+    @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicClass WHERE s.academicClass.classId = :classId ORDER BY s.displayOrder ASC")
+    List<AcademicSection> findWithClassByAcademicClass_ClassIdOrderByDisplayOrderAsc(@Param("classId") Long classId);
+
+    @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicClass WHERE s.academicClass.classId = :classId AND s.active = true ORDER BY s.displayOrder ASC")
+    List<AcademicSection> findWithClassByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(
+            @Param("classId") Long classId);
 
     @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicClass WHERE s.sectionId = :sectionId")
     Optional<AcademicSection> findByIdWithClass(@Param("sectionId") Long sectionId);
 
-    Optional<AcademicSection> findByAcademicClass_ClassIdAndSectionNameIgnoreCase(Long classId, String sectionName);
+    Optional<AcademicSection> findByAcademicClass_ClassIdAndCodeIgnoreCase(Long classId, String code);
+
+    Optional<AcademicSection> findByAcademicClass_ClassIdAndNameIgnoreCase(Long classId, String name);
+
+    /** Legacy alias: section name maps to {@code name}. */
+    default Optional<AcademicSection> findByAcademicClass_ClassIdAndSectionNameIgnoreCase(
+            Long classId, String sectionName) {
+        return findByAcademicClass_ClassIdAndNameIgnoreCase(classId, sectionName);
+    }
 
     boolean existsByAcademicClass_ClassId(Long classId);
 }

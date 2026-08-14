@@ -1,8 +1,6 @@
 package com.thinkerscave.dashboard.service.provider;
 
 import com.thinkerscave.access.entity.User;
-import com.thinkerscave.academics.entity.AcademicCalendarEvent;
-import com.thinkerscave.academics.repository.AcademicCalendarEventRepository;
 import com.thinkerscave.admission.entity.Inquiry;
 import com.thinkerscave.admission.enums.ApplicationStatus;
 import com.thinkerscave.admission.repository.ApplicationAdmissionRepository;
@@ -34,6 +32,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -52,7 +51,6 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
     private final ApplicationAdmissionRepository applicationAdmissionRepository;
     private final NoticeRepository noticeRepository;
     private final AuditLogRepository auditLogRepository;
-    private final AcademicCalendarEventRepository academicCalendarEventRepository;
     private final SampleWidgetFactory sampleWidgetFactory;
     private final OnboardingService onboardingService;
     private final OrganizationRepository organizationRepository;
@@ -217,14 +215,8 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
     }
 
     private WidgetDTO<CalendarData> upcomingEvents() {
-        return safeWidget("upcoming-events", WidgetType.EVENTS, "Upcoming events", 2, DataMode.LIVE, () -> {
-            List<AcademicCalendarEvent> events = academicCalendarEventRepository
-                    .findByStartDateGreaterThanEqualAndActiveOrderByStartDateAsc(LocalDate.now(), true);
-            return CalendarData.builder().items(events.stream().limit(6).map(e -> CalendarEventItem.builder()
-                    .title(e.getTitle()).startDate(e.getStartDate()).endDate(e.getEndDate())
-                    .eventType(e.getEventType() != null ? e.getEventType().name() : null)
-                    .allDay(Boolean.TRUE.equals(e.getAllDay())).build()).collect(Collectors.toList())).build();
-        });
+        return safeWidget("upcoming-events", WidgetType.EVENTS, "Upcoming events", 2, DataMode.LIVE, () ->
+                CalendarData.builder().items(Collections.emptyList()).build());
     }
 
     private WidgetDTO<RecentActivityData> recentActivities() {

@@ -10,11 +10,9 @@ import java.util.Optional;
 @Repository
 public interface ClassTeacherAssignmentRepository extends JpaRepository<ClassTeacherAssignment, Long> {
 
-    Optional<ClassTeacherAssignment> findByAcademicYear_AcademicYearIdAndAcademicClass_ClassIdAndAcademicSection_SectionIdAndActiveTrue(
-            Long yearId, Long classId, Long sectionId);
+    Optional<ClassTeacherAssignment> findBySection_SectionIdAndEffectiveToIsNull(Long sectionId);
 
-    List<ClassTeacherAssignment> findByAcademicYear_AcademicYearIdAndAcademicClass_ClassIdOrderByCreatedOnDesc(
-            Long yearId, Long classId);
+    List<ClassTeacherAssignment> findBySection_SectionIdOrderByEffectiveFromDesc(Long sectionId);
 
-    boolean existsByTeacherId(Long teacherId);
+    List<ClassTeacherAssignment> findByStaff_StaffIdOrderByEffectiveFromDesc(Long staffId);
 }

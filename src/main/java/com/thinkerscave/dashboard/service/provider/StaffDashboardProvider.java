@@ -1,12 +1,6 @@
 package com.thinkerscave.dashboard.service.provider;
 
 import com.thinkerscave.access.entity.User;
-import com.thinkerscave.academics.entity.AcademicCalendarEvent;
-import com.thinkerscave.academics.entity.SubjectAssignment;
-import com.thinkerscave.academics.entity.TimetableSlot;
-import com.thinkerscave.academics.repository.AcademicCalendarEventRepository;
-import com.thinkerscave.academics.repository.SubjectAssignmentRepository;
-import com.thinkerscave.academics.repository.TimetableSlotRepository;
 import com.thinkerscave.attendance.entity.StaffAttendance;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
 import com.thinkerscave.attendance.repository.StaffAttendanceRepository;
@@ -30,8 +24,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -46,10 +40,7 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
     private final StaffAttendanceRepository staffAttendanceRepository;
     private final StudentAttendanceRepository studentAttendanceRepository;
     private final PayrollRepository payrollRepository;
-    private final SubjectAssignmentRepository subjectAssignmentRepository;
-    private final TimetableSlotRepository timetableSlotRepository;
     private final NoticeRepository noticeRepository;
-    private final AcademicCalendarEventRepository academicCalendarEventRepository;
     private final SampleWidgetFactory sampleWidgetFactory;
 
     @Override
@@ -84,12 +75,6 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
 
     private WidgetDTO<KpiGridData> kpiGrid(Staff staff) {
         return safeWidget("kpi-grid", WidgetType.KPI_GRID, "Your day at a glance", 4, DataMode.LIVE, () -> {
-            int todaysClasses = 0;
-            if (staff != null) {
-                var day = com.thinkerscave.academics.enums.DayOfWeek.valueOf(LocalDate.now().getDayOfWeek().name());
-                todaysClasses = timetableSlotRepository.findByTeacherIdAndDayOfWeek(staff.getStaffId(), day).size();
-            }
-
             String payrollStatus = "N/A";
             if (staff != null) {
                 LocalDate now = LocalDate.now();
@@ -100,7 +85,7 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
             }
 
             return KpiGridData.builder().items(List.of(
-                    KpiItem.builder().label("Today's Classes").value(String.valueOf(todaysClasses)).icon("pi-book").tone("primary").build(),
+                    KpiItem.builder().label("Today's Classes").value("0").icon("pi-book").tone("primary").build(),
                     KpiItem.builder().label("Classes Completed").value("0").icon("pi-check-circle").tone("success").sample(true).build(),
                     KpiItem.builder().label("Attendance Pending").value("1").icon("pi-exclamation-circle").tone("warning").sample(true).build(),
                     KpiItem.builder().label("Leave Balance").value("12 days").icon("pi-calendar-times").tone("info").sample(true).build(),
@@ -142,24 +127,11 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
     }
 
     private WidgetDTO<TimetableData> todaysTimetable(Staff staff) {
-        return safeWidget("todays-timetable", WidgetType.TIMETABLE, "Today's timetable", 4, DataMode.LIVE, () -> {
-            if (staff == null) return TimetableData.builder().dayLabel(LocalDate.now().getDayOfWeek().toString()).slots(List.of()).build();
-            var day = com.thinkerscave.academics.enums.DayOfWeek.valueOf(LocalDate.now().getDayOfWeek().name());
-            List<TimetableSlot> slots = timetableSlotRepository.findByTeacherIdAndDayOfWeek(staff.getStaffId(), day);
-            return TimetableData.builder()
-                    .dayLabel(LocalDate.now().getDayOfWeek().toString())
-                    .slots(slots.stream().map(s -> TimetableSlotItem.builder()
-                            .periodNumber(s.getPeriodTemplate() != null ? s.getPeriodTemplate().getPeriodNumber() : null)
-                            .periodName(s.getPeriodTemplate() != null ? s.getPeriodTemplate().getPeriodName() : null)
-                            .startTime(s.getPeriodTemplate() != null ? s.getPeriodTemplate().getStartTime() : null)
-                            .endTime(s.getPeriodTemplate() != null ? s.getPeriodTemplate().getEndTime() : null)
-                            .subjectName(s.getSubjectAssignment() != null && s.getSubjectAssignment().getSubject() != null
-                                    ? s.getSubjectAssignment().getSubject().getSubjectName() : null)
-                            .className(s.getAcademicClass() != null ? s.getAcademicClass().getClassName() : null)
-                            .roomLabel(s.getAcademicSection() != null ? s.getAcademicSection().getSectionName() : null)
-                            .build()).collect(Collectors.toList()))
-                    .build();
-        });
+        return safeWidget("todays-timetable", WidgetType.TIMETABLE, "Today's timetable", 4, DataMode.LIVE, () ->
+                TimetableData.builder()
+                        .dayLabel(LocalDate.now().getDayOfWeek().toString())
+                        .slots(Collections.emptyList())
+                        .build());
     }
 
     private WidgetDTO<AttendanceSummaryData> studentAttendanceToday() {
@@ -188,23 +160,8 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
     }
 
     private WidgetDTO<StatListData> myClassesOverview(Staff staff) {
-        return safeWidget("my-classes-overview", WidgetType.STAT_LIST, "My classes overview", 2, DataMode.LIVE, () -> {
-            if (staff == null) return StatListData.builder().items(List.of()).build();
-            List<SubjectAssignment> assignments = subjectAssignmentRepository.findByTeacherIdAndActiveTrue(staff.getStaffId());
-            Set<String> classes = assignments.stream()
-                    .map(a -> a.getAcademicClass() != null ? a.getAcademicClass().getClassName() : "-")
-                    .collect(Collectors.toSet());
-            Set<String> subjects = assignments.stream()
-                    .map(a -> a.getSubject() != null ? a.getSubject().getSubjectName() : "-")
-                    .collect(Collectors.toSet());
-            int periodsPerWeek = assignments.stream().mapToInt(a -> a.getPeriodsPerWeek() != null ? a.getPeriodsPerWeek() : 0).sum();
-
-            return StatListData.builder().items(List.of(
-                    StatListItem.builder().label("Classes assigned").value(String.valueOf(classes.size())).icon("pi-users").tone("primary").build(),
-                    StatListItem.builder().label("Subjects taught").value(String.valueOf(subjects.size())).icon("pi-book").tone("info").build(),
-                    StatListItem.builder().label("Periods per week").value(String.valueOf(periodsPerWeek)).icon("pi-clock").tone("success").build()
-            )).build();
-        });
+        return safeWidget("my-classes-overview", WidgetType.STAT_LIST, "My classes overview", 2, DataMode.LIVE, () ->
+                StatListData.builder().items(Collections.emptyList()).build());
     }
 
     private WidgetDTO<AnnouncementsData> announcements() {
@@ -221,14 +178,8 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
     }
 
     private WidgetDTO<CalendarData> upcomingEvents() {
-        return safeWidget("upcoming-events", WidgetType.EVENTS, "Upcoming events", 2, DataMode.LIVE, () -> {
-            List<AcademicCalendarEvent> events = academicCalendarEventRepository
-                    .findByStartDateGreaterThanEqualAndActiveOrderByStartDateAsc(LocalDate.now(), true);
-            return CalendarData.builder().items(events.stream().limit(6).map(e -> CalendarEventItem.builder()
-                    .title(e.getTitle()).startDate(e.getStartDate()).endDate(e.getEndDate())
-                    .eventType(e.getEventType() != null ? e.getEventType().name() : null)
-                    .allDay(Boolean.TRUE.equals(e.getAllDay())).build()).collect(Collectors.toList())).build();
-        });
+        return safeWidget("upcoming-events", WidgetType.EVENTS, "Upcoming events", 2, DataMode.LIVE, () ->
+                CalendarData.builder().items(Collections.emptyList()).build());
     }
 
     private WidgetDTO<LeaveSummaryData> leaveSummaryPreview() {

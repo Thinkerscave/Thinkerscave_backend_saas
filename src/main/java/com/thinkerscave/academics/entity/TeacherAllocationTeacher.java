@@ -1,5 +1,6 @@
 package com.thinkerscave.academics.entity;
 
+import com.thinkerscave.academics.enums.TeacherAllocationTeacherRole;
 import com.thinkerscave.shared.entity.Auditable;
 import com.thinkerscave.staff.entity.Staff;
 import jakarta.persistence.*;
@@ -15,30 +16,35 @@ import java.time.LocalDate;
 @Setter
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Table(
-        name = "class_teacher_assignment",
+        name = "teacher_allocation_teacher",
         indexes = {
-                @Index(name = "idx_cta_section_effective", columnList = "section_id, effective_from"),
-                @Index(name = "idx_cta_staff_effective", columnList = "staff_id, effective_from"),
-                @Index(name = "idx_cta_active", columnList = "is_active")
+                @Index(name = "idx_tat_staff_effective", columnList = "staff_id, effective_from"),
+                @Index(name = "idx_tat_allocation_effective", columnList = "teacher_allocation_id, effective_from"),
+                @Index(name = "idx_tat_active", columnList = "is_active")
         }
 )
-public class ClassTeacherAssignment extends Auditable {
+public class TeacherAllocationTeacher extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "class_teacher_assignment_id")
+    @Column(name = "teacher_allocation_teacher_id")
     @EqualsAndHashCode.Include
-    private Long classTeacherAssignmentId;
+    private Long teacherAllocationTeacherId;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "section_id", nullable = false)
-    private AcademicSection section;
+    @JoinColumn(name = "teacher_allocation_id", nullable = false)
+    private TeacherAllocation teacherAllocation;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "staff_id", nullable = false)
     private Staff staff;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private TeacherAllocationTeacherRole role = TeacherAllocationTeacherRole.SECONDARY;
 
     @NotNull
     @Column(name = "effective_from", nullable = false)

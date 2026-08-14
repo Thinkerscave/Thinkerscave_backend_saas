@@ -208,7 +208,7 @@ public class AttendanceRosterController {
         if (p.getSectionName() != null) {
             a.setSectionName(p.getSectionName());
             if (a.getSectionId() == null && classId != null) {
-                sectionRepository.findByAcademicClass_ClassIdAndSectionNameIgnoreCase(classId, p.getSectionName())
+                sectionRepository.findByAcademicClass_ClassIdAndNameIgnoreCase(classId, p.getSectionName())
                         .ifPresent(sec -> a.setSectionId(sec.getSectionId()));
             }
         }
