@@ -22,6 +22,14 @@ public interface ClassSubjectMappingRepository extends JpaRepository<ClassSubjec
 
     List<ClassSubjectMapping> findBySubject_SubjectIdAndActiveTrue(Long subjectId);
 
+    @Query("""
+            SELECT m FROM ClassSubjectMapping m
+            JOIN FETCH m.subject
+            JOIN FETCH m.academicClass
+            WHERE m.academicClass.classId = :classId AND m.active = true
+            """)
+    List<ClassSubjectMapping> findActiveWithSubjectByClassId(@Param("classId") Long classId);
+
     long countBySubject_SubjectIdAndActiveTrue(Long subjectId);
 
     long countBySubject_AcademicYear_AcademicYearIdAndActiveTrue(Long yearId);

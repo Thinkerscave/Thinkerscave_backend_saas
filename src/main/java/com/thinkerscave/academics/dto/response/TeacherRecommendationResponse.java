@@ -7,12 +7,12 @@ import lombok.Setter;
 @Getter
 @Setter
 @Builder
-public class TeacherWorkloadResponse {
+public class TeacherRecommendationResponse {
     private Long staffId;
     private String staffName;
-    private Long academicYearId;
     private Integer assignedWeeklyPeriods;
     private Integer maxWeeklyPeriods;
-    /** AVAILABLE | LIMITED | AT_CAPACITY | EXCEEDS_LIMIT */
-    private String status;
+    private String workloadStatus;
+    private boolean recommended;
+    private String reason;
 }
