@@ -1,15 +1,17 @@
 package com.thinkerscave.academics.dto.response;
 
-import java.util.List;
+import com.thinkerscave.academics.enums.AcademicStage;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.List;
 
 @Getter
 @Setter
 @Builder
 public class AcademicStructureTreeResponse {
-    private String stage;
+    private AcademicStage stage;
     private List<ClassNode> classes;
 
     @Getter
@@ -17,10 +19,19 @@ public class AcademicStructureTreeResponse {
     @Builder
     public static class ClassNode {
         private Long classId;
-        private String className;
-        private String classCode;
+        private String name;
+        private String code;
+        private Boolean active;
         private Integer displayOrder;
         private List<SectionNode> sections;
+
+        public String getClassName() {
+            return name;
+        }
+
+        public String getClassCode() {
+            return code;
+        }
     }
 
     @Getter
@@ -28,7 +39,13 @@ public class AcademicStructureTreeResponse {
     @Builder
     public static class SectionNode {
         private Long sectionId;
-        private String sectionName;
+        private String name;
+        private String code;
         private Integer capacity;
+        private Boolean active;
+
+        public String getSectionName() {
+            return name;
+        }
     }
 }

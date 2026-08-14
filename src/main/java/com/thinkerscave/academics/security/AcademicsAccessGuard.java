@@ -20,6 +20,7 @@ import org.springframework.stereotype.Component;
 public class AcademicsAccessGuard {
 
     public static final String RESOURCE_ACADEMIC_YEAR = "ACADEMICS_ACADEMIC_YEAR";
+    public static final String RESOURCE_CLASSES = "ACADEMICS_CLASSES";
 
     private final PermissionService permissionService;
     private final UserRepository userRepository;

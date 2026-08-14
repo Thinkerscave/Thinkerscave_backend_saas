@@ -57,4 +57,10 @@ public interface StudentEnrollmentRepository extends JpaRepository<StudentEnroll
 	List<StudentEnrollment> findActiveByAcademicYearId(@Param("yearId") Long yearId);
 
 	boolean existsByStudentStudentIdAndAcademicYearAcademicYearId(Long studentId, Long academicYearId);
+
+	long countByClassEntityClassIdAndActiveTrue(Long classId);
+
+	long countBySectionSectionIdAndActiveTrue(Long sectionId);
+
+	long countByAcademicYearAcademicYearIdAndActiveTrue(Long academicYearId);
 }

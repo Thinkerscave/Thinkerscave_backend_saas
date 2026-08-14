@@ -48,4 +48,8 @@ public interface ClassRepository extends JpaRepository<AcademicClass, Long> {
             Long yearId, String className) {
         return findByAcademicYear_AcademicYearIdAndNameIgnoreCase(yearId, className);
     }
+
+    long countByAcademicYear_AcademicYearId(Long yearId);
+
+    long countByAcademicYear_AcademicYearIdAndActiveTrue(Long yearId);
 }

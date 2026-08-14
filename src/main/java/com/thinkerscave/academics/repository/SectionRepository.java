@@ -45,4 +45,12 @@ public interface SectionRepository extends JpaRepository<AcademicSection, Long> 
     }
 
     boolean existsByAcademicClass_ClassId(Long classId);
+
+    long countByAcademicClass_AcademicYear_AcademicYearId(Long yearId);
+
+    long countByAcademicClass_AcademicYear_AcademicYearIdAndActiveTrue(Long yearId);
+
+    long countByAcademicClass_ClassId(Long classId);
+
+    long countByAcademicClass_ClassIdAndActiveTrue(Long classId);
 }

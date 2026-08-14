@@ -312,8 +312,8 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "/app/academics", "school", MenuType.MODULE, null, 10, MenuScope.SUBSCRIPTION, academicsFeature);
         ensureMenu("ACADEMICS_ACADEMIC_YEAR", "Academic Year", "Academic year lifecycle and history",
                 "/app/academics/academic-year", "calendar_month", MenuType.PAGE, academics, 1, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("ACADEMICS_SETUP", "Academic Setup", "Academic setup",
-                "/app/academics/academic-setup", "settings", MenuType.PAGE, academics, 2, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_CLASSES", "Classes & Sections", "Manage classes, sections and class teachers",
+                "/app/academics/classes-sections", "class", MenuType.PAGE, academics, 2, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_TIMETABLE", "Timetable", "Timetable",
                 "/app/academics/timetable", "calendar", MenuType.PAGE, academics, 3, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_TEACHER_ARRANGEMENT", "Teacher Arrangement", "Teacher arrangement",
