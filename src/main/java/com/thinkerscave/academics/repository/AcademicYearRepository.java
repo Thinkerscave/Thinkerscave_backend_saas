@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,24 +25,43 @@ public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long
 
     Optional<AcademicYear> findByStatus(AcademicYearStatus status);
 
+    Optional<AcademicYear> findByStatusAndActiveTrue(AcademicYearStatus status);
+
     List<AcademicYear> findByStatusInOrderByStartDateDesc(List<AcademicYearStatus> statuses);
+
+    List<AcademicYear> findByActiveTrueOrderByStartDateDesc();
+
+    List<AcademicYear> findByActiveOrderByStartDateDesc(boolean active);
 
     Page<AcademicYear> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
     Page<AcademicYear> findAllByOrderByStartDateDesc(Pageable pageable);
 
-    @Modifying
+    Page<AcademicYear> findByStatusOrderByStartDateDesc(AcademicYearStatus status, Pageable pageable);
+
+    Page<AcademicYear> findByNameContainingIgnoreCaseAndStatusOrderByStartDateDesc(
+            String name, AcademicYearStatus status, Pageable pageable);
+
+    @Query("""
+            SELECT COUNT(y) > 0 FROM AcademicYear y
+            WHERE y.active = true
+              AND y.academicYearId <> COALESCE(:excludeId, -1L)
+              AND y.startDate <= :endDate
+              AND y.endDate >= :startDate
+            """)
+    boolean existsOverlappingActiveRange(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            @Param("excludeId") Long excludeId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE AcademicYear y SET y.status = com.thinkerscave.academics.enums.AcademicYearStatus.COMPLETED "
             + "WHERE y.status = com.thinkerscave.academics.enums.AcademicYearStatus.CURRENT")
     void clearCurrentYearStatus();
 
-    /** Legacy alias: year code maps to {@code name}. */
     @Query("SELECT y FROM AcademicYear y WHERE UPPER(y.name) = UPPER(:yearCode)")
     Optional<AcademicYear> findByYearCode(@Param("yearCode") String yearCode);
 
-    /** Legacy alias: current year is {@code status = CURRENT}. */
     @Query("SELECT y FROM AcademicYear y WHERE y.status = com.thinkerscave.academics.enums.AcademicYearStatus.CURRENT")
     Optional<AcademicYear> findByCurrentYearTrue();
-
-    List<AcademicYear> findByActiveOrderByStartDateDesc(boolean active);
 }

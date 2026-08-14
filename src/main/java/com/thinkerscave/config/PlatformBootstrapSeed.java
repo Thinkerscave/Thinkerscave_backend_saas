@@ -308,18 +308,20 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
         // ── SUBSCRIPTION (gated by the organization's subscription plan) ─────
         Feature academicsFeature = ensureFeature("FEAT_ACADEMICS", "ACADEMICS_MODULE", "Academics",
                 "Academics", "ACADEMIC", 1);
-        Menu academics = ensureMenu("ACADEMICS", "Academics", "Academic setup and scheduling",
+        Menu academics =         ensureMenu("ACADEMICS", "Academics", "Academic setup and scheduling",
                 "/app/academics", "school", MenuType.MODULE, null, 10, MenuScope.SUBSCRIPTION, academicsFeature);
+        ensureMenu("ACADEMICS_ACADEMIC_YEAR", "Academic Year", "Academic year lifecycle and history",
+                "/app/academics/academic-year", "calendar_month", MenuType.PAGE, academics, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_SETUP", "Academic Setup", "Academic setup",
-                "/app/academics/academic-setup", "settings", MenuType.PAGE, academics, 1, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/academic-setup", "settings", MenuType.PAGE, academics, 2, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_TIMETABLE", "Timetable", "Timetable",
-                "/app/academics/timetable", "calendar", MenuType.PAGE, academics, 2, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/timetable", "calendar", MenuType.PAGE, academics, 3, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_TEACHER_ARRANGEMENT", "Teacher Arrangement", "Teacher arrangement",
-                "/app/academics/teacher-arrangement", "person", MenuType.PAGE, academics, 3, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/teacher-arrangement", "person", MenuType.PAGE, academics, 4, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_CALENDAR", "Academic Calendar", "Academic calendar",
-                "/app/academics/academic-calendar", "calendar", MenuType.PAGE, academics, 4, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/academic-calendar", "calendar", MenuType.PAGE, academics, 5, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_SYLLABUS_TRACKER", "Syllabus Tracker", "Syllabus tracker",
-                "/app/academics/syllabus-tracker", "book", MenuType.PAGE, academics, 5, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/syllabus-tracker", "book", MenuType.PAGE, academics, 6, MenuScope.SUBSCRIPTION, null);
 
         Feature studentsFeature = ensureFeature("FEAT_STUDENTS", "STUDENTS_MODULE", "Students",
                 "Students", "CORE", 2);

@@ -1,5 +1,6 @@
 package com.thinkerscave.academics.dto.request;
 
+import com.thinkerscave.academics.enums.AcademicYearPattern;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -12,13 +13,9 @@ import java.time.LocalDate;
 @Setter
 public class AcademicYearRequest {
 
-    @NotBlank(message = "Year code is mandatory")
-    @Size(max = 20, message = "Year code cannot exceed 20 characters")
-    private String yearCode;
-
-    @NotBlank(message = "Year name is mandatory")
-    @Size(max = 100, message = "Year name cannot exceed 100 characters")
-    private String yearName;
+    @NotBlank(message = "Academic year name is mandatory")
+    @Size(max = 50, message = "Academic year name cannot exceed 50 characters")
+    private String name;
 
     @NotNull(message = "Start date is mandatory")
     private LocalDate startDate;
@@ -26,5 +23,6 @@ public class AcademicYearRequest {
     @NotNull(message = "End date is mandatory")
     private LocalDate endDate;
 
-    private String remarks;
+    @NotNull(message = "Academic pattern is mandatory")
+    private AcademicYearPattern pattern = AcademicYearPattern.ANNUAL;
 }
