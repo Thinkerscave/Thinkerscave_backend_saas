@@ -21,6 +21,7 @@ public class AcademicsAccessGuard {
 
     public static final String RESOURCE_ACADEMIC_YEAR = "ACADEMICS_ACADEMIC_YEAR";
     public static final String RESOURCE_CLASSES = "ACADEMICS_CLASSES";
+    public static final String RESOURCE_SUBJECTS = "ACADEMICS_SUBJECTS";
 
     private final PermissionService permissionService;
     private final UserRepository userRepository;

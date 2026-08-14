@@ -19,4 +19,11 @@ public interface TeacherAllocationRepository extends JpaRepository<TeacherAlloca
     List<TeacherAllocation> findBySection_AcademicClass_AcademicYear_AcademicYearId(Long academicYearId);
 
     List<TeacherAllocation> findByStatus(TeacherAllocationStatus status);
+
+    List<TeacherAllocation> findByClassSubjectMapping_ClassSubjectMappingId(Long mappingId);
+
+    long countByClassSubjectMapping_ClassSubjectMappingId(Long mappingId);
+
+    long countByClassSubjectMapping_ClassSubjectMappingIdAndStatus(
+            Long mappingId, TeacherAllocationStatus status);
 }
