@@ -45,6 +45,10 @@ public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long
     @Query("""
             SELECT COUNT(y) > 0 FROM AcademicYear y
             WHERE y.active = true
+              AND y.status NOT IN (
+                    com.thinkerscave.academics.enums.AcademicYearStatus.COMPLETED,
+                    com.thinkerscave.academics.enums.AcademicYearStatus.ARCHIVED
+              )
               AND y.academicYearId <> COALESCE(:excludeId, -1L)
               AND y.startDate <= :endDate
               AND y.endDate >= :startDate
@@ -55,7 +59,8 @@ public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long
             @Param("excludeId") Long excludeId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE AcademicYear y SET y.status = com.thinkerscave.academics.enums.AcademicYearStatus.COMPLETED "
+    @Query("UPDATE AcademicYear y SET y.status = com.thinkerscave.academics.enums.AcademicYearStatus.COMPLETED, "
+            + "y.active = false "
             + "WHERE y.status = com.thinkerscave.academics.enums.AcademicYearStatus.CURRENT")
     void clearCurrentYearStatus();
 

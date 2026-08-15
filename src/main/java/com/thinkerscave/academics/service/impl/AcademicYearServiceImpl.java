@@ -346,7 +346,7 @@ public class AcademicYearServiceImpl implements AcademicYearService {
 
         var subjects = subjectRepository.findByAcademicYear_AcademicYearIdOrderByNameAsc(yearId);
         long subjectsActive = subjects.stream().filter(s -> Boolean.TRUE.equals(s.getActive())).count();
-        long studentsActive = studentEnrollmentRepository.findActiveByAcademicYearId(yearId).size();
+        long studentsActive = studentEnrollmentRepository.countByAcademicYearAcademicYearIdAndActiveTrue(yearId);
 
         return AcademicYearResponse.YearStructureStats.builder()
                 .classesTotal(classes.size())

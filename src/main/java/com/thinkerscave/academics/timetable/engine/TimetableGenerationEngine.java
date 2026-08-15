@@ -51,16 +51,24 @@ public class TimetableGenerationEngine {
 
             if (progress.isCancelRequested()) return cancelled(version, progress);
 
-            // Phase 3: Load source data
+            // Phase 3–4: Load source data + expand requirements inside one read transaction
+            // (async worker otherwise hits LazyInitializationException on associations).
             progress.advanceTo(GenerationPhase.LOADING_DATA, 10);
-            SchedulingSourceData source = loadSourceData(version);
+            record Prepared(SchedulingSourceData source, List<SchedulingRequirement> requirements) {}
+            Prepared prepared = transactionTemplate.execute(status -> {
+                SchedulingSourceData loaded = loadSourceData(versionId);
+                progress.advanceTo(GenerationPhase.BUILDING_REQUIREMENTS, 20);
+                List<SchedulingRequirement> reqs = expander.expand(loaded);
+                return new Prepared(loaded, reqs);
+            });
+            if (prepared == null) {
+                throw new IllegalStateException("Failed to prepare scheduling data for version " + versionId);
+            }
+            SchedulingSourceData source = prepared.source();
+            List<SchedulingRequirement> requirements = prepared.requirements();
+            log.info("Expanded {} scheduling requirements", requirements.size());
 
             if (progress.isCancelRequested()) return cancelled(version, progress);
-
-            // Phase 4: Build requirements
-            progress.advanceTo(GenerationPhase.BUILDING_REQUIREMENTS, 20);
-            List<SchedulingRequirement> requirements = expander.expand(source);
-            log.info("Expanded {} scheduling requirements", requirements.size());
 
             if (requirements.isEmpty()) {
                 return completeEmpty(version, progress);
@@ -115,7 +123,9 @@ public class TimetableGenerationEngine {
         }
     }
 
-    private SchedulingSourceData loadSourceData(TimetableVersion version) {
+    private SchedulingSourceData loadSourceData(Long versionId) {
+        TimetableVersion version = versionRepository.findByIdWithConfigAndYear(versionId)
+                .orElseThrow(() -> new IllegalStateException("Version not found: " + versionId));
         TimetableConfiguration config = version.getTimetableConfiguration();
         Long configId = config.getTimetableConfigurationId();
         Long yearId = version.getAcademicYear().getAcademicYearId();

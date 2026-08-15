@@ -285,7 +285,11 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
 
         classTeacherAssignmentRepository.findBySection_SectionIdAndEffectiveToIsNull(section.getSectionId())
                 .ifPresent(existing -> {
-                    existing.setEffectiveTo(LocalDate.now().minusDays(1));
+                    LocalDate end = LocalDate.now();
+                    if (existing.getEffectiveFrom() != null && end.isBefore(existing.getEffectiveFrom())) {
+                        end = existing.getEffectiveFrom();
+                    }
+                    existing.setEffectiveTo(end);
                     existing.setActive(false);
                     classTeacherAssignmentRepository.save(existing);
                 });
@@ -333,7 +337,11 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
         AcademicSection section = sectionRepository.findByIdWithClass(assignment.getSection().getSectionId())
                 .orElse(assignment.getSection());
         assertYearMutable(section.getAcademicClass().getAcademicYear());
-        assignment.setEffectiveTo(LocalDate.now().minusDays(1));
+        LocalDate end = LocalDate.now();
+        if (assignment.getEffectiveFrom() != null && end.isBefore(assignment.getEffectiveFrom())) {
+            end = assignment.getEffectiveFrom();
+        }
+        assignment.setEffectiveTo(end);
         assignment.setActive(false);
         classTeacherAssignmentRepository.save(assignment);
     }
@@ -455,7 +463,13 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
                 .findByTeacherAllocation_TeacherAllocationIdAndRoleAndEffectiveToIsNull(
                         allocation.getTeacherAllocationId(), role)
                 .ifPresent(existing -> {
-                    existing.setEffectiveTo(LocalDate.now().minusDays(1));
+                    LocalDate end = LocalDate.now();
+                    // Same-day assign+unassign must not set effective_to before effective_from
+                    // (violates chk_tat_effective_dates).
+                    if (existing.getEffectiveFrom() != null && end.isBefore(existing.getEffectiveFrom())) {
+                        end = existing.getEffectiveFrom();
+                    }
+                    existing.setEffectiveTo(end);
                     existing.setActive(false);
                     allocationTeacherRepository.save(existing);
                 });

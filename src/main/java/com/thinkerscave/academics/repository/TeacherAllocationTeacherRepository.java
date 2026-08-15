@@ -43,7 +43,9 @@ public interface TeacherAllocationTeacherRepository extends JpaRepository<Teache
             JOIN FETCH t.staff
             JOIN FETCH t.teacherAllocation a
             JOIN FETCH a.classSubjectMapping m
+            JOIN FETCH m.subject
             JOIN FETCH a.section s
+            LEFT JOIN FETCH s.defaultResource
             JOIN FETCH s.academicClass c
             WHERE c.academicYear.academicYearId = :yearId
               AND t.active = true

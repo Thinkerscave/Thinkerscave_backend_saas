@@ -91,8 +91,11 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
             }
             if (today.isAfter(year.getEndDate())) {
                 daysRemaining = 0;
+            } else if (today.isBefore(year.getStartDate())) {
+                // Not started yet: remaining = full year length (align with progress bar / Academic Year page)
+                daysRemaining = totalDays;
             } else {
-                daysRemaining = Math.max(0, ChronoUnit.DAYS.between(today, year.getEndDate()));
+                daysRemaining = Math.max(0, totalDays - daysCompleted);
             }
         }
 

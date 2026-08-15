@@ -71,8 +71,18 @@ public class AcademicClass extends Auditable {
     }
 
     /** Cross-module compatibility alias during Academics rebuild. */
+    public void setClassName(String className) {
+        this.name = className;
+    }
+
+    /** Cross-module compatibility alias during Academics rebuild. */
     public String getClassCode() {
         return code;
+    }
+
+    /** Cross-module compatibility alias during Academics rebuild. */
+    public void setClassCode(String classCode) {
+        this.code = classCode;
     }
 
     public boolean isActive() {
