@@ -150,30 +150,10 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
 
         Long yearId = section.getAcademicClass().getAcademicYear().getAcademicYearId();
         int maxPeriods = resolveMaxWeeklyPeriods(yearId);
-        int currentLoad = computeStaffWorkload(staff.getStaffId(), yearId);
-        int periods = mapping.getWeeklyPeriods() == null ? 0 : mapping.getWeeklyPeriods();
-
-        TeacherAllocationTeacher previousPrimary = null;
-        if (allocation.getTeacherAllocationId() != null && role == TeacherAllocationTeacherRole.PRIMARY) {
-            previousPrimary = allocationTeacherRepository
-                    .findFirstByTeacherAllocation_TeacherAllocationIdAndActiveTrueAndEffectiveToIsNullAndRoleOrderByEffectiveFromDesc(
-                            allocation.getTeacherAllocationId(), TeacherAllocationTeacherRole.PRIMARY)
-                    .orElse(null);
-        }
-
-        int nextLoad = currentLoad + periods;
-        if (previousPrimary != null && previousPrimary.getStaff() != null) {
-            if (Objects.equals(previousPrimary.getStaff().getStaffId(), staff.getStaffId())) {
-                nextLoad = currentLoad;
-            }
-            // replacing another teacher: their periods remain until closed; this teacher's load increases
-        }
 
         closeOpenRole(allocation, role);
 
-        allocation.setStatus(nextLoad > maxPeriods
-                ? TeacherAllocationStatus.CONFLICT
-                : TeacherAllocationStatus.ASSIGNED);
+        allocation.setStatus(TeacherAllocationStatus.ASSIGNED);
         TeacherAllocation saved = allocationRepository.save(allocation);
 
         TeacherAllocationTeacher assignment = new TeacherAllocationTeacher();
@@ -185,6 +165,10 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
         allocationTeacherRepository.save(assignment);
 
         Map<Long, Integer> workload = computeWorkloadMap(yearId);
+        if (workload.getOrDefault(staff.getStaffId(), 0) > maxPeriods) {
+            saved.setStatus(TeacherAllocationStatus.CONFLICT);
+            saved = allocationRepository.save(saved);
+        }
         return toRow(saved, maxPeriods, workload);
     }
 
@@ -420,12 +404,14 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
 
         Long staffId = primary == null || primary.getStaff() == null ? null : primary.getStaff().getStaffId();
         Integer assigned = staffId == null ? null : workloadByStaff.getOrDefault(staffId, 0);
-        TeacherAllocationStatus status = allocation.getStatus();
+        // Status is always derived from the current workload; a persisted CONFLICT must not
+        // survive once other allocations have been rebalanced.
+        TeacherAllocationStatus status;
         if (staffId == null) {
             status = TeacherAllocationStatus.UNASSIGNED;
-        } else if (assigned != null && assigned > maxPeriods) {
+        } else if (assigned > maxPeriods) {
             status = TeacherAllocationStatus.CONFLICT;
-        } else if (status == TeacherAllocationStatus.UNASSIGNED) {
+        } else {
             status = TeacherAllocationStatus.ASSIGNED;
         }
 
