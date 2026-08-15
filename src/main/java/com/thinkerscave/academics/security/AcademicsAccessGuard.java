@@ -24,6 +24,11 @@ public class AcademicsAccessGuard {
     public static final String RESOURCE_SUBJECTS = "ACADEMICS_SUBJECTS";
     public static final String RESOURCE_TEACHER_ALLOCATION = "ACADEMICS_TEACHER_ALLOCATION";
     public static final String RESOURCE_TIMETABLE = "ACADEMICS_TIMETABLE";
+    public static final String RESOURCE_OVERVIEW = "ACADEMICS_OVERVIEW";
+    public static final String RESOURCE_MY_CLASSES = "ACADEMICS_MY_CLASSES";
+    public static final String RESOURCE_MY_TIMETABLE = "ACADEMICS_MY_TIMETABLE";
+    public static final String RESOURCE_MY_ACADEMICS = "ACADEMICS_MY_ACADEMICS";
+    public static final String RESOURCE_ACADEMIC_STRUCTURE = "ACADEMICS_ACADEMIC_STRUCTURE";
 
     private final PermissionService permissionService;
     private final UserRepository userRepository;
