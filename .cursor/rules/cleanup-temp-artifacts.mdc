@@ -1,0 +1,24 @@
+---
+description: Delete temporary agent scripts/logs after tasks; never commit scratch artifacts
+alwaysApply: true
+---
+
+# Cleanup temporary artifacts
+
+When the task is done (or abandoned), remove one-off files created only for investigation, DB probing, E2E harnesses, screenshots, or local run logs.
+
+## Do delete after the task
+- Ad-hoc helpers under `/_scratch/`, `/.agent-tmp/`, `/tmp-agent/`
+- Root runtime logs: `be-run.log`, `be-test-run.log`, `*-run.log`
+- Password-reset / credential probe scripts not part of the product
+
+## Do keep (commit when the user asks)
+- Real product code under `src/`
+- Migrations/seeds under `src/main/resources/db/migration/`
+- Intentional tracked scripts (`scripts/postgres/`, `scripts/load_test_tenant.sh`)
+- `.gitignore` updates that prevent reintroducing junk
+
+## Practice
+1. Prefer ignored scratch paths for throwaway work.
+2. Before marking complete, delete throwaways so `git status` shows only meaningful source changes.
+3. Do not commit secrets or connection passwords in scripts.

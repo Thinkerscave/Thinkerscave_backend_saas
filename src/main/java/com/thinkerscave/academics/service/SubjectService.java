@@ -1,11 +1,19 @@
 package com.thinkerscave.academics.service;
 
+import com.thinkerscave.academics.dto.request.ClassSubjectMappingRequest;
 import com.thinkerscave.academics.dto.request.SubjectRequest;
+import com.thinkerscave.academics.dto.response.ClassMappingBoardResponse;
+import com.thinkerscave.academics.dto.response.ClassSubjectMappingResponse;
 import com.thinkerscave.academics.dto.response.SubjectResponse;
+import com.thinkerscave.academics.dto.response.SubjectsMappingDashboardResponse;
+import com.thinkerscave.academics.enums.SubjectCategory;
 
 import java.util.List;
 
 public interface SubjectService {
+
+    SubjectsMappingDashboardResponse getDashboard(
+            Long academicYearId, String q, SubjectCategory category, Boolean active);
 
     SubjectResponse create(SubjectRequest request);
 
@@ -13,9 +21,13 @@ public interface SubjectService {
 
     SubjectResponse getById(Long subjectId);
 
-    List<SubjectResponse> getAll();
+    List<SubjectResponse> getByYear(Long academicYearId);
 
-    List<SubjectResponse> search(String keyword);
+    SubjectResponse deactivate(Long subjectId);
 
-    void deactivate(Long subjectId);
+    SubjectResponse activate(Long subjectId);
+
+    ClassMappingBoardResponse getClassMappingBoard(Long classId);
+
+    ClassSubjectMappingResponse upsertClassMapping(Long classId, ClassSubjectMappingRequest request);
 }

@@ -3,6 +3,9 @@ package com.thinkerscave.academics.entity;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -16,15 +19,12 @@ import lombok.Setter;
         name = "academic_section",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_class_section",
-                        columnNames = {
-                                "class_id",
-                                "section_name"
-                        }
+                        name = "uk_academic_section_class_code",
+                        columnNames = {"class_id", "code"}
                 )
         },
         indexes = {
-                @Index(name = "idx_section_name", columnList = "section_name")
+                @Index(name = "idx_academic_section_class_active", columnList = "class_id, is_active")
         }
 )
 public class AcademicSection extends Auditable {
@@ -35,21 +35,49 @@ public class AcademicSection extends Auditable {
     @EqualsAndHashCode.Include
     private Long sectionId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "class_id", nullable = false)
     private AcademicClass academicClass;
 
     @NotBlank
-    @Size(max = 20)
-    @Column(name = "section_name", nullable = false, length = 20)
-    private String sectionName;
+    @Size(max = 50)
+    @Column(name = "name", nullable = false, length = 50)
+    private String name;
 
+    @NotBlank
+    @Size(max = 50)
+    @Column(name = "code", nullable = false, length = 50)
+    private String code;
+
+    @Positive
     @Column(name = "capacity")
     private Integer capacity;
 
-    @Column(name = "active", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "default_resource_id")
+    private AcademicResource defaultResource;
+
+    @NotNull
+    @PositiveOrZero
+    @Column(name = "display_order", nullable = false)
+    private Integer displayOrder = 0;
+
+    @NotNull
+    @Column(name = "is_active", nullable = false)
     private Boolean active = true;
 
-    @Column(name = "remarks", columnDefinition = "TEXT")
-    private String remarks;
+    /** Cross-module compatibility alias during Academics rebuild. */
+    public String getSectionName() {
+        return name;
+    }
+
+    /** Cross-module compatibility alias during Academics rebuild. */
+    public String getSectionCode() {
+        return code;
+    }
+
+    public boolean isActive() {
+        return Boolean.TRUE.equals(active);
+    }
 }

@@ -13,9 +13,29 @@ public class AcademicSectionResponse {
     private Long sectionId;
     private Long classId;
     private String className;
-    private String sectionName;
+    private String classCode;
+
+    private String name;
+    private String code;
     private Integer capacity;
+    private Integer displayOrder;
+    private Long defaultResourceId;
     private Boolean active;
-    private String remarks;
+
+    private long studentCount;
+    private String classTeacherName;
+    private Long classTeacherStaffId;
+
+    private String createdBy;
     private LocalDateTime createdOn;
+    private String updatedBy;
+    private LocalDateTime updatedOn;
+
+    public String getSectionName() {
+        return name;
+    }
+
+    public String getSectionCode() {
+        return code;
+    }
 }

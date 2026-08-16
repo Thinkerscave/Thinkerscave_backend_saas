@@ -115,7 +115,7 @@ public interface StudentAttendanceRepository extends JpaRepository<StudentAttend
     long countClassesWithPendingAttendance(@Param("orgId") Long orgId, @Param("date") LocalDate date);
 
     @Query("""
-            SELECT ac.classId, ac.className
+            SELECT ac.classId, ac.name
             FROM AcademicClass ac
             WHERE ac.active = true
               AND NOT EXISTS (
@@ -124,7 +124,7 @@ public interface StudentAttendanceRepository extends JpaRepository<StudentAttend
                   AND sa2.classId = ac.classId
                   AND sa2.attendanceDate = :date
               )
-            ORDER BY ac.className
+            ORDER BY ac.name
             """)
     List<Object[]> findClassesWithPendingAttendance(@Param("orgId") Long orgId, @Param("date") LocalDate date);
 

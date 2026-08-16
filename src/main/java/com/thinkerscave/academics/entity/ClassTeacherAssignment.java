@@ -1,7 +1,9 @@
 package com.thinkerscave.academics.entity;
 
 import com.thinkerscave.shared.entity.Auditable;
+import com.thinkerscave.staff.entity.Staff;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,41 +17,41 @@ import java.time.LocalDate;
 @Table(
         name = "class_teacher_assignment",
         indexes = {
-                @Index(name = "idx_class_teacher", columnList = "teacher_id")
+                @Index(name = "idx_cta_section_effective", columnList = "section_id, effective_from"),
+                @Index(name = "idx_cta_staff_effective", columnList = "staff_id, effective_from"),
+                @Index(name = "idx_cta_active", columnList = "is_active")
         }
 )
 public class ClassTeacherAssignment extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "assignment_id")
+    @Column(name = "class_teacher_assignment_id")
     @EqualsAndHashCode.Include
-    private Long assignmentId;
+    private Long classTeacherAssignmentId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "academic_year_id", nullable = false)
-    private AcademicYear academicYear;
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "section_id", nullable = false)
+    private AcademicSection section;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "class_id", nullable = false)
-    private AcademicClass academicClass;
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "staff_id", nullable = false)
+    private Staff staff;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "section_id")
-    private AcademicSection academicSection;
-
-    @Column(name = "teacher_id", nullable = false)
-    private Long teacherId;
-
-    @Column(name = "effective_from")
+    @NotNull
+    @Column(name = "effective_from", nullable = false)
     private LocalDate effectiveFrom;
 
     @Column(name = "effective_to")
     private LocalDate effectiveTo;
 
-    @Column(name = "active")
+    @NotNull
+    @Column(name = "is_active", nullable = false)
     private Boolean active = true;
 
-    @Column(name = "remarks", columnDefinition = "TEXT")
-    private String remarks;
+    public boolean isActive() {
+        return Boolean.TRUE.equals(active);
+    }
 }

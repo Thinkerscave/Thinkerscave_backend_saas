@@ -5,12 +5,15 @@ import com.thinkerscave.academics.dto.request.AcademicSectionRequest;
 import com.thinkerscave.academics.dto.response.AcademicClassResponse;
 import com.thinkerscave.academics.dto.response.AcademicSectionResponse;
 import com.thinkerscave.academics.dto.response.AcademicStructureTreeResponse;
+import com.thinkerscave.academics.dto.response.ClassesSectionsDashboardResponse;
+import com.thinkerscave.academics.enums.AcademicStage;
 
 import java.util.List;
 
 public interface AcademicStructureService {
 
-    // Class operations
+    ClassesSectionsDashboardResponse getDashboard(Long academicYearId, String q, AcademicStage stage, Boolean active);
+
     AcademicClassResponse createClass(AcademicClassRequest request);
 
     AcademicClassResponse updateClass(Long classId, AcademicClassRequest request);
@@ -19,9 +22,10 @@ public interface AcademicStructureService {
 
     List<AcademicClassResponse> getClassesByYear(Long academicYearId);
 
-    void deactivateClass(Long classId);
+    AcademicClassResponse deactivateClass(Long classId);
 
-    // Section operations
+    AcademicClassResponse activateClass(Long classId);
+
     AcademicSectionResponse createSection(Long classId, AcademicSectionRequest request);
 
     AcademicSectionResponse updateSection(Long sectionId, AcademicSectionRequest request);
@@ -30,8 +34,9 @@ public interface AcademicStructureService {
 
     List<AcademicSectionResponse> getSectionsByClass(Long classId);
 
-    void deactivateSection(Long sectionId);
+    AcademicSectionResponse deactivateSection(Long sectionId);
 
-    // Hierarchy
+    AcademicSectionResponse activateSection(Long sectionId);
+
     List<AcademicStructureTreeResponse> getStructureTree(Long academicYearId);
 }

@@ -1,75 +1,73 @@
 package com.thinkerscave.academics.service.impl;
 
 import com.thinkerscave.academics.dto.response.LookupDTO;
-import com.thinkerscave.academics.repository.AcademicScheduleRepository;
+import com.thinkerscave.academics.enums.AcademicYearStatus;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
 import com.thinkerscave.academics.repository.ClassRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.academics.repository.SubjectRepository;
-import com.thinkerscave.academics.repository.TimetableTemplateRepository;
 import com.thinkerscave.academics.service.AcademicsLookupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class AcademicsLookupServiceImpl implements AcademicsLookupService {
 
     private final AcademicYearRepository academicYearRepository;
     private final ClassRepository classRepository;
     private final SectionRepository sectionRepository;
     private final SubjectRepository subjectRepository;
-    private final AcademicScheduleRepository scheduleRepository;
-    private final TimetableTemplateRepository templateRepository;
 
     @Override
     public List<LookupDTO> getActiveAcademicYears() {
-        return academicYearRepository.findByActiveOrderByStartDateDesc(true)
+        return academicYearRepository.findByStatusInOrderByStartDateDesc(
+                        List.of(AcademicYearStatus.CURRENT, AcademicYearStatus.APPROVED, AcademicYearStatus.PREPARING))
                 .stream()
-                .map(y -> new LookupDTO(y.getAcademicYearId(), y.getYearCode() + " - " + y.getYearName()))
-                .collect(Collectors.toList());
+                .filter(y -> Boolean.TRUE.equals(y.getActive()))
+                .map(y -> new LookupDTO(y.getAcademicYearId(), y.getName()))
+                .toList();
     }
 
     @Override
     public List<LookupDTO> getClassesByYear(Long academicYearId) {
-        return classRepository.findByAcademicYear_AcademicYearIdAndActiveOrderByDisplayOrderAsc(academicYearId, true)
+        return classRepository.findByAcademicYear_AcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(academicYearId)
                 .stream()
-                .map(c -> new LookupDTO(c.getClassId(), c.getClassName()))
-                .collect(Collectors.toList());
+                .map(c -> new LookupDTO(c.getClassId(), c.getName()))
+                .toList();
     }
 
     @Override
     public List<LookupDTO> getSectionsByClass(Long classId) {
-        return sectionRepository.findByAcademicClass_ClassIdAndActiveOrderBySectionNameAsc(classId, true)
+        return sectionRepository.findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(classId)
                 .stream()
-                .map(s -> new LookupDTO(s.getSectionId(), s.getSectionName()))
-                .collect(Collectors.toList());
+                .map(s -> new LookupDTO(s.getSectionId(), s.getName()))
+                .toList();
     }
 
     @Override
     public List<LookupDTO> getActiveSubjects() {
-        return subjectRepository.findByActiveOrderBySubjectNameAsc(true)
-                .stream()
-                .map(s -> new LookupDTO(s.getSubjectId(), s.getSubjectName()))
-                .collect(Collectors.toList());
+        return academicYearRepository.findByStatus(AcademicYearStatus.CURRENT)
+                .map(current -> subjectRepository.findByAcademicYear_AcademicYearIdAndActiveTrueOrderByNameAsc(
+                                current.getAcademicYearId())
+                        .stream()
+                        .map(s -> new LookupDTO(s.getSubjectId(), s.getName()))
+                        .toList())
+                .orElse(Collections.emptyList());
     }
 
     @Override
     public List<LookupDTO> getSchedulesByYear(Long academicYearId) {
-        return scheduleRepository.findByAcademicYear_AcademicYearIdAndActiveOrderByStartDateAsc(academicYearId, true)
-                .stream()
-                .map(s -> new LookupDTO(s.getScheduleId(), s.getScheduleName()))
-                .collect(Collectors.toList());
+        return Collections.emptyList();
     }
 
     @Override
     public List<LookupDTO> getTemplatesBySchedule(Long scheduleId) {
-        return templateRepository.findByAcademicSchedule_ScheduleIdAndActiveOrderByTemplateNameAsc(scheduleId, true)
-                .stream()
-                .map(t -> new LookupDTO(t.getTemplateId(), t.getTemplateName()))
-                .collect(Collectors.toList());
+        return Collections.emptyList();
     }
 }

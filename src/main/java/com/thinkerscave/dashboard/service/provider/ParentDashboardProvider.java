@@ -1,10 +1,6 @@
 package com.thinkerscave.dashboard.service.provider;
 
 import com.thinkerscave.access.entity.User;
-import com.thinkerscave.academics.entity.AcademicCalendarEvent;
-import com.thinkerscave.academics.entity.TimetableSlot;
-import com.thinkerscave.academics.repository.AcademicCalendarEventRepository;
-import com.thinkerscave.academics.repository.TimetableSlotRepository;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
 import com.thinkerscave.communication.entity.Notice;
 import com.thinkerscave.communication.enums.NoticeStatus;
@@ -28,6 +24,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -43,9 +40,7 @@ public class ParentDashboardProvider extends AbstractDashboardWidgetProvider imp
     private final StudentParentRepository studentParentRepository;
     private final StudentEnrollmentRepository studentEnrollmentRepository;
     private final StudentAttendanceRepository studentAttendanceRepository;
-    private final TimetableSlotRepository timetableSlotRepository;
     private final NoticeRepository noticeRepository;
-    private final AcademicCalendarEventRepository academicCalendarEventRepository;
     private final SampleWidgetFactory sampleWidgetFactory;
 
     @Override
@@ -122,34 +117,16 @@ public class ParentDashboardProvider extends AbstractDashboardWidgetProvider imp
                         QuickActionItem.builder().label("View Attendance").icon("pi-calendar-plus").route("/app/attendance/students").tone("primary").build(),
                         QuickActionItem.builder().label("Fee Payments").icon("pi-wallet").route("/app/finance/fees").tone("warning").build(),
                         QuickActionItem.builder().label("Notices").icon("pi-megaphone").route("/app/communication/notices").tone("info").build(),
-                        QuickActionItem.builder().label("Academic Calendar").icon("pi-calendar").route("/app/academics/calendar").tone("success").build()
+                        QuickActionItem.builder().label("Academic Calendar").icon("pi-calendar").route("/app/academics/academic-calendar").tone("success").build()
                 )).build());
     }
 
     private WidgetDTO<TimetableData> todaysSchedule(StudentEnrollment enrollment) {
-        return safeWidget("todays-schedule", WidgetType.TIMETABLE, "Today's schedule", 4, DataMode.LIVE, () -> {
-            if (enrollment == null || enrollment.getClassEntity() == null) {
-                return TimetableData.builder().dayLabel(LocalDate.now().getDayOfWeek().toString()).slots(List.of()).build();
-            }
-            var day = com.thinkerscave.academics.enums.DayOfWeek.valueOf(LocalDate.now().getDayOfWeek().name());
-            Long sectionId = enrollment.getSection() != null ? enrollment.getSection().getSectionId() : null;
-            List<TimetableSlot> all = sectionId != null
-                    ? timetableSlotRepository.findByAcademicClass_ClassIdAndAcademicSection_SectionIdAndActiveOrderByDayOfWeekAscPeriodTemplate_PeriodNumberAsc(
-                            enrollment.getClassEntity().getClassId(), sectionId, true)
-                    : List.of();
-            List<TimetableSlot> todaysSlots = all.stream().filter(s -> s.getDayOfWeek() == day).collect(Collectors.toList());
-            return TimetableData.builder()
-                    .dayLabel(LocalDate.now().getDayOfWeek().toString())
-                    .slots(todaysSlots.stream().map(s -> TimetableSlotItem.builder()
-                            .periodNumber(s.getPeriodTemplate() != null ? s.getPeriodTemplate().getPeriodNumber() : null)
-                            .periodName(s.getPeriodTemplate() != null ? s.getPeriodTemplate().getPeriodName() : null)
-                            .startTime(s.getPeriodTemplate() != null ? s.getPeriodTemplate().getStartTime() : null)
-                            .endTime(s.getPeriodTemplate() != null ? s.getPeriodTemplate().getEndTime() : null)
-                            .subjectName(s.getSubjectAssignment() != null && s.getSubjectAssignment().getSubject() != null
-                                    ? s.getSubjectAssignment().getSubject().getSubjectName() : null)
-                            .build()).collect(Collectors.toList()))
-                    .build();
-        });
+        return safeWidget("todays-schedule", WidgetType.TIMETABLE, "Today's schedule", 4, DataMode.LIVE, () ->
+                TimetableData.builder()
+                        .dayLabel(LocalDate.now().getDayOfWeek().toString())
+                        .slots(Collections.emptyList())
+                        .build());
     }
 
     private WidgetDTO<AttendanceSummaryData> attendanceOverview(Student primaryChild) {
@@ -195,26 +172,13 @@ public class ParentDashboardProvider extends AbstractDashboardWidgetProvider imp
     }
 
     private WidgetDTO<CalendarData> upcomingEvents() {
-        return safeWidget("upcoming-events", WidgetType.EVENTS, "Upcoming events", 2, DataMode.LIVE, () -> {
-            List<AcademicCalendarEvent> events = academicCalendarEventRepository
-                    .findByStartDateGreaterThanEqualAndActiveOrderByStartDateAsc(LocalDate.now(), true);
-            return CalendarData.builder().items(events.stream().limit(5).map(this::toCalendarItem).collect(Collectors.toList())).build();
-        });
+        return safeWidget("upcoming-events", WidgetType.EVENTS, "Upcoming events", 2, DataMode.LIVE, () ->
+                CalendarData.builder().items(Collections.emptyList()).build());
     }
 
     private WidgetDTO<CalendarData> academicCalendar() {
-        return safeWidget("academic-calendar", WidgetType.CALENDAR, "Academic calendar", 4, DataMode.LIVE, () -> {
-            List<AcademicCalendarEvent> events = academicCalendarEventRepository
-                    .findByStartDateGreaterThanEqualAndActiveOrderByStartDateAsc(LocalDate.now().withDayOfMonth(1), true);
-            return CalendarData.builder().items(events.stream().limit(10).map(this::toCalendarItem).collect(Collectors.toList())).build();
-        });
-    }
-
-    private CalendarEventItem toCalendarItem(AcademicCalendarEvent e) {
-        return CalendarEventItem.builder()
-                .title(e.getTitle()).startDate(e.getStartDate()).endDate(e.getEndDate())
-                .eventType(e.getEventType() != null ? e.getEventType().name() : null)
-                .allDay(Boolean.TRUE.equals(e.getAllDay())).build();
+        return safeWidget("academic-calendar", WidgetType.CALENDAR, "Academic calendar", 4, DataMode.LIVE, () ->
+                CalendarData.builder().items(Collections.emptyList()).build());
     }
 
     private double attendancePercentage(Student student) {

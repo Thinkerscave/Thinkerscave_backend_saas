@@ -308,18 +308,30 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
         // ── SUBSCRIPTION (gated by the organization's subscription plan) ─────
         Feature academicsFeature = ensureFeature("FEAT_ACADEMICS", "ACADEMICS_MODULE", "Academics",
                 "Academics", "ACADEMIC", 1);
-        Menu academics = ensureMenu("ACADEMICS", "Academics", "Academic setup and scheduling",
+        Menu academics =         ensureMenu("ACADEMICS", "Academics", "Academic setup and scheduling",
                 "/app/academics", "school", MenuType.MODULE, null, 10, MenuScope.SUBSCRIPTION, academicsFeature);
-        ensureMenu("ACADEMICS_SETUP", "Academic Setup", "Academic setup",
-                "/app/academics/academic-setup", "settings", MenuType.PAGE, academics, 1, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_OVERVIEW", "Overview", "Academics dashboard overview",
+                "/app/academics/overview", "dashboard", MenuType.PAGE, academics, 1, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_ACADEMIC_YEAR", "Academic Year", "Academic year lifecycle and history",
+                "/app/academics/academic-year", "calendar_month", MenuType.PAGE, academics, 2, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_CLASSES", "Classes & Sections", "Manage classes, sections and class teachers",
+                "/app/academics/classes-sections", "class", MenuType.PAGE, academics, 3, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_SUBJECTS", "Subjects & Mapping", "Configure subjects and class subject mapping",
+                "/app/academics/subjects-mapping", "menu_book", MenuType.PAGE, academics, 4, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_TEACHER_ALLOCATION", "Teacher Allocation", "Assign teachers to class subjects",
+                "/app/academics/teacher-allocation", "person_search", MenuType.PAGE, academics, 5, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_TIMETABLE", "Timetable", "Timetable",
-                "/app/academics/timetable", "calendar", MenuType.PAGE, academics, 2, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("ACADEMICS_TEACHER_ARRANGEMENT", "Teacher Arrangement", "Teacher arrangement",
-                "/app/academics/teacher-arrangement", "person", MenuType.PAGE, academics, 3, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("ACADEMICS_CALENDAR", "Academic Calendar", "Academic calendar",
-                "/app/academics/academic-calendar", "calendar", MenuType.PAGE, academics, 4, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("ACADEMICS_SYLLABUS_TRACKER", "Syllabus Tracker", "Syllabus tracker",
-                "/app/academics/syllabus-tracker", "book", MenuType.PAGE, academics, 5, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/timetable", "calendar", MenuType.PAGE, academics, 6, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_CALENDAR", "Academic Calendar", "Academic events and holiday calendar",
+                "/app/academics/academic-calendar", "event", MenuType.PAGE, academics, 7, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_MY_CLASSES", "My Classes", "Teacher class assignments and subjects",
+                "/app/academics/my-classes", "class", MenuType.PAGE, academics, 8, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_MY_TIMETABLE", "My Timetable", "Personal timetable view",
+                "/app/academics/my-timetable", "calendar", MenuType.PAGE, academics, 9, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_ACADEMIC_STRUCTURE", "Academic Structure", "Read-only academic structure for teachers",
+                "/app/academics/academic-structure", "account_tree", MenuType.PAGE, academics, 10, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_MY_ACADEMICS", "My Academics", "Student academic profile and subjects",
+                "/app/academics/my-academics", "school", MenuType.PAGE, academics, 11, MenuScope.SUBSCRIPTION, null);
 
         Feature studentsFeature = ensureFeature("FEAT_STUDENTS", "STUDENTS_MODULE", "Students",
                 "Students", "CORE", 2);
@@ -442,7 +454,9 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "FEE_LEDGER",
                 "FEE_ADJUSTMENTS",
                 "FEE_CONTROLS",
-                "FEE_AUDIT"
+                "FEE_AUDIT",
+                "ACADEMICS_TEACHER_ARRANGEMENT",
+                "ACADEMICS_SYLLABUS_TRACKER"
         );
         menuRepository.findByMenuCodeInAndActiveTrue(obsoleteCodes)
                 .forEach(menu -> {

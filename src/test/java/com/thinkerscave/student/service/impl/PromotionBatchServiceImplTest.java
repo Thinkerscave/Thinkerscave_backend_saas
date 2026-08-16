@@ -211,8 +211,8 @@ class PromotionBatchServiceImplTest {
     private static AcademicClass clazz(Long id, String code, int order) {
         AcademicClass c = new AcademicClass();
         c.setClassId(id);
-        c.setClassCode(code);
-        c.setClassName("Class " + code);
+        c.setCode(code);
+        c.setName("Class " + code);
         c.setDisplayOrder(order);
         return c;
     }

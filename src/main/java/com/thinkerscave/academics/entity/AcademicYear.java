@@ -1,5 +1,7 @@
 package com.thinkerscave.academics.entity;
 
+import com.thinkerscave.academics.enums.AcademicYearPattern;
+import com.thinkerscave.academics.enums.AcademicYearStatus;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
@@ -10,6 +12,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -17,9 +20,13 @@ import java.time.LocalDate;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Table(
         name = "academic_year",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_academic_year_name", columnNames = "name")
+        },
         indexes = {
-                @Index(name = "idx_academic_year_code", columnList = "year_code"),
-                @Index(name = "idx_academic_year_current", columnList = "current_year")
+                @Index(name = "idx_academic_year_status", columnList = "status"),
+                @Index(name = "idx_academic_year_dates", columnList = "start_date, end_date"),
+                @Index(name = "idx_academic_year_active", columnList = "is_active")
         }
 )
 public class AcademicYear extends Auditable {
@@ -31,14 +38,9 @@ public class AcademicYear extends Auditable {
     private Long academicYearId;
 
     @NotBlank
-    @Size(max = 20)
-    @Column(name = "year_code", nullable = false, unique = true, length = 20)
-    private String yearCode;
-
-    @NotBlank
-    @Size(max = 100)
-    @Column(name = "year_name", nullable = false, length = 100)
-    private String yearName;
+    @Size(max = 50)
+    @Column(name = "name", nullable = false, length = 50)
+    private String name;
 
     @NotNull
     @Column(name = "start_date", nullable = false)
@@ -48,12 +50,64 @@ public class AcademicYear extends Auditable {
     @Column(name = "end_date", nullable = false)
     private LocalDate endDate;
 
-    @Column(name = "current_year", nullable = false)
-    private Boolean currentYear = false;
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pattern", nullable = false, length = 30)
+    private AcademicYearPattern pattern = AcademicYearPattern.ANNUAL;
 
-    @Column(name = "active", nullable = false)
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 40)
+    private AcademicYearStatus status = AcademicYearStatus.DRAFT;
+
+    @Column(name = "submitted_at")
+    private LocalDateTime submittedAt;
+
+    @Column(name = "submitted_by_user_id")
+    private Long submittedByUserId;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "approved_by_user_id")
+    private Long approvedByUserId;
+
+    @Column(name = "rejected_at")
+    private LocalDateTime rejectedAt;
+
+    @Column(name = "rejected_by_user_id")
+    private Long rejectedByUserId;
+
+    @Size(max = 1000)
+    @Column(name = "rejection_reason", length = 1000)
+    private String rejectionReason;
+
+    @Column(name = "activated_at")
+    private LocalDateTime activatedAt;
+
+    @Column(name = "activated_by_user_id")
+    private Long activatedByUserId;
+
+    @NotNull
+    @Column(name = "is_active", nullable = false)
     private Boolean active = true;
 
-    @Column(name = "remarks", columnDefinition = "TEXT")
-    private String remarks;
+    /** Cross-module compatibility alias during Academics rebuild. */
+    public String getYearCode() {
+        return name;
+    }
+
+    /** Cross-module compatibility alias during Academics rebuild. */
+    public String getYearName() {
+        return name;
+    }
+
+    /** Cross-module compatibility alias during Academics rebuild. */
+    public boolean isCurrentYear() {
+        return status == AcademicYearStatus.CURRENT;
+    }
+
+    public boolean isActive() {
+        return Boolean.TRUE.equals(active);
+    }
 }

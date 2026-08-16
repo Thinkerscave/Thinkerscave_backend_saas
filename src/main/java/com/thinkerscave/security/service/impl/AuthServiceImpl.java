@@ -247,8 +247,19 @@ public class AuthServiceImpl implements AuthService {
         String previousTenant = TenantContext.getTenant();
         try {
             TenantContext.setTenant("public");
-            return tenantRegistryRepository.findActiveByTenantIdentifierNormalized(loginContext.getTenantIdentifier())
+            TenantRegistry tenant = tenantRegistryRepository.findActiveByTenantIdentifierNormalized(loginContext.getTenantIdentifier())
                     .orElseThrow(() -> new BadRequestException("Unknown institution tenant"));
+            // Eagerly touch org + customer while still on the platform catalog. After this
+            // method restores the institution TenantContext, lazy-loading Customer would hit
+            // the tenant DB (legacy customers schema) and fail.
+            Organization organization = tenant.getOrganization();
+            if (organization != null) {
+                organization.getStatus();
+                if (organization.getCustomer() != null) {
+                    organization.getCustomer().getStatus();
+                }
+            }
+            return tenant;
         } finally {
             TenantContext.setTenant(previousTenant);
         }

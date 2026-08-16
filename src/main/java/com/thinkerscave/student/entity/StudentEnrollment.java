@@ -9,6 +9,8 @@ import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 
 @Entity
 @Getter
@@ -39,15 +41,18 @@ public class StudentEnrollment extends Auditable {
     private Student student;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "academic_year_id", nullable = false)
+    @JoinColumn(name = "academic_year_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private AcademicYear academicYear;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "class_id", nullable = false)
+    @JoinColumn(name = "class_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private AcademicClass classEntity;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "section_id")
+    @NotFound(action = NotFoundAction.IGNORE)
     private AcademicSection section;
 
     @Column(name = "roll_number", length = 50)

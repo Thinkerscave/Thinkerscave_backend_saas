@@ -1,33 +1,38 @@
 package com.thinkerscave.academics.service;
 
 import com.thinkerscave.academics.dto.request.ClassTeacherAssignmentRequest;
-import com.thinkerscave.academics.dto.request.SubjectAssignmentRequest;
+import com.thinkerscave.academics.dto.request.TeacherAllocationAssignRequest;
 import com.thinkerscave.academics.dto.response.ClassTeacherAssignmentResponse;
-import com.thinkerscave.academics.dto.response.SubjectAssignmentResponse;
+import com.thinkerscave.academics.dto.response.TeacherAllocationDashboardResponse;
+import com.thinkerscave.academics.dto.response.TeacherAllocationRowResponse;
+import com.thinkerscave.academics.dto.response.TeacherRecommendationResponse;
 import com.thinkerscave.academics.dto.response.TeacherWorkloadResponse;
+import com.thinkerscave.academics.enums.TeacherAllocationStatus;
 
 import java.util.List;
 
 public interface TeacherAllocationService {
 
-    // Class teacher
+    TeacherAllocationDashboardResponse getDashboard(
+            Long academicYearId,
+            Long classId,
+            Long sectionId,
+            Long subjectId,
+            TeacherAllocationStatus status);
+
+    TeacherAllocationRowResponse assign(TeacherAllocationAssignRequest request);
+
+    TeacherAllocationRowResponse unassign(Long teacherAllocationId);
+
+    List<TeacherRecommendationResponse> recommendations(Long sectionId, Long classSubjectMappingId);
+
+    TeacherWorkloadResponse getTeacherWorkload(Long staffId, Long academicYearId);
+
+    List<TeacherWorkloadResponse> listWorkloads(Long academicYearId);
+
     ClassTeacherAssignmentResponse assignClassTeacher(ClassTeacherAssignmentRequest request);
 
-    ClassTeacherAssignmentResponse getClassTeacherAssignment(Long assignmentId);
-
-    List<ClassTeacherAssignmentResponse> getClassTeacherAssignments(Long yearId, Long classId, Long sectionId);
+    List<ClassTeacherAssignmentResponse> getClassTeachers(Long yearId, Long classId, Long sectionId);
 
     void removeClassTeacher(Long assignmentId);
-
-    // Subject assignment
-    SubjectAssignmentResponse assignSubject(SubjectAssignmentRequest request);
-
-    SubjectAssignmentResponse updateSubjectAssignment(Long assignmentId, SubjectAssignmentRequest request);
-
-    List<SubjectAssignmentResponse> getSubjectAssignments(Long yearId, Long classId, Long sectionId);
-
-    void removeSubjectAssignment(Long assignmentId);
-
-    // Workload
-    TeacherWorkloadResponse getTeacherWorkload(Long teacherId, Long academicYearId);
 }

@@ -1,23 +1,48 @@
 package com.thinkerscave.academics.service;
 
-import com.thinkerscave.academics.dto.request.CalendarEventRequest;
-import com.thinkerscave.academics.dto.response.CalendarEventResponse;
+import com.thinkerscave.academics.dto.request.AcademicCalendarEventRequest;
+import com.thinkerscave.academics.dto.response.AcademicCalendarDashboardResponse;
+import com.thinkerscave.academics.dto.response.AcademicCalendarEventResponse;
+import com.thinkerscave.academics.enums.CalendarAudienceType;
+import com.thinkerscave.academics.enums.CalendarEventStatus;
+import com.thinkerscave.academics.enums.CalendarEventType;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface AcademicCalendarService {
 
-    CalendarEventResponse createEvent(Long academicYearId, CalendarEventRequest request);
+    AcademicCalendarDashboardResponse getDashboard(
+            Long yearId,
+            String q,
+            CalendarEventType eventType,
+            CalendarEventStatus status,
+            CalendarAudienceType audienceType,
+            LocalDate from,
+            LocalDate to);
 
-    CalendarEventResponse updateEvent(Long eventId, CalendarEventRequest request);
+    List<AcademicCalendarEventResponse> listEvents(
+            Long yearId,
+            String q,
+            CalendarEventType eventType,
+            CalendarEventStatus status,
+            CalendarAudienceType audienceType,
+            LocalDate from,
+            LocalDate to);
 
-    CalendarEventResponse getById(Long eventId);
+    AcademicCalendarEventResponse getById(Long eventId);
 
-    List<CalendarEventResponse> getEventsByYear(Long academicYearId);
+    AcademicCalendarEventResponse create(AcademicCalendarEventRequest request);
 
-    List<CalendarEventResponse> getEventsByMonth(int year, int month);
+    AcademicCalendarEventResponse update(Long eventId, AcademicCalendarEventRequest request);
 
-    List<CalendarEventResponse> getUpcomingEvents();
+    AcademicCalendarEventResponse publish(Long eventId);
 
-    void deleteEvent(Long eventId);
+    AcademicCalendarEventResponse unpublish(Long eventId);
+
+    AcademicCalendarEventResponse deactivate(Long eventId);
+
+    AcademicCalendarEventResponse reactivate(Long eventId);
+
+    List<AcademicCalendarEventResponse> upcoming(Long academicYearId, Integer limit);
 }

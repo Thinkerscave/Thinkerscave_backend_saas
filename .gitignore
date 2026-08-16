@@ -57,3 +57,18 @@ local.properties
 .DS_Store
 Thumbs.db
 desktop.ini
+
+### Local agent / one-off scratch ###
+# Repo already has intentional scripts/ (load_test, postgres seeds).
+# Ignore only ephemeral agent dumps and runtime logs at repo root.
+/_scratch/
+/.agent-tmp/
+/tmp-agent/
+be-run.log
+be-test-run.log
+*-run.log
+*.pyc
+__pycache__/
+.Python
+.venv/
+venv/

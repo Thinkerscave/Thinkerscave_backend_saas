@@ -11,14 +11,13 @@ import java.time.LocalDateTime;
 @Setter
 @Builder
 public class ClassTeacherAssignmentResponse {
-    private Long assignmentId;
-    private Long academicYearId;
-    private String yearCode;
-    private Long classId;
-    private String className;
+    private Long classTeacherAssignmentId;
     private Long sectionId;
     private String sectionName;
-    private Long teacherId;
+    private Long classId;
+    private String className;
+    private Long staffId;
+    private String staffName;
     private LocalDate effectiveFrom;
     private LocalDate effectiveTo;
     private Boolean active;

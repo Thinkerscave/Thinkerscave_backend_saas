@@ -10,17 +10,11 @@ import java.time.LocalDate;
 @Setter
 public class ClassTeacherAssignmentRequest {
 
-    @NotNull(message = "Academic year ID is mandatory")
-    private Long academicYearId;
-
-    @NotNull(message = "Class ID is mandatory")
-    private Long classId;
-
+    @NotNull(message = "Section ID is mandatory")
     private Long sectionId;
 
-    @NotNull(message = "Teacher ID is mandatory")
-    private Long teacherId;
+    @NotNull(message = "Teacher (staff) ID is mandatory")
+    private Long staffId;
 
     private LocalDate effectiveFrom;
-    private String remarks;
 }
