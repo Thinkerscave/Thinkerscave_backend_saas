@@ -11,12 +11,10 @@ import com.thinkerscave.academics.repository.*;
 import com.thinkerscave.academics.security.AcademicsAccessGuard;
 import com.thinkerscave.academics.service.AcademicsOverviewService;
 import com.thinkerscave.shared.exceptions.BusinessException;
-import com.thinkerscave.staff.entity.Staff;
 import com.thinkerscave.student.repository.StudentEnrollmentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -38,7 +36,6 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
     private final TimetableVersionRepository versionRepo;
     private final TimetableConflictRepository conflictRepo;
     private final StudentEnrollmentRepository enrollmentRepo;
-    private final ClassTeacherAssignmentRepository classTeacherAssignmentRepo;
 
     @Override
     public AcademicsOverviewResponse getOverview(Long yearId) {
@@ -333,29 +330,10 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
                             .className(c.getName())
                             .sectionCount(sectionRepo.countByAcademicClass_ClassIdAndActiveTrue(c.getClassId()))
                             .studentCount(studentCount)
-                            .classTeacherName(resolvePrimaryClassTeacher(c.getClassId()))
+                            .classTeacherName(null)
                             .build();
                 })
                 .collect(Collectors.toList());
-    }
-
-    private String resolvePrimaryClassTeacher(Long classId) {
-        List<AcademicSection> sections = sectionRepo
-                .findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(classId);
-        for (AcademicSection section : sections) {
-            Optional<ClassTeacherAssignment> assignment = classTeacherAssignmentRepo
-                    .findFirstBySection_SectionIdAndActiveTrueAndEffectiveToIsNullOrderByEffectiveFromDesc(
-                            section.getSectionId());
-            if (assignment.isPresent() && assignment.get().getStaff() != null) {
-                return staffDisplayName(assignment.get().getStaff());
-            }
-        }
-        return null;
-    }
-
-    private String staffDisplayName(Staff staff) {
-        String middle = StringUtils.hasText(staff.getMiddleName()) ? " " + staff.getMiddleName() : "";
-        return (staff.getFirstName() + middle + " " + staff.getLastName()).trim();
     }
 
     private List<SubjectCard> buildTopSubjects(Long yearId) {

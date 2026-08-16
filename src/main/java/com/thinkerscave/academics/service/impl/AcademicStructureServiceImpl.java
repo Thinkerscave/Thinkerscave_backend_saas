@@ -213,15 +213,22 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
 
         section.setName(name);
         section.setCode(code);
-        section.setCapacity(request.getCapacity());
+        // Capacity is retained in schema for compatibility but is not part of the
+        // active Class/Section admin UX — only overwrite when explicitly provided.
+        if (request.getCapacity() != null) {
+            section.setCapacity(request.getCapacity());
+        }
         if (request.getDisplayOrder() != null) {
             section.setDisplayOrder(request.getDisplayOrder());
         }
         section.setDefaultResource(resolveResource(request.getDefaultResourceId()));
         AcademicSection saved = sectionRepository.save(section);
 
+        // Class teacher belongs to the Section. Null clears the active assignment.
         if (request.getClassTeacherStaffId() != null) {
             assignClassTeacher(saved, request.getClassTeacherStaffId());
+        } else {
+            clearClassTeacher(saved);
         }
         return toSectionResponse(saved);
     }
@@ -315,8 +322,6 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         long sectionCount = 0;
         long sectionsActive = 0;
         long studentCount = 0;
-        String teacherName = null;
-        Long teacherStaffId = null;
         List<AcademicSectionResponse> sections = null;
 
         if (withCounts || withSections) {
@@ -326,24 +331,13 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
             sectionsActive = sectionEntities.stream().filter(AcademicSection::isActive).count();
             studentCount = studentEnrollmentRepository.countByClassEntityClassIdAndActiveTrue(entity.getClassId());
 
-            ClassTeacherAssignment teacher = sectionEntities.stream()
-                    .map(s -> classTeacherAssignmentRepository
-                            .findFirstBySection_SectionIdAndActiveTrueAndEffectiveToIsNullOrderByEffectiveFromDesc(
-                                    s.getSectionId())
-                            .orElse(null))
-                    .filter(Objects::nonNull)
-                    .findFirst()
-                    .orElse(null);
-            if (teacher != null && teacher.getStaff() != null) {
-                teacherStaffId = teacher.getStaff().getStaffId();
-                teacherName = staffDisplayName(teacher.getStaff());
-            }
-
             if (withSections) {
                 sections = sectionEntities.stream().map(this::toSectionResponse).toList();
             }
         }
 
+        // Class Teacher is a Section relationship only — never roll up a single
+        // teacher onto the Class response (that implied an incorrect Class→Teacher model).
         return AcademicClassResponse.builder()
                 .classId(entity.getClassId())
                 .academicYearId(year.getAcademicYearId())
@@ -358,8 +352,8 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
                 .sectionCount(sectionCount)
                 .sectionsActive(sectionsActive)
                 .studentCount(studentCount)
-                .classTeacherName(teacherName)
-                .classTeacherStaffId(teacherStaffId)
+                .classTeacherName(null)
+                .classTeacherStaffId(null)
                 .sections(sections)
                 .createdBy(entity.getCreatedBy())
                 .createdOn(entity.getCreatedOn())
@@ -406,12 +400,7 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         Staff staff = staffRepository.findById(staffId)
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + staffId));
 
-        classTeacherAssignmentRepository.findBySection_SectionIdAndEffectiveToIsNull(section.getSectionId())
-                .ifPresent(existing -> {
-                    existing.setEffectiveTo(LocalDate.now().minusDays(1));
-                    existing.setActive(false);
-                    classTeacherAssignmentRepository.save(existing);
-                });
+        clearClassTeacher(section);
 
         ClassTeacherAssignment assignment = new ClassTeacherAssignment();
         assignment.setSection(section);
@@ -419,6 +408,20 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         assignment.setEffectiveFrom(LocalDate.now());
         assignment.setActive(true);
         classTeacherAssignmentRepository.save(assignment);
+    }
+
+    private void clearClassTeacher(AcademicSection section) {
+        classTeacherAssignmentRepository.findBySection_SectionIdAndEffectiveToIsNull(section.getSectionId())
+                .ifPresent(existing -> {
+                    LocalDate end = LocalDate.now();
+                    // CHECK (effective_to IS NULL OR effective_to >= effective_from)
+                    if (existing.getEffectiveFrom() != null && end.isBefore(existing.getEffectiveFrom())) {
+                        end = existing.getEffectiveFrom();
+                    }
+                    existing.setEffectiveTo(end);
+                    existing.setActive(false);
+                    classTeacherAssignmentRepository.save(existing);
+                });
     }
 
     private AcademicResource resolveResource(Long resourceId) {

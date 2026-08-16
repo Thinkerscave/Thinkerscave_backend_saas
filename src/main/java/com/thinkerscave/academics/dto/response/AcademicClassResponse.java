@@ -28,7 +28,15 @@ public class AcademicClassResponse {
     private long sectionCount;
     private long sectionsActive;
     private long studentCount;
+
+    /**
+     * @deprecated Class Teacher is a Section-level relationship. These fields are
+     * always null and kept only for JSON compatibility with older clients.
+     */
+    @Deprecated
     private String classTeacherName;
+    /** @deprecated See {@link #classTeacherName}. */
+    @Deprecated
     private Long classTeacherStaffId;
 
     private List<AcademicSectionResponse> sections;
