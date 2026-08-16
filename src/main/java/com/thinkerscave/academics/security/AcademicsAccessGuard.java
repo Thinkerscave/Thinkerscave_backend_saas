@@ -24,6 +24,7 @@ public class AcademicsAccessGuard {
     public static final String RESOURCE_SUBJECTS = "ACADEMICS_SUBJECTS";
     public static final String RESOURCE_TEACHER_ALLOCATION = "ACADEMICS_TEACHER_ALLOCATION";
     public static final String RESOURCE_TIMETABLE = "ACADEMICS_TIMETABLE";
+    public static final String RESOURCE_CALENDAR = "ACADEMICS_CALENDAR";
     public static final String RESOURCE_OVERVIEW = "ACADEMICS_OVERVIEW";
     public static final String RESOURCE_MY_CLASSES = "ACADEMICS_MY_CLASSES";
     public static final String RESOURCE_MY_TIMETABLE = "ACADEMICS_MY_TIMETABLE";
@@ -45,6 +46,23 @@ public class AcademicsAccessGuard {
         require(resource, "APPROVE");
     }
 
+    /** True when caller has MANAGE on the resource (or elevated org role). */
+    public boolean canManage(String resource) {
+        if (hasElevatedRole()) {
+            return true;
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null) {
+            return false;
+        }
+        Long orgId = OrganizationContext.getOrganizationId();
+        User user = userRepository.findByUsername(auth.getName()).orElse(null);
+        if (user == null || orgId == null) {
+            return false;
+        }
+        return permissionService.hasPermission(user.getId(), orgId, resource, "MANAGE");
+    }
+
     public Long currentUserIdOrNull() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || auth.getName() == null) {
@@ -53,6 +71,26 @@ public class AcademicsAccessGuard {
         return userRepository.findByUsername(auth.getName())
                 .map(User::getId)
                 .orElse(null);
+    }
+
+    public String currentUsernameOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getName() == null) {
+            return null;
+        }
+        return auth.getName();
+    }
+
+    public boolean hasElevatedRole() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            return false;
+        }
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> "SUPER_ADMIN".equals(a)
+                        || "ORGANIZATION_OWNER".equals(a)
+                        || "ORGANIZATION_ADMIN".equals(a));
     }
 
     private void require(String resource, String privilege) {
@@ -71,17 +109,5 @@ public class AcademicsAccessGuard {
         if (!permissionService.hasPermission(user.getId(), orgId, resource, privilege)) {
             throw new AccessDeniedException(resource + ":" + privilege + " required");
         }
-    }
-
-    private boolean hasElevatedRole() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null) {
-            return false;
-        }
-        return auth.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .anyMatch(a -> "SUPER_ADMIN".equals(a)
-                        || "ORGANIZATION_OWNER".equals(a)
-                        || "ORGANIZATION_ADMIN".equals(a));
     }
 }

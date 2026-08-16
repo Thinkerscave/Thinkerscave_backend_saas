@@ -31,7 +31,7 @@ public interface SectionRepository extends JpaRepository<AcademicSection, Long> 
     List<AcademicSection> findWithClassByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(
             @Param("classId") Long classId);
 
-    @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicClass WHERE s.sectionId = :sectionId")
+    @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicClass c JOIN FETCH c.academicYear WHERE s.sectionId = :sectionId")
     Optional<AcademicSection> findByIdWithClass(@Param("sectionId") Long sectionId);
 
     Optional<AcademicSection> findByAcademicClass_ClassIdAndCodeIgnoreCase(Long classId, String code);

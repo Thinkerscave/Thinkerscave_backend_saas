@@ -99,7 +99,7 @@ public class StudentDashboardProvider extends AbstractDashboardWidgetProvider im
                         QuickActionItem.builder().label("My Timetable").icon("pi-clock").route("/app/academics/timetable").tone("primary").build(),
                         QuickActionItem.builder().label("My Attendance").icon("pi-calendar-plus").route("/app/attendance/students").tone("info").build(),
                         QuickActionItem.builder().label("Notices").icon("pi-megaphone").route("/app/communication/notices").tone("warning").build(),
-                        QuickActionItem.builder().label("Academic Calendar").icon("pi-calendar").route("/app/academics/calendar").tone("success").build()
+                        QuickActionItem.builder().label("Academic Calendar").icon("pi-calendar").route("/app/academics/academic-calendar").tone("success").build()
                 )).build());
     }
 
