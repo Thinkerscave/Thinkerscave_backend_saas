@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
@@ -22,6 +21,7 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 /**
  * Loads local MySQL seed data AFTER Hibernate has created entity tables.
  * Active only under the "dev" Spring profile (local development).
+ * Never mass-overwrites user passwords.
  */
 @Component
 @Profile("dev")
@@ -30,7 +30,6 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 public class DevDataInitializer implements ApplicationRunner {
 
     private final DataSource dataSource;
-    private final PasswordEncoder passwordEncoder;
     private final JdbcTemplate jdbcTemplate;
 
     @Override
@@ -58,13 +57,8 @@ public class DevDataInitializer implements ApplicationRunner {
 
             provisionTenantDatabases();
 
-            // Fix password hashes so they match the app's BCrypt encoder.
-            // Dev default for all seeded users (including platform superadmin).
-            String hash = passwordEncoder.encode("Password@123");
-            int updated = jdbcTemplate.update(
-                    "UPDATE users SET password = ?, account_locked = FALSE, failed_login_attempts = 0, lock_expiry_at = NULL WHERE password IS NOT NULL",
-                    hash);
-            log.info("Updated {} user passwords with BCrypt hash and cleared lockouts.", updated);
+            // Do NOT overwrite user passwords here. Seed scripts may insert placeholders;
+            // operators must set real credentials via provisioning / password-reset flows.
 
             jdbcTemplate.update("""
                     INSERT IGNORE INTO roles (id, role_code, role_name, description, role_type, dashboard_code, system_role, active, display_order, created_by, updated_by, version)
@@ -125,7 +119,7 @@ public class DevDataInitializer implements ApplicationRunner {
      *   1. CREATE DATABASE IF NOT EXISTS
      *   2. Copy all table structures from thinkerscave_dev using CREATE TABLE ... LIKE
      *   3. Load tenant-specific seed SQL (db/tenant/seed_{slug}.sql)
-     *   4. BCrypt-rehash placeholder passwords in tenant schema
+     *   4. Does not rewrite passwords (never force a shared default hash)
      */
     private void provisionTenantDatabases() {
         List<Map<String, Object>> tenants = new ArrayList<>();
@@ -153,7 +147,9 @@ public class DevDataInitializer implements ApplicationRunner {
             log.warn("Could not read platform table list: {}", e.getMessage());
         }
 
-        String bcryptHash = passwordEncoder.encode("Password@123");
+        if (platformTables.isEmpty()) {
+            // keep going; seed may still apply when tables already exist
+        }
 
         for (Map<String, Object> tenant : tenants) {
             String schema   = (String) tenant.get("schema_name");
@@ -194,13 +190,7 @@ public class DevDataInitializer implements ApplicationRunner {
                         populator.setSeparator(";");
                         populator.setContinueOnError(true);
                         populator.execute(tenantDs);
-
-                        // 4. BCrypt-rehash placeholder passwords
-                        JdbcTemplate tenantJdbc = new JdbcTemplate(tenantDs);
-                        tenantJdbc.update(
-                                "UPDATE users SET password = ?, account_locked = FALSE, failed_login_attempts = 0, lock_expiry_at = NULL WHERE password IS NOT NULL",
-                                bcryptHash);
-                        log.info("Seed data and passwords loaded for tenant: {}", schema);
+                        log.info("Seed data loaded for tenant: {} (passwords left unchanged)", schema);
                     }
                 } else {
                     log.warn("Seed file not found for tenant '{}' at path: {}", tenantId, seedFile);

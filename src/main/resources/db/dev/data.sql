@@ -2,7 +2,7 @@
 -- DEV Seed Data for MySQL
 -- ThinkersCave SaaS - Odisha school / college demo data
 -- INSERT IGNORE makes the script idempotent.
--- DevDataInitializer re-hashes user passwords to BCrypt("Password@123").
+-- Dev seed data. Does not rewrite live passwords at runtime.
 -- ============================================
 
 -- =========================================================
@@ -1401,7 +1401,7 @@ VALUES
 (5, 3, 'Attendance Alert - ABC',    'Sai Panda was absent on June 27. Please inform.',                  'SMS,EMAIL',   'ATTENDANCE', '2026-06-27 15:00:00', '2026-06-27 15:00:10', 'SENT',    9,  1, 1, 0, 'system', 'system', 0);
 
 -- =========================================================
--- FINAL: Ensure all new users get Password@123 BCrypt
+-- FINAL: placeholder only for empty password fields (runtime must not mass-overwrite hashes)
 -- (DevDataInitializer will handle this, but adding placeholder marker)
 -- =========================================================
 UPDATE users SET password = 'PLACEHOLDER' WHERE password IS NULL OR password = '';

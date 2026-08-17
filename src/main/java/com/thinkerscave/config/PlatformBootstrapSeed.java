@@ -38,7 +38,8 @@ import java.util.List;
 /**
  * Idempotent bootstrap for an empty remote PostgreSQL database (test/prod).
  * Creates platform host org, system roles, privileges, Super Admin menus,
- * role_permissions, and superadmin / Password@123 when the DB has no superadmin.
+ * role_permissions, and a Super Admin user only when none exists.
+ * Existing user passwords are never modified.
  */
 @Component
 @Profile({"test", "prod"})
@@ -81,7 +82,7 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
         ensureUserRole(superAdmin, superAdminRole);
         seedCodeSequences();
 
-                log.info("Platform bootstrap baseline verified. Login: {} / {}", SUPERADMIN_USERNAME, SUPERADMIN_PASSWORD);
+                log.info("Platform bootstrap baseline verified (superadmin ensured if missing; passwords not rewritten).");
     }
 
     private Customer ensurePlatformCustomer() {
