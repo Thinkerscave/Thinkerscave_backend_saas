@@ -367,11 +367,14 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .institutionType(o.getInstitutionType())
                 .boardName(o.getBoardName())
                 .status(o.getStatus())
-                .email(o.getEmail())
-                .mobileNumber(o.getMobileNumber())
+                .email(firstText(o.getEmail()))
+                .mobileNumber(firstText(o.getMobileNumber()))
                 .alternateMobileNumber(o.getAlternateMobileNumber())
-                .website(o.getWebsite())
-                .addressLine1(o.getAddressLine1())
+                .website(firstText(
+                        o.getWebsite(),
+                        o.getOrganizationDomain() != null ? o.getOrganizationDomain().getDomain() : null,
+                        o.getTenantRegistry() != null ? o.getTenantRegistry().getTenantDomain() : null))
+                .addressLine1(firstText(o.getAddressLine1(), locationLabel(o)))
                 .addressLine2(o.getAddressLine2())
                 .city(o.getCity())
                 .state(o.getState())
@@ -396,5 +399,20 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .updatedOn(o.getUpdatedOn())
                 .updatedBy(o.getUpdatedBy())
                 .build();
+    }
+
+    private static String locationLabel(Organization o) {
+        return Stream.of(o.getCity(), o.getState(), o.getCountry())
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .collect(Collectors.joining(", "));
+    }
+
+    private static String firstText(String... values) {
+        return Stream.of(values)
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .findFirst()
+                .orElse(null);
     }
 }

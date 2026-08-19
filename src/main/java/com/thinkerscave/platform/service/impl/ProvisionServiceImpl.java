@@ -206,9 +206,10 @@ public class ProvisionServiceImpl implements ProvisionService {
                 .shortName(request.getShortName())
                 .institutionType(request.getInstitutionType())
                 .boardName(request.getBoardName())
-                .email(request.getOrgEmail())
-                .mobileNumber(request.getOrgMobile())
-                .addressLine1(request.getAddressLine1())
+                .email(firstNonBlank(request.getOrgEmail(), request.getAdminEmail()))
+                .mobileNumber(firstNonBlank(request.getOrgMobile(), request.getAdminMobile()))
+                .addressLine1(firstNonBlank(request.getAddressLine1(),
+                        joinNonBlank(", ", request.getCity(), request.getState(), request.getCountry())))
                 .city(request.getCity())
                 .state(request.getState())
                 .country(request.getCountry())
@@ -255,6 +256,11 @@ public class ProvisionServiceImpl implements ProvisionService {
             String schemaName = tenantId;
             provisionedSchemaName = schemaName;
             String tenantDomain = subDomainSlug + ".thinkerscave.app";
+
+            if (firstNonBlank(org.getWebsite()) == null) {
+                org.setWebsite(tenantDomain);
+                org = organizationRepository.save(org);
+            }
 
             TenantRegistry tenant = TenantRegistry.builder()
                     .tenantIdentifier(tenantId)
@@ -903,6 +909,23 @@ public class ProvisionServiceImpl implements ProvisionService {
             }
         }
         return null;
+    }
+
+    private static String joinNonBlank(String delimiter, String... values) {
+        if (values == null) {
+            return null;
+        }
+        StringBuilder joined = new StringBuilder();
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            if (joined.length() > 0) {
+                joined.append(delimiter);
+            }
+            joined.append(value.trim());
+        }
+        return joined.length() == 0 ? null : joined.toString();
     }
 
     private void updateJobProgress(ProvisioningJob job, String step, int percentage) {
