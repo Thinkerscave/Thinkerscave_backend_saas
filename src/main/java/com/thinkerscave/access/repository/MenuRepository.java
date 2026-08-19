@@ -36,11 +36,21 @@ public interface MenuRepository extends JpaRepository<Menu, Long>, JpaSpecificat
     @Query("SELECT CASE WHEN COUNT(m) > 0 THEN true ELSE false END FROM Menu m WHERE m.parentMenu.id = :menuId")
     boolean hasChildren(@Param("menuId") Long menuId);
 
+    List<Menu> findByParentMenu_Id(Long parentId);
+
     List<Menu> findByParentMenu_IdAndActiveTrue(Long parentId);
 
     List<Menu> findByMenuScopeAndParentMenuIsNullAndActiveTrue(MenuScope menuScope);
 
     List<Menu> findByFeature_IdInAndParentMenuIsNullAndActiveTrue(List<Long> featureIds);
 
+    List<Menu> findByFeature_Id(Long featureId);
+
+    List<Menu> findAllByOrderByDisplayOrderAsc();
+
+    List<Menu> findByParentMenuIsNullOrderByDisplayOrderAsc();
+
     List<Menu> findByMenuCodeInAndActiveTrue(List<String> menuCodes);
+
+    List<Menu> findByMenuCodeIn(List<String> menuCodes);
 }

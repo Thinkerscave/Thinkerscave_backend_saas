@@ -24,5 +24,7 @@ public interface FeatureRepository extends JpaRepository<Feature, Long> {
 
     List<Feature> findByActiveTrueOrderByModuleAscDisplayOrderAsc();
 
+    List<Feature> findAllByOrderByModuleAscDisplayOrderAsc();
+
     List<Feature> findByModuleAndActiveTrueOrderByDisplayOrderAsc(String module);
 }

@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -30,6 +31,8 @@ public interface TenantRegistryRepository extends JpaRepository<TenantRegistry, 
     Optional<TenantRegistry> findBySchemaName(String schemaName);
 
     Optional<TenantRegistry> findByOrganization_Id(Long organizationId);
+
+    List<TenantRegistry> findByActiveTrueAndProvisionStatus(ProvisionStatus provisionStatus);
 
     boolean existsByTenantIdentifier(String tenantIdentifier);
 

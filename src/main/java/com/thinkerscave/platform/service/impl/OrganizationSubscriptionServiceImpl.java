@@ -23,6 +23,7 @@ import com.thinkerscave.platform.repository.PromotionRepository;
 import com.thinkerscave.platform.repository.SubscriptionFeatureOverrideRepository;
 import com.thinkerscave.platform.repository.SubscriptionPlanRepository;
 import com.thinkerscave.platform.service.OrganizationSubscriptionService;
+import com.thinkerscave.platform.service.TenantCatalogSyncService;
 import com.thinkerscave.shared.exceptions.AlreadyExistsException;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
@@ -51,6 +52,7 @@ public class OrganizationSubscriptionServiceImpl implements OrganizationSubscrip
     private final OrganizationPromotionRepository orgPromotionRepository;
     private final SubscriptionFeatureOverrideRepository featureOverrideRepository;
     private final FeatureRepository featureRepository;
+    private final TenantCatalogSyncService tenantCatalogSyncService;
 
     @Override
     @Transactional(readOnly = true)
@@ -214,7 +216,9 @@ public class OrganizationSubscriptionServiceImpl implements OrganizationSubscrip
                 .active(true)
                 .remarks(request.getRemarks())
                 .build();
-        return toOverrideResponse(featureOverrideRepository.save(override));
+        SubscriptionFeatureOverride saved = featureOverrideRepository.save(override);
+        tenantCatalogSyncService.reseedOrganization(sub.getOrganization());
+        return toOverrideResponse(saved);
     }
 
     @Override
@@ -229,7 +233,9 @@ public class OrganizationSubscriptionServiceImpl implements OrganizationSubscrip
         if (request.getChargeable() != null) override.setChargeable(request.getChargeable());
         override.setAdditionalCharge(request.getAdditionalCharge());
         override.setRemarks(request.getRemarks());
-        return toOverrideResponse(featureOverrideRepository.save(override));
+        SubscriptionFeatureOverride saved = featureOverrideRepository.save(override);
+        tenantCatalogSyncService.reseedOrganization(saved.getOrganizationSubscription().getOrganization());
+        return toOverrideResponse(saved);
     }
 
     @Override
@@ -239,6 +245,7 @@ public class OrganizationSubscriptionServiceImpl implements OrganizationSubscrip
                 .orElseThrow(() -> new ResourceNotFoundException("FeatureOverride not found: " + id));
         override.setActive(false);
         featureOverrideRepository.save(override);
+        tenantCatalogSyncService.reseedOrganization(override.getOrganizationSubscription().getOrganization());
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 package com.thinkerscave.access.dto.response;
 
+import com.thinkerscave.access.enums.MenuScope;
 import com.thinkerscave.access.enums.MenuType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.*;
@@ -26,5 +27,9 @@ public class MenuResponse {
     private Boolean showInSidebar;
     private Boolean active;
     private Boolean defaultPage;
+    private MenuScope menuScope;
+    private Long featureId;
+    private String featureCode;
+    private String featureName;
     private List<MenuResponse> children;
 }
