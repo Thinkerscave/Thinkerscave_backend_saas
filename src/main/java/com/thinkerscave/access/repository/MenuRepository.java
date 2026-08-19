@@ -3,6 +3,7 @@ package com.thinkerscave.access.repository;
 import com.thinkerscave.access.entity.Menu;
 import com.thinkerscave.access.enums.MenuScope;
 import com.thinkerscave.access.enums.MenuType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -53,4 +54,16 @@ public interface MenuRepository extends JpaRepository<Menu, Long>, JpaSpecificat
     List<Menu> findByMenuCodeInAndActiveTrue(List<String> menuCodes);
 
     List<Menu> findByMenuCodeIn(List<String> menuCodes);
+
+    @Query("""
+            SELECT m FROM Menu m
+            WHERE m.active = true
+              AND (
+                LOWER(m.menuName) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(m.menuCode) LIKE LOWER(CONCAT('%', :keyword, '%'))
+                OR LOWER(COALESCE(m.route, '')) LIKE LOWER(CONCAT('%', :keyword, '%'))
+              )
+            ORDER BY m.displayOrder ASC
+            """)
+    List<Menu> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 }
