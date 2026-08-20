@@ -1,0 +1,10 @@
+ALTER TABLE organizations
+    ADD COLUMN IF NOT EXISTS admin_full_name VARCHAR(200) NULL;
+
+ALTER TABLE tenant_registry
+    ADD COLUMN IF NOT EXISTS student_count INTEGER,
+    ADD COLUMN IF NOT EXISTS staff_count INTEGER,
+    ADD COLUMN IF NOT EXISTS branch_count INTEGER,
+    ADD COLUMN IF NOT EXISTS class_count INTEGER,
+    ADD COLUMN IF NOT EXISTS section_count INTEGER,
+    ADD COLUMN IF NOT EXISTS usage_refreshed_at TIMESTAMP;

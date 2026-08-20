@@ -83,6 +83,12 @@ public class Organization extends Auditable {
     private String mobileNumber;
 
     /**
+     * First tenant administrator captured at provision time.
+     */
+    @Column(name = "admin_full_name", length = 200)
+    private String adminFullName;
+
+    /**
      * Alternate Mobile Number.
      */
     @Column(name = "alternate_mobile_number", length = 20)

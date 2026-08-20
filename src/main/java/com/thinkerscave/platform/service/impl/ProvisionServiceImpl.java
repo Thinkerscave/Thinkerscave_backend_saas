@@ -208,6 +208,9 @@ public class ProvisionServiceImpl implements ProvisionService {
                 .boardName(request.getBoardName())
                 .email(firstNonBlank(request.getOrgEmail(), request.getAdminEmail()))
                 .mobileNumber(firstNonBlank(request.getOrgMobile(), request.getAdminMobile()))
+                .adminFullName(firstNonBlank(
+                        (request.getAdminFirstName() + " " + (request.getAdminLastName() != null ? request.getAdminLastName() : "")).trim(),
+                        request.getAdminFirstName()))
                 .addressLine1(firstNonBlank(request.getAddressLine1(),
                         joinNonBlank(", ", request.getCity(), request.getState(), request.getCountry())))
                 .city(request.getCity())

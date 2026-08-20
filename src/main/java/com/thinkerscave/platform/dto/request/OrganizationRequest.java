@@ -35,6 +35,9 @@ public class OrganizationRequest {
     @Size(max = 20)
     private String mobileNumber;
 
+    @Size(max = 200)
+    private String adminFullName;
+
     @Size(max = 20)
     private String alternateMobileNumber;
 

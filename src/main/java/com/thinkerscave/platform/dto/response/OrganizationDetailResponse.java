@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -22,6 +23,9 @@ public class OrganizationDetailResponse {
     private OrganizationStatus status;
     private String email;
     private String mobileNumber;
+    private String adminFullName;
+    private String adminEmail;
+    private String adminMobile;
     private String alternateMobileNumber;
     private String website;
     private String addressLine1;
@@ -51,6 +55,9 @@ public class OrganizationDetailResponse {
 
     // active subscription
     private OrganizationSubscriptionResponse subscription;
+
+    /** Features this org is entitled to (plan defaults after overrides). */
+    private List<SubscriptionPlanFeatureResponse> entitledFeatures;
 
     // configuration
     private OrganizationConfigurationResponse configuration;

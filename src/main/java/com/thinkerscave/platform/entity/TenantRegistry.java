@@ -89,6 +89,24 @@ public class TenantRegistry extends Auditable {
     @Column(name = "storage_used_mb")
     private Long storageUsedMb;
 
+    @Column(name = "student_count")
+    private Integer studentCount;
+
+    @Column(name = "staff_count")
+    private Integer staffCount;
+
+    @Column(name = "branch_count")
+    private Integer branchCount;
+
+    @Column(name = "class_count")
+    private Integer classCount;
+
+    @Column(name = "section_count")
+    private Integer sectionCount;
+
+    @Column(name = "usage_refreshed_at")
+    private LocalDateTime usageRefreshedAt;
+
     /**
      * Last Migration Time.
      */

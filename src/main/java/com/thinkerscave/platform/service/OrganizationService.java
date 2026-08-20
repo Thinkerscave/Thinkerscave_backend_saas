@@ -19,6 +19,9 @@ public interface OrganizationService {
 
     OrganizationDetailResponse getOrganizationById(Long id);
 
+    /** Onboarding invoice PDF generated from the existing subscription snapshot. */
+    byte[] downloadOnboardingInvoicePdf(Long id);
+
     OrganizationSummaryResponse createOrganization(OrganizationRequest request);
 
     OrganizationSummaryResponse updateOrganization(Long id, OrganizationRequest request);

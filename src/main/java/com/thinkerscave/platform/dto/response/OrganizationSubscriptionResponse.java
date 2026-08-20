@@ -36,6 +36,11 @@ public class OrganizationSubscriptionResponse {
     private Integer staffLimitOverride;
     private Integer branchLimitOverride;
     private Integer storageLimitOverride;
+    private Integer studentLimit;
+    private Integer staffLimit;
+    private Integer branchLimit;
+    private Integer storageLimitGb;
+    private String invoiceNumber;
     private Boolean autoRenew;
     private SubscriptionStatus status;
     private Boolean active;
