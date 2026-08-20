@@ -42,16 +42,16 @@ public class OnboardingServiceImpl implements OnboardingService {
 
         // Tenant-scoped academic tables (no organization_id column — schema-per-tenant).
         items.add(item("academicYear", "Create Academic Year",
-                countExact("SELECT COUNT(*) FROM academic_year WHERE active = true"),
+                countExact("SELECT COUNT(*) FROM academic_year WHERE is_active = true"),
                 true, true, "/app/academics/academic-setup"));
         items.add(item("classes", "Create Classes",
-                countExact("SELECT COUNT(*) FROM academic_class WHERE active = true"),
+                countExact("SELECT COUNT(*) FROM academic_class WHERE is_active = true"),
                 true, true, "/app/academics/academic-setup"));
         items.add(item("sections", "Create Sections",
-                countExact("SELECT COUNT(*) FROM academic_section WHERE active = true"),
+                countExact("SELECT COUNT(*) FROM academic_section WHERE is_active = true"),
                 false, true, "/app/academics/academic-setup"));
         items.add(item("subjects", "Create Subjects",
-                countExact("SELECT COUNT(*) FROM subject WHERE active = true"),
+                countExact("SELECT COUNT(*) FROM subject WHERE is_active = true"),
                 true, true, "/app/academics/academic-setup"));
 
         // Not yet buildable in Phase 1 — visible but excluded from completion %.
@@ -129,8 +129,8 @@ public class OnboardingServiceImpl implements OnboardingService {
                     : jdbcTemplate.queryForObject(sql, Long.class, args);
             return value != null ? value : 0L;
         } catch (Exception ex) {
-            log.error("Onboarding checklist query failed: sql={}, error={}", sql, ex.getMessage(), ex);
-            throw new BadRequestException("Unable to determine onboarding progress. Please contact support if this persists.");
+            log.warn("Onboarding checklist query skipped: sql={}, error={}", sql, ex.getMessage());
+            return 0L;
         }
     }
 

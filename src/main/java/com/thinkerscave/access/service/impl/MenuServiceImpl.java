@@ -79,7 +79,7 @@ public class MenuServiceImpl implements MenuService {
                 .icon(request.getIcon())
                 .menuType(request.getMenuType())
                 .parentMenu(parent)
-                .displayOrder(request.getDisplayOrder() != null ? request.getDisplayOrder() : 1)
+                .displayOrder(nextUniqueDisplayOrder(parent, request.getDisplayOrder()))
                 .showInSidebar(request.getShowInSidebar() == null || Boolean.TRUE.equals(request.getShowInSidebar()))
                 .defaultPage(Boolean.TRUE.equals(request.getDefaultPage()))
                 .active(request.getActive() == null || Boolean.TRUE.equals(request.getActive()))
@@ -273,6 +273,20 @@ public class MenuServiceImpl implements MenuService {
                     .build());
         }
         return result;
+    }
+
+    private int nextUniqueDisplayOrder(Menu parent, Integer requested) {
+        List<Menu> siblings = parent == null
+                ? menuRepository.findByParentMenuIsNullOrderByDisplayOrderAsc()
+                : menuRepository.findByParentMenu_Id(parent.getId());
+        var used = siblings.stream()
+                .map(Menu::getDisplayOrder)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (requested != null && requested > 0 && !used.contains(requested)) {
+            return requested;
+        }
+        return used.stream().mapToInt(Integer::intValue).max().orElse(0) + 1;
     }
 
     private void validateNoCircularHierarchy(Long menuId, Long newParentId) {

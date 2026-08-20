@@ -173,9 +173,9 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
     }
 
     private void seedMenusAndPermissions(Organization organization, Role superAdminRole) {
-        Menu dashboard = ensureMenu("PLATFORM_DASHBOARD", "Dashboard", "Platform overview",
-                "/app/tenant-management/dashboard", "pi pi-home", MenuType.PAGE, null, 1,
-                MenuScope.PLATFORM, null);
+        Menu dashboard = ensureMenu("DASHBOARD", "Dashboard", "Role-based workspace home",
+                "/app", "pi pi-home", MenuType.PAGE, null, 1,
+                MenuScope.CORE, null);
         Menu customers = ensureMenu("CUSTOMERS", "Customers", "Commercial customer accounts",
                 "/app/tenant-management/customers", "pi pi-users", MenuType.PAGE, null, 2,
                 MenuScope.PLATFORM, null);
@@ -290,61 +290,54 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 purgeObsoleteOrganizationMenus();
 
         // ── CORE (always available, no subscription gating) ──────────────────
-        ensureMenu("DASHBOARD", "Dashboard", "Organization dashboard", "/app", "dashboard",
+        ensureMenu("DASHBOARD", "Dashboard", "Role-based workspace home", "/app", "pi pi-home",
                 MenuType.PAGE, null, 1, MenuScope.CORE, null);
-        Menu orgProfile = ensureMenu("ORG_PROFILE", "Organization Profile", "Organization profile",
-                "/app/organization-profile", "business", MenuType.PAGE, null, 2, MenuScope.CORE, null);
-        ensureMenu("ORG_ACTIVITY_LOGS", "Activity Logs", "Organization activity logs",
-                "/app/organization/activity-logs", "history", MenuType.PAGE, orgProfile, 1, MenuScope.CORE, null);
 
         Menu access = ensureMenu("ACCESS_MANAGEMENT", "Access & Security", "Roles, permissions and security",
-                null, "shield", MenuType.MODULE, null, 3, MenuScope.CORE, null);
+                null, "pi pi-shield", MenuType.MODULE, null, 7, MenuScope.CORE, null);
         ensureMenu("ACCESS_DASHBOARD", "Access Dashboard", "Access management overview",
-                "/app/access-management/dashboard", "dashboard", MenuType.PAGE, access, 1, MenuScope.CORE, null);
+                "/app/access-management/dashboard", "pi pi-home", MenuType.PAGE, access, 1, MenuScope.CORE, null);
         ensureMenu("ACCESS_USERS", "Users", "Manage users",
-                "/app/access-management/users", "groups", MenuType.PAGE, access, 2, MenuScope.CORE, null);
+                "/app/access-management/users", "pi pi-users", MenuType.PAGE, access, 2, MenuScope.CORE, null);
         ensureMenu("ACCESS_SECURITY_POLICY", "Security Policy", "Security policy configuration",
-                "/app/access-management/security-policy", "lock", MenuType.PAGE, access, 5, MenuScope.CORE, null);
+                "/app/access-management/security-policy", "pi pi-lock", MenuType.PAGE, access, 3, MenuScope.CORE, null);
         ensureMenu("ACCESS_LOGIN_HISTORY", "Login History", "Login history",
-                "/app/access-management/login-history", "history", MenuType.PAGE, access, 6, MenuScope.CORE, null);
-
-        ensureMenu("ONBOARDING_CHECKLIST", "Setup Checklist", "First-time setup checklist",
-                "/app/onboarding", "checklist", MenuType.PAGE, null, 4, MenuScope.CORE, null);
-        ensureMenu("USER_PROFILE", "My Profile", "My profile", "/app/profile", "person",
-                MenuType.PAGE, null, 90, MenuScope.CORE, null);
-        ensureMenu("GLOBAL_SETTINGS", "Settings", "Application settings", "/app/settings", "settings",
-                MenuType.PAGE, null, 91, MenuScope.CORE, null);
+                "/app/access-management/login-history", "pi pi-history", MenuType.PAGE, access, 4, MenuScope.CORE, null);
 
         // ── SUBSCRIPTION (gated by the organization's subscription plan) ─────
         Feature academicsFeature = ensureFeature("FEAT_ACADEMICS", "ACADEMICS_MODULE", "Academics",
                 "Academics", "ACADEMIC", 1,
                 "Academic year, classes, subjects, teacher allocation, timetable and calendar.");
         Menu academics = ensureMenu("ACADEMICS", "Academics", "Academic setup and scheduling",
-                "/app/academics", "school", MenuType.MODULE, null, 10, MenuScope.SUBSCRIPTION, academicsFeature);
+                "/app/academics", "pi pi-book", MenuType.MODULE, null, 8, MenuScope.SUBSCRIPTION, academicsFeature);
+        ensureMenu("ACADEMICS_OVERVIEW", "Academics Overview", "Academic command center",
+                "/app/academics/overview", "pi pi-home", MenuType.PAGE, academics, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_ACADEMIC_YEAR", "Academic Year", "Academic year lifecycle and history",
-                "/app/academics/academic-year", "calendar_month", MenuType.PAGE, academics, 1, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/academic-year", "pi pi-calendar", MenuType.PAGE, academics, 2, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_CLASSES", "Classes & Sections", "Manage classes, sections and class teachers",
-                "/app/academics/classes-sections", "class", MenuType.PAGE, academics, 2, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/classes-sections", "pi pi-th-large", MenuType.PAGE, academics, 3, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_SUBJECTS", "Subjects & Mapping", "Configure subjects and class subject mapping",
-                "/app/academics/subjects-mapping", "menu_book", MenuType.PAGE, academics, 3, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/subjects-mapping", "pi pi-book", MenuType.PAGE, academics, 4, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_TEACHER_ALLOCATION", "Teacher Allocation", "Assign teachers to class subjects",
-                "/app/academics/teacher-allocation", "person_search", MenuType.PAGE, academics, 4, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/teacher-allocation", "pi pi-user-edit", MenuType.PAGE, academics, 5, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_TIMETABLE", "Timetable", "Timetable",
-                "/app/academics/timetable", "calendar", MenuType.PAGE, academics, 5, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/timetable", "pi pi-table", MenuType.PAGE, academics, 6, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_CALENDAR", "Academic Calendar", "Academic events and holiday calendar",
-                "/app/academics/academic-calendar", "event", MenuType.PAGE, academics, 6, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/academic-calendar", "pi pi-calendar", MenuType.PAGE, academics, 7, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_MY_CLASSES", "My Classes", "Teacher class assignments and subjects",
-                "/app/academics/my-classes", "class", MenuType.PAGE, academics, 7, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/my-classes", "pi pi-users", MenuType.PAGE, academics, 8, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_MY_TIMETABLE", "My Timetable", "Personal timetable view",
-                "/app/academics/my-timetable", "calendar", MenuType.PAGE, academics, 8, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/my-timetable", "pi pi-clock", MenuType.PAGE, academics, 9, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ACADEMICS_MY_ACADEMICS", "My Academics", "Student academic profile and subjects",
-                "/app/academics/my-academics", "school", MenuType.PAGE, academics, 9, MenuScope.SUBSCRIPTION, null);
+                "/app/academics/my-academics", "pi pi-id-card", MenuType.PAGE, academics, 10, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ACADEMICS_ACADEMIC_STRUCTURE", "Academic Structure", "Read-only structure for teaching assignments",
+                "/app/academics/academic-structure", "pi pi-sitemap", MenuType.PAGE, academics, 11, MenuScope.SUBSCRIPTION, null);
 
         Feature studentsFeature = ensureFeature("FEAT_STUDENTS", "STUDENTS_MODULE", "Students",
                 "Students", "CORE", 2,
                 "Student directory, alumni and lifecycle records for the school.");
         Menu students = ensureMenu("STUDENTS", "Students", "Student directory and lifecycle",
-                "/app/students", "groups", MenuType.MODULE, null, 11, MenuScope.SUBSCRIPTION, studentsFeature);
+                "/app/students", "pi pi-users", MenuType.MODULE, null, 9, MenuScope.SUBSCRIPTION, studentsFeature);
         ensureMenu("STUDENTS_DIRECTORY", "Directory", "Student directory",
                 "/app/students/directory", "list", MenuType.PAGE, students, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("STUDENTS_ALUMNI", "Alumni", "Student alumni",
@@ -354,7 +347,7 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "Staff", "ADMINISTRATION", 3,
                 "Staff directory, payroll, leave and day-to-day HR operations.");
         Menu staff = ensureMenu("STAFF", "Staff", "Staff directory and HR",
-                "/app/staff", "badge", MenuType.MODULE, null, 12, MenuScope.SUBSCRIPTION, staffFeature);
+                "/app/staff", "pi pi-id-card", MenuType.MODULE, null, 10, MenuScope.SUBSCRIPTION, staffFeature);
         ensureMenu("STAFF_DIRECTORY", "Directory", "Staff directory",
                 "/app/staff/directory", "list", MenuType.PAGE, staff, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("STAFF_RESPONSIBILITIES", "Responsibilities", "Staff responsibilities",
@@ -368,7 +361,7 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "Attendance", "ACADEMIC", 4,
                 "Student and staff attendance, reports, calendar and settings.");
         Menu attendance = ensureMenu("ATTENDANCE", "Attendance", "Student and staff attendance",
-                "/app/attendance", "check_circle", MenuType.MODULE, null, 13, MenuScope.SUBSCRIPTION, attendanceFeature);
+                "/app/attendance", "pi pi-calendar-check", MenuType.MODULE, null, 11, MenuScope.SUBSCRIPTION, attendanceFeature);
         ensureMenu("ATTENDANCE_STUDENTS", "Student Attendance", "Student attendance",
                 "/app/attendance/students", "groups", MenuType.PAGE, attendance, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ATTENDANCE_STAFF", "Staff Attendance", "Staff attendance",
@@ -384,7 +377,7 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "Admissions", "ADMINISTRATION", 5,
                 "Leads, follow-ups, applications and admissions reporting.");
         Menu admissions = ensureMenu("ADMISSIONS", "Admissions", "Admissions CRM",
-                "/app/admissions", "person_add", MenuType.MODULE, null, 14, MenuScope.SUBSCRIPTION, admissionsFeature);
+                "/app/admissions", "pi pi-inbox", MenuType.MODULE, null, 12, MenuScope.SUBSCRIPTION, admissionsFeature);
         ensureMenu("ADMISSIONS_LEADS", "Leads", "Admissions leads",
                 "/app/admissions/leads", "list", MenuType.PAGE, admissions, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_FOLLOW_UPS", "Follow-ups", "Admissions follow-ups",
@@ -400,24 +393,17 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "Promotion & Transfer", "Promotion & Transfer", "ACADEMIC", 8,
                 "Promote students between classes and process transfers.");
         Menu promotionTransfer = ensureMenu("PROMOTION_TRANSFER", "Promotion & Transfer", "Student promotion and transfer",
-                null, "trending_up", MenuType.MODULE, null, 17, MenuScope.SUBSCRIPTION, promotionTransferFeature);
+                null, "pi pi-sort-alt", MenuType.MODULE, null, 13, MenuScope.SUBSCRIPTION, promotionTransferFeature);
         ensureMenu("PROMOTIONS_STUDENT", "Promotions", "Student promotions",
                 "/app/promotions", "trending_up", MenuType.PAGE, promotionTransfer, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("STUDENT_TRANSFERS", "Transfers", "Student transfers",
                 "/app/transfers", "sync", MenuType.PAGE, promotionTransfer, 2, MenuScope.SUBSCRIPTION, null);
 
-        Feature responsibilitiesFeature = ensureFeature("FEAT_RESPONSIBILITIES", "RESPONSIBILITIES_MODULE",
-                "Responsibilities", "Responsibilities", "ADMINISTRATION", 9,
-                "Assign operational responsibilities to staff.");
-        ensureMenu("RESPONSIBILITIES", "Responsibilities", "Staff responsibilities",
-                "/app/responsibilities", "assignment", MenuType.PAGE, null, 18, MenuScope.SUBSCRIPTION,
-                responsibilitiesFeature);
-
         Feature communicationFeature = ensureFeature("FEAT_COMMUNICATION", "COMMUNICATION_MODULE",
                 "Communication", "Communication", "CORE", 10,
                 "Notices, announcements, conversations, templates and delivery logs.");
         Menu communication = ensureMenu("COMMUNICATION", "Communication", "Notices, announcements and messaging",
-                "/app/communication", "chat", MenuType.MODULE, null, 19, MenuScope.SUBSCRIPTION, communicationFeature);
+                "/app/communication", "pi pi-send", MenuType.MODULE, null, 14, MenuScope.SUBSCRIPTION, communicationFeature);
         ensureMenu("COMMUNICATION_NOTICES", "Notices", "Notices",
                 "/app/communication/notices", "notifications", MenuType.PAGE, communication, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("COMMUNICATION_ANNOUNCEMENTS", "Announcements", "Announcements",
@@ -429,31 +415,20 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
         ensureMenu("COMMUNICATION_DELIVERY_LOGS", "Delivery Logs", "Delivery logs",
                 "/app/communication/delivery-logs", "history", MenuType.PAGE, communication, 5, MenuScope.SUBSCRIPTION, null);
 
-        Feature feeManagementFeature = ensureFeature("FEAT_FEE_MANAGEMENT", "FEE_MANAGEMENT_MODULE",
-                "Fee Management", "Fee Management", "FINANCE", 11,
-                "Fee dashboard, payments, receipts and finance reports.");
-        Menu feeManagement = ensureMenu("FEE_MANAGEMENT", "Fee Management", "Fee collection and accounting",
-                "/app/fees", "credit_card", MenuType.MODULE, null, 20, MenuScope.SUBSCRIPTION, feeManagementFeature);
-        ensureMenu("FEE_DASHBOARD", "Dashboard", "Fee dashboard",
-                "/app/fees/dashboard", "dashboard", MenuType.PAGE, feeManagement, 1, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_PAYMENTS", "Payments", "Fee payments",
-                "/app/fees/payments", "credit_card", MenuType.PAGE, feeManagement, 2, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_RECEIPTS", "Receipts", "Fee receipts",
-                "/app/fees/receipts", "receipt", MenuType.PAGE, feeManagement, 3, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_REPORTS", "Reports", "Fee reports",
-                "/app/fees/reports", "bar_chart", MenuType.PAGE, feeManagement, 4, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("FEE_MY_FEES", "My Fees", "My fees",
-                "/app/fees/my-fees", "credit_card", MenuType.PAGE, feeManagement, 5, MenuScope.SUBSCRIPTION, null);
-
+        resequenceTopLevelMenus();
         return List.of(academicsFeature, studentsFeature, staffFeature, attendanceFeature, admissionsFeature,
-                promotionTransferFeature, responsibilitiesFeature,
-                communicationFeature, feeManagementFeature);
+                promotionTransferFeature, communicationFeature);
     }
 
     private void purgeObsoleteOrganizationMenus() {
         List<String> obsoleteCodes = List.of(
-                "ACADEMICS_OVERVIEW",
-                "ACADEMICS_ACADEMIC_STRUCTURE",
+                "PLATFORM_DASHBOARD",
+                "ORG_PROFILE",
+                "ORG_ACTIVITY_LOGS",
+                "ONBOARDING_CHECKLIST",
+                "USER_PROFILE",
+                "GLOBAL_SETTINGS",
+                "RESPONSIBILITIES",
                 "STUDENTS_TRANSFERS",
                 "STUDENTS_DOCUMENTS",
                 "STAFF_DOCUMENTS",
@@ -462,6 +437,12 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "ADMISSIONS_ENROLLMENT",
                 "EXAMS",
                 "ENROLLMENTS",
+                "FEE_MANAGEMENT",
+                "FEE_DASHBOARD",
+                "FEE_PAYMENTS",
+                "FEE_RECEIPTS",
+                "FEE_REPORTS",
+                "FEE_MY_FEES",
                 "FEE_SETUP",
                 "FEE_SETUP_POLICY",
                 "FEE_SETUP_HEADS",
@@ -485,6 +466,7 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                         purgeMenu(menu);
                     }
                 });
+        purgeObsoleteFeatures();
     }
 
     private void purgeMenu(Menu menu) {
@@ -498,6 +480,45 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
             menuRepository.deleteById(menuId);
         }
         log.info("Purged obsolete menu {}", menu.getMenuCode());
+    }
+
+    private void purgeObsoleteFeatures() {
+        for (String code : List.of("FEAT_FEE_MANAGEMENT", "FEAT_RESPONSIBILITIES")) {
+            featureRepository.findByFeatureCode(code).ifPresent(feature -> {
+                menuRepository.findByFeature_Id(feature.getId()).forEach(menu -> {
+                    if (menuRepository.existsById(menu.getId())) {
+                        purgeMenu(menu);
+                    }
+                });
+                subscriptionPlanFeatureRepository.deleteByFeature_Id(feature.getId());
+                featureRepository.delete(feature);
+                log.info("Purged obsolete feature {}", code);
+            });
+        }
+    }
+
+    private void resequenceTopLevelMenus() {
+        List<Menu> topLevel = menuRepository.findByParentMenuIsNullOrderByDisplayOrderAsc();
+        int order = 1;
+        for (Menu menu : topLevel) {
+            if (menu.getDisplayOrder() == null || menu.getDisplayOrder() != order) {
+                menu.setDisplayOrder(order);
+                menuRepository.save(menu);
+            }
+            List<Menu> children = menuRepository.findByParentMenu_Id(menu.getId());
+            children.sort((left, right) -> Integer.compare(
+                    left.getDisplayOrder() == null ? 0 : left.getDisplayOrder(),
+                    right.getDisplayOrder() == null ? 0 : right.getDisplayOrder()));
+            int childOrder = 1;
+            for (Menu child : children) {
+                if (child.getDisplayOrder() == null || child.getDisplayOrder() != childOrder) {
+                    child.setDisplayOrder(childOrder);
+                    menuRepository.save(child);
+                }
+                childOrder++;
+            }
+            order++;
+        }
     }
 
     private Feature ensureFeature(String code, String key, String name, String module, String category, int order,
