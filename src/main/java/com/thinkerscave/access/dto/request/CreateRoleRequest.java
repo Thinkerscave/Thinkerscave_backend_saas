@@ -33,4 +33,7 @@ public class CreateRoleRequest {
     private String dashboardCode;
 
     private Integer displayOrder = 1;
+
+    @Schema(description = "false = draft, true = saved")
+    private Boolean active = true;
 }

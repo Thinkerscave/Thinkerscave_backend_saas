@@ -5,6 +5,7 @@ import com.thinkerscave.access.dto.request.UpdateRoleRequest;
 import com.thinkerscave.access.dto.request.UpdateRolePermissionsRequest;
 import com.thinkerscave.access.dto.response.PermissionMatrixResponse;
 import com.thinkerscave.access.dto.response.RoleResponse;
+import com.thinkerscave.access.dto.response.UserSummaryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -23,11 +24,15 @@ public interface RoleService {
 
     List<RoleResponse> getAllActiveRoles();
 
+    List<RoleResponse> getAllRoles();
+
     Page<RoleResponse> searchRoles(Boolean active, String search, Pageable pageable);
 
     void activateRole(Long roleId);
 
     void deactivateRole(Long roleId);
+
+    List<UserSummaryResponse> getRoleUsers(Long roleId, Long organizationId);
 
     PermissionMatrixResponse getPermissionMatrix(Long roleId, Long organizationId);
 

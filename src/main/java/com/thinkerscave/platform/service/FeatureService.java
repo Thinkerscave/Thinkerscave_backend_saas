@@ -1,5 +1,7 @@
 package com.thinkerscave.platform.service;
 
+import com.thinkerscave.access.dto.response.MenuResponse;
+import com.thinkerscave.platform.dto.request.FeatureMenuMappingRequest;
 import com.thinkerscave.platform.dto.request.FeatureRequest;
 import com.thinkerscave.platform.dto.response.FeatureResponse;
 
@@ -16,4 +18,8 @@ public interface FeatureService {
     FeatureResponse updateFeature(Long id, FeatureRequest request);
 
     void deleteFeature(Long id);
+
+    List<MenuResponse> getFeatureMenus(Long featureId);
+
+    List<MenuResponse> replaceFeatureMenus(Long featureId, FeatureMenuMappingRequest request);
 }

@@ -23,6 +23,12 @@ public class TenantRegistryResponse {
     private ProvisionStatus provisionStatus;
     private Long databaseSizeMb;
     private Long storageUsedMb;
+    private Integer studentCount;
+    private Integer staffCount;
+    private Integer branchCount;
+    private Integer classCount;
+    private Integer sectionCount;
+    private LocalDateTime usageRefreshedAt;
     private LocalDateTime lastMigrationAt;
     private LocalDateTime lastBackupAt;
     private LocalDateTime lastHealthCheckAt;

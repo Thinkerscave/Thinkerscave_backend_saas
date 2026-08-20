@@ -147,7 +147,7 @@ VALUES
 (1, 1, 8, TRUE, TRUE, TRUE, FALSE, 90, 5, 5, 30, 60, 3, TRUE, FALSE, TRUE, 'system', 'system', 0);
 
 -- ============================================================
--- 4. USERS  (password rehashed to BCrypt("Password@123") on startup)
+-- 4. USERS  (passwords must be set via app encoder / ops reset — not mass-overwritten on startup)
 -- ============================================================
 
 INSERT IGNORE INTO users (

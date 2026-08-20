@@ -26,6 +26,8 @@ public interface RoleRepository extends JpaRepository<Role, Long>, JpaSpecificat
 
     List<Role> findByActiveTrueOrderByDisplayOrderAsc();
 
+    List<Role> findAllByOrderByDisplayOrderAsc();
+
     List<Role> findByRoleTypeAndActiveTrueOrderByDisplayOrderAsc(RoleType roleType);
 
     Page<Role> findByActive(Boolean active, Pageable pageable);

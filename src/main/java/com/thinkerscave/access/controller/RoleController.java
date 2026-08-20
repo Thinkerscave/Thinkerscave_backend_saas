@@ -26,7 +26,7 @@ public class RoleController {
 
     @PostMapping
     @Operation(summary = "Create a new role")
-    @PreAuthorize("hasAuthority('ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<RoleResponse>> createRole(@Valid @RequestBody CreateRoleRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created("Role created", roleService.createRole(request)));
@@ -34,7 +34,7 @@ public class RoleController {
 
     @PutMapping("/{roleId}")
     @Operation(summary = "Update a role")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<RoleResponse>> updateRole(
             @PathVariable Long roleId,
             @Valid @RequestBody UpdateRoleRequest request) {
@@ -49,10 +49,12 @@ public class RoleController {
     }
 
     @GetMapping
-    @Operation(summary = "List all active roles")
+    @Operation(summary = "List all roles")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<RoleResponse>>> getAllRoles() {
-        return ResponseEntity.ok(ApiResponse.success(roleService.getAllActiveRoles()));
+    public ResponseEntity<ApiResponse<List<RoleResponse>>> getAllRoles(
+            @RequestParam(defaultValue = "false") boolean includeInactive) {
+        return ResponseEntity.ok(ApiResponse.success(
+                includeInactive ? roleService.getAllRoles() : roleService.getAllActiveRoles()));
     }
 
     @GetMapping("/search")
@@ -69,7 +71,7 @@ public class RoleController {
 
     @PatchMapping("/{roleId}/activate")
     @Operation(summary = "Activate a role")
-    @PreAuthorize("hasAuthority('ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> activate(@PathVariable Long roleId) {
         roleService.activateRole(roleId);
         return ResponseEntity.ok(ApiResponse.noContent("Role activated"));
@@ -77,10 +79,19 @@ public class RoleController {
 
     @PatchMapping("/{roleId}/deactivate")
     @Operation(summary = "Deactivate a role")
-    @PreAuthorize("hasAuthority('ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long roleId) {
         roleService.deactivateRole(roleId);
         return ResponseEntity.ok(ApiResponse.noContent("Role deactivated"));
+    }
+
+    @GetMapping("/{roleId}/users")
+    @Operation(summary = "List users currently assigned to a role")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    public ResponseEntity<ApiResponse<List<UserSummaryResponse>>> getRoleUsers(
+            @PathVariable Long roleId,
+            @RequestParam(required = false) Long organizationId) {
+        return ResponseEntity.ok(ApiResponse.success(roleService.getRoleUsers(roleId, organizationId)));
     }
 
     @GetMapping("/{roleId}/permissions")

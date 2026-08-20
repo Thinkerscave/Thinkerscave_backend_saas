@@ -1,6 +1,7 @@
 package com.thinkerscave.academics.repository;
 
 import com.thinkerscave.academics.entity.AcademicClass;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -33,6 +34,14 @@ public interface ClassRepository extends JpaRepository<AcademicClass, Long> {
 
     @Query("SELECT c FROM AcademicClass c JOIN FETCH c.academicYear y WHERE y.academicYearId = :yearId AND c.active = true ORDER BY c.displayOrder ASC")
     List<AcademicClass> findWithYearByAcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(@Param("yearId") Long yearId);
+
+    @Query("""
+            SELECT c FROM AcademicClass c
+            WHERE LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+               OR LOWER(c.code) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            ORDER BY c.displayOrder ASC
+            """)
+    List<AcademicClass> searchByKeyword(@Param("keyword") String keyword, Pageable pageable);
 
     @Query("SELECT c FROM AcademicClass c JOIN FETCH c.academicYear WHERE c.classId = :classId")
     Optional<AcademicClass> findByIdWithYear(@Param("classId") Long classId);

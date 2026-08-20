@@ -27,6 +27,9 @@ public interface UserRoleRepository extends JpaRepository<UserRole, Long> {
     @Query("SELECT COUNT(ur) FROM UserRole ur WHERE ur.role.id = :roleId AND ur.active = true")
     long countActiveUsersByRole(@Param("roleId") Long roleId);
 
+    @Query("SELECT ur FROM UserRole ur JOIN FETCH ur.user WHERE ur.role.id = :roleId AND ur.active = true")
+    List<UserRole> findActiveAssignmentsByRoleId(@Param("roleId") Long roleId);
+
     @Query("SELECT COUNT(ur) FROM UserRole ur JOIN ur.role r WHERE r.roleType = com.thinkerscave.access.enums.RoleType.ORGANIZATION_ADMIN AND ur.user.organizationId = :organizationId AND ur.active = true")
     long countActiveAdminsByOrganization(@Param("organizationId") Long organizationId);
 

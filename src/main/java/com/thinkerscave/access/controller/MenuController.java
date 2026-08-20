@@ -46,7 +46,7 @@ public class MenuController {
 
     @PostMapping
     @Operation(summary = "Create a new menu or page")
-    @PreAuthorize("hasAuthority('ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<MenuResponse>> createMenu(@Valid @RequestBody CreateMenuRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created("Menu created", menuService.createMenu(request)));
@@ -54,7 +54,7 @@ public class MenuController {
 
     @PutMapping("/{menuId}")
     @Operation(summary = "Update menu")
-    @PreAuthorize("hasAuthority('ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<MenuResponse>> updateMenu(
             @PathVariable Long menuId,
             @Valid @RequestBody UpdateMenuRequest request) {
@@ -71,8 +71,9 @@ public class MenuController {
     @GetMapping("/tree")
     @Operation(summary = "Get full menu tree (all menus hierarchically)")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<MenuResponse>>> getTree() {
-        return ResponseEntity.ok(ApiResponse.success(menuService.getMenuTree()));
+    public ResponseEntity<ApiResponse<List<MenuResponse>>> getTree(
+            @RequestParam(defaultValue = "false") boolean includeInactive) {
+        return ResponseEntity.ok(ApiResponse.success(menuService.getMenuTree(includeInactive)));
     }
 
     @GetMapping("/search")
@@ -89,8 +90,8 @@ public class MenuController {
     }
 
     @PatchMapping("/{menuId}/activate")
-    @Operation(summary = "Activate menu")
-    @PreAuthorize("hasAuthority('ORGANIZATION_OWNER')")
+    @Operation(summary = "Activate / save menu")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> activate(@PathVariable Long menuId) {
         menuService.activateMenu(menuId);
         return ResponseEntity.ok(ApiResponse.noContent("Menu activated"));
@@ -98,10 +99,18 @@ public class MenuController {
 
     @PatchMapping("/{menuId}/deactivate")
     @Operation(summary = "Deactivate menu")
-    @PreAuthorize("hasAuthority('ORGANIZATION_OWNER')")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deactivate(@PathVariable Long menuId) {
         menuService.deactivateMenu(menuId);
         return ResponseEntity.ok(ApiResponse.noContent("Menu deactivated"));
+    }
+
+    @DeleteMapping("/{menuId}")
+    @Operation(summary = "Delete a draft or unused menu")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> deleteMenu(@PathVariable Long menuId) {
+        menuService.deleteMenu(menuId);
+        return ResponseEntity.ok(ApiResponse.noContent("Menu deleted"));
     }
 
     @GetMapping("/sidebar")

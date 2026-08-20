@@ -21,7 +21,9 @@ public interface MenuService {
 
     MenuResponse getMenuById(Long menuId);
 
-    List<MenuResponse> getMenuTree();
+    List<MenuResponse> getMenuTree(boolean includeInactive);
+
+    void deleteMenu(Long menuId);
 
     Page<MenuResponse> searchMenus(MenuType menuType, Boolean active, String search, Pageable pageable);
 

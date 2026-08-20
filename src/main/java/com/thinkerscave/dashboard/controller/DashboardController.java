@@ -35,8 +35,8 @@ public class DashboardController {
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF', 'TEACHER', 'PRINCIPAL', 'HR_MANAGER', 'RECEPTIONIST')")
-    @Operation(summary = "Global search across students, staff and admission leads")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'PLATFORM_ADMIN', 'THINKERSCAVE_INTERNAL', 'INTERNAL_TEAM', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF', 'TEACHER', 'PRINCIPAL', 'HR_MANAGER', 'RECEPTIONIST', 'ACADEMIC_COORDINATOR', 'ADMIN')")
+    @Operation(summary = "Role-aware global search")
     public ResponseEntity<ApiResponse<DashboardSearchResponseDTO>> search(@RequestParam String query) {
         return ResponseEntity.ok(ApiResponse.success("Search results", dashboardSearchService.search(query)));
     }

@@ -29,7 +29,6 @@ public class FeatureRequest {
 
     private Long parentFeatureId;
 
-    @NotBlank
     @Size(max = 100)
     private String featureKey;
 

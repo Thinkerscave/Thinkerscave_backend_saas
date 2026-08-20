@@ -1,5 +1,6 @@
 package com.thinkerscave.access.dto.request;
 
+import com.thinkerscave.access.enums.MenuScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
 import lombok.*;
@@ -28,4 +29,10 @@ public class UpdateMenuRequest {
     private Integer displayOrder;
     private Boolean showInSidebar;
     private Boolean defaultPage;
+
+    @Schema(description = "false = draft, true = saved/live")
+    private Boolean active;
+
+    private MenuScope menuScope;
+    private Long featureId;
 }

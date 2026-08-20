@@ -3,6 +3,7 @@ package com.thinkerscave;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.util.TimeZone;
 
@@ -32,6 +33,7 @@ import java.util.TimeZone;
         "com.thinkerscave.student"
 })
 @EnableAsync
+@EnableScheduling
 public class ThinkersCaveApplication {
 
     public static void main(String[] args) {

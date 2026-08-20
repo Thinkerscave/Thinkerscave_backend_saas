@@ -5,12 +5,14 @@ import com.thinkerscave.access.dto.response.*;
 import com.thinkerscave.access.entity.*;
 import com.thinkerscave.access.enums.MenuScope;
 import com.thinkerscave.access.mapper.RoleMapper;
+import com.thinkerscave.access.mapper.UserMapper;
 import com.thinkerscave.access.repository.*;
 import com.thinkerscave.access.service.RoleService;
 import com.thinkerscave.access.specification.MenuSpecification;
 import com.thinkerscave.shared.exceptions.*;
 import com.thinkerscave.platform.entity.Organization;
 import com.thinkerscave.platform.repository.OrganizationRepository;
+import com.thinkerscave.platform.service.TenantCatalogSyncService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
@@ -32,7 +34,9 @@ public class RoleServiceImpl implements RoleService {
     private final OrganizationRepository organizationRepository;
     private final OrganizationModuleRepository organizationModuleRepository;
     private final RoleMapper roleMapper;
+    private final UserMapper userMapper;
     private final UserRoleRepository userRoleRepository;
+    private final TenantCatalogSyncService tenantCatalogSyncService;
 
     @Override
     @Transactional
@@ -47,32 +51,31 @@ public class RoleServiceImpl implements RoleService {
                 .roleType(request.getRoleType())
                 .dashboardCode(request.getDashboardCode())
                 .displayOrder(request.getDisplayOrder() != null ? request.getDisplayOrder() : 1)
-                .systemRole(false)
-                .active(true)
+                .systemRole(true)
+                .active(request.getActive() == null || Boolean.TRUE.equals(request.getActive()))
                 .build();
-        return roleMapper.toResponse(roleRepository.save(role));
+        Role saved = roleRepository.save(role);
+        tenantCatalogSyncService.syncRole(saved);
+        return roleMapper.toResponse(saved);
     }
 
     @Override
     @Transactional
     public RoleResponse updateRole(Long roleId, UpdateRoleRequest request) {
         Role role = findRoleById(roleId);
-        if (Boolean.TRUE.equals(role.getSystemRole())) {
-            // System roles: only description and display order can change
-            role.setDescription(request.getDescription());
-        } else {
-            if (StringUtils.hasText(request.getRoleName())
-                    && roleRepository.existsByRoleNameAndIdNot(request.getRoleName(), roleId)) {
-                throw new AlreadyExistsException("Role name already in use: " + request.getRoleName());
-            }
-            role.setRoleName(request.getRoleName());
-            role.setDescription(request.getDescription());
-            role.setDashboardCode(request.getDashboardCode());
+        if (StringUtils.hasText(request.getRoleName())
+                && roleRepository.existsByRoleNameAndIdNot(request.getRoleName(), roleId)) {
+            throw new AlreadyExistsException("Role name already in use: " + request.getRoleName());
         }
+        role.setRoleName(request.getRoleName());
+        role.setDescription(request.getDescription());
+        role.setDashboardCode(request.getDashboardCode());
         if (request.getDisplayOrder() != null) {
             role.setDisplayOrder(request.getDisplayOrder());
         }
-        return roleMapper.toResponse(roleRepository.save(role));
+        Role saved = roleRepository.save(role);
+        tenantCatalogSyncService.syncRole(saved);
+        return roleMapper.toResponse(saved);
     }
 
     @Override
@@ -88,6 +91,14 @@ public class RoleServiceImpl implements RoleService {
     @Transactional(readOnly = true)
     public List<RoleResponse> getAllActiveRoles() {
         List<RoleResponse> responses = roleMapper.toResponseList(roleRepository.findByActiveTrueOrderByDisplayOrderAsc());
+        responses.forEach(res -> res.setActiveUserCount(userRoleRepository.countActiveUsersByRole(res.getId())));
+        return responses;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RoleResponse> getAllRoles() {
+        List<RoleResponse> responses = roleMapper.toResponseList(roleRepository.findAllByOrderByDisplayOrderAsc());
         responses.forEach(res -> res.setActiveUserCount(userRoleRepository.countActiveUsersByRole(res.getId())));
         return responses;
     }
@@ -121,7 +132,7 @@ public class RoleServiceImpl implements RoleService {
     public void activateRole(Long roleId) {
         Role role = findRoleById(roleId);
         role.setActive(true);
-        roleRepository.save(role);
+        tenantCatalogSyncService.syncRole(roleRepository.save(role));
         log.info("Role activated: {}", roleId);
     }
 
@@ -129,12 +140,24 @@ public class RoleServiceImpl implements RoleService {
     @Transactional
     public void deactivateRole(Long roleId) {
         Role role = findRoleById(roleId);
-        if (Boolean.TRUE.equals(role.getSystemRole())) {
-            throw new ConflictException("Cannot deactivate a system role");
+        if (Boolean.TRUE.equals(role.getSystemRole()) && role.getRoleType() != null
+                && role.getRoleType().name().equals("SUPER_ADMIN")) {
+            throw new ConflictException("Cannot deactivate the Super Admin role");
         }
         role.setActive(false);
-        roleRepository.save(role);
+        tenantCatalogSyncService.syncRole(roleRepository.save(role));
         log.info("Role deactivated: {}", roleId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserSummaryResponse> getRoleUsers(Long roleId, Long organizationId) {
+        findRoleById(roleId);
+        return userRoleRepository.findActiveAssignmentsByRoleId(roleId).stream()
+                .map(UserRole::getUser)
+                .filter(user -> organizationId == null || organizationId.equals(user.getOrganizationId()))
+                .map(userMapper::toSummary)
+                .toList();
     }
 
     @Override

@@ -7,13 +7,13 @@
 --
 -- Login (Thinkers Department / PLATFORM login — not institution login):
 --   Username : superadmin
---   Password : Password@123
+--   Password : admin@123  (only for a newly inserted row; existing passwords are never overwritten)
 --
 -- Run (example):
 --   psql -h <host> -U <user> -d <database> -v ON_ERROR_STOP=1 -f 01_platform_master_seed.sql
 --
 -- If login fails on password only: Spring BCrypt may not match pgcrypto on some hosts.
--- Re-hash with the app encoder, then:
+-- Set a Spring-compatible hash once (do not re-run mass password updates):
 --   UPDATE users SET password = '<spring-bcrypt-hash>' WHERE username = 'superadmin';
 -- =============================================================================
 
@@ -151,7 +151,8 @@ UPDATE menus SET menu_name = 'Audit Center',            route = '/app/tenant-man
 
 -- =============================================================================
 -- 5) SUPER ADMIN USER + ROLE MAPPING
--- Password = BCrypt(Password@123, strength 12) via pgcrypto
+-- Creates superadmin only when id=1 is missing. Never overwrites an existing password.
+-- Bootstrap password for a brand-new row only; align with PlatformBootstrapSeed (admin@123).
 -- =============================================================================
 
 INSERT INTO users (
@@ -162,21 +163,13 @@ INSERT INTO users (
     created_by, created_on, updated_by, updated_on, version
 ) VALUES (
     1, 1, 'USR000001', 'superadmin', 'superadmin@thinkerscave.com', '9777000001',
-    crypt('Password@123', gen_salt('bf', 12)),
+    crypt('admin@123', gen_salt('bf', 12)),
     'Super', 'Admin', 'Super Admin', NULL, 'ACTIVE',
     TRUE, TRUE, FALSE,
     0, FALSE, NULL, NOW(), NULL, NULL,
     'system', NOW(), 'system', NOW(), 0
 )
-ON CONFLICT (id) DO UPDATE
-SET password = crypt('Password@123', gen_salt('bf', 12)),
-    account_locked = FALSE,
-    failed_login_attempts = 0,
-    lock_expiry_at = NULL,
-    status = 'ACTIVE',
-    first_time_login = FALSE,
-    updated_by = 'system',
-    updated_on = NOW();
+ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO user_roles (
     id, user_id, role_id, primary_role, active,

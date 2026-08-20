@@ -27,4 +27,8 @@ public interface UserPermissionRepository extends JpaRepository<UserPermission, 
     @Modifying
     @Query("DELETE FROM UserPermission up WHERE up.user.id = :userId")
     void deleteAllByUser(@Param("userId") Long userId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM UserPermission up WHERE up.menu.id = :menuId")
+    void deleteByMenu_Id(@Param("menuId") Long menuId);
 }

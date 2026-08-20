@@ -6,14 +6,21 @@ import com.thinkerscave.access.dto.response.MenuResponse;
 import com.thinkerscave.access.dto.response.SidebarItemResponse;
 import com.thinkerscave.access.entity.Menu;
 import com.thinkerscave.access.entity.UserRole;
+import com.thinkerscave.access.enums.MenuScope;
 import com.thinkerscave.access.enums.MenuType;
 import com.thinkerscave.access.mapper.MenuMapper;
 import com.thinkerscave.access.repository.MenuRepository;
+import com.thinkerscave.access.repository.OrganizationModuleRepository;
+import com.thinkerscave.access.repository.RolePermissionRepository;
+import com.thinkerscave.access.repository.UserPermissionRepository;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.access.repository.UserRoleRepository;
 import com.thinkerscave.access.service.MenuService;
 import com.thinkerscave.access.service.PermissionService;
 import com.thinkerscave.access.specification.MenuSpecification;
+import com.thinkerscave.platform.entity.Feature;
+import com.thinkerscave.platform.repository.FeatureRepository;
+import com.thinkerscave.platform.service.TenantCatalogSyncService;
 import com.thinkerscave.shared.exceptions.AlreadyExistsException;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ConflictException;
@@ -39,6 +46,11 @@ public class MenuServiceImpl implements MenuService {
     private final MenuMapper menuMapper;
     private final UserRoleRepository userRoleRepository;
     private final PermissionService permissionService;
+    private final FeatureRepository featureRepository;
+    private final TenantCatalogSyncService tenantCatalogSyncService;
+    private final RolePermissionRepository rolePermissionRepository;
+    private final UserPermissionRepository userPermissionRepository;
+    private final OrganizationModuleRepository organizationModuleRepository;
 
     @Override
     @Transactional
@@ -56,6 +68,9 @@ public class MenuServiceImpl implements MenuService {
             }
         }
 
+        MenuScope scope = resolveScope(request.getMenuScope(), parent);
+        Feature feature = resolveFeature(request.getFeatureId(), parent, scope);
+
         Menu menu = Menu.builder()
                 .menuCode(request.getMenuCode())
                 .menuName(request.getMenuName())
@@ -65,12 +80,18 @@ public class MenuServiceImpl implements MenuService {
                 .menuType(request.getMenuType())
                 .parentMenu(parent)
                 .displayOrder(request.getDisplayOrder() != null ? request.getDisplayOrder() : 1)
-                .showInSidebar(Boolean.TRUE.equals(request.getShowInSidebar()))
+                .showInSidebar(request.getShowInSidebar() == null || Boolean.TRUE.equals(request.getShowInSidebar()))
                 .defaultPage(Boolean.TRUE.equals(request.getDefaultPage()))
-                .active(true)
+                .active(request.getActive() == null || Boolean.TRUE.equals(request.getActive()))
+                .menuScope(scope)
+                .feature(feature)
                 .build();
 
-        return menuMapper.toResponse(menuRepository.save(menu));
+        Menu saved = menuRepository.save(menu);
+        if (Boolean.TRUE.equals(saved.getActive())) {
+            tenantCatalogSyncService.syncMenu(saved);
+        }
+        return menuMapper.toResponse(saved);
     }
 
     @Override
@@ -96,8 +117,17 @@ public class MenuServiceImpl implements MenuService {
         if (request.getDisplayOrder() != null) menu.setDisplayOrder(request.getDisplayOrder());
         if (request.getShowInSidebar() != null) menu.setShowInSidebar(request.getShowInSidebar());
         if (request.getDefaultPage() != null) menu.setDefaultPage(request.getDefaultPage());
+        if (request.getActive() != null) menu.setActive(request.getActive());
+        if (request.getMenuScope() != null) menu.setMenuScope(request.getMenuScope());
+        if (request.getFeatureId() != null) {
+            menu.setFeature(resolveFeature(request.getFeatureId(), menu.getParentMenu(), menu.getMenuScope()));
+        } else if (request.getFeatureId() == null && menu.getParentMenu() == null) {
+            menu.setFeature(null);
+        }
 
-        return menuMapper.toResponse(menuRepository.save(menu));
+        Menu saved = menuRepository.save(menu);
+        tenantCatalogSyncService.syncMenu(saved);
+        return menuMapper.toResponse(saved);
     }
 
     @Override
@@ -108,8 +138,10 @@ public class MenuServiceImpl implements MenuService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<MenuResponse> getMenuTree() {
-        List<Menu> allMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc();
+    public List<MenuResponse> getMenuTree(boolean includeInactive) {
+        List<Menu> allMenus = includeInactive
+                ? menuRepository.findAllByOrderByDisplayOrderAsc()
+                : menuRepository.findByActiveTrueOrderByDisplayOrderAsc();
         return buildTree(allMenus);
     }
 
@@ -125,7 +157,7 @@ public class MenuServiceImpl implements MenuService {
     public void activateMenu(Long menuId) {
         Menu menu = findMenuById(menuId);
         menu.setActive(true);
-        menuRepository.save(menu);
+        tenantCatalogSyncService.syncMenu(menuRepository.save(menu));
     }
 
     @Override
@@ -136,7 +168,28 @@ public class MenuServiceImpl implements MenuService {
             throw new ConflictException("Cannot deactivate a menu that has active child menus");
         }
         menu.setActive(false);
-        menuRepository.save(menu);
+        tenantCatalogSyncService.syncMenu(menuRepository.save(menu));
+    }
+
+    @Override
+    @Transactional
+    public void deleteMenu(Long menuId) {
+        Menu menu = findMenuById(menuId);
+        hardDeleteMenu(menu);
+    }
+
+    private void hardDeleteMenu(Menu menu) {
+        List<Menu> children = menuRepository.findByParentMenu_Id(menu.getId());
+        for (Menu child : children) {
+            hardDeleteMenu(child);
+        }
+        Long menuId = menu.getId();
+        tenantCatalogSyncService.removeMenu(menuId);
+        rolePermissionRepository.deleteByMenu_Id(menuId);
+        userPermissionRepository.deleteByMenu_Id(menuId);
+        organizationModuleRepository.deleteByMenu_Id(menuId);
+        menuRepository.delete(menu);
+        log.info("Hard-deleted menu {}", menu.getMenuCode());
     }
 
     @Override
@@ -238,5 +291,23 @@ public class MenuServiceImpl implements MenuService {
     private Menu findMenuById(Long menuId) {
         return menuRepository.findById(menuId)
                 .orElseThrow(() -> new ResourceNotFoundException("Menu not found: " + menuId));
+    }
+
+    private MenuScope resolveScope(MenuScope requested, Menu parent) {
+        if (parent != null && parent.getMenuScope() != null) {
+            return parent.getMenuScope();
+        }
+        return requested != null ? requested : MenuScope.SUBSCRIPTION;
+    }
+
+    private Feature resolveFeature(Long featureId, Menu parent, MenuScope scope) {
+        if (parent != null) {
+            return null;
+        }
+        if (featureId == null) {
+            return null;
+        }
+        return featureRepository.findById(featureId)
+                .orElseThrow(() -> new ResourceNotFoundException("Feature not found: " + featureId));
     }
 }

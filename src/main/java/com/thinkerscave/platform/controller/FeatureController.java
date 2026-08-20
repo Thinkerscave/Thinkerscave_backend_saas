@@ -1,7 +1,9 @@
 package com.thinkerscave.platform.controller;
 
+import com.thinkerscave.platform.dto.request.FeatureMenuMappingRequest;
 import com.thinkerscave.platform.dto.request.FeatureRequest;
 import com.thinkerscave.platform.dto.response.FeatureResponse;
+import com.thinkerscave.access.dto.response.MenuResponse;
 import com.thinkerscave.platform.service.FeatureService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,5 +61,21 @@ public class FeatureController {
     public ResponseEntity<ApiResponse<Void>> deleteFeature(@PathVariable Long id) {
         featureService.deleteFeature(id);
         return ResponseEntity.ok(ApiResponse.noContent("Feature archived successfully"));
+    }
+
+    @GetMapping("/{id}/menus")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @Operation(summary = "List menus mapped to a feature")
+    public ResponseEntity<ApiResponse<List<MenuResponse>>> getFeatureMenus(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Feature menus retrieved", featureService.getFeatureMenus(id)));
+    }
+
+    @PutMapping("/{id}/menus")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    @Operation(summary = "Replace the menus mapped to a feature")
+    public ResponseEntity<ApiResponse<List<MenuResponse>>> replaceFeatureMenus(
+            @PathVariable Long id,
+            @Valid @RequestBody FeatureMenuMappingRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Feature menus updated", featureService.replaceFeatureMenus(id, request)));
     }
 }

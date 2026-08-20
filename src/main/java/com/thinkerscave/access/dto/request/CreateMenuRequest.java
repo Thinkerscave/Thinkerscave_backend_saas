@@ -1,5 +1,6 @@
 package com.thinkerscave.access.dto.request;
 
+import com.thinkerscave.access.enums.MenuScope;
 import com.thinkerscave.access.enums.MenuType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.*;
@@ -42,4 +43,13 @@ public class CreateMenuRequest {
     private Integer displayOrder = 1;
     private Boolean showInSidebar = true;
     private Boolean defaultPage = false;
+
+    @Schema(description = "false = draft (not shown to tenants), true = saved and live")
+    private Boolean active = true;
+
+    @Schema(description = "PLATFORM never copied to tenants; CORE always entitled; SUBSCRIPTION gated by feature")
+    private MenuScope menuScope;
+
+    @Schema(description = "Feature that unlocks this top-level menu for subscribed tenants")
+    private Long featureId;
 }

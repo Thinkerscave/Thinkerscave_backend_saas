@@ -2,6 +2,7 @@ package com.thinkerscave.platform.service.impl;
 
 import com.thinkerscave.platform.dto.request.OrganizationRequest;
 import com.thinkerscave.platform.dto.request.OrganizationProfileUpdateRequest;
+import com.thinkerscave.platform.dto.response.FeatureOverrideResponse;
 import com.thinkerscave.platform.dto.response.OrganizationConfigurationResponse;
 import com.thinkerscave.platform.dto.response.OrganizationDetailResponse;
 import com.thinkerscave.platform.dto.response.OrganizationDomainResponse;
@@ -9,14 +10,24 @@ import com.thinkerscave.platform.dto.response.OrganizationProfileResponse;
 import com.thinkerscave.platform.dto.response.OrganizationSubscriptionResponse;
 import com.thinkerscave.platform.dto.response.OrganizationSummaryResponse;
 import com.thinkerscave.platform.dto.response.PublicOrganizationOptionResponse;
+import com.thinkerscave.platform.dto.response.SubscriptionPlanFeatureResponse;
 import com.thinkerscave.platform.dto.response.TenantRegistryResponse;
 import com.thinkerscave.platform.entity.Customer;
 import com.thinkerscave.platform.entity.Organization;
+import com.thinkerscave.platform.entity.OrganizationSubscription;
+import com.thinkerscave.platform.entity.SubscriptionFeatureOverride;
+import com.thinkerscave.platform.entity.SubscriptionPlan;
+import com.thinkerscave.platform.entity.SubscriptionPlanFeature;
+import com.thinkerscave.platform.entity.TenantRegistry;
 import com.thinkerscave.platform.enums.InstitutionType;
 import com.thinkerscave.platform.enums.OrganizationStatus;
 import com.thinkerscave.platform.repository.CustomerRepository;
 import com.thinkerscave.platform.repository.OrganizationRepository;
+import com.thinkerscave.platform.repository.SubscriptionFeatureOverrideRepository;
+import com.thinkerscave.platform.repository.SubscriptionPlanFeatureRepository;
+import com.thinkerscave.platform.service.OrganizationInvoicePdfService;
 import com.thinkerscave.platform.service.OrganizationService;
+import com.thinkerscave.platform.service.TenantInsightService;
 import com.thinkerscave.shared.enums.CodeType;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
@@ -29,8 +40,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -42,6 +56,10 @@ public class OrganizationServiceImpl implements OrganizationService {
     private final OrganizationRepository organizationRepository;
     private final CustomerRepository customerRepository;
     private final CodeGeneratorService codeGeneratorService;
+    private final TenantInsightService tenantInsightService;
+    private final SubscriptionPlanFeatureRepository planFeatureRepository;
+    private final SubscriptionFeatureOverrideRepository overrideRepository;
+    private final OrganizationInvoicePdfService organizationInvoicePdfService;
 
     @Override
     @Transactional(readOnly = true)
@@ -51,10 +69,33 @@ public class OrganizationServiceImpl implements OrganizationService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public OrganizationDetailResponse getOrganizationById(Long id) {
         Organization org = findById(id);
+        if (org.getTenantRegistry() != null) {
+            tenantInsightService.refreshIfStale(org.getTenantRegistry());
+        }
         return toDetailResponse(org);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] downloadOnboardingInvoicePdf(Long id) {
+        Organization org = findById(id);
+        OrganizationSubscription subscription = org.getOrganizationSubscription();
+        if (subscription == null) {
+            throw new BadRequestException("No subscription invoice is available for this organization.");
+        }
+        if (subscription.getSubscriptionPlan() != null) {
+            subscription.getSubscriptionPlan().getPlanName();
+        }
+        if (subscription.getPromotion() != null) {
+            subscription.getPromotion().getPromotionCode();
+        }
+        if (org.getCustomer() != null) {
+            org.getCustomer().getCustomerName();
+        }
+        return organizationInvoicePdfService.build(org, subscription);
     }
 
     @Override
@@ -104,6 +145,9 @@ public class OrganizationServiceImpl implements OrganizationService {
         org.setBoardName(request.getBoardName());
         org.setEmail(request.getEmail());
         org.setMobileNumber(request.getMobileNumber());
+        if (StringUtils.hasText(request.getAdminFullName())) {
+            org.setAdminFullName(request.getAdminFullName().trim());
+        }
         org.setAlternateMobileNumber(request.getAlternateMobileNumber());
         org.setWebsite(request.getWebsite());
         org.setAddressLine1(request.getAddressLine1());
@@ -117,7 +161,15 @@ public class OrganizationServiceImpl implements OrganizationService {
         org.setLanguage(request.getLanguage());
         org.setLogoUrl(request.getLogoUrl());
         org.setRemarks(request.getRemarks());
-        return toSummaryResponse(organizationRepository.save(org));
+        Organization saved = organizationRepository.save(org);
+        if (saved.getTenantRegistry() != null) {
+            tenantInsightService.updateOrgAdmin(
+                    saved.getTenantRegistry().getSchemaName(),
+                    saved.getAdminFullName(),
+                    saved.getEmail(),
+                    saved.getMobileNumber());
+        }
+        return toSummaryResponse(saved);
     }
 
     @Override
@@ -254,30 +306,43 @@ public class OrganizationServiceImpl implements OrganizationService {
     }
 
     private OrganizationDetailResponse toDetailResponse(Organization o) {
+        TenantRegistry tenant = o.getTenantRegistry();
+        TenantInsightService.OrgAdmin admin = tenant != null
+                ? tenantInsightService.findOrgAdmin(tenant.getSchemaName())
+                : null;
+        String adminEmail = firstText(o.getEmail(), admin != null ? admin.email() : null);
+        String adminMobile = firstText(o.getMobileNumber(), admin != null ? admin.mobile() : null);
+        String adminName = firstText(o.getAdminFullName(), admin != null ? admin.fullName() : null);
+
         TenantRegistryResponse tenantResponse = null;
-        if (o.getTenantRegistry() != null) {
-            var t = o.getTenantRegistry();
+        if (tenant != null) {
             tenantResponse = TenantRegistryResponse.builder()
-                    .id(t.getId())
-                    .tenantIdentifier(t.getTenantIdentifier())
+                    .id(tenant.getId())
+                    .tenantIdentifier(tenant.getTenantIdentifier())
                     .organizationId(o.getId())
                     .organizationName(o.getOrganizationName())
-                    .schemaName(t.getSchemaName())
-                    .provisionStatus(t.getProvisionStatus())
-                    .databaseVersion(t.getDatabaseVersion())
-                    .migrationVersion(t.getMigrationVersion())
-                    .templateVersion(t.getTemplateVersion())
-                    .databaseSizeMb(t.getDatabaseSizeMb())
-                    .storageUsedMb(t.getStorageUsedMb())
-                    .lastMigrationAt(t.getLastMigrationAt())
-                    .lastBackupAt(t.getLastBackupAt())
-                    .lastHealthCheckAt(t.getLastHealthCheckAt())
-                    .tenantDomain(t.getTenantDomain())
-                    .customDomain(t.getCustomDomain())
-                    .maintenanceMode(t.getMaintenanceMode())
-                    .active(t.getActive())
-                    .createdOn(t.getCreatedOn())
-                    .createdBy(t.getCreatedBy())
+                    .schemaName(tenant.getSchemaName())
+                    .provisionStatus(tenant.getProvisionStatus())
+                    .databaseVersion(tenant.getDatabaseVersion())
+                    .migrationVersion(tenant.getMigrationVersion())
+                    .templateVersion(tenant.getTemplateVersion())
+                    .databaseSizeMb(tenant.getDatabaseSizeMb())
+                    .storageUsedMb(tenant.getStorageUsedMb())
+                    .studentCount(tenant.getStudentCount())
+                    .staffCount(tenant.getStaffCount())
+                    .branchCount(tenant.getBranchCount())
+                    .classCount(tenant.getClassCount())
+                    .sectionCount(tenant.getSectionCount())
+                    .usageRefreshedAt(tenant.getUsageRefreshedAt())
+                    .lastMigrationAt(tenant.getLastMigrationAt())
+                    .lastBackupAt(tenant.getLastBackupAt())
+                    .lastHealthCheckAt(tenant.getLastHealthCheckAt())
+                    .tenantDomain(tenant.getTenantDomain())
+                    .customDomain(tenant.getCustomDomain())
+                    .maintenanceMode(tenant.getMaintenanceMode())
+                    .active(tenant.getActive())
+                    .createdOn(tenant.getCreatedOn())
+                    .createdBy(tenant.getCreatedBy())
                     .build();
         }
 
@@ -305,16 +370,26 @@ public class OrganizationServiceImpl implements OrganizationService {
         }
 
         OrganizationSubscriptionResponse subscriptionResponse = null;
+        List<SubscriptionPlanFeatureResponse> entitled = List.of();
         if (o.getOrganizationSubscription() != null) {
             var s = o.getOrganizationSubscription();
+            SubscriptionPlan plan = s.getSubscriptionPlan();
+            Integer studentLimit = firstInt(s.getStudentLimitOverride(), plan != null ? plan.getStudentLimit() : null);
+            Integer staffLimit = firstInt(s.getStaffLimitOverride(), plan != null ? plan.getStaffLimit() : null);
+            Integer branchLimit = firstInt(s.getBranchLimitOverride(), plan != null ? plan.getBranchLimit() : null);
+            Integer storageLimit = firstInt(s.getStorageLimitOverride(), plan != null ? plan.getStorageLimitGb() : null);
+            List<FeatureOverrideResponse> overrides = overrideRepository
+                    .findByOrganizationSubscription_IdAndActiveTrueOrderByCreatedOnDesc(s.getId())
+                    .stream().map(this::toOverrideResponse).collect(Collectors.toList());
+            entitled = entitledFeatures(plan != null ? plan.getId() : null, s.getId());
             subscriptionResponse = OrganizationSubscriptionResponse.builder()
                     .id(s.getId())
                     .organizationId(o.getId())
                     .organizationName(o.getOrganizationName())
                     .organizationCode(o.getOrganizationCode())
-                    .subscriptionPlanId(s.getSubscriptionPlan().getId())
-                    .planCode(s.getSubscriptionPlan().getPlanCode())
-                    .planName(s.getSubscriptionPlan().getPlanName())
+                    .subscriptionPlanId(plan != null ? plan.getId() : null)
+                    .planCode(plan != null ? plan.getPlanCode() : null)
+                    .planName(plan != null ? plan.getPlanName() : null)
                     .promotionId(s.getPromotion() != null ? s.getPromotion().getId() : null)
                     .promotionCode(s.getPromotion() != null ? s.getPromotion().getPromotionCode() : null)
                     .startDate(s.getStartDate())
@@ -328,9 +403,15 @@ public class OrganizationServiceImpl implements OrganizationService {
                     .staffLimitOverride(s.getStaffLimitOverride())
                     .branchLimitOverride(s.getBranchLimitOverride())
                     .storageLimitOverride(s.getStorageLimitOverride())
+                    .studentLimit(studentLimit)
+                    .staffLimit(staffLimit)
+                    .branchLimit(branchLimit)
+                    .storageLimitGb(storageLimit)
+                    .invoiceNumber(OrganizationInvoicePdfService.invoiceNumber(o.getOrganizationCode(), s.getId()))
                     .autoRenew(s.getAutoRenew())
                     .status(s.getStatus())
                     .active(s.getActive())
+                    .featureOverrides(overrides)
                     .createdOn(s.getCreatedOn())
                     .build();
         }
@@ -367,11 +448,17 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .institutionType(o.getInstitutionType())
                 .boardName(o.getBoardName())
                 .status(o.getStatus())
-                .email(o.getEmail())
-                .mobileNumber(o.getMobileNumber())
+                .email(adminEmail)
+                .mobileNumber(adminMobile)
+                .adminFullName(adminName)
+                .adminEmail(adminEmail)
+                .adminMobile(adminMobile)
                 .alternateMobileNumber(o.getAlternateMobileNumber())
-                .website(o.getWebsite())
-                .addressLine1(o.getAddressLine1())
+                .website(firstText(
+                        o.getWebsite(),
+                        o.getOrganizationDomain() != null ? o.getOrganizationDomain().getDomain() : null,
+                        tenant != null ? tenant.getTenantDomain() : null))
+                .addressLine1(firstText(o.getAddressLine1(), locationLabel(o)))
                 .addressLine2(o.getAddressLine2())
                 .city(o.getCity())
                 .state(o.getState())
@@ -390,11 +477,102 @@ public class OrganizationServiceImpl implements OrganizationService {
                 .tenant(tenantResponse)
                 .domain(domainResponse)
                 .subscription(subscriptionResponse)
+                .entitledFeatures(entitled)
                 .configuration(configResponse)
                 .createdOn(o.getCreatedOn())
                 .createdBy(o.getCreatedBy())
                 .updatedOn(o.getUpdatedOn())
                 .updatedBy(o.getUpdatedBy())
                 .build();
+    }
+
+    private List<SubscriptionPlanFeatureResponse> entitledFeatures(Long planId, Long subscriptionId) {
+        Map<Long, SubscriptionPlanFeatureResponse> byFeature = new LinkedHashMap<>();
+        if (planId != null) {
+            for (SubscriptionPlanFeature spf : planFeatureRepository
+                    .findBySubscriptionPlan_IdAndEnabledTrueAndActiveTrue(planId)) {
+                byFeature.put(spf.getFeature().getId(), toPlanFeatureResponse(spf, true));
+            }
+        }
+        if (subscriptionId != null) {
+            for (SubscriptionFeatureOverride override : overrideRepository
+                    .findByOrganizationSubscription_IdAndActiveTrueOrderByCreatedOnDesc(subscriptionId)) {
+                Long featureId = override.getFeature().getId();
+                if (Boolean.FALSE.equals(override.getEnabled())) {
+                    byFeature.remove(featureId);
+                } else {
+                    byFeature.put(featureId, SubscriptionPlanFeatureResponse.builder()
+                            .featureId(featureId)
+                            .featureCode(override.getFeature().getFeatureCode())
+                            .featureName(override.getFeature().getFeatureName())
+                            .featureKey(override.getFeature().getFeatureKey())
+                            .module(override.getFeature().getModule())
+                            .enabled(true)
+                            .notes("Override")
+                            .active(true)
+                            .build());
+                }
+            }
+        }
+        return new ArrayList<>(byFeature.values());
+    }
+
+    private SubscriptionPlanFeatureResponse toPlanFeatureResponse(SubscriptionPlanFeature spf, boolean enabled) {
+        return SubscriptionPlanFeatureResponse.builder()
+                .id(spf.getId())
+                .subscriptionPlanId(spf.getSubscriptionPlan().getId())
+                .planName(spf.getSubscriptionPlan().getPlanName())
+                .featureId(spf.getFeature().getId())
+                .featureCode(spf.getFeature().getFeatureCode())
+                .featureName(spf.getFeature().getFeatureName())
+                .featureKey(spf.getFeature().getFeatureKey())
+                .module(spf.getFeature().getModule())
+                .enabled(enabled)
+                .mandatory(spf.getMandatory())
+                .displayOrder(spf.getDisplayOrder())
+                .notes(spf.getNotes())
+                .active(spf.getActive())
+                .createdOn(spf.getCreatedOn())
+                .build();
+    }
+
+    private FeatureOverrideResponse toOverrideResponse(SubscriptionFeatureOverride override) {
+        return FeatureOverrideResponse.builder()
+                .id(override.getId())
+                .organizationSubscriptionId(override.getOrganizationSubscription().getId())
+                .featureId(override.getFeature().getId())
+                .featureCode(override.getFeature().getFeatureCode())
+                .featureName(override.getFeature().getFeatureName())
+                .featureKey(override.getFeature().getFeatureKey())
+                .enabled(override.getEnabled())
+                .overrideReason(override.getOverrideReason())
+                .expiryDate(override.getExpiryDate())
+                .complimentary(override.getComplimentary())
+                .chargeable(override.getChargeable())
+                .additionalCharge(override.getAdditionalCharge())
+                .active(override.getActive())
+                .remarks(override.getRemarks())
+                .createdOn(override.getCreatedOn())
+                .createdBy(override.getCreatedBy())
+                .build();
+    }
+
+    private static Integer firstInt(Integer... values) {
+        return Stream.of(values).filter(v -> v != null).findFirst().orElse(null);
+    }
+
+    private static String locationLabel(Organization o) {
+        return Stream.of(o.getCity(), o.getState(), o.getCountry())
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .collect(Collectors.joining(", "));
+    }
+
+    private static String firstText(String... values) {
+        return Stream.of(values)
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .findFirst()
+                .orElse(null);
     }
 }
