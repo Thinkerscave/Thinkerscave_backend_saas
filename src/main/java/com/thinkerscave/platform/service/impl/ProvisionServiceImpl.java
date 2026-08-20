@@ -842,7 +842,7 @@ public class ProvisionServiceImpl implements ProvisionService {
                         "FROM \"" + schemaName + "\".\"roles\" r " +
                         "INNER JOIN \"" + schemaName + "\".\"menus\" m ON m.menu_code IN (" +
                         "'DASHBOARD','STUDENTS','STUDENTS_DIRECTORY','ATTENDANCE','ATTENDANCE_STUDENTS'," +
-                        "'COMMUNICATION','COMMUNICATION_NOTICES','FEE_MANAGEMENT','FEE_MY_FEES') " +
+                        "'COMMUNICATION','COMMUNICATION_NOTICES') " +
                         "WHERE r.role_code = '" + ROLE_PARENT_CODE + "' " +
                         "AND m.id IN (" + menuIdList + ") AND m.menu_type = 'PAGE' " +
                         "ON CONFLICT (organization_id, role_id, menu_id) DO NOTHING");

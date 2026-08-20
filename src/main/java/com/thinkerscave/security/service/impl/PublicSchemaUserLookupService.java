@@ -6,7 +6,10 @@ import com.thinkerscave.access.enums.LoginStatus;
 import com.thinkerscave.access.enums.RoleType;
 import com.thinkerscave.access.repository.LoginHistoryRepository;
 import com.thinkerscave.access.repository.UserRepository;
+import com.thinkerscave.platform.entity.Organization;
+import com.thinkerscave.platform.entity.TenantRegistry;
 import com.thinkerscave.platform.repository.OrganizationRepository;
+import com.thinkerscave.platform.repository.TenantRegistryRepository;
 import com.thinkerscave.security.entity.UserSession;
 import com.thinkerscave.security.enums.SessionStatus;
 import com.thinkerscave.security.repository.UserSessionRepository;
@@ -39,22 +42,55 @@ public class PublicSchemaUserLookupService {
 
     private final UserRepository userRepository;
     private final OrganizationRepository organizationRepository;
+    private final TenantRegistryRepository tenantRegistryRepository;
     private final UserSessionRepository sessionRepository;
     private final LoginHistoryRepository loginHistoryRepository;
 
     /**
-     * Must be called with {@link TenantContext} already set to "public" by the caller.
-     * REQUIRES_NEW opens the transaction (and acquires the Hibernate connection) at the
-     * moment this proxied method is entered — setting the context inside the method body
-     * would be too late, since the tenant identifier is resolved at transaction start.
+     * Institution catalog lives in public. Login requests arrive with X-Tenant-ID already
+     * set, so the ambient transaction is bound to the tenant schema — looking up
+     * {@link TenantRegistry} there hits a stale copy of {@code organizations} missing
+     * platform columns such as {@code admin_full_name}.
+     *
+     * <p>Must be called with {@link TenantContext} already set to "public".
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
-    public Optional<User> findActiveOwnerForOrganization(String usernameOrEmail, Long organizationId) {
+    public TenantRegistry findActiveTenantByIdentifier(String identifier) {
+        TenantRegistry tenant = tenantRegistryRepository.findActiveByTenantIdentifierNormalized(identifier)
+                .orElseThrow(() -> new IllegalStateException("Unknown institution tenant"));
+        Organization organization = tenant.getOrganization();
+        if (organization != null) {
+            organization.getStatus();
+            organization.getAdminFullName();
+            if (organization.getCustomer() != null) {
+                organization.getCustomer().getStatus();
+            }
+        }
+        return tenant;
+    }
+
+    /**
+     * Institution users (owners, org admins, staff) may live only in public.users for some
+     * tenants. Must be called with {@link TenantContext} already set to "public" — REQUIRES_NEW
+     * resolves the tenant at proxy entry, so the switch has to happen before this call.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public Optional<User> findInstitutionUserInPublicSchema(String usernameOrEmail, Long organizationId) {
         return userRepository.findByUsername(usernameOrEmail)
                 .or(() -> userRepository.findByEmail(usernameOrEmail))
-                .filter(candidate -> hasActiveRole(candidate, RoleType.ORGANIZATION_OWNER)
-                        && organizationRepository.existsActiveOwnedOrganization(candidate.getId(), organizationId))
+                .filter(candidate -> belongsToInstitution(candidate, organizationId))
                 .map(this::initializeRoles);
+    }
+
+    private boolean belongsToInstitution(User user, Long organizationId) {
+        if (hasActiveRole(user, RoleType.SUPER_ADMIN)) {
+            return false;
+        }
+        if (organizationId != null && organizationId.equals(user.getOrganizationId())) {
+            return true;
+        }
+        return hasActiveRole(user, RoleType.ORGANIZATION_OWNER)
+                && organizationRepository.existsActiveOwnedOrganization(user.getId(), organizationId);
     }
 
     /**

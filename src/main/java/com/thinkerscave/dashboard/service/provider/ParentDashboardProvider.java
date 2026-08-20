@@ -61,7 +61,6 @@ public class ParentDashboardProvider extends AbstractDashboardWidgetProvider imp
                 quickActions(),
                 todaysSchedule(enrollment),
                 attendanceOverview(primaryChild),
-                feeSummaryPreview(),
                 recentAnnouncements(),
                 upcomingEvents(),
                 academicCalendar()
@@ -151,11 +150,6 @@ public class ParentDashboardProvider extends AbstractDashboardWidgetProvider imp
                     .date(to)
                     .build();
         });
-    }
-
-    private WidgetDTO<FeeSummaryData> feeSummaryPreview() {
-        return safeWidget("fee-summary", WidgetType.FEE_SUMMARY, "Fee summary", "Future scope preview",
-                2, DataMode.SAMPLE, sampleWidgetFactory::feeSummary);
     }
 
     private WidgetDTO<AnnouncementsData> recentAnnouncements() {

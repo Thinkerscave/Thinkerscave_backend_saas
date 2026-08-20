@@ -53,7 +53,6 @@ public class StudentDashboardProvider extends AbstractDashboardWidgetProvider im
                 attendanceOverview(student),
                 examinationSummaryPreview(),
                 schoolNotices(),
-                feeSummaryPreview(),
                 recentAnnouncements(),
                 upcomingEvents(),
                 academicCalendar(),
@@ -151,11 +150,6 @@ public class StudentDashboardProvider extends AbstractDashboardWidgetProvider im
                             .category(n.getCategory()).pinned(n.isPinned()).build()).collect(Collectors.toList()))
                     .build();
         });
-    }
-
-    private WidgetDTO<FeeSummaryData> feeSummaryPreview() {
-        return safeWidget("fee-summary", WidgetType.FEE_SUMMARY, "Fee summary", "Future scope preview",
-                2, DataMode.SAMPLE, sampleWidgetFactory::feeSummary);
     }
 
     private WidgetDTO<AnnouncementsData> recentAnnouncements() {

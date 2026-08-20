@@ -12,24 +12,13 @@ import java.util.Locale;
 
 /**
  * Builds realistic, clearly-{@code SAMPLE}-tagged payloads for domains that
- * have no backend module yet (Fee, Leave, Examination, Library, Transport,
+ * have no backend module yet (Leave, Examination, Library, Transport,
  * Support Tickets). These are consumed through the exact same
  * {@code WidgetDTO} contract as live widgets so swapping to real data later
  * is a provider-level change only — no frontend rewrite.
  */
 @Component
 public class SampleWidgetFactory {
-
-    public FeeSummaryData feeSummary() {
-        return FeeSummaryData.builder()
-                .totalDue(48500)
-                .totalPaid(36000)
-                .pendingAmount(12500)
-                .nextDueDate(LocalDate.now().plusDays(9))
-                .pendingInvoices(2)
-                .currency("INR")
-                .build();
-    }
 
     public LeaveSummaryData leaveSummary() {
         return LeaveSummaryData.builder()

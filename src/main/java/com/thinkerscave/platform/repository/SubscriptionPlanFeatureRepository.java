@@ -18,4 +18,6 @@ public interface SubscriptionPlanFeatureRepository extends JpaRepository<Subscri
     boolean existsBySubscriptionPlan_IdAndFeature_IdAndIdNot(Long planId, Long featureId, Long id);
 
     void deleteBySubscriptionPlan_Id(Long planId);
+
+    void deleteByFeature_Id(Long featureId);
 }

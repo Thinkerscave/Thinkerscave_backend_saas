@@ -75,12 +75,12 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse login(LoginRequest request, LoginContext loginContext) {
-        User user = resolveUserForLogin(request.getUsernameOrEmail(), loginContext);
-        // ORGANIZATION_OWNER accounts always live in "public"; if this is a tenant/institution
-        // login, the ambient transaction is bound to that tenant's schema, so `user` is
-        // detached from it — all writes for this user must run in their own "public"
-        // transaction instead (see PublicSchemaUserLookupService).
-        boolean crossSchemaUser = !loginContext.isPlatformLogin() && hasActiveRole(user, RoleType.ORGANIZATION_OWNER);
+        ResolvedLoginUser resolved = resolveUserForLogin(request.getUsernameOrEmail(), loginContext);
+        User user = resolved.user();
+        // Public-schema accounts (owners, and some org admins/staff whose tenant users table
+        // was never provisioned) are detached from the tenant-bound session — writes must
+        // go through PublicSchemaUserLookupService instead of the ambient repositories.
+        boolean crossSchemaUser = !loginContext.isPlatformLogin() && resolved.fromPublicSchema();
 
         if (Boolean.TRUE.equals(user.getAccountLocked())) {
             if (!crossSchemaUser) {
@@ -159,14 +159,14 @@ public class AuthServiceImpl implements AuthService {
                 .build();
     }
 
-    private User resolveUserForLogin(String usernameOrEmail, LoginContext loginContext) {
+    private ResolvedLoginUser resolveUserForLogin(String usernameOrEmail, LoginContext loginContext) {
         if (loginContext.isPlatformLogin()) {
             User user = findByUsernameOrEmail(usernameOrEmail)
                     .orElseThrow(() -> new BadRequestException("Invalid credentials"));
             if (!hasActiveRole(user, RoleType.SUPER_ADMIN)) {
                 throw new BadRequestException("This account is not authorized for Thinkers Department login");
             }
-            return user;
+            return new ResolvedLoginUser(user, false);
         }
 
         TenantRegistry tenant = resolveTenantRegistry(loginContext);
@@ -186,40 +186,46 @@ public class AuthServiceImpl implements AuthService {
             throw new BadRequestException("Account access has been suspended. Please contact support for assistance.");
         }
 
-        // 1) Exact org match (platform catalog / correctly provisioned rows)
+        // 1) Exact org match in the tenant schema
         // 2) Tenant-schema users may have organization_id unset/0 — schema isolation already scopes them
-        // 3) ORGANIZATION_OWNER accounts live only in the public schema (they can own/switch
-        //    across multiple organizations). A single Hibernate session/transaction is bound
-        //    to one schema for its whole lifetime (see TenantIdentifierResolver) — flipping
-        //    TenantContext here would NOT re-route the ambient (tenant-schema) queries above,
-        //    so this lookup must run in a genuinely separate transaction/connection. The
-        //    tenant identifier for that new transaction is resolved the instant it is opened
-        //    (at proxy entry), so TenantContext must be switched to "public" BEFORE calling in.
-        User user = findByUsernameOrEmailAndOrganization(usernameOrEmail, organizationId)
+        // 3) Some institution accounts (owners, and org admins whose tenant users table
+        //    was never provisioned) live only in public.users. A single Hibernate
+        //    session is bound to one schema for its whole lifetime — flipping TenantContext
+        //    here would NOT re-route the ambient queries above, so this lookup must run
+        //    in a genuinely separate transaction with TenantContext already set to "public".
+        Optional<User> tenantUser = findByUsernameOrEmailAndOrganization(usernameOrEmail, organizationId)
             .or(() -> findByUsernameOrEmail(usernameOrEmail)
                 .filter(candidate -> {
                     Long candidateOrgId = candidate.getOrganizationId();
                     return candidateOrgId == null || candidateOrgId <= 0 || organizationId.equals(candidateOrgId);
-                }))
-            .or(() -> lookupOwnerInPublicSchema(usernameOrEmail, organizationId))
-            .orElseThrow(() -> new BadRequestException("Invalid credentials for the selected institution"));
-
-        if (hasActiveRole(user, RoleType.SUPER_ADMIN)) {
-            throw new BadRequestException("Platform accounts must sign in through Thinkers Department");
+                }));
+        if (tenantUser.isPresent()) {
+            User user = tenantUser.get();
+            if (hasActiveRole(user, RoleType.SUPER_ADMIN)) {
+                throw new BadRequestException("Platform accounts must sign in through Thinkers Department");
+            }
+            return new ResolvedLoginUser(user, false);
         }
 
-        return user;
+        User publicUser = lookupInstitutionUserInPublicSchema(usernameOrEmail, organizationId)
+                .orElseThrow(() -> new BadRequestException("Invalid credentials for the selected institution"));
+        if (hasActiveRole(publicUser, RoleType.SUPER_ADMIN)) {
+            throw new BadRequestException("Platform accounts must sign in through Thinkers Department");
+        }
+        return new ResolvedLoginUser(publicUser, true);
     }
 
-    private Optional<User> lookupOwnerInPublicSchema(String usernameOrEmail, Long organizationId) {
+    private Optional<User> lookupInstitutionUserInPublicSchema(String usernameOrEmail, Long organizationId) {
         String previousTenant = TenantContext.getTenant();
         try {
             TenantContext.setTenant("public");
-            return publicSchemaUserLookupService.findActiveOwnerForOrganization(usernameOrEmail, organizationId);
+            return publicSchemaUserLookupService.findInstitutionUserInPublicSchema(usernameOrEmail, organizationId);
         } finally {
             TenantContext.setTenant(previousTenant);
         }
     }
+
+    private record ResolvedLoginUser(User user, boolean fromPublicSchema) {}
 
     /**
      * Runs the given action with {@link TenantContext} set to "public" — required before
@@ -247,19 +253,9 @@ public class AuthServiceImpl implements AuthService {
         String previousTenant = TenantContext.getTenant();
         try {
             TenantContext.setTenant("public");
-            TenantRegistry tenant = tenantRegistryRepository.findActiveByTenantIdentifierNormalized(loginContext.getTenantIdentifier())
-                    .orElseThrow(() -> new BadRequestException("Unknown institution tenant"));
-            // Eagerly touch org + customer while still on the platform catalog. After this
-            // method restores the institution TenantContext, lazy-loading Customer would hit
-            // the tenant DB (legacy customers schema) and fail.
-            Organization organization = tenant.getOrganization();
-            if (organization != null) {
-                organization.getStatus();
-                if (organization.getCustomer() != null) {
-                    organization.getCustomer().getStatus();
-                }
-            }
-            return tenant;
+            return publicSchemaUserLookupService.findActiveTenantByIdentifier(loginContext.getTenantIdentifier());
+        } catch (IllegalStateException ex) {
+            throw new BadRequestException("Unknown institution tenant");
         } finally {
             TenantContext.setTenant(previousTenant);
         }
@@ -505,10 +501,15 @@ public class AuthServiceImpl implements AuthService {
                 ? loginContext.getOrganizationId()
                 : user.getOrganizationId();
         if (orgId != null) {
-            return securityPolicyRepository.findByOrganizationId(orgId)
-                    .map(SecurityPolicy::getMaxFailedAttempts)
-                    .filter(v -> v != null && v > 0)
-                    .orElse(defaultMaxFailedAttempts);
+            try {
+                return securityPolicyRepository.findByOrganizationId(orgId)
+                        .map(SecurityPolicy::getMaxFailedAttempts)
+                        .filter(v -> v != null && v > 0)
+                        .orElse(defaultMaxFailedAttempts);
+            } catch (Exception ex) {
+                log.warn("Security policy lookup failed for orgId={}: {}", orgId, ex.getMessage());
+                return defaultMaxFailedAttempts;
+            }
         }
         return defaultMaxFailedAttempts;
     }
