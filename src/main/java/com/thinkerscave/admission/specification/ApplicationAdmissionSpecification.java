@@ -21,7 +21,9 @@ public final class ApplicationAdmissionSpecification {
                 return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
             }
 
-            if (request.getStatus() != null) {
+            if (request.getStatuses() != null && !request.getStatuses().isEmpty()) {
+                predicates.add(root.get("status").in(request.getStatuses()));
+            } else if (request.getStatus() != null) {
                 predicates.add(cb.equal(root.get("status"), request.getStatus()));
             }
 

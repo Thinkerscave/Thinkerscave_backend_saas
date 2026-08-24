@@ -1,12 +1,14 @@
 package com.thinkerscave.admission.entity;
 
 import com.thinkerscave.admission.enums.ApplicationStatus;
+import com.thinkerscave.admission.enums.FeePaymentStatus;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -57,6 +59,18 @@ public class ApplicationAdmission extends Auditable {
     @Column(name = "applying_for_class", length = 50)
     private String applyingForClass;
 
+    @Column(name = "academic_year_id")
+    private Long academicYearId;
+
+    @Column(name = "class_id")
+    private Long classId;
+
+    @Column(name = "section_id")
+    private Long sectionId;
+
+    @Column(name = "student_id")
+    private Long studentId;
+
     @Column(name = "email", length = 150)
     private String email;
 
@@ -65,6 +79,10 @@ public class ApplicationAdmission extends Auditable {
 
     @Column(name = "address", columnDefinition = "TEXT")
     private String address;
+
+    /** JSON blob of extra Indian-school form fields (blood group, previous school, etc.). */
+    @Column(name = "profile_details", columnDefinition = "TEXT")
+    private String profileDetails;
 
     // ─── Parent / Guardian ─────────────────────────────────────────────────
 
@@ -94,6 +112,28 @@ public class ApplicationAdmission extends Auditable {
 
     @Column(name = "archived", nullable = false)
     private boolean archived = false;
+
+    @Column(name = "fee_amount", precision = 12, scale = 2)
+    private BigDecimal feeAmount;
+
+    @Column(name = "fee_receipt_number", length = 60)
+    private String feeReceiptNumber;
+
+    @Column(name = "fee_payment_mode", length = 40)
+    private String feePaymentMode;
+
+    @Column(name = "fee_paid_on")
+    private LocalDate feePaidOn;
+
+    @Column(name = "fee_received_by", length = 100)
+    private String feeReceivedBy;
+
+    @Column(name = "fee_remarks", columnDefinition = "TEXT")
+    private String feeRemarks;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fee_status", length = 20)
+    private FeePaymentStatus feeStatus = FeePaymentStatus.PENDING;
 
     // ─── Documents (stored as file paths / URLs) ───────────────────────────
 

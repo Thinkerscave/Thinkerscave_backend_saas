@@ -219,8 +219,14 @@ public class StaffServiceImpl implements StaffService {
     }
 
     StaffDetailResponse buildDetailResponse(Staff staff) {
-        List<Document> docs = documentRepository.findByOwnerTypeAndOwnerIdAndActiveTrue(
-                DocumentOwnerType.STAFF, staff.getStaffId());
+        List<Document> docs;
+        try {
+            docs = documentRepository.findByOwnerTypeAndOwnerIdAndActiveTrue(
+                    DocumentOwnerType.STAFF, staff.getStaffId());
+        } catch (RuntimeException ex) {
+            log.warn("Staff documents unavailable for {}: {}", staff.getStaffId(), ex.getMessage());
+            docs = List.of();
+        }
 
         List<ResponsibilityAssignmentResponse> responsibilities = assignmentRepository
                 .findByStaff_StaffIdAndActiveTrueOrderByEffectiveFromDesc(staff.getStaffId())

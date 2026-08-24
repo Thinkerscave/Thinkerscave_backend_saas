@@ -1,5 +1,6 @@
 package com.thinkerscave.admission.entity;
 
+import com.thinkerscave.admission.enums.FollowUpLifecycleStatus;
 import com.thinkerscave.admission.enums.FollowUpType;
 import com.thinkerscave.admission.enums.InquiryStatus;
 import com.thinkerscave.shared.entity.Auditable;
@@ -54,4 +55,17 @@ public class InquiryFollowUp extends Auditable {
 
     @Column(name = "next_follow_up_date")
     private LocalDate nextFollowUpDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "lifecycle_status", length = 20)
+    private FollowUpLifecycleStatus lifecycleStatus = FollowUpLifecycleStatus.SCHEDULED;
+
+    @Column(name = "outcome", length = 200)
+    private String outcome;
+
+    @Column(name = "completed_on")
+    private LocalDateTime completedOn;
+
+    @Column(name = "completed_by", length = 100)
+    private String completedBy;
 }

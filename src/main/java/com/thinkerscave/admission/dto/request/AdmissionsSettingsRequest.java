@@ -1,14 +1,12 @@
-package com.thinkerscave.admission.dto.response;
+package com.thinkerscave.admission.dto.request;
 
-import lombok.Builder;
 import lombok.Data;
 
 import java.util.List;
 import java.util.Map;
 
 @Data
-@Builder
-public class AdmissionsSettingsResponse {
+public class AdmissionsSettingsRequest {
 
     private List<String> inquirySources;
     private List<String> inquiryStatuses;

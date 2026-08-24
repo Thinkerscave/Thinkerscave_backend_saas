@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/admission/applications")
 @RequiredArgsConstructor
 @Tag(name = "Admission - Applications", description = "Manage student admission applications")
-@PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'TEACHER')")
+@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 public class ApplicationAdmissionController {
 
     private final ApplicationAdmissionService service;

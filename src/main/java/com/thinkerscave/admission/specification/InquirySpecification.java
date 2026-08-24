@@ -34,6 +34,14 @@ public final class InquirySpecification {
                 predicates.add(cb.equal(cb.lower(root.get("classInterestedIn")), request.getClassInterestedIn().trim().toLowerCase()));
             }
 
+            if (request.getAcademicYearId() != null) {
+                predicates.add(cb.equal(root.get("academicYearId"), request.getAcademicYearId()));
+            }
+
+            if (request.getClassId() != null) {
+                predicates.add(cb.equal(root.get("classId"), request.getClassId()));
+            }
+
             if (request.getCounselorId() != null) {
                 predicates.add(cb.equal(root.get("assignedCounselorId"), request.getCounselorId()));
             }
@@ -51,9 +59,10 @@ public final class InquirySpecification {
                 predicates.add(cb.or(
                         cb.like(cb.lower(root.get("name")), like),
                         cb.like(cb.lower(root.get("mobileNumber")), like),
-                        cb.like(cb.lower(root.get("email")), like),
-                        cb.like(cb.lower(root.get("comments")), like),
-                        cb.like(cb.lower(root.get("referredBy")), like)
+                        cb.like(cb.lower(cb.coalesce(root.get("email"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.get("inquiryNumber"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.get("comments"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.get("referredBy"), "")), like)
                 ));
             }
 

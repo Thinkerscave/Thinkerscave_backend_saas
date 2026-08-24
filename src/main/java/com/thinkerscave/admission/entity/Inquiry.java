@@ -48,8 +48,17 @@ public class Inquiry extends Auditable {
     @Column(name = "email", length = 100)
     private String email;
 
+    @Column(name = "inquiry_number", length = 40)
+    private String inquiryNumber;
+
     @Column(name = "class_interested_in", nullable = false, length = 50)
     private String classInterestedIn;
+
+    @Column(name = "academic_year_id")
+    private Long academicYearId;
+
+    @Column(name = "class_id")
+    private Long classId;
 
     @Column(name = "address", columnDefinition = "TEXT")
     private String address;

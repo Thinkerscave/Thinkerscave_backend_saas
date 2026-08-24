@@ -10,6 +10,7 @@ import com.thinkerscave.security.service.AuthService;
 import com.thinkerscave.security.service.PasswordResetService;
 import com.thinkerscave.security.util.RefreshTokenCookieHelper;
 import com.thinkerscave.shared.dto.ApiResponse;
+import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,9 +43,19 @@ public class AuthController {
             description = "Public endpoint (no auth required) for the org-select login screen")
     public ResponseEntity<ApiResponse<List<PublicOrganizationOptionResponse>>> getPublicOrganizations(
             @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Organizations loaded",
-                organizationService.listPublicOrganizations(search)));
+        String previous = TenantContext.getTenant();
+        TenantContext.setTenant("public");
+        try {
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Organizations loaded",
+                    organizationService.listPublicOrganizations(search)));
+        } finally {
+            if (previous != null) {
+                TenantContext.setTenant(previous);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 
     @PostMapping("/login")

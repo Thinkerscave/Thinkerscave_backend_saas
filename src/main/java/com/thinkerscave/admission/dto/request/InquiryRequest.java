@@ -20,7 +20,8 @@ public class InquiryRequest {
 
     @NotBlank(message = "Class interested in is required")
     private String classInterestedIn;
-
+    private Long academicYearId;
+    private Long classId;
     private String address;
     private String inquirySource;
     private String referredBy;

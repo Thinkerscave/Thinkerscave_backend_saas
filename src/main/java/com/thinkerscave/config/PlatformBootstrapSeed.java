@@ -378,16 +378,20 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "Leads, follow-ups, applications and admissions reporting.");
         Menu admissions = ensureMenu("ADMISSIONS", "Admissions", "Admissions CRM",
                 "/app/admissions", "pi pi-inbox", MenuType.MODULE, null, 12, MenuScope.SUBSCRIPTION, admissionsFeature);
+        ensureMenu("ADMISSIONS_OVERVIEW", "Overview", "Admissions overview",
+                "/app/admissions/overview", "dashboard", MenuType.PAGE, admissions, 0, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_LEADS", "Leads", "Admissions leads",
                 "/app/admissions/leads", "list", MenuType.PAGE, admissions, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_FOLLOW_UPS", "Follow-ups", "Admissions follow-ups",
                 "/app/admissions/follow-ups", "event", MenuType.PAGE, admissions, 2, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_APPLICATIONS", "Applications", "Admissions applications",
                 "/app/admissions/applications", "description", MenuType.PAGE, admissions, 3, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("ADMISSIONS_ENROLLMENT", "Enrollment", "Enroll approved applications",
+                "/app/admissions/enrollment", "how_to_reg", MenuType.PAGE, admissions, 4, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_REPORTS", "Reports", "Admissions reports",
-                "/app/admissions/reports", "bar_chart", MenuType.PAGE, admissions, 4, MenuScope.SUBSCRIPTION, null);
+                "/app/admissions/reports", "bar_chart", MenuType.PAGE, admissions, 5, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_SETTINGS", "Settings", "Admissions settings",
-                "/app/admissions/settings", "settings", MenuType.PAGE, admissions, 5, MenuScope.SUBSCRIPTION, null);
+                "/app/admissions/settings", "settings", MenuType.PAGE, admissions, 6, MenuScope.SUBSCRIPTION, null);
 
         Feature promotionTransferFeature = ensureFeature("FEAT_PROMOTION_TRANSFER", "PROMOTION_TRANSFER_MODULE",
                 "Promotion & Transfer", "Promotion & Transfer", "ACADEMIC", 8,
@@ -433,8 +437,6 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "STUDENTS_DOCUMENTS",
                 "STAFF_DOCUMENTS",
                 "STAFF_ALUMNI",
-                "ADMISSIONS_OVERVIEW",
-                "ADMISSIONS_ENROLLMENT",
                 "EXAMS",
                 "ENROLLMENTS",
                 "FEE_MANAGEMENT",
@@ -457,7 +459,11 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "ACADEMICS_SYLLABUS_TRACKER",
                 "ACCESS_ROLES",
                 "ACCESS_MENUS",
-                "PROVISIONING_TEMPLATES"
+                "PROVISIONING_TEMPLATES",
+                "INQUIRY_CENTER",
+                "ADMISSION_CENTER",
+                "ADMISSIONS_INQUIRY_CENTER",
+                "ADMISSIONS_ADMISSION_CENTER"
         );
         menuRepository.findByMenuCodeIn(obsoleteCodes).stream()
                 .sorted((left, right) -> Boolean.compare(left.getParentMenu() == null, right.getParentMenu() == null))

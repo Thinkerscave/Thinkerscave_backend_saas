@@ -13,4 +13,6 @@ public class InquiryWorkspaceKpiResponse {
     private long admissionReady;
     private long futureProspects;
     private long closed;
+    private long applicationsStarted;
+    private long lostLeads;
 }

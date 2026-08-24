@@ -28,7 +28,7 @@ import java.util.Map;
 @RequestMapping("/api/v1/admission/inquiries")
 @RequiredArgsConstructor
 @Tag(name = "Admission - Inquiries", description = "Manage admission prospect inquiries")
-@PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'TEACHER')")
+@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 public class InquiryController {
 
     private final InquiryService inquiryService;

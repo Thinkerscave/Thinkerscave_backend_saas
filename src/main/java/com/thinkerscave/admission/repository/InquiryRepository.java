@@ -30,7 +30,7 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long>, JpaSpec
 
     boolean existsByMobileNumberAndDeletedFalse(String mobileNumber);
 
-    boolean existsByInquiryIdAndDeletedFalse(Long inquiryId);
+    boolean existsByInquiryNumber(String inquiryNumber);
 
     @Query("""
             SELECT i.status, COUNT(i)

@@ -56,6 +56,8 @@ public class DevDataInitializer implements ApplicationRunner {
             log.info("Dev seed data loaded.");
 
             provisionTenantDatabases();
+            ensurePlatformSchema();
+            ensureAdmissionsCrmSchema();
 
             // Do NOT overwrite user passwords here. Seed scripts may insert placeholders;
             // operators must set real credentials via provisioning / password-reset flows.
@@ -230,6 +232,122 @@ public class DevDataInitializer implements ApplicationRunner {
             }
         } catch (Exception ex) {
             log.warn("Could not ensure {} owner_user_id migration: {}", tableRef, ex.getMessage());
+        }
+    }
+
+    /**
+     * Flyway is disabled on local MySQL. Keep platform columns in sync on every catalog
+     * so org-select / login do not fail with Unknown column errors on cloned tenant DBs.
+     */
+    private void ensurePlatformSchema() {
+        List<String> schemas = new ArrayList<>();
+        schemas.add("thinkerscave_dev");
+        try {
+            jdbcTemplate.queryForList(
+                            "SELECT schema_name FROM tenant_registry WHERE schema_name IS NOT NULL AND TRIM(schema_name) <> ''",
+                            String.class)
+                    .forEach(schemas::add);
+        } catch (Exception ignored) {
+            // tenant registry may not exist yet
+        }
+        for (String schema : schemas.stream().distinct().toList()) {
+            ensureColumn(schema, "organizations", "admin_full_name", "varchar(200) NULL");
+            ensureColumn(schema, "tenant_registry", "student_count", "INT NULL");
+            ensureColumn(schema, "tenant_registry", "staff_count", "INT NULL");
+            ensureColumn(schema, "tenant_registry", "branch_count", "INT NULL");
+            ensureColumn(schema, "tenant_registry", "class_count", "INT NULL");
+            ensureColumn(schema, "tenant_registry", "section_count", "INT NULL");
+            ensureColumn(schema, "tenant_registry", "usage_refreshed_at", "datetime NULL");
+        }
+    }
+
+    private void ensureAdmissionsCrmSchema() {
+        List<String> schemas = new ArrayList<>();
+        schemas.add("thinkerscave_dev");
+        try {
+            jdbcTemplate.queryForList(
+                            "SELECT schema_name FROM tenant_registry WHERE schema_name IS NOT NULL AND TRIM(schema_name) <> ''",
+                            String.class)
+                    .forEach(schemas::add);
+        } catch (Exception ignored) {
+            // tenant registry may not exist yet
+        }
+        for (String schema : schemas.stream().distinct().toList()) {
+            try {
+                ensureColumn(schema, "inquiry", "inquiry_number", "varchar(40) NULL");
+                ensureColumn(schema, "inquiry", "academic_year_id", "bigint NULL");
+                ensureColumn(schema, "inquiry", "class_id", "bigint NULL");
+                ensureColumn(schema, "inquiry_follow_up", "lifecycle_status", "varchar(20) NULL DEFAULT 'SCHEDULED'");
+                ensureColumn(schema, "inquiry_follow_up", "outcome", "varchar(200) NULL");
+                ensureColumn(schema, "inquiry_follow_up", "completed_on", "datetime NULL");
+                ensureColumn(schema, "inquiry_follow_up", "completed_by", "varchar(100) NULL");
+                ensureColumn(schema, "application_admission", "academic_year_id", "bigint NULL");
+                ensureColumn(schema, "application_admission", "class_id", "bigint NULL");
+                ensureColumn(schema, "application_admission", "section_id", "bigint NULL");
+                ensureColumn(schema, "application_admission", "student_id", "bigint NULL");
+                ensureColumn(schema, "application_admission", "fee_amount", "decimal(12,2) NULL");
+                ensureColumn(schema, "application_admission", "fee_receipt_number", "varchar(60) NULL");
+                ensureColumn(schema, "application_admission", "fee_payment_mode", "varchar(40) NULL");
+                ensureColumn(schema, "application_admission", "fee_paid_on", "date NULL");
+                ensureColumn(schema, "application_admission", "fee_received_by", "varchar(100) NULL");
+                ensureColumn(schema, "application_admission", "fee_remarks", "text NULL");
+                ensureColumn(schema, "application_admission", "fee_status", "varchar(20) NULL DEFAULT 'PENDING'");
+                jdbcTemplate.execute("""
+                        CREATE TABLE IF NOT EXISTS `%s`.`admissions_setting` (
+                          setting_id BIGINT NOT NULL AUTO_INCREMENT,
+                          organization_id BIGINT NOT NULL,
+                          inquiry_sources TEXT,
+                          inquiry_statuses TEXT,
+                          required_documents TEXT,
+                          lead_prefix VARCHAR(20) DEFAULT 'LD',
+                          application_prefix VARCHAR(20) DEFAULT 'APP',
+                          admission_prefix VARCHAR(20) DEFAULT 'ADM',
+                          reminder_mode VARCHAR(30) DEFAULT 'AUTO',
+                          reminder_lead_time VARCHAR(20) DEFAULT '24H',
+                          assignment_mode VARCHAR(30) DEFAULT 'MANUAL',
+                          created_by VARCHAR(100),
+                          created_on DATETIME,
+                          updated_by VARCHAR(100),
+                          updated_on DATETIME,
+                          version BIGINT NOT NULL DEFAULT 0,
+                          PRIMARY KEY (setting_id),
+                          UNIQUE KEY uq_adm_setting_org (organization_id)
+                        )
+                        """.formatted(schema));
+                jdbcTemplate.execute("""
+                        CREATE TABLE IF NOT EXISTS `%s`.`admission_application_document` (
+                          document_id BIGINT NOT NULL AUTO_INCREMENT,
+                          application_id BIGINT NOT NULL,
+                          document_type VARCHAR(80) NOT NULL,
+                          original_name VARCHAR(255),
+                          stored_path VARCHAR(500),
+                          status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+                          remarks TEXT,
+                          created_by VARCHAR(100),
+                          created_on DATETIME,
+                          updated_by VARCHAR(100),
+                          updated_on DATETIME,
+                          version BIGINT NOT NULL DEFAULT 0,
+                          PRIMARY KEY (document_id),
+                          KEY idx_aad_application (application_id)
+                        )
+                        """.formatted(schema));
+            } catch (Exception ex) {
+                log.warn("Could not patch admissions schema on {}: {}", schema, ex.getMessage());
+            }
+        }
+    }
+
+    private void ensureColumn(String schema, String table, String column, String ddlType) {
+        try (Connection connection = dataSource.getConnection();
+             ResultSet columns = connection.getMetaData().getColumns(schema, null, table, column)) {
+            if (columns.next()) {
+                return;
+            }
+            jdbcTemplate.execute("ALTER TABLE `" + schema + "`.`" + table + "` ADD COLUMN `" + column + "` " + ddlType);
+            log.info("Added {}.{} .{}", schema, table, column);
+        } catch (Exception ex) {
+            log.debug("Could not add {}.{} .{}: {}", schema, table, column, ex.getMessage());
         }
     }
 }

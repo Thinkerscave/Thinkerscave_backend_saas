@@ -15,15 +15,19 @@ import java.time.LocalDateTime;
 public class InquiryResponse {
 
     private Long inquiryId;
+    private String inquiryNumber;
     private String name;
     private String mobileNumber;
     private String email;
     private String classInterestedIn;
+    private Long academicYearId;
+    private Long classId;
     private String address;
     private String inquirySource;
     private String referredBy;
     private String comments;
     private Long assignedCounselorId;
+    private String assignedCounselorName;
     private InquiryStatus status;
     private LocalDateTime lastFollowUpDate;
     private FollowUpType lastFollowUpType;

@@ -1,5 +1,6 @@
 package com.thinkerscave.admission.controller;
 
+import com.thinkerscave.admission.dto.request.AdmissionsSettingsRequest;
 import com.thinkerscave.admission.dto.request.ApplicationSearchRequest;
 import com.thinkerscave.admission.dto.request.AssignCounselorRequest;
 import com.thinkerscave.admission.dto.request.CounselingNoteRequest;
@@ -16,15 +17,20 @@ import com.thinkerscave.admission.dto.response.InquiryResponse;
 import com.thinkerscave.admission.dto.response.InquiryTimelineItemResponse;
 import com.thinkerscave.admission.dto.response.InquiryWorkspaceKpiResponse;
 import com.thinkerscave.admission.enums.InquiryStatus;
+import com.thinkerscave.admission.service.AdmissionsSettingService;
 import com.thinkerscave.admission.service.ApplicationAdmissionService;
 import com.thinkerscave.admission.service.InquiryService;
 import com.thinkerscave.shared.dto.ApiResponse;
+import com.thinkerscave.staff.dto.response.StaffSummaryResponse;
+import com.thinkerscave.staff.enums.EmploymentStatus;
+import com.thinkerscave.staff.service.StaffService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,34 +43,33 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/admissions/workspace")
 @RequiredArgsConstructor
 @Tag(name = "Admissions CRM - Workspace")
+@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 public class AdmissionsWorkspaceController {
 
     private final InquiryService inquiryService;
     private final ApplicationAdmissionService applicationService;
+    private final AdmissionsSettingService settingService;
+    private final StaffService staffService;
 
     @GetMapping("/inquiries/kpi")
     @Operation(summary = "Workspace inquiry KPI")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<InquiryWorkspaceKpiResponse>> inquiryKpi() {
         return ResponseEntity.ok(ApiResponse.success("Inquiry KPI loaded", inquiryService.getWorkspaceKpi()));
     }
 
     @GetMapping("/inquiries/quick-actions")
     @Operation(summary = "Workspace quick action counters")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<InquiryQuickActionResponse>> inquiryQuickActions() {
         return ResponseEntity.ok(ApiResponse.success("Quick actions loaded", inquiryService.getQuickActions()));
     }
 
     @PostMapping("/inquiries/search")
     @Operation(summary = "Workspace inquiry search")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<Page<InquiryResponse>>> inquirySearch(
             @RequestBody(required = false) LeadSearchRequest request,
             Pageable pageable) {
@@ -73,21 +78,18 @@ public class AdmissionsWorkspaceController {
 
     @GetMapping("/inquiries/{id}/full")
     @Operation(summary = "Workspace inquiry full detail")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<InquiryFullDetailResponse>> fullDetail(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Inquiry detail loaded", inquiryService.getFullDetail(id)));
     }
 
     @GetMapping("/inquiries/{id}/timeline")
     @Operation(summary = "Workspace inquiry timeline")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<List<InquiryTimelineItemResponse>>> timeline(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Timeline loaded", inquiryService.getTimeline(id)));
     }
 
     @PutMapping("/inquiries/{id}/assign-counselor")
     @Operation(summary = "Workspace assign counselor")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<InquiryResponse>> assignCounselor(
             @PathVariable Long id,
             @Valid @RequestBody AssignCounselorRequest request) {
@@ -97,7 +99,6 @@ public class AdmissionsWorkspaceController {
 
     @PostMapping("/inquiries/{id}/mark-interested")
     @Operation(summary = "Workspace mark interested")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<InquiryResponse>> markInterested(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Inquiry marked interested",
                 inquiryService.updateStatus(id, InquiryStatus.INTERESTED)));
@@ -105,7 +106,6 @@ public class AdmissionsWorkspaceController {
 
     @PostMapping("/inquiries/{id}/mark-closed")
     @Operation(summary = "Workspace mark closed")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<InquiryResponse>> markClosed(@PathVariable Long id,
                                                                     @RequestParam(required = false) String reason) {
         if (reason != null && !reason.isBlank()) {
@@ -116,14 +116,12 @@ public class AdmissionsWorkspaceController {
 
     @GetMapping("/inquiries/{id}/counseling-notes")
     @Operation(summary = "Workspace counseling notes")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<List<CounselingNoteResponse>>> counselingNotes(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Counseling notes loaded", inquiryService.getCounselingNotes(id)));
     }
 
     @PostMapping("/inquiries/{id}/counseling-notes")
     @Operation(summary = "Workspace add counseling note")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<CounselingNoteResponse>> addCounselingNote(@PathVariable Long id,
                                                                                   @Valid @RequestBody CounselingNoteRequest request) {
         return ResponseEntity.ok(ApiResponse.created("Counseling note added", inquiryService.addCounselingNote(id, request)));
@@ -131,14 +129,12 @@ public class AdmissionsWorkspaceController {
 
     @GetMapping("/admissions/kpi")
     @Operation(summary = "Workspace admissions KPI")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<AdmissionKpiResponse>> admissionKpi() {
         return ResponseEntity.ok(ApiResponse.success("Admissions KPI loaded", inquiryService.getKpi()));
     }
 
     @PostMapping("/admissions/search")
     @Operation(summary = "Workspace admissions search")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<Page<ApplicationAdmissionResponse>>> admissionSearch(
             @RequestBody(required = false) ApplicationSearchRequest request,
             Pageable pageable) {
@@ -147,22 +143,31 @@ public class AdmissionsWorkspaceController {
 
     @GetMapping("/admissions/{id}/progress")
     @Operation(summary = "Workspace wizard progress")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<ApplicationProgressResponse>> progress(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Progress loaded", applicationService.getProgress(id)));
     }
 
+    @GetMapping("/counselors")
+    @Operation(summary = "Search staff who can be assigned as counselors")
+    public ResponseEntity<ApiResponse<Page<StaffSummaryResponse>>> counselors(
+            @RequestParam(required = false) String keyword,
+            @PageableDefault(size = 20, sort = "createdOn") Pageable pageable) {
+        Page<StaffSummaryResponse> page = staffService.getStaffList(
+                null, null, EmploymentStatus.ACTIVE, null, keyword, pageable);
+        return ResponseEntity.ok(ApiResponse.success("Counselors loaded", page));
+    }
+
     @GetMapping("/settings")
     @Operation(summary = "Workspace settings")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','TEACHER')")
     public ResponseEntity<ApiResponse<AdmissionsSettingsResponse>> settings() {
-        AdmissionsSettingsResponse response = AdmissionsSettingsResponse.builder()
-                .inquirySources(List.of("Website", "Walk-in", "Referral", "Social Media", "Campaign"))
-                .inquiryStatuses(List.of("NEW", "CONTACTED", "INTERESTED", "COUNSELING", "READY_FOR_ADMISSION", "LOST", "CLOSED"))
-                .requiredDocuments(List.of("BIRTH_CERTIFICATE", "AADHAR", "TRANSFER_CERTIFICATE", "PHOTO", "MARKSHEET"))
-                .numbering(Map.of("leadPrefix", "LD", "applicationPrefix", "APP", "admissionPrefix", "ADM"))
-                .reminderRules(Map.of("defaultMode", "AUTO", "defaultLeadTime", "24H"))
-                .build();
-        return ResponseEntity.ok(ApiResponse.success("Settings loaded", response));
+        return ResponseEntity.ok(ApiResponse.success("Settings loaded", settingService.getSettings()));
+    }
+
+    @PutMapping("/settings")
+    @Operation(summary = "Save workspace settings")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    public ResponseEntity<ApiResponse<AdmissionsSettingsResponse>> saveSettings(
+            @RequestBody AdmissionsSettingsRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Settings saved", settingService.saveSettings(request)));
     }
 }

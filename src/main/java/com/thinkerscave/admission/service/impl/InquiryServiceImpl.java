@@ -1,5 +1,6 @@
 package com.thinkerscave.admission.service.impl;
 
+import com.thinkerscave.admission.dto.request.CompleteFollowUpRequest;
 import com.thinkerscave.admission.dto.request.CounselingNoteRequest;
 import com.thinkerscave.admission.dto.request.FollowUpRequest;
 import com.thinkerscave.admission.dto.request.InquiryRequest;
@@ -18,19 +19,26 @@ import com.thinkerscave.admission.entity.CounselingNote;
 import com.thinkerscave.admission.entity.Inquiry;
 import com.thinkerscave.admission.entity.InquiryFollowUp;
 import com.thinkerscave.admission.enums.ApplicationStatus;
+import com.thinkerscave.admission.enums.FollowUpLifecycleStatus;
+import com.thinkerscave.admission.enums.FollowUpType;
 import com.thinkerscave.admission.enums.InquiryStatus;
 import com.thinkerscave.admission.repository.ApplicationAdmissionRepository;
 import com.thinkerscave.admission.repository.CounselingNoteRepository;
 import com.thinkerscave.admission.repository.InquiryFollowUpRepository;
 import com.thinkerscave.admission.repository.InquiryRepository;
+import com.thinkerscave.admission.service.AdmissionsSettingService;
 import com.thinkerscave.admission.service.InquiryService;
 import com.thinkerscave.admission.specification.InquirySpecification;
-import com.thinkerscave.shared.context.OrganizationContext;
+import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.staff.entity.Staff;
+import com.thinkerscave.staff.repository.StaffRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,15 +63,22 @@ public class InquiryServiceImpl implements InquiryService {
     private final InquiryFollowUpRepository followUpRepository;
     private final CounselingNoteRepository counselingNoteRepository;
     private final ApplicationAdmissionRepository applicationRepository;
+    private final AdmissionsSettingService settingService;
+    private final StaffRepository staffRepository;
 
     @Override
     @Transactional
     public InquiryResponse create(InquiryRequest request) {
         // Schema-per-tenant: No need to set organizationId
+        if (request.getMobileNumber() != null
+                && inquiryRepository.existsByMobileNumberAndDeletedFalse(request.getMobileNumber().trim())) {
+            throw new BadRequestException("A lead with this mobile number already exists");
+        }
         Inquiry inquiry = new Inquiry();
         mapRequest(request, inquiry);
         inquiry.setStatus(InquiryStatus.NEW);
         inquiry.setDeleted(false);
+        inquiry.setInquiryNumber(generateInquiryNumber());
         return toResponse(inquiryRepository.save(inquiry));
     }
 
@@ -156,15 +171,21 @@ public class InquiryServiceImpl implements InquiryService {
             return toApplicationResponse(existing);
         }
 
+        if (inquiry.getStatus() == InquiryStatus.LOST || inquiry.getStatus() == InquiryStatus.CLOSED) {
+            throw new BadRequestException("Lost or closed inquiries cannot be converted to applications");
+        }
+
         ApplicationAdmission app = new ApplicationAdmission();
         app.setInquiryId(inquiry.getInquiryId());
         app.setApplicationNumber(generateApplicationNumber());
         app.setApplicantName(inquiry.getName());
         app.setApplyingForClass(inquiry.getClassInterestedIn());
+        app.setAcademicYearId(inquiry.getAcademicYearId());
+        app.setClassId(inquiry.getClassId());
         app.setEmail(inquiry.getEmail());
         app.setContactNumber(inquiry.getMobileNumber());
         app.setAddress(inquiry.getAddress());
-        app.setParentName(inquiry.getReferredBy());
+        app.setParentContact(inquiry.getMobileNumber());
         app.setInternalComments(inquiry.getComments());
         app.setStatus(ApplicationStatus.DRAFT);
         ApplicationAdmission saved = applicationRepository.save(app);
@@ -186,6 +207,7 @@ public class InquiryServiceImpl implements InquiryService {
         followUp.setStatusAfter(request.getStatusAfter());
         followUp.setFollowUpDate(request.getFollowUpDate() != null ? request.getFollowUpDate() : LocalDateTime.now());
         followUp.setNextFollowUpDate(request.getNextFollowUpDate());
+        followUp.setLifecycleStatus(FollowUpLifecycleStatus.SCHEDULED);
         followUp = followUpRepository.save(followUp);
 
         // Update inquiry state
@@ -218,6 +240,12 @@ public class InquiryServiceImpl implements InquiryService {
     }
 
     @Override
+    public List<FollowUpResponse> getUpcomingFollowUps() {
+        return followUpRepository.findUpcoming(LocalDate.now())
+                .stream().map(this::toFollowUpResponse).collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public FollowUpResponse updateFollowUp(Long followUpId, FollowUpRequest request) {
         InquiryFollowUp followUp = followUpRepository.findById(followUpId)
@@ -232,6 +260,11 @@ public class InquiryServiceImpl implements InquiryService {
             followUp.setFollowUpDate(request.getFollowUpDate());
         }
         followUp.setNextFollowUpDate(request.getNextFollowUpDate());
+        if (request.getNextFollowUpDate() != null
+                && followUp.getLifecycleStatus() != FollowUpLifecycleStatus.COMPLETED
+                && followUp.getLifecycleStatus() != FollowUpLifecycleStatus.CANCELLED) {
+            followUp.setLifecycleStatus(FollowUpLifecycleStatus.RESCHEDULED);
+        }
         followUp = followUpRepository.save(followUp);
 
         Inquiry inquiry = followUp.getInquiry();
@@ -248,18 +281,59 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public FollowUpResponse completeFollowUp(Long followUpId) {
+        return completeFollowUp(followUpId, new CompleteFollowUpRequest());
+    }
+
+    @Override
+    @Transactional
+    public FollowUpResponse completeFollowUp(Long followUpId, CompleteFollowUpRequest request) {
         InquiryFollowUp followUp = followUpRepository.findById(followUpId)
                 .orElseThrow(() -> new ResourceNotFoundException("Follow-up not found: " + followUpId));
-
         Inquiry inquiry = followUp.getInquiry();
+        followUp.setLifecycleStatus(FollowUpLifecycleStatus.COMPLETED);
+        followUp.setCompletedOn(LocalDateTime.now());
+        followUp.setCompletedBy(currentUsername());
+        if (request != null) {
+            if (request.getOutcome() != null) {
+                followUp.setOutcome(request.getOutcome());
+            }
+            if (request.getRemarks() != null) {
+                followUp.setRemarks(request.getRemarks());
+            }
+            if (request.getStatusAfter() != null) {
+                followUp.setStatusAfter(request.getStatusAfter());
+                inquiry.setStatus(request.getStatusAfter());
+            }
+            if (request.getNextFollowUpDate() != null) {
+                followUp.setNextFollowUpDate(request.getNextFollowUpDate());
+                inquiry.setNextFollowUpDate(request.getNextFollowUpDate());
+            } else {
+                inquiry.setNextFollowUpDate(null);
+            }
+        } else {
+            inquiry.setNextFollowUpDate(null);
+        }
         inquiry.setLastFollowUpDate(LocalDateTime.now());
         inquiry.setLastFollowUpType(followUp.getFollowUpType());
-        inquiry.setNextFollowUpDate(null);
-        if (followUp.getStatusAfter() != null) {
-            inquiry.setStatus(followUp.getStatusAfter());
-        }
         inquiryRepository.save(inquiry);
-        return toFollowUpResponse(followUp);
+        return toFollowUpResponse(followUpRepository.save(followUp));
+    }
+
+    @Override
+    @Transactional
+    public FollowUpResponse cancelFollowUp(Long followUpId, String remarks) {
+        InquiryFollowUp followUp = followUpRepository.findById(followUpId)
+                .orElseThrow(() -> new ResourceNotFoundException("Follow-up not found: " + followUpId));
+        followUp.setLifecycleStatus(FollowUpLifecycleStatus.CANCELLED);
+        followUp.setCompletedOn(LocalDateTime.now());
+        followUp.setCompletedBy(currentUsername());
+        if (remarks != null && !remarks.isBlank()) {
+            followUp.setRemarks(remarks.trim());
+        }
+        Inquiry inquiry = followUp.getInquiry();
+        inquiry.setNextFollowUpDate(null);
+        inquiryRepository.save(inquiry);
+        return toFollowUpResponse(followUpRepository.save(followUp));
     }
 
     @Override
@@ -344,6 +418,9 @@ public class InquiryServiceImpl implements InquiryService {
                 .admissionReady(admissionReady)
                 .futureProspects(futureProspects)
                 .closed(closed)
+                .applicationsStarted(inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.APPLICATION_STARTED)
+                        + inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.APPLICATION_SUBMITTED))
+                .lostLeads(inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.LOST))
                 .build();
             }
 
@@ -358,22 +435,39 @@ public class InquiryServiceImpl implements InquiryService {
                 + followUpRepository.findDueOnDate(today.plusDays(4)).size()
                 + followUpRepository.findDueOnDate(today.plusDays(5)).size()
                 + followUpRepository.findDueOnDate(today.plusDays(6)).size();
-            return InquiryQuickActionResponse.builder()
+        long todaysCalls = followUpRepository.findDueOnDate(today).stream()
+                .filter(f -> f.getFollowUpType() == FollowUpType.CALL)
+                .count();
+        long todaysMeetings = followUpRepository.findDueOnDate(today).stream()
+                .filter(f -> f.getFollowUpType() == FollowUpType.WALK_IN)
+                .count();
+        return InquiryQuickActionResponse.builder()
                 .overdue(overdue)
                 .dueToday(dueToday)
                 .dueTomorrow(dueTomorrow)
                 .dueThisWeek(dueThisWeek)
+                .todaysCalls(todaysCalls)
+                .todaysMeetings(todaysMeetings)
+                .overdueFollowUps(overdue)
+                .admissionReady(inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.READY_FOR_ADMISSION))
                 .build();
             }
 
             @Override
             public InquiryFullDetailResponse getFullDetail(Long inquiryId) {
             InquiryResponse inquiry = getById(inquiryId);
+            var application = applicationRepository.findByInquiryId(inquiryId).orElse(null);
             return InquiryFullDetailResponse.builder()
                 .inquiry(inquiry)
                 .followUps(getFollowUps(inquiryId))
                 .counselingNotes(getCounselingNotes(inquiryId))
                 .timeline(getTimeline(inquiryId))
+                .applicationId(application != null ? application.getApplicationId() : null)
+                .applicationNumber(application != null ? application.getApplicationNumber() : null)
+                .applicationStatus(application != null && application.getStatus() != null ? application.getStatus().name() : null)
+                .studentId(application != null ? application.getStudentId() : null)
+                .studentCode(null)
+                .admissionNumber(null)
                 .build();
             }
 
@@ -384,29 +478,35 @@ public class InquiryServiceImpl implements InquiryService {
             List<InquiryTimelineItemResponse> timeline = new ArrayList<>();
             timeline.add(InquiryTimelineItemResponse.builder()
                 .eventType("LEAD_CREATED")
+                .action("LEAD_CREATED")
                 .title("Lead created")
                 .description("Lead was created in admissions CRM")
                 .performedBy(inquiry.getCreatedBy())
                 .performedOn(inquiry.getCreatedOn())
+                .performedAt(inquiry.getCreatedOn())
                 .build());
 
             followUpRepository.findByInquiryInquiryIdOrderByFollowUpDateDesc(inquiryId).forEach(fu ->
                 timeline.add(InquiryTimelineItemResponse.builder()
                     .eventType("FOLLOW_UP")
+                    .action("FOLLOW_UP")
                     .title("Follow-up: " + fu.getFollowUpType().name())
                     .description(fu.getRemarks())
                     .performedBy(fu.getCreatedBy())
                     .performedOn(fu.getFollowUpDate())
+                    .performedAt(fu.getFollowUpDate())
                     .build())
             );
 
             counselingNoteRepository.findByInquiryInquiryIdOrderByCreatedOnDesc(inquiryId).forEach(note ->
                 timeline.add(InquiryTimelineItemResponse.builder()
                     .eventType("COUNSELING_NOTE")
+                    .action("COUNSELING_NOTE")
                     .title("Counseling note added")
                     .description(note.getNotes())
                     .performedBy(note.getCreatedBy())
                     .performedOn(note.getCreatedOn())
+                    .performedAt(note.getCreatedOn())
                     .build())
             );
 
@@ -428,6 +528,8 @@ public class InquiryServiceImpl implements InquiryService {
         inquiry.setMobileNumber(request.getMobileNumber());
         inquiry.setEmail(request.getEmail());
         inquiry.setClassInterestedIn(request.getClassInterestedIn());
+        inquiry.setAcademicYearId(request.getAcademicYearId());
+        inquiry.setClassId(request.getClassId());
         inquiry.setAddress(request.getAddress());
         inquiry.setInquirySource(request.getInquirySource());
         inquiry.setReferredBy(request.getReferredBy());
@@ -443,15 +545,19 @@ public class InquiryServiceImpl implements InquiryService {
     private InquiryResponse toResponse(Inquiry i) {
         return InquiryResponse.builder()
                 .inquiryId(i.getInquiryId())
+                .inquiryNumber(i.getInquiryNumber())
                 .name(i.getName())
                 .mobileNumber(i.getMobileNumber())
                 .email(i.getEmail())
                 .classInterestedIn(i.getClassInterestedIn())
+                .academicYearId(i.getAcademicYearId())
+                .classId(i.getClassId())
                 .address(i.getAddress())
                 .inquirySource(i.getInquirySource())
                 .referredBy(i.getReferredBy())
                 .comments(i.getComments())
                 .assignedCounselorId(i.getAssignedCounselorId())
+                .assignedCounselorName(resolveCounselorName(i.getAssignedCounselorId()))
                 .status(i.getStatus())
                 .lastFollowUpDate(i.getLastFollowUpDate())
                 .lastFollowUpType(i.getLastFollowUpType())
@@ -470,6 +576,11 @@ public class InquiryServiceImpl implements InquiryService {
                 .statusAfter(f.getStatusAfter())
                 .followUpDate(f.getFollowUpDate())
                 .nextFollowUpDate(f.getNextFollowUpDate())
+                .lifecycleStatus(f.getLifecycleStatus())
+                .outcome(f.getOutcome())
+                .completedOn(f.getCompletedOn())
+                .completedBy(f.getCompletedBy())
+                .leadName(f.getInquiry() != null ? f.getInquiry().getName() : null)
                 .createdOn(f.getCreatedOn())
                 .createdBy(f.getCreatedBy())
                 .build();
@@ -487,6 +598,16 @@ public class InquiryServiceImpl implements InquiryService {
                 .createdOn(n.getCreatedOn())
                 .createdBy(n.getCreatedBy())
                 .build();
+    }
+
+    private String generateInquiryNumber() {
+        String prefix = settingService.leadPrefix();
+        String yearMonth = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMM"));
+        String candidate;
+        do {
+            candidate = prefix + "-" + yearMonth + "-" + ThreadLocalRandom.current().nextLong(10000, 99999);
+        } while (inquiryRepository.existsByInquiryNumber(candidate));
+        return candidate;
     }
 
     private String generateApplicationNumber() {
@@ -515,9 +636,38 @@ public class InquiryServiceImpl implements InquiryService {
                 .parentEmail(a.getParentEmail())
                 .status(a.getStatus())
                 .internalComments(a.getInternalComments())
-                .uploadedDocuments(a.getUploadedDocuments())
+                .uploadedDocuments(copiedApplicationDocuments(a))
                 .createdOn(a.getCreatedOn())
                 .createdBy(a.getCreatedBy())
                 .build();
+    }
+
+    private List<String> copiedApplicationDocuments(ApplicationAdmission a) {
+        try {
+            List<String> docs = a.getUploadedDocuments();
+            return docs == null || docs.isEmpty() ? List.of() : List.copyOf(docs);
+        } catch (RuntimeException ex) {
+            return List.of();
+        }
+    }
+
+    private String resolveCounselorName(Long counselorId) {
+        if (counselorId == null) {
+            return null;
+        }
+        return staffRepository.findById(counselorId)
+                .or(() -> staffRepository.findByUser_Id(counselorId))
+                .map(this::staffDisplayName)
+                .orElse(null);
+    }
+
+    private String staffDisplayName(Staff staff) {
+        String last = staff.getLastName() == null ? "" : staff.getLastName().trim();
+        return (staff.getFirstName() + " " + last).trim();
+    }
+
+    private String currentUsername() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth == null ? null : auth.getName();
     }
 }
