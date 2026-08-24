@@ -5,6 +5,7 @@ import com.thinkerscave.access.enums.LoginStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -26,4 +27,22 @@ public interface LoginHistoryRepository extends JpaRepository<LoginHistory, Long
 
     @Query("SELECT COUNT(lh) FROM LoginHistory lh WHERE lh.user.id = :userId AND lh.status = 'FAILED' AND lh.loginTime > :since")
     long countRecentFailures(@Param("userId") Long userId, @Param("since") LocalDateTime since);
+
+    @Query("""
+        SELECT lh FROM LoginHistory lh
+        WHERE lh.user.organizationId = :orgId
+          AND lh.loginTime >= :fromTime AND lh.loginTime <= :toTime
+          AND (:status IS NULL OR lh.status = :status)
+        ORDER BY lh.loginTime DESC
+        """)
+    Page<LoginHistory> findByOrganizationIdAndWindow(
+            @Param("orgId") Long orgId,
+            @Param("status") LoginStatus status,
+            @Param("fromTime") LocalDateTime fromTime,
+            @Param("toTime") LocalDateTime toTime,
+            Pageable pageable);
+
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM LoginHistory lh WHERE lh.loginTime < :cutoff")
+    int deleteByLoginTimeBefore(@Param("cutoff") LocalDateTime cutoff);
 }

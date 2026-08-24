@@ -24,7 +24,9 @@ public class SecurityPolicyServiceImpl implements SecurityPolicyService {
     public SecurityPolicyResponse getPolicy(Long organizationId) {
         SecurityPolicy policy = securityPolicyRepository.findByOrganizationId(organizationId)
                 .orElseGet(() -> SecurityPolicy.builder().organizationId(organizationId).build());
-        return securityPolicyMapper.toResponse(policy);
+        SecurityPolicyResponse response = securityPolicyMapper.toResponse(policy);
+        response.setRequireTwoFactor(false);
+        return response;
     }
 
     @Override
@@ -45,12 +47,14 @@ public class SecurityPolicyServiceImpl implements SecurityPolicyService {
         policy.setSessionTimeoutMinutes(request.getSessionTimeoutMinutes());
         policy.setMaxConcurrentSessions(request.getMaxConcurrentSessions());
         policy.setAllowRememberMe(request.getAllowRememberMe());
-        policy.setRequireTwoFactor(request.getRequireTwoFactor());
+        policy.setRequireTwoFactor(false);
         policy.setActive(true);
 
         SecurityPolicy saved = securityPolicyRepository.save(policy);
         log.info("Security policy updated for org={}", organizationId);
-        return securityPolicyMapper.toResponse(saved);
+        SecurityPolicyResponse response = securityPolicyMapper.toResponse(saved);
+        response.setRequireTwoFactor(false);
+        return response;
     }
 
     @Override

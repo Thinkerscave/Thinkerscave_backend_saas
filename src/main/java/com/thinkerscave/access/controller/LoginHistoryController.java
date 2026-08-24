@@ -12,10 +12,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+
 @RestController
 @RequestMapping("/api/access/login-history")
 @RequiredArgsConstructor
-@Tag(name = "Login History", description = "Audit log of login attempts")
+@Tag(name = "Login History", description = "Recent sign-ins. Events older than 30 days are not kept.")
 public class LoginHistoryController {
 
     private final LoginHistoryService loginHistoryService;
@@ -38,9 +42,17 @@ public class LoginHistoryController {
     public ResponseEntity<ApiResponse<Page<LoginHistoryResponse>>> getOrgHistory(
             @PathVariable Long organizationId,
             @RequestParam(required = false) LoginStatus status,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100), Sort.by("loginTime").descending());
-        return ResponseEntity.ok(ApiResponse.success(loginHistoryService.getOrganizationLoginHistory(organizationId, status, pageable)));
+        return ResponseEntity.ok(ApiResponse.success(
+                loginHistoryService.getOrganizationLoginHistory(
+                        organizationId,
+                        status,
+                        from == null ? null : LocalDateTime.ofInstant(from, ZoneId.systemDefault()),
+                        to == null ? null : LocalDateTime.ofInstant(to, ZoneId.systemDefault()),
+                        pageable)));
     }
 }
