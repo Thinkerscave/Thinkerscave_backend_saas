@@ -31,7 +31,7 @@ public class LoginHistoryController {
             @PathVariable Long userId,
             @RequestParam(required = false) LoginStatus status,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100), Sort.by("loginTime").descending());
         return ResponseEntity.ok(ApiResponse.success(loginHistoryService.getUserLoginHistory(userId, status, pageable)));
     }
@@ -45,7 +45,7 @@ public class LoginHistoryController {
             @RequestParam(required = false) Instant from,
             @RequestParam(required = false) Instant to,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100), Sort.by("loginTime").descending());
         return ResponseEntity.ok(ApiResponse.success(
                 loginHistoryService.getOrganizationLoginHistory(

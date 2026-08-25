@@ -51,7 +51,7 @@ public class ProvisionController {
     public ResponseEntity<ApiResponse<Page<ProvisioningJobResponse>>> getJobs(
             @RequestParam(required = false) ProvisionJobStatus status,
             @RequestParam(required = false) String search,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Provisioning jobs retrieved",
                 provisionService.getJobs(status, search, pageable)));
     }

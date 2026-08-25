@@ -31,7 +31,7 @@ public class PromotionBatchController {
     @GetMapping
     @Operation(summary = "List promotion batches")
     public ResponseEntity<ApiResponse<Page<PromotionBatchResponse>>> list(
-            @PageableDefault(size = 20, sort = "batchId") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "batchId") Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Promotion batches fetched",
                 promotionBatchService.list(pageable)));
     }

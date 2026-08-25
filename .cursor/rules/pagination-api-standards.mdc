@@ -1,0 +1,14 @@
+---
+description: Canonical Spring pagination contract for list APIs. Apply when adding or changing paged controllers/services.
+globs: **/*Controller.java
+alwaysApply: false
+---
+
+# Pagination API standard
+
+- Query params: `page` (0-based), `size`, `sort` (`field,dir`; multiple orders separated by `;`).
+- Default size: `PaginationConstants.DEFAULT_SIZE` (10). Cap: `PaginationConstants.MAX_SIZE` (100).
+- Prefer `PageRequestUtil.of(page, size, sort)` or `@PageableDefault(size = PaginationConstants.DEFAULT_SIZE, sort = "createdOn")`.
+- Return `ApiResponse<PageResponse<T>>` for new list endpoints. `PageResponse.of(page)` wraps Spring Data `Page` and emits both `page` and `number`.
+- Do not introduce a third-party pagination library. Do not invent `pageSize` as a query param.
+- Keep existing `ApiResponse<Page<T>>` endpoints working; new code should use `PageResponse`.

@@ -38,7 +38,7 @@ public class OrganizationSubscriptionController {
     public ResponseEntity<ApiResponse<Page<OrganizationSubscriptionResponse>>> getSubscriptions(
             @RequestParam(required = false) SubscriptionStatus status,
             @RequestParam(required = false) String search,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Subscriptions retrieved",
                 subscriptionService.getSubscriptions(status, search, pageable)));
     }

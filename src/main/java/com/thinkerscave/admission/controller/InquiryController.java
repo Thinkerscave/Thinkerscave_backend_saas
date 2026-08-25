@@ -42,7 +42,7 @@ public class InquiryController {
     @GetMapping
     @Operation(summary = "Get all inquiries (paged)")
     public ResponseEntity<ApiResponse<Page<InquiryResponse>>> getAll(
-            @PageableDefault(size = 20, sort = "createdOn") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "createdOn") Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Inquiries fetched", inquiryService.getAll(pageable)));
     }
 

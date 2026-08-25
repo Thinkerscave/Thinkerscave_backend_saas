@@ -37,7 +37,7 @@ public class MessageController {
     @Operation(summary = "Get my message threads (authenticated user only)")
     public ResponseEntity<ApiResponse<Page<MessageThreadResponse>>> getMyThreads(
             @RequestParam(required = false) Long userId,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 10) Pageable pageable) {
         // userId query param is ignored — identity always comes from the security context
         return ResponseEntity.ok(ApiResponse.success("Threads fetched", messageService.getMyThreads(pageable)));
     }

@@ -64,7 +64,7 @@ public class RoleController {
             @RequestParam(required = false) Boolean active,
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100), Sort.by("displayOrder").ascending());
         return ResponseEntity.ok(ApiResponse.success(roleService.searchRoles(active, search, pageable)));
     }

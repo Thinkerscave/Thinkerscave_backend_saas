@@ -35,7 +35,7 @@ public class NotificationController {
     @GetMapping
     @Operation(summary = "Get all notifications (paged)")
     public ResponseEntity<ApiResponse<Page<NotificationResponse>>> getAll(
-            @PageableDefault(size = 20, sort = "createdOn") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "createdOn") Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Notifications fetched", notificationService.getAll(pageable)));
     }
 
@@ -49,7 +49,7 @@ public class NotificationController {
     @Operation(summary = "Get notifications by status (paged)")
     public ResponseEntity<ApiResponse<Page<NotificationResponse>>> getByStatus(
             @RequestParam NotificationStatus status,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Notifications by status", notificationService.getByStatus(status, pageable)));
     }
 

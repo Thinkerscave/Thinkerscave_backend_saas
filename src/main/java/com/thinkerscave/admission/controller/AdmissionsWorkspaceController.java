@@ -151,7 +151,7 @@ public class AdmissionsWorkspaceController {
     @Operation(summary = "Search staff who can be assigned as counselors")
     public ResponseEntity<ApiResponse<Page<StaffSummaryResponse>>> counselors(
             @RequestParam(required = false) String keyword,
-            @PageableDefault(size = 20, sort = "createdOn") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "createdOn") Pageable pageable) {
         Page<StaffSummaryResponse> page = staffService.getStaffList(
                 null, null, EmploymentStatus.ACTIVE, null, keyword, pageable);
         return ResponseEntity.ok(ApiResponse.success("Counselors loaded", page));

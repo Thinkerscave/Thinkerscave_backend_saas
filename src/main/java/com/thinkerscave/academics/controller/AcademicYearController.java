@@ -40,7 +40,7 @@ public class AcademicYearController {
     public ResponseEntity<ApiResponse<Page<AcademicYearResponse>>> search(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) AcademicYearStatus status,
-            @PageableDefault(size = 20, sort = "startDate", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 10, sort = "startDate", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Academic years retrieved",
                 academicYearService.search(q, status, pageable)));
     }

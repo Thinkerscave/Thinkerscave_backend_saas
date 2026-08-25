@@ -65,7 +65,7 @@ public class StaffController {
             @RequestParam(required = false) EmploymentStatus employmentStatus,
             @RequestParam(required = false) String designation,
             @RequestParam(required = false) String keyword,
-            @PageableDefault(size = 20, sort = "createdOn") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "createdOn") Pageable pageable) {
         Page<StaffSummaryResponse> page = staffService.getStaffList(
                 staffType, employmentCategory, employmentStatus, designation, keyword, pageable);
         return ResponseEntity.ok(ApiResponse.success("Staff list retrieved", page));
