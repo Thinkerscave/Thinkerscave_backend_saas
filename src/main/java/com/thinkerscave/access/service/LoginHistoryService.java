@@ -12,7 +12,12 @@ import java.time.LocalDateTime;
  */
 public interface LoginHistoryService {
 
-    Page<LoginHistoryResponse> getUserLoginHistory(Long userId, LoginStatus status, Pageable pageable);
+    Page<LoginHistoryResponse> getUserLoginHistory(
+            Long userId,
+            LoginStatus status,
+            LocalDateTime from,
+            LocalDateTime to,
+            Pageable pageable);
 
     Page<LoginHistoryResponse> getOrganizationLoginHistory(
             Long organizationId,

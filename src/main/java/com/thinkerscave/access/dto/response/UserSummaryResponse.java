@@ -29,6 +29,7 @@ public class UserSummaryResponse {
     private Boolean emailVerified;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdOn;
+    private LocalDateTime lockedAt;
     private List<UserRoleSummary> roles;
 
     @Data

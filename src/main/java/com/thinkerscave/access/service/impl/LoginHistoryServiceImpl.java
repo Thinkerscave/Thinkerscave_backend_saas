@@ -27,11 +27,15 @@ public class LoginHistoryServiceImpl implements LoginHistoryService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<LoginHistoryResponse> getUserLoginHistory(Long userId, LoginStatus status, Pageable pageable) {
-        Page<LoginHistory> page = (status != null)
-                ? loginHistoryRepository.findByUser_IdAndStatusOrderByLoginTimeDesc(userId, status, pageable)
-                : loginHistoryRepository.findByUser_IdOrderByLoginTimeDesc(userId, pageable);
-        return page.map(this::toResponse);
+    public Page<LoginHistoryResponse> getUserLoginHistory(
+            Long userId,
+            LoginStatus status,
+            LocalDateTime from,
+            LocalDateTime to,
+            Pageable pageable) {
+        LocalDateTime[] window = clampWindow(from, to);
+        return loginHistoryRepository.findByUserIdAndWindow(userId, status, window[0], window[1], pageable)
+                .map(this::toResponse);
     }
 
     @Override

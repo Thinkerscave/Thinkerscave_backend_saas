@@ -30,6 +30,20 @@ public interface LoginHistoryRepository extends JpaRepository<LoginHistory, Long
 
     @Query("""
         SELECT lh FROM LoginHistory lh
+        WHERE lh.user.id = :userId
+          AND lh.loginTime >= :fromTime AND lh.loginTime <= :toTime
+          AND (:status IS NULL OR lh.status = :status)
+        ORDER BY lh.loginTime DESC
+        """)
+    Page<LoginHistory> findByUserIdAndWindow(
+            @Param("userId") Long userId,
+            @Param("status") LoginStatus status,
+            @Param("fromTime") LocalDateTime fromTime,
+            @Param("toTime") LocalDateTime toTime,
+            Pageable pageable);
+
+    @Query("""
+        SELECT lh FROM LoginHistory lh
         WHERE lh.user.organizationId = :orgId
           AND lh.loginTime >= :fromTime AND lh.loginTime <= :toTime
           AND (:status IS NULL OR lh.status = :status)

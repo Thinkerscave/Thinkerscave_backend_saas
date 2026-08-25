@@ -30,10 +30,17 @@ public class LoginHistoryController {
     public ResponseEntity<ApiResponse<Page<LoginHistoryResponse>>> getUserHistory(
             @PathVariable Long userId,
             @RequestParam(required = false) LoginStatus status,
+            @RequestParam(required = false) Instant from,
+            @RequestParam(required = false) Instant to,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100), Sort.by("loginTime").descending());
-        return ResponseEntity.ok(ApiResponse.success(loginHistoryService.getUserLoginHistory(userId, status, pageable)));
+        return ResponseEntity.ok(ApiResponse.success(loginHistoryService.getUserLoginHistory(
+                userId,
+                status,
+                from == null ? null : LocalDateTime.ofInstant(from, ZoneId.systemDefault()),
+                to == null ? null : LocalDateTime.ofInstant(to, ZoneId.systemDefault()),
+                pageable)));
     }
 
     @GetMapping("/organizations/{organizationId}")

@@ -45,6 +45,10 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Value("${app.platform.login-url:http://localhost:4200/auth/login}")
     private String platformLoginUrl;
 
+    /** TEMPORARY — remove when production email reset is the only path. */
+    @Value("${app.access.development-reset-password:}")
+    private String developmentResetPassword;
+
     @Override
     @Transactional
     public UserSummaryResponse createUser(Long organizationId, CreateUserRequest request) {
@@ -74,6 +78,7 @@ public class UserManagementServiceImpl implements UserManagementService {
                 .build();
 
         user = userRepository.save(user);
+        ensureCreatedOn(user);
 
         UserRole userRole = UserRole.builder()
                 .user(user)
@@ -84,7 +89,7 @@ public class UserManagementServiceImpl implements UserManagementService {
         userRoleRepository.save(userRole);
 
         log.info("User created: code={}, org={}, role={}", userCode, organizationId, request.getRoleType());
-        return userMapper.toSummary(userRepository.findById(user.getId()).orElseThrow());
+        return toSummary(userRepository.findById(user.getId()).orElseThrow());
     }
 
     @Override
@@ -104,29 +109,30 @@ public class UserManagementServiceImpl implements UserManagementService {
         if (request.getProfileImageUrl() != null) {
             user.setProfileImageUrl(request.getProfileImageUrl());
         }
-        return userMapper.toSummary(userRepository.save(user));
+        return toSummary(userRepository.save(user));
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public UserSummaryResponse getUserById(Long organizationId, Long userId) {
-        return userMapper.toSummary(findUserInOrg(organizationId, userId));
+        return toSummary(findUserInOrg(organizationId, userId));
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public UserSummaryResponse getUserByCode(Long organizationId, String userCode) {
         User user = userRepository.findByUserCode(userCode)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userCode));
         assertBelongsToOrg(user, organizationId);
-        return userMapper.toSummary(user);
+        return toSummary(user);
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public Page<UserSummaryResponse> searchUsers(Long organizationId, UserStatus status, RoleType roleType, String search, Pageable pageable) {
+        userRepository.backfillMissingCreatedOn();
         var spec = com.thinkerscave.access.specification.UserSpecification.filter(organizationId, status, roleType, search);
-        return userRepository.findAll(spec, pageable).map(userMapper::toSummary);
+        return userRepository.findAll(spec, pageable).map(this::toSummary);
     }
 
     @Override
@@ -176,7 +182,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Transactional
     public void resetPassword(Long organizationId, Long userId) {
         User user = findUserInOrg(organizationId, userId);
-        String tempPassword = generateTempPassword();
+        String tempPassword = resolveResetPassword();
         user.setPassword(passwordEncoder.encode(tempPassword));
         user.setFirstTimeLogin(true);
         user.setPasswordChangedAt(LocalDateTime.now());
@@ -330,6 +336,34 @@ public class UserManagementServiceImpl implements UserManagementService {
         return StringUtils.hasText(lastName)
                 ? firstName + " " + lastName
                 : firstName;
+    }
+
+    private UserSummaryResponse toSummary(User user) {
+        ensureCreatedOn(user);
+        UserSummaryResponse response = userMapper.toSummary(user);
+        if (Boolean.TRUE.equals(user.getAccountLocked()) || user.getStatus() == UserStatus.LOCKED) {
+            response.setStatus(UserStatus.LOCKED);
+            response.setAccountLocked(true);
+        }
+        return response;
+    }
+
+    private void ensureCreatedOn(User user) {
+        if (user.getCreatedOn() != null) {
+            return;
+        }
+        LocalDateTime fallback = user.getUpdatedOn() != null ? user.getUpdatedOn() : LocalDateTime.now();
+        user.setCreatedOn(fallback);
+        if (user.getId() != null) {
+            userRepository.backfillCreatedOnIfMissing(user.getId(), fallback);
+        }
+    }
+
+    private String resolveResetPassword() {
+        if (StringUtils.hasText(developmentResetPassword)) {
+            return developmentResetPassword;
+        }
+        return generateTempPassword();
     }
 
     private String generateTempPassword() {

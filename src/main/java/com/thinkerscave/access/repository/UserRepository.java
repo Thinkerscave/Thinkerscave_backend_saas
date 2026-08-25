@@ -6,10 +6,12 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
@@ -48,4 +50,16 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
            " LOWER(u.firstName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')) OR " +
            " LOWER(u.lastName) LIKE LOWER(CONCAT('%', CAST(:search AS string), '%')))")
     Page<User> searchByOrganization(@Param("orgId") Long orgId, @Param("search") String search, Pageable pageable);
+
+    /**
+     * {@code created_on} is insert-only ({@code updatable = false}), so a normal save cannot
+     * backfill rows created before JPA auditing was enabled.
+     */
+    @Modifying
+    @Query(value = "UPDATE users SET created_on = COALESCE(updated_on, CURRENT_TIMESTAMP) WHERE created_on IS NULL", nativeQuery = true)
+    int backfillMissingCreatedOn();
+
+    @Modifying
+    @Query(value = "UPDATE users SET created_on = :createdOn WHERE id = :id AND created_on IS NULL", nativeQuery = true)
+    int backfillCreatedOnIfMissing(@Param("id") Long id, @Param("createdOn") LocalDateTime createdOn);
 }
