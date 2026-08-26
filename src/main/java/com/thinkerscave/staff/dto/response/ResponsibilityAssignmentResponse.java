@@ -16,6 +16,7 @@ public class ResponsibilityAssignmentResponse {
     private Long staffId;
     private String staffName;
     private String staffCode;
+    private Long userId;
     private Long responsibilityId;
     private String responsibilityCode;
     private String responsibilityName;

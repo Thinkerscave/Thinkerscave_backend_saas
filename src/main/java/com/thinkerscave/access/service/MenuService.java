@@ -4,6 +4,7 @@ import com.thinkerscave.access.dto.request.CreateMenuRequest;
 import com.thinkerscave.access.dto.request.UpdateMenuRequest;
 import com.thinkerscave.access.dto.response.MenuResponse;
 import com.thinkerscave.access.dto.response.SidebarItemResponse;
+import com.thinkerscave.access.entity.Menu;
 import com.thinkerscave.access.enums.MenuType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -22,6 +23,10 @@ public interface MenuService {
     MenuResponse getMenuById(Long menuId);
 
     List<MenuResponse> getMenuTree(boolean includeInactive);
+
+    List<MenuResponse> getEntitledMenuTree(Long organizationId);
+
+    List<Menu> findEntitledMenus(Long organizationId);
 
     void deleteMenu(Long menuId);
 

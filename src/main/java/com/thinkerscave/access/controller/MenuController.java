@@ -61,19 +61,21 @@ public class MenuController {
         return ResponseEntity.ok(ApiResponse.success("Menu updated", menuService.updateMenu(menuId, request)));
     }
 
-    @GetMapping("/{menuId}")
-    @Operation(summary = "Get menu by ID")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<MenuResponse>> getMenu(@PathVariable Long menuId) {
-        return ResponseEntity.ok(ApiResponse.success(menuService.getMenuById(menuId)));
-    }
-
     @GetMapping("/tree")
     @Operation(summary = "Get full menu tree (all menus hierarchically)")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<MenuResponse>>> getTree(
             @RequestParam(defaultValue = "false") boolean includeInactive) {
         return ResponseEntity.ok(ApiResponse.success(menuService.getMenuTree(includeInactive)));
+    }
+
+    @GetMapping("/catalog")
+    @Operation(summary = "Menus and submenus entitled to an organization")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    public ResponseEntity<ApiResponse<List<MenuResponse>>> getOrganizationCatalog(
+            @RequestParam Long organizationId) {
+        assertCanViewOrganizationCatalog(organizationId);
+        return ResponseEntity.ok(ApiResponse.success(menuService.getEntitledMenuTree(organizationId)));
     }
 
     @GetMapping("/search")
@@ -87,6 +89,23 @@ public class MenuController {
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100), Sort.by("displayOrder").ascending());
         return ResponseEntity.ok(ApiResponse.success(menuService.searchMenus(menuType, active, search, pageable)));
+    }
+
+    @GetMapping("/sidebar")
+    @Operation(summary = "Build sidebar tree for a user with effective permissions")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<List<SidebarItemResponse>>> getSidebar(
+            @RequestParam Long userId,
+            @RequestParam Long organizationId) {
+        assertCanViewSidebar(userId, organizationId);
+        return ResponseEntity.ok(ApiResponse.success(menuService.buildSidebar(userId, organizationId)));
+    }
+
+    @GetMapping("/{menuId}")
+    @Operation(summary = "Get menu by ID")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<MenuResponse>> getMenu(@PathVariable Long menuId) {
+        return ResponseEntity.ok(ApiResponse.success(menuService.getMenuById(menuId)));
     }
 
     @PatchMapping("/{menuId}/activate")
@@ -113,14 +132,19 @@ public class MenuController {
         return ResponseEntity.ok(ApiResponse.noContent("Menu deleted"));
     }
 
-    @GetMapping("/sidebar")
-    @Operation(summary = "Build sidebar tree for a user with effective permissions")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ApiResponse<List<SidebarItemResponse>>> getSidebar(
-            @RequestParam Long userId,
-            @RequestParam Long organizationId) {
-        assertCanViewSidebar(userId, organizationId);
-        return ResponseEntity.ok(ApiResponse.success(menuService.buildSidebar(userId, organizationId)));
+    private void assertCanViewOrganizationCatalog(Long organizationId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+        if (hasAnyAuthority(authentication, "SUPER_ADMIN")) {
+            return;
+        }
+        User caller = resolveCaller(authentication.getName())
+                .orElseThrow(() -> new AccessDeniedException("Caller not resolvable"));
+        if (!isOrganizationInScope(caller, organizationId)) {
+            throw new AccessDeniedException("Not authorized to view this organization's menu catalog");
+        }
     }
 
     /**

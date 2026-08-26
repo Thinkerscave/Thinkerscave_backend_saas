@@ -33,8 +33,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -143,6 +145,54 @@ public class MenuServiceImpl implements MenuService {
                 ? menuRepository.findAllByOrderByDisplayOrderAsc()
                 : menuRepository.findByActiveTrueOrderByDisplayOrderAsc();
         return buildTree(allMenus);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<MenuResponse> getEntitledMenuTree(Long organizationId) {
+        return buildTree(findEntitledMenus(organizationId));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Menu> findEntitledMenus(Long organizationId) {
+        List<Menu> catalog = menuRepository.findActiveWithFeatureAndParent().stream()
+                .filter(menu -> menu.getMenuScope() != MenuScope.PLATFORM)
+                .toList();
+        Set<Long> enabled = new HashSet<>(organizationModuleRepository.findEnabledMenuIds(organizationId));
+        boolean hasPlanMenus = !enabled.isEmpty();
+        Set<Long> included = new HashSet<>();
+        for (Menu menu : catalog) {
+            if (menu.getMenuScope() == MenuScope.CORE || !hasPlanMenus || enabled.contains(menu.getId())) {
+                included.add(menu.getId());
+            }
+        }
+        boolean expanded = true;
+        while (expanded) {
+            expanded = false;
+            for (Menu menu : catalog) {
+                if (included.contains(menu.getId())) {
+                    continue;
+                }
+                Long parentId = menu.getParentMenu() != null ? menu.getParentMenu().getId() : null;
+                if (parentId != null && included.contains(parentId)) {
+                    included.add(menu.getId());
+                    expanded = true;
+                }
+            }
+        }
+        Map<Long, Menu> byId = catalog.stream().collect(Collectors.toMap(Menu::getId, menu -> menu, (a, b) -> a));
+        for (Long id : Set.copyOf(included)) {
+            Menu walk = byId.get(id);
+            while (walk != null && walk.getParentMenu() != null) {
+                walk = walk.getParentMenu();
+                if (walk.getMenuScope() == MenuScope.PLATFORM) {
+                    break;
+                }
+                included.add(walk.getId());
+            }
+        }
+        return catalog.stream().filter(menu -> included.contains(menu.getId())).toList();
     }
 
     @Override

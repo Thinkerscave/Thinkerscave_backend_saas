@@ -1,6 +1,7 @@
 package com.thinkerscave.staff.service.impl;
 
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.staff.dto.request.BulkResponsibilityAssignmentRequest;
 import com.thinkerscave.staff.dto.request.ResponsibilityAssignmentRequest;
 import com.thinkerscave.staff.dto.response.ResponsibilityAssignmentResponse;
 import com.thinkerscave.staff.entity.Responsibility;
@@ -15,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,23 +32,18 @@ public class ResponsibilityAssignmentServiceImpl implements ResponsibilityAssign
     @Override
     @Transactional
     public Long assignResponsibility(ResponsibilityAssignmentRequest request) {
-        Staff staff = staffRepository.findById(request.getStaffId())
-                .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + request.getStaffId()));
-        Responsibility responsibility = responsibilityRepository.findById(request.getResponsibilityId())
-                .orElseThrow(() -> new ResourceNotFoundException("Responsibility not found: " + request.getResponsibilityId()));
+        return upsertAssignment(request.getStaffId(), request.getResponsibilityId(), request.getScope(),
+                request.getEffectiveFrom(), request.getEffectiveTo(), request.getRemarks());
+    }
 
-        ResponsibilityAssignment assignment = new ResponsibilityAssignment();
-        assignment.setStaff(staff);
-        assignment.setResponsibility(responsibility);
-        assignment.setScope(request.getScope());
-        assignment.setEffectiveFrom(request.getEffectiveFrom());
-        assignment.setEffectiveTo(request.getEffectiveTo());
-        assignment.setRemarks(request.getRemarks());
-        assignment.setActive(true);
-
-        ResponsibilityAssignment saved = assignmentRepository.save(assignment);
-        log.info("Responsibility assigned: {} to staff: {}", responsibility.getResponsibilityCode(), staff.getStaffCode());
-        return saved.getAssignmentId();
+    @Override
+    @Transactional
+    public void assignStaff(Long responsibilityId, BulkResponsibilityAssignmentRequest request) {
+        findResponsibility(responsibilityId);
+        LocalDate from = LocalDate.now();
+        for (Long staffId : request.getStaffIds()) {
+            upsertAssignment(staffId, responsibilityId, null, from, null, null);
+        }
     }
 
     @Override
@@ -70,6 +67,41 @@ public class ResponsibilityAssignmentServiceImpl implements ResponsibilityAssign
                 .collect(Collectors.toList());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResponsibilityAssignmentResponse> getResponsibilityStaff(Long responsibilityId) {
+        findResponsibility(responsibilityId);
+        return assignmentRepository.findActiveByResponsibilityId(responsibilityId).stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+    }
+
+    private Long upsertAssignment(Long staffId, Long responsibilityId, String scope,
+                                  LocalDate effectiveFrom, LocalDate effectiveTo, String remarks) {
+        Staff staff = staffRepository.findById(staffId)
+                .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + staffId));
+        Responsibility responsibility = findResponsibility(responsibilityId);
+
+        ResponsibilityAssignment assignment = assignmentRepository
+                .findFirstByStaff_StaffIdAndResponsibility_ResponsibilityIdOrderByAssignmentIdDesc(staffId, responsibilityId)
+                .orElseGet(ResponsibilityAssignment::new);
+        assignment.setStaff(staff);
+        assignment.setResponsibility(responsibility);
+        assignment.setScope(scope);
+        assignment.setEffectiveFrom(effectiveFrom != null ? effectiveFrom : LocalDate.now());
+        assignment.setEffectiveTo(effectiveTo);
+        assignment.setRemarks(remarks);
+        assignment.setActive(true);
+        ResponsibilityAssignment saved = assignmentRepository.save(assignment);
+        log.info("Responsibility assigned: {} to staff: {}", responsibility.getResponsibilityCode(), staff.getStaffCode());
+        return saved.getAssignmentId();
+    }
+
+    private Responsibility findResponsibility(Long responsibilityId) {
+        return responsibilityRepository.findById(responsibilityId)
+                .orElseThrow(() -> new ResourceNotFoundException("Responsibility not found: " + responsibilityId));
+    }
+
     private ResponsibilityAssignment getEntity(Long id) {
         return assignmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Assignment not found with ID: " + id));
@@ -81,6 +113,7 @@ public class ResponsibilityAssignmentServiceImpl implements ResponsibilityAssign
                 .staffId(a.getStaff().getStaffId())
                 .staffName(a.getStaff().getFirstName() + " " + a.getStaff().getLastName())
                 .staffCode(a.getStaff().getStaffCode())
+                .userId(a.getStaff().getUser() != null ? a.getStaff().getUser().getId() : null)
                 .responsibilityId(a.getResponsibility().getResponsibilityId())
                 .responsibilityCode(a.getResponsibility().getResponsibilityCode())
                 .responsibilityName(a.getResponsibility().getResponsibilityName())

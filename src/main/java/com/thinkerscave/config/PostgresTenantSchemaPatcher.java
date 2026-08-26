@@ -95,6 +95,31 @@ public class PostgresTenantSchemaPatcher implements ApplicationRunner {
                             document_url varchar(500)
                         )', s);
 
+                    EXECUTE format(
+                        'CREATE TABLE IF NOT EXISTS %I.responsibility_permissions (
+                            id bigserial PRIMARY KEY,
+                            organization_id bigint NOT NULL,
+                            responsibility_id bigint NOT NULL,
+                            menu_id bigint NOT NULL,
+                            can_view boolean DEFAULT false,
+                            can_manage boolean DEFAULT false,
+                            can_approve boolean DEFAULT false,
+                            created_by varchar(100),
+                            created_on timestamp,
+                            updated_by varchar(100),
+                            updated_on timestamp,
+                            version bigint NOT NULL DEFAULT 0
+                        )', s);
+                    EXECUTE format(
+                        'CREATE UNIQUE INDEX IF NOT EXISTS uk_responsibility_permission
+                         ON %I.responsibility_permissions (organization_id, responsibility_id, menu_id)', s);
+                    EXECUTE format(
+                        'CREATE INDEX IF NOT EXISTS idx_resp_permission_resp
+                         ON %I.responsibility_permissions (responsibility_id)', s);
+                    EXECUTE format(
+                        'CREATE INDEX IF NOT EXISTS idx_resp_permission_menu
+                         ON %I.responsibility_permissions (menu_id)', s);
+
                     -- Legacy tenant tables required organization_id; JPA admissions
                     -- entities are schema-scoped and do not send that column.
                     IF EXISTS (

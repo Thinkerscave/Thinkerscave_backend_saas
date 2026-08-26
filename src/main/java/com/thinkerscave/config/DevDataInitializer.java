@@ -58,6 +58,7 @@ public class DevDataInitializer implements ApplicationRunner {
             provisionTenantDatabases();
             ensurePlatformSchema();
             ensureAdmissionsCrmSchema();
+            ensureResponsibilityPermissionsSchema();
 
             // Do NOT overwrite user passwords here. Seed scripts may insert placeholders;
             // operators must set real credentials via provisioning / password-reset flows.
@@ -334,6 +335,45 @@ public class DevDataInitializer implements ApplicationRunner {
                         """.formatted(schema));
             } catch (Exception ex) {
                 log.warn("Could not patch admissions schema on {}: {}", schema, ex.getMessage());
+            }
+        }
+    }
+
+    private void ensureResponsibilityPermissionsSchema() {
+        List<String> schemas = new ArrayList<>();
+        schemas.add("thinkerscave_dev");
+        try {
+            jdbcTemplate.queryForList(
+                            "SELECT schema_name FROM tenant_registry WHERE schema_name IS NOT NULL AND TRIM(schema_name) <> ''",
+                            String.class)
+                    .forEach(schemas::add);
+        } catch (Exception ignored) {
+            // tenant registry may not exist yet
+        }
+        for (String schema : schemas.stream().distinct().toList()) {
+            try {
+                jdbcTemplate.execute("""
+                        CREATE TABLE IF NOT EXISTS `%s`.`responsibility_permissions` (
+                          id BIGINT NOT NULL AUTO_INCREMENT,
+                          organization_id BIGINT NOT NULL,
+                          responsibility_id BIGINT NOT NULL,
+                          menu_id BIGINT NOT NULL,
+                          can_view TINYINT(1) DEFAULT 0,
+                          can_manage TINYINT(1) DEFAULT 0,
+                          can_approve TINYINT(1) DEFAULT 0,
+                          created_by VARCHAR(100),
+                          created_on DATETIME,
+                          updated_by VARCHAR(100),
+                          updated_on DATETIME,
+                          version BIGINT NOT NULL DEFAULT 0,
+                          PRIMARY KEY (id),
+                          UNIQUE KEY uk_responsibility_permission (organization_id, responsibility_id, menu_id),
+                          KEY idx_resp_permission_resp (responsibility_id),
+                          KEY idx_resp_permission_menu (menu_id)
+                        )
+                        """.formatted(schema));
+            } catch (Exception ex) {
+                log.warn("Could not patch responsibility_permissions on {}: {}", schema, ex.getMessage());
             }
         }
     }

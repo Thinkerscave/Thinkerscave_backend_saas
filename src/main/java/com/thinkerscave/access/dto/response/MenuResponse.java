@@ -31,5 +31,6 @@ public class MenuResponse {
     private Long featureId;
     private String featureCode;
     private String featureName;
+    private String featureIcon;
     private List<MenuResponse> children;
 }

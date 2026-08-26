@@ -26,6 +26,15 @@ public interface MenuRepository extends JpaRepository<Menu, Long>, JpaSpecificat
 
     List<Menu> findByActiveTrueOrderByDisplayOrderAsc();
 
+    @Query("""
+            SELECT m FROM Menu m
+            LEFT JOIN FETCH m.feature
+            LEFT JOIN FETCH m.parentMenu
+            WHERE m.active = true
+            ORDER BY m.displayOrder ASC
+            """)
+    List<Menu> findActiveWithFeatureAndParent();
+
     List<Menu> findByMenuTypeAndActiveTrueOrderByDisplayOrderAsc(MenuType menuType);
 
     @Query("SELECT m FROM Menu m WHERE m.active = true AND m.showInSidebar = true AND m.parentMenu IS NULL ORDER BY m.displayOrder ASC")
