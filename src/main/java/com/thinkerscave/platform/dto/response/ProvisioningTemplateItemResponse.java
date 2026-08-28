@@ -1,5 +1,6 @@
 package com.thinkerscave.platform.dto.response;
 
+import com.thinkerscave.platform.enums.ProvisionItemType;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -13,7 +14,7 @@ public class ProvisioningTemplateItemResponse {
 
     private Long id;
     private Long templateId;
-    private String itemType;
+    private ProvisionItemType itemType;
     private String itemKey;
     private String itemName;
     private String itemValue;

@@ -1,6 +1,8 @@
 package com.thinkerscave.platform.dto.request;
 
+import com.thinkerscave.platform.enums.InstitutionType;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
@@ -17,9 +19,8 @@ public class ProvisioningTemplateRequest {
     @Size(max = 150)
     private String templateName;
 
-    @NotBlank
-    @Size(max = 100)
-    private String institutionType;
+    @NotNull
+    private InstitutionType institutionType;
 
     @NotBlank
     @Size(max = 20)

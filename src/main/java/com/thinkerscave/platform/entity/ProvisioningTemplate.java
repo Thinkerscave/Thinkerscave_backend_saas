@@ -1,5 +1,6 @@
 package com.thinkerscave.platform.entity;
 
+import com.thinkerscave.platform.enums.InstitutionType;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import lombok.*;
@@ -46,8 +47,9 @@ public class ProvisioningTemplate extends Auditable {
     /**
      * Institution Type.
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "institution_type", nullable = false, length = 100)
-    private String institutionType;
+    private InstitutionType institutionType;
 
     /**
      * Provisioning Template Version.

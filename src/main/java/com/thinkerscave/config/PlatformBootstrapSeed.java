@@ -10,14 +10,23 @@ import com.thinkerscave.access.repository.*;
 import com.thinkerscave.platform.entity.Customer;
 import com.thinkerscave.platform.entity.Feature;
 import com.thinkerscave.platform.entity.Organization;
+import com.thinkerscave.platform.entity.Promotion;
+import com.thinkerscave.platform.entity.ProvisioningTemplate;
+import com.thinkerscave.platform.entity.ProvisioningTemplateItem;
 import com.thinkerscave.platform.entity.SubscriptionPlan;
 import com.thinkerscave.platform.entity.SubscriptionPlanFeature;
 import com.thinkerscave.platform.enums.CustomerStatus;
+import com.thinkerscave.platform.enums.DiscountType;
 import com.thinkerscave.platform.enums.InstitutionType;
 import com.thinkerscave.platform.enums.OrganizationStatus;
+import com.thinkerscave.platform.enums.PromotionStatus;
+import com.thinkerscave.platform.enums.ProvisionItemType;
 import com.thinkerscave.platform.repository.CustomerRepository;
 import com.thinkerscave.platform.repository.FeatureRepository;
 import com.thinkerscave.platform.repository.OrganizationRepository;
+import com.thinkerscave.platform.repository.PromotionRepository;
+import com.thinkerscave.platform.repository.ProvisioningTemplateItemRepository;
+import com.thinkerscave.platform.repository.ProvisioningTemplateRepository;
 import com.thinkerscave.platform.repository.SubscriptionPlanFeatureRepository;
 import com.thinkerscave.platform.repository.SubscriptionPlanRepository;
 import com.thinkerscave.platform.service.TenantCatalogSyncService;
@@ -34,16 +43,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Idempotent bootstrap for an empty remote PostgreSQL database (test/prod).
+ * Idempotent bootstrap for an empty database (local MySQL via {@code dev},
+ * or PostgreSQL via {@code test}/{@code prod}).
  * Creates platform host org, system roles, privileges, Super Admin menus,
- * role_permissions, and a Super Admin user only when none exists.
+ * role_permissions, subscription plans, promotions, provisioning templates,
+ * and a Super Admin user only when none exists.
  * Existing user passwords are never modified.
  */
 @Component
-@Profile({"test", "prod"})
+@Profile({"dev", "test", "prod"})
 @Order(100)
 @Slf4j
 @RequiredArgsConstructor
@@ -65,6 +78,9 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
     private final FeatureRepository featureRepository;
     private final SubscriptionPlanRepository subscriptionPlanRepository;
     private final SubscriptionPlanFeatureRepository subscriptionPlanFeatureRepository;
+    private final PromotionRepository promotionRepository;
+    private final ProvisioningTemplateRepository provisioningTemplateRepository;
+    private final ProvisioningTemplateItemRepository provisioningTemplateItemRepository;
     private final TenantCatalogSyncService tenantCatalogSyncService;
     private final UserPermissionRepository userPermissionRepository;
     private final OrganizationModuleRepository organizationModuleRepository;
@@ -79,8 +95,11 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
         seedPrivileges();
         Role superAdminRole = seedRoles();
         seedMenusAndPermissions(organization, superAdminRole);
+        seedSubscriptionPlans();
         List<Feature> subscriptionFeatures = seedOrganizationFacingCatalog();
         seedSubscriptionPlanFeatures(subscriptionFeatures);
+        seedPromotions();
+        seedProvisioningTemplates();
         User superAdmin = userRepository.findByUsername(SUPERADMIN_USERNAME)
                                 .orElseGet(() -> seedSuperAdmin(organization));
         ensureUserRole(superAdmin, superAdminRole);
@@ -569,6 +588,154 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
         }
     }
 
+    private void seedSubscriptionPlans() {
+        ensurePlan("STARTER", "Starter Plan", "Starter plan for a single school",
+                bd("1499.00"), bd("3999.00"), bd("6999.00"), bd("12999.00"),
+                300, 50, 1, 50, 100_000L, 14, 1, false, "Good for a single campus");
+        ensurePlan("GROWTH", "Growth Plan", "For growing school groups",
+                bd("2999.00"), bd("7999.00"), bd("13999.00"), bd("25999.00"),
+                1200, 200, 5, 200, 500_000L, 14, 2, true, "Recommended for groups");
+        ensurePlan("ENTERPRISE", "Enterprise Plan", "Large scale multi-campus plan",
+                bd("9999.00"), bd("24999.00"), bd("44999.00"), bd("89999.00"),
+                5000, 400, 20, 1000, 2_000_000L, 30, 3, false, "For large institutions");
+    }
+
+    private void ensurePlan(String code, String name, String description,
+                            BigDecimal monthly, BigDecimal quarterly, BigDecimal halfYearly, BigDecimal yearly,
+                            int students, int staff, int branches, int storageGb, long apiLimit,
+                            int trialDays, int order, boolean recommended, String remarks) {
+        if (subscriptionPlanRepository.existsByPlanCode(code)) {
+            return;
+        }
+        subscriptionPlanRepository.save(SubscriptionPlan.builder()
+                .planCode(code)
+                .planName(name)
+                .description(description)
+                .monthlyPrice(monthly)
+                .quarterlyPrice(quarterly)
+                .halfYearlyPrice(halfYearly)
+                .yearlyPrice(yearly)
+                .studentLimit(students)
+                .staffLimit(staff)
+                .branchLimit(branches)
+                .storageLimitGb(storageGb)
+                .apiRequestLimit(apiLimit)
+                .trialDays(trialDays)
+                .displayOrder(order)
+                .recommended(recommended)
+                .customPlan(false)
+                .visible(true)
+                .active(true)
+                .remarks(remarks)
+                .build());
+    }
+
+    private void seedPromotions() {
+        ensurePromotion("SUMMER2026", "Summer Enrollment Offer",
+                "10% off yearly plans for new campuses", DiscountType.PERCENTAGE,
+                bd("10.00"), bd("15000.00"),
+                LocalDate.of(2026, 4, 1), LocalDate.of(2026, 8, 31),
+                100, false, false, true);
+        ensurePromotion("ODISHA_LAUNCH", "Odisha Launch Discount",
+                "Flat discount for Odisha pilot schools", DiscountType.FLAT_AMOUNT,
+                bd("5000.00"), bd("5000.00"),
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31),
+                50, false, true, false);
+    }
+
+    private void ensurePromotion(String code, String name, String description, DiscountType type,
+                                 BigDecimal value, BigDecimal maxDiscount,
+                                 LocalDate from, LocalDate to, int maxUsage,
+                                 boolean allowCustom, boolean stackable, boolean autoApply) {
+        if (promotionRepository.existsByPromotionCode(code)) {
+            return;
+        }
+        promotionRepository.save(Promotion.builder()
+                .promotionCode(code)
+                .promotionName(name)
+                .description(description)
+                .discountType(type)
+                .discountValue(value)
+                .maximumDiscount(maxDiscount)
+                .validFrom(from)
+                .validTo(to)
+                .maximumUsage(maxUsage)
+                .usedCount(0)
+                .allowCustomPlan(allowCustom)
+                .stackable(stackable)
+                .autoApply(autoApply)
+                .status(PromotionStatus.ACTIVE)
+                .active(true)
+                .build());
+    }
+
+    private void seedProvisioningTemplates() {
+        ProvisioningTemplate school = ensureTemplate(
+                "SCHOOL_DEFAULT", "Default School Template", InstitutionType.SCHOOL,
+                "Standard school onboarding template");
+        ProvisioningTemplate college = ensureTemplate(
+                "COLLEGE_DEFAULT", "Default College Template", InstitutionType.COLLEGE,
+                "Standard college onboarding template");
+        ProvisioningTemplate coaching = ensureTemplate(
+                "COACHING_DEFAULT", "Default Coaching Template", InstitutionType.COACHING,
+                "Standard coaching institute onboarding template");
+
+        ensureTemplateItem(school, ProvisionItemType.MODULE, "STUDENT", "Student Module", 1);
+        ensureTemplateItem(school, ProvisionItemType.MODULE, "STAFF", "Staff Module", 2);
+        ensureTemplateItem(school, ProvisionItemType.MODULE, "ATTENDANCE", "Attendance Module", 3);
+        ensureTemplateItem(school, ProvisionItemType.ROLE, "ADMIN", "Organization Admin", 4);
+
+        ensureTemplateItem(college, ProvisionItemType.MODULE, "STUDENT", "Student Module", 1);
+        ensureTemplateItem(college, ProvisionItemType.MODULE, "STAFF", "Staff Module", 2);
+        ensureTemplateItem(college, ProvisionItemType.ROLE, "ADMIN", "Organization Admin", 3);
+
+        ensureTemplateItem(coaching, ProvisionItemType.MODULE, "STUDENT", "Student Module", 1);
+        ensureTemplateItem(coaching, ProvisionItemType.MODULE, "STAFF", "Staff Module", 2);
+        ensureTemplateItem(coaching, ProvisionItemType.ROLE, "ADMIN", "Organization Admin", 3);
+    }
+
+    private ProvisioningTemplate ensureTemplate(String code, String name, InstitutionType type, String description) {
+        return provisioningTemplateRepository.findByTemplateCode(code).orElseGet(() ->
+                provisioningTemplateRepository.save(ProvisioningTemplate.builder()
+                        .templateCode(code)
+                        .templateName(name)
+                        .institutionType(type)
+                        .templateVersion("1.0")
+                        .description(description)
+                        .academicStructureEnabled(true)
+                        .rolesEnabled(true)
+                        .permissionsEnabled(true)
+                        .classesEnabled(true)
+                        .sectionsEnabled(true)
+                        .departmentsEnabled(true)
+                        .designationsEnabled(true)
+                        .seedMasterData(true)
+                        .active(true)
+                        .build()));
+    }
+
+    private void ensureTemplateItem(ProvisioningTemplate template, ProvisionItemType type,
+                                    String key, String name, int order) {
+        if (provisioningTemplateItemRepository.existsByTemplate_IdAndItemKey(template.getId(), key)) {
+            return;
+        }
+        provisioningTemplateItemRepository.save(ProvisioningTemplateItem.builder()
+                .template(template)
+                .itemType(type)
+                .itemKey(key)
+                .itemName(name)
+                .itemValue("ENABLED")
+                .mandatory(true)
+                .enabled(true)
+                .displayOrder(order)
+                .active(true)
+                .build());
+    }
+
+    private static BigDecimal bd(String value) {
+        return new BigDecimal(value);
+    }
+
     private User seedSuperAdmin(Organization organization) {
         return userRepository.save(User.builder()
                 .organizationId(organization.getId())
@@ -610,8 +777,8 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
         upsertSequence(CodeType.CONTACT, 0);
         upsertSequence(CodeType.PROVISION_JOB, 0);
         upsertSequence(CodeType.TENANT, 0);
-        upsertSequence(CodeType.PROMOTION, 0);
-        upsertSequence(CodeType.TEMPLATE, 0);
+        upsertSequence(CodeType.PROMOTION, 2);
+        upsertSequence(CodeType.TEMPLATE, 3);
     }
 
     private void upsertSequence(CodeType type, long value) {

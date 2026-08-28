@@ -1,6 +1,7 @@
 package com.thinkerscave.platform.repository;
 
 import com.thinkerscave.platform.entity.ProvisioningTemplate;
+import com.thinkerscave.platform.enums.InstitutionType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -22,5 +23,5 @@ public interface ProvisioningTemplateRepository extends JpaRepository<Provisioni
 
     List<ProvisioningTemplate> findByActiveTrueOrderByInstitutionTypeAscTemplateNameAsc();
 
-    List<ProvisioningTemplate> findByInstitutionTypeAndActiveTrue(String institutionType);
+    List<ProvisioningTemplate> findByInstitutionTypeAndActiveTrue(InstitutionType institutionType);
 }

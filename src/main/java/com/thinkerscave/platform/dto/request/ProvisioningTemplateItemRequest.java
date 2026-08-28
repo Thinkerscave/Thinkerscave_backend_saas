@@ -1,5 +1,6 @@
 package com.thinkerscave.platform.dto.request;
 
+import com.thinkerscave.platform.enums.ProvisionItemType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -13,9 +14,8 @@ public class ProvisioningTemplateItemRequest {
     @NotNull
     private Long templateId;
 
-    @NotBlank
-    @Size(max = 50)
-    private String itemType;
+    @NotNull
+    private ProvisionItemType itemType;
 
     @NotBlank
     @Size(max = 150)

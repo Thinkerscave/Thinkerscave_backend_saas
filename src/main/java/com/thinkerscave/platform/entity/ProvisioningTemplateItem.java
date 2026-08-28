@@ -1,5 +1,6 @@
 package com.thinkerscave.platform.entity;
 
+import com.thinkerscave.platform.enums.ProvisionItemType;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import lombok.*;
@@ -36,18 +37,10 @@ public class ProvisioningTemplateItem extends Auditable {
 
     /**
      * Item Type.
-     * Example:
-     * MODULE
-     * ROLE
-     * PERMISSION
-     * CLASS
-     * SECTION
-     * DEPARTMENT
-     * DESIGNATION
-     * CONFIGURATION
      */
+    @Enumerated(EnumType.STRING)
     @Column(name = "item_type", nullable = false, length = 50)
-    private String itemType;
+    private ProvisionItemType itemType;
 
     /**
      * Unique Item Key.

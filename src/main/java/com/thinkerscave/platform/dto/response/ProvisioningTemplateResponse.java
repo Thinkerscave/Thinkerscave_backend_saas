@@ -1,5 +1,6 @@
 package com.thinkerscave.platform.dto.response;
 
+import com.thinkerscave.platform.enums.InstitutionType;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -15,7 +16,7 @@ public class ProvisioningTemplateResponse {
     private Long id;
     private String templateCode;
     private String templateName;
-    private String institutionType;
+    private InstitutionType institutionType;
     private String templateVersion;
     private String description;
     private Boolean academicStructureEnabled;
