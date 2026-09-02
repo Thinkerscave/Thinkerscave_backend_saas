@@ -13,6 +13,9 @@ public class EffectivePermissionResponse {
     private Long menuId;
     private String menuCode;
     private String menuName;
+    private String menuType;
+    private Long parentMenuId;
+    private String parentMenuName;
     private Boolean canView;
     private Boolean canManage;
     private Boolean canApprove;

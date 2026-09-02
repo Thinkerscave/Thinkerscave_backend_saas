@@ -1,6 +1,8 @@
 package com.thinkerscave.shared.dto;
 
+import com.fasterxml.jackson.annotation.JsonGetter;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,6 +15,9 @@ import java.util.function.Function;
 /**
  * Standardised paged response wrapper for all list endpoints.
  *
+ * <p>{@code page} is the canonical 0-based index. {@code number} is serialised
+ * as well so existing clients that read Spring Data {@code Page.number} keep working.
+ *
  * @param <T> element type
  */
 @Data
@@ -23,6 +28,7 @@ import java.util.function.Function;
 public class PageResponse<T> {
 
     private List<T> content;
+    @JsonProperty("page")
     private int page;
     private int size;
     private long totalElements;
@@ -30,6 +36,12 @@ public class PageResponse<T> {
     private boolean first;
     private boolean last;
     private String sort;
+
+    /** Spring Data {@code Page.number} alias for backward compatibility. */
+    @JsonGetter("number")
+    public int getNumber() {
+        return page;
+    }
 
     /** Build from a Spring Data {@link Page} with an element mapper. */
     public static <E, T> PageResponse<T> of(Page<E> page, Function<E, T> mapper) {

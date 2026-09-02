@@ -20,7 +20,18 @@ public final class UserSpecification {
 
             predicates.add(cb.equal(root.get("organizationId"), organizationId));
 
-            if (status != null) {
+            if (status == UserStatus.LOCKED) {
+                predicates.add(cb.or(
+                        cb.equal(root.get("status"), UserStatus.LOCKED),
+                        cb.isTrue(root.get("accountLocked"))
+                ));
+            } else if (status == UserStatus.ACTIVE) {
+                predicates.add(cb.equal(root.get("status"), UserStatus.ACTIVE));
+                predicates.add(cb.or(
+                        cb.isFalse(root.get("accountLocked")),
+                        cb.isNull(root.get("accountLocked"))
+                ));
+            } else if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
             }
 

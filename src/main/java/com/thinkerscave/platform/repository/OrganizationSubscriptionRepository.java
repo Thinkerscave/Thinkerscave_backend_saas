@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -20,6 +21,15 @@ public interface OrganizationSubscriptionRepository extends JpaRepository<Organi
     Optional<OrganizationSubscription> findByOrganization_Id(Long organizationId);
 
     Optional<OrganizationSubscription> findByOrganization_IdAndActiveTrue(Long organizationId);
+
+    @Query("""
+            SELECT s.organization.id, p.planName
+            FROM OrganizationSubscription s
+            LEFT JOIN s.subscriptionPlan p
+            WHERE s.active = true
+              AND s.organization.id IN :organizationIds
+            """)
+    List<Object[]> findPlanNamesByOrganizationIds(@Param("organizationIds") Collection<Long> organizationIds);
 
     @Query("""
             SELECT s FROM OrganizationSubscription s

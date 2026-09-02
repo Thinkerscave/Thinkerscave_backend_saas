@@ -25,7 +25,7 @@ public class SessionController {
     public ResponseEntity<ApiResponse<Page<SessionResponse>>> getUserSessions(
             @PathVariable Long userId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 50), Sort.by("loginAt").descending());
         return ResponseEntity.ok(ApiResponse.success(authService.getUserSessions(userId, pageable)));
     }

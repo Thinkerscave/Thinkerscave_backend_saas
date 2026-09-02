@@ -6,6 +6,8 @@ import com.thinkerscave.platform.entity.Feature;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -131,8 +133,10 @@ public class Menu extends Auditable {
     /**
      * Subscription plan feature that unlocks this menu (top-level menus only,
      * null for PLATFORM/CORE scope and for child menus, which inherit from parent).
+     * Orphan feature_id values are ignored so catalog pages still load.
      */
     @ManyToOne(fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "feature_id")
     private Feature feature;
 

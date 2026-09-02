@@ -20,6 +20,7 @@ public interface InquiryFollowUpRepository extends JpaRepository<InquiryFollowUp
         FROM InquiryFollowUp f
         JOIN f.inquiry i
         WHERE i.deleted = false
+          AND (f.lifecycleStatus IS NULL OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.SCHEDULED)
           AND f.nextFollowUpDate = :date
         ORDER BY f.nextFollowUpDate ASC, f.followUpDate DESC
         """)
@@ -30,8 +31,20 @@ public interface InquiryFollowUpRepository extends JpaRepository<InquiryFollowUp
         FROM InquiryFollowUp f
         JOIN f.inquiry i
         WHERE i.deleted = false
+          AND (f.lifecycleStatus IS NULL OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.SCHEDULED)
           AND f.nextFollowUpDate < :date
         ORDER BY f.nextFollowUpDate ASC, f.followUpDate DESC
         """)
     List<InquiryFollowUp> findOverdue(@Param("date") LocalDate date);
+
+    @Query("""
+        SELECT f
+        FROM InquiryFollowUp f
+        JOIN f.inquiry i
+        WHERE i.deleted = false
+          AND (f.lifecycleStatus IS NULL OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.SCHEDULED)
+          AND f.nextFollowUpDate > :date
+        ORDER BY f.nextFollowUpDate ASC, f.followUpDate DESC
+        """)
+    List<InquiryFollowUp> findUpcoming(@Param("date") LocalDate date);
 }

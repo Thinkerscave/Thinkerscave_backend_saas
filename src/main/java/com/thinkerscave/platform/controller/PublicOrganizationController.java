@@ -2,6 +2,7 @@ package com.thinkerscave.platform.controller;
 
 import com.thinkerscave.platform.dto.response.PublicOrganizationOptionResponse;
 import com.thinkerscave.platform.service.OrganizationService;
+import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -30,8 +31,18 @@ public class PublicOrganizationController {
     @Operation(summary = "List active institutions available for login selection")
     public ResponseEntity<ApiResponse<List<PublicOrganizationOptionResponse>>> list(
             @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Organizations loaded",
-                organizationService.listPublicOrganizations(search)));
+        String previous = TenantContext.getTenant();
+        TenantContext.setTenant("public");
+        try {
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Organizations loaded",
+                    organizationService.listPublicOrganizations(search)));
+        } finally {
+            if (previous != null) {
+                TenantContext.setTenant(previous);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 }

@@ -15,4 +15,6 @@ public interface ResponsibilityRepository extends JpaRepository<Responsibility, 
     Optional<Responsibility> findByResponsibilityCode(String responsibilityCode);
 
     List<Responsibility> findByActiveTrueOrderByDisplayOrderAscResponsibilityNameAsc();
+
+    List<Responsibility> findAllByOrderByCreatedOnDesc();
 }

@@ -18,7 +18,8 @@ import java.time.LocalDateTime;
         name = "login_history",
         indexes = {
                 @Index(name = "idx_login_history_user", columnList = "user_id"),
-                @Index(name = "idx_login_history_status", columnList = "status")
+                @Index(name = "idx_login_history_status", columnList = "status"),
+                @Index(name = "idx_login_history_login_time", columnList = "login_time")
         }
 )
 public class LoginHistory extends Auditable {
@@ -44,6 +45,12 @@ public class LoginHistory extends Auditable {
 
     @Column(name = "ip_address", length = 100)
     private String ipAddress;
+
+    @Column(name = "logout_ip_address", length = 100)
+    private String logoutIpAddress;
+
+    @Column(name = "device_name", length = 200)
+    private String deviceName;
 
     @Column(name = "browser", length = 100)
     private String browser;

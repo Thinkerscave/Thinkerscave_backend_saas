@@ -6,6 +6,7 @@ import com.thinkerscave.access.enums.RoleType;
 import com.thinkerscave.access.enums.UserStatus;
 import com.thinkerscave.access.service.UserManagementService;
 import com.thinkerscave.shared.dto.ApiResponse;
+import com.thinkerscave.shared.util.PageRequestUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -65,9 +66,9 @@ public class UserController {
             @Parameter(description = "Filter by role type") @RequestParam(required = false) RoleType roleType,
             @Parameter(description = "Search term") @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "createdOn,desc") String sort) {
-        Pageable pageable = buildPageable(page, size, sort);
+        Pageable pageable = PageRequestUtil.of(page, size, sort);
         return ResponseEntity.ok(ApiResponse.success(userManagementService.searchUsers(organizationId, status, roleType, search, pageable)));
     }
 
@@ -171,12 +172,5 @@ public class UserController {
             @PathVariable Long organizationId,
             @PathVariable Long userId) {
         return ResponseEntity.ok(ApiResponse.success(userManagementService.getEffectivePermissions(organizationId, userId)));
-    }
-
-    private Pageable buildPageable(int page, int size, String sort) {
-        String[] parts = sort.split(",");
-        Sort.Direction dir = parts.length > 1 && parts[1].equalsIgnoreCase("asc")
-                ? Sort.Direction.ASC : Sort.Direction.DESC;
-        return PageRequest.of(page, Math.min(size, 100), Sort.by(dir, parts[0]));
     }
 }

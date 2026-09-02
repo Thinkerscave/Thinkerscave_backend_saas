@@ -30,6 +30,13 @@ public class ResponsibilityServiceImpl implements ResponsibilityService {
         }
         Responsibility responsibility = new Responsibility();
         mapRequest(request, responsibility);
+        if (responsibility.getResponsibilityId() == null) {
+            responsibility.setSystemDefined(false);
+            responsibility.setActive(true);
+            if (responsibility.getDisplayOrder() == null) {
+                responsibility.setDisplayOrder(0);
+            }
+        }
         Responsibility saved = responsibilityRepository.save(responsibility);
         log.info("Responsibility created: {}", saved.getResponsibilityId());
         return saved.getResponsibilityId();
@@ -39,7 +46,9 @@ public class ResponsibilityServiceImpl implements ResponsibilityService {
     @Transactional
     public void updateResponsibility(Long id, ResponsibilityRequest request) {
         Responsibility responsibility = getEntity(id);
-        if (!responsibility.getResponsibilityCode().equals(request.getResponsibilityCode())
+        if (Boolean.TRUE.equals(responsibility.getSystemDefined())) {
+            request.setResponsibilityCode(responsibility.getResponsibilityCode());
+        } else if (!responsibility.getResponsibilityCode().equals(request.getResponsibilityCode())
                 && responsibilityRepository.existsByResponsibilityCode(request.getResponsibilityCode())) {
             throw new AlreadyExistsException("Responsibility code already exists: " + request.getResponsibilityCode());
         }
@@ -49,9 +58,11 @@ public class ResponsibilityServiceImpl implements ResponsibilityService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ResponsibilityResponse> getResponsibilityList() {
-        return responsibilityRepository.findByActiveTrueOrderByDisplayOrderAscResponsibilityNameAsc()
-                .stream()
+    public List<ResponsibilityResponse> getResponsibilityList(boolean includeInactive) {
+        List<Responsibility> rows = includeInactive
+                ? responsibilityRepository.findAllByOrderByCreatedOnDesc()
+                : responsibilityRepository.findByActiveTrueOrderByDisplayOrderAscResponsibilityNameAsc();
+        return rows.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -87,7 +98,9 @@ public class ResponsibilityServiceImpl implements ResponsibilityService {
         r.setResponsibilityCode(req.getResponsibilityCode());
         r.setResponsibilityName(req.getResponsibilityName());
         r.setDescription(req.getDescription());
-        r.setDisplayOrder(req.getDisplayOrder());
+        if (req.getDisplayOrder() != null) {
+            r.setDisplayOrder(req.getDisplayOrder());
+        }
         r.setRemarks(req.getRemarks());
     }
 

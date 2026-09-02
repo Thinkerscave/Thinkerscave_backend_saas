@@ -5,7 +5,7 @@ import com.thinkerscave.admission.enums.InquiryStatus;
 import com.thinkerscave.admission.repository.ApplicationAdmissionRepository;
 import com.thinkerscave.admission.repository.InquiryRepository;
 import com.thinkerscave.admission.service.AdmissionReportService;
-import com.thinkerscave.shared.context.OrganizationContext;
+import com.thinkerscave.staff.repository.StaffRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +22,7 @@ public class AdmissionReportServiceImpl implements AdmissionReportService {
 
     private final InquiryRepository inquiryRepository;
     private final ApplicationAdmissionRepository applicationRepository;
+    private final StaffRepository staffRepository;
 
     @Override
     public Map<String, Object> overview() {
@@ -56,7 +57,9 @@ public class AdmissionReportServiceImpl implements AdmissionReportService {
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Object[] row : inquiryRepository.countByCounselor()) {
             Map<String, Object> data = new LinkedHashMap<>();
-            data.put("counselorId", row[0]);
+            Long counselorId = row[0] == null ? null : ((Number) row[0]).longValue();
+            data.put("counselorId", counselorId);
+            data.put("counselorName", resolveCounselorName(counselorId));
             data.put("leadCount", ((Number) row[1]).longValue());
             rows.add(data);
         }
@@ -67,8 +70,23 @@ public class AdmissionReportServiceImpl implements AdmissionReportService {
     public Map<String, Long> sourceAnalysis() {
         Map<String, Long> source = new LinkedHashMap<>();
         for (Object[] row : inquiryRepository.countBySource()) {
-            source.put(String.valueOf(row[0]), ((Number) row[1]).longValue());
+            String label = row[0] == null || String.valueOf(row[0]).isBlank() ? "Unknown" : String.valueOf(row[0]);
+            source.put(label, ((Number) row[1]).longValue());
         }
         return source;
+    }
+
+    private String resolveCounselorName(Long counselorId) {
+        if (counselorId == null) {
+            return "Unassigned";
+        }
+        return staffRepository.findById(counselorId)
+                .or(() -> staffRepository.findByUser_Id(counselorId))
+                .map(staff -> {
+                    String last = staff.getLastName() == null ? "" : staff.getLastName().trim();
+                    return (staff.getFirstName() + " " + last).trim();
+                })
+                .filter(name -> !name.isBlank())
+                .orElse("Counselor " + counselorId);
     }
 }

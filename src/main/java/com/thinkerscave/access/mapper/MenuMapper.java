@@ -14,6 +14,7 @@ public interface MenuMapper {
     @Mapping(target = "featureId", source = "feature.id")
     @Mapping(target = "featureCode", source = "feature.featureCode")
     @Mapping(target = "featureName", source = "feature.featureName")
+    @Mapping(target = "featureIcon", source = "feature.icon")
     @Mapping(target = "children", ignore = true)
     MenuResponse toResponse(Menu menu);
 
@@ -22,6 +23,7 @@ public interface MenuMapper {
     @Mapping(target = "featureId", source = "feature.id")
     @Mapping(target = "featureCode", source = "feature.featureCode")
     @Mapping(target = "featureName", source = "feature.featureName")
+    @Mapping(target = "featureIcon", source = "feature.icon")
     @Mapping(target = "children", ignore = true)
     List<MenuResponse> toResponseList(List<Menu> menus);
 }

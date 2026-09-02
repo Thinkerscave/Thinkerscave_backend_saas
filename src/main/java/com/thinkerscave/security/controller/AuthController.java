@@ -2,14 +2,17 @@ package com.thinkerscave.security.controller;
 
 import com.thinkerscave.platform.dto.response.PublicOrganizationOptionResponse;
 import com.thinkerscave.platform.service.OrganizationService;
+import com.thinkerscave.security.dto.ClientEnvironment;
 import com.thinkerscave.security.dto.LoginContext;
 import com.thinkerscave.security.dto.request.LoginRequest;
+import com.thinkerscave.security.util.ClientEnvironmentResolver;
 import com.thinkerscave.security.dto.request.OtpResetPasswordRequest;
 import com.thinkerscave.security.dto.response.AuthResponse;
 import com.thinkerscave.security.service.AuthService;
 import com.thinkerscave.security.service.PasswordResetService;
 import com.thinkerscave.security.util.RefreshTokenCookieHelper;
 import com.thinkerscave.shared.dto.ApiResponse;
+import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -42,9 +45,19 @@ public class AuthController {
             description = "Public endpoint (no auth required) for the org-select login screen")
     public ResponseEntity<ApiResponse<List<PublicOrganizationOptionResponse>>> getPublicOrganizations(
             @RequestParam(required = false) String search) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Organizations loaded",
-                organizationService.listPublicOrganizations(search)));
+        String previous = TenantContext.getTenant();
+        TenantContext.setTenant("public");
+        try {
+            return ResponseEntity.ok(ApiResponse.success(
+                    "Organizations loaded",
+                    organizationService.listPublicOrganizations(search)));
+        } finally {
+            if (previous != null) {
+                TenantContext.setTenant(previous);
+            } else {
+                TenantContext.clear();
+            }
+        }
     }
 
     @PostMapping("/login")
@@ -57,7 +70,10 @@ public class AuthController {
                 httpRequest.getHeader(LoginContext.HEADER),
                 httpRequest.getHeader("X-Tenant-ID"),
                 httpRequest.getHeader("X-Organization-ID"));
-        AuthResponse authResponse = authService.login(request, loginContext);
+        AuthResponse authResponse = authService.login(
+                request,
+                loginContext,
+                ClientEnvironmentResolver.from(httpRequest, request.getDeviceName()));
         return ResponseEntity.ok(ApiResponse.success("Login successful", applyRefreshCookie(authResponse, httpResponse)));
     }
 
@@ -98,7 +114,7 @@ public class AuthController {
             HttpServletResponse httpResponse) {
         String token = refreshTokenCookieHelper.resolveRefreshToken(httpRequest, refreshToken);
         if (StringUtils.hasText(token)) {
-            authService.logout(token);
+            authService.logout(token, ClientEnvironmentResolver.from(httpRequest, null));
         }
         refreshTokenCookieHelper.clearRefreshTokenCookie(httpResponse);
         return ResponseEntity.ok(ApiResponse.noContent("Logged out successfully"));

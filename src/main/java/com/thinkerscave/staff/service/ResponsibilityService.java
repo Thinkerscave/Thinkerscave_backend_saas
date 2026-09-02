@@ -11,7 +11,7 @@ public interface ResponsibilityService {
 
     void updateResponsibility(Long id, ResponsibilityRequest request);
 
-    List<ResponsibilityResponse> getResponsibilityList();
+    List<ResponsibilityResponse> getResponsibilityList(boolean includeInactive);
 
     ResponsibilityResponse getResponsibilityById(Long id);
 

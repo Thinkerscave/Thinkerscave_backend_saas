@@ -1,5 +1,6 @@
 package com.thinkerscave.admission.dto.response;
 
+import com.thinkerscave.admission.enums.FollowUpLifecycleStatus;
 import com.thinkerscave.admission.enums.FollowUpType;
 import com.thinkerscave.admission.enums.InquiryStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -21,6 +22,11 @@ public class FollowUpResponse {
     private InquiryStatus statusAfter;
     private LocalDateTime followUpDate;
     private LocalDate nextFollowUpDate;
+    private FollowUpLifecycleStatus lifecycleStatus;
+    private String outcome;
+    private LocalDateTime completedOn;
+    private String completedBy;
+    private String leadName;
     private LocalDateTime createdOn;
     private String createdBy;
 }

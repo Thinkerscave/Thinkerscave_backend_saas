@@ -1,5 +1,6 @@
 package com.thinkerscave.shared.util;
 
+import com.thinkerscave.shared.pagination.PaginationConstants;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -12,10 +13,14 @@ import java.util.Arrays;
  */
 public final class PageRequestUtil {
 
-    public static final int DEFAULT_SIZE = 20;
-    public static final int MAX_SIZE = 200;
+    public static final int DEFAULT_SIZE = PaginationConstants.DEFAULT_SIZE;
+    public static final int MAX_SIZE = PaginationConstants.MAX_SIZE;
 
     private PageRequestUtil() {}
+
+    public static Pageable of(Integer page, Integer size) {
+        return of(page, size, null);
+    }
 
     public static Pageable of(Integer page, Integer size, String sort) {
         int p = (page == null || page < 0) ? 0 : page;

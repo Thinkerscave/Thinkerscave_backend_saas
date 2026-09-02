@@ -25,7 +25,9 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -179,22 +181,37 @@ public class SuperAdminDashboardProvider extends AbstractDashboardWidgetProvider
 
     private WidgetDTO<TopOrganizationsData> topOrganizations() {
         return safeWidget("top-organizations", WidgetType.TOP_ORGANIZATIONS, "Top organizations", "By active users", 2, DataMode.LIVE, () -> {
-            List<Organization> orgs = organizationRepository.findAll(PageRequest.of(0, 5000)).getContent();
+            List<Organization> orgs = organizationRepository.findAll(PageRequest.of(0, 200)).getContent();
+            if (orgs.isEmpty()) {
+                return TopOrganizationsData.builder().items(List.of()).build();
+            }
+            List<Long> orgIds = orgs.stream().map(Organization::getId).toList();
+            Map<Long, String> planByOrgId = new HashMap<>();
+            for (Object[] row : organizationSubscriptionRepository.findPlanNamesByOrganizationIds(orgIds)) {
+                if (row[0] instanceof Long orgId && row[1] instanceof String planName && !planName.isBlank()) {
+                    planByOrgId.putIfAbsent(orgId, planName);
+                }
+            }
             List<TopOrgItem> items = orgs.stream()
-                    .map(o -> new Object[]{o, userRepository.countByOrganizationIdAndStatus(o.getId(), UserStatus.ACTIVE)})
+                    .map(o -> {
+                        long activeUsers = 0L;
+                        try {
+                            activeUsers = userRepository.countByOrganizationIdAndStatus(o.getId(), UserStatus.ACTIVE);
+                        } catch (Exception ignored) {
+                            // Tenant-only users are not in public.users; still rank by whatever the catalog has.
+                        }
+                        return new Object[]{o, activeUsers};
+                    })
                     .sorted(Comparator.comparingLong((Object[] a) -> (Long) a[1]).reversed())
                     .limit(5)
                     .map(a -> {
                         Organization o = (Organization) a[0];
                         long activeUsers = (Long) a[1];
-                        String planName = o.getOrganizationSubscription() != null
-                                && o.getOrganizationSubscription().getSubscriptionPlan() != null
-                                ? o.getOrganizationSubscription().getSubscriptionPlan().getPlanName() : "-";
                         return TopOrgItem.builder()
                                 .organizationName(o.getOrganizationName())
                                 .institutionType(o.getInstitutionType() != null ? o.getInstitutionType().name() : "-")
                                 .activeUsers(activeUsers)
-                                .planName(planName)
+                                .planName(planByOrgId.getOrDefault(o.getId(), "-"))
                                 .build();
                     })
                     .collect(Collectors.toList());

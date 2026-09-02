@@ -28,7 +28,7 @@ import java.util.Map;
 @RequestMapping("/api/v1/admission/inquiries")
 @RequiredArgsConstructor
 @Tag(name = "Admission - Inquiries", description = "Manage admission prospect inquiries")
-@PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'TEACHER')")
+@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 public class InquiryController {
 
     private final InquiryService inquiryService;
@@ -42,7 +42,7 @@ public class InquiryController {
     @GetMapping
     @Operation(summary = "Get all inquiries (paged)")
     public ResponseEntity<ApiResponse<Page<InquiryResponse>>> getAll(
-            @PageableDefault(size = 20, sort = "createdOn") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "createdOn") Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Inquiries fetched", inquiryService.getAll(pageable)));
     }
 

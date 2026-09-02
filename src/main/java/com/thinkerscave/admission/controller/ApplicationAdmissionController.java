@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/admission/applications")
 @RequiredArgsConstructor
 @Tag(name = "Admission - Applications", description = "Manage student admission applications")
-@PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'TEACHER')")
+@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 public class ApplicationAdmissionController {
 
     private final ApplicationAdmissionService service;
@@ -55,7 +55,7 @@ public class ApplicationAdmissionController {
     @GetMapping
     @Operation(summary = "Get all applications (paged)")
     public ResponseEntity<ApiResponse<Page<ApplicationAdmissionResponse>>> getAll(
-            @PageableDefault(size = 20, sort = "createdOn") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "createdOn") Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Applications fetched", service.getAll(pageable)));
     }
 
@@ -63,7 +63,7 @@ public class ApplicationAdmissionController {
     @Operation(summary = "Get applications by status (paged)")
     public ResponseEntity<ApiResponse<Page<ApplicationAdmissionResponse>>> getByStatus(
             @RequestParam ApplicationStatus status,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Applications by status", service.getByStatus(status, pageable)));
     }
 

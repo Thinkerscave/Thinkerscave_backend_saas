@@ -14,9 +14,9 @@ public class PublicInquiryRequest {
 
     private String email;
 
-    @NotBlank
     private String classInterestedIn;
-
+    private Long academicYearId;
+    private Long classId;
     private String address;
     private String inquirySource;
     private String comments;

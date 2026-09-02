@@ -6,7 +6,13 @@ import org.springframework.boot.autoconfigure.orm.jpa.HibernatePropertiesCustomi
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.domain.AuditorAware;
+import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.util.Optional;
 
 /**
  * JPA configuration for the modular package structure.
@@ -20,6 +26,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * Tenant identification is handled by {@link TenantIdentifierResolver}.
  */
 @Configuration
+@EnableJpaAuditing(auditorAwareRef = "auditorAware")
 @EnableJpaRepositories(basePackages = {
         "com.thinkerscave.access.repository",
         "com.thinkerscave.academics.repository",
@@ -29,6 +36,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         "com.thinkerscave.communication.repository",
         "com.thinkerscave.document.repository",
         "com.thinkerscave.platform.repository",
+        "com.thinkerscave.retention.repository",
         "com.thinkerscave.security.repository",
         "com.thinkerscave.shared.repository",
         "com.thinkerscave.staff.repository",
@@ -43,6 +51,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         "com.thinkerscave.communication.entity",
         "com.thinkerscave.document.entity",
         "com.thinkerscave.platform.entity",
+        "com.thinkerscave.retention.entity",
         "com.thinkerscave.security.entity",
         "com.thinkerscave.shared.entity",
         "com.thinkerscave.staff.entity",
@@ -64,6 +73,18 @@ public class AppJpaConfig {
         return hibernateProperties -> {
             hibernateProperties.put("hibernate.multi_tenant_connection_provider", connectionProvider);
             hibernateProperties.put("hibernate.tenant_identifier_resolver", tenantIdentifierResolver);
+        };
+    }
+
+    @Bean
+    public AuditorAware<String> auditorAware() {
+        return () -> {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication == null || !authentication.isAuthenticated()
+                    || "anonymousUser".equals(authentication.getPrincipal())) {
+                return Optional.of("system");
+            }
+            return Optional.ofNullable(authentication.getName()).filter(name -> !name.isBlank()).or(() -> Optional.of("system"));
         };
     }
 }

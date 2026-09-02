@@ -1,6 +1,7 @@
 package com.thinkerscave.staff.controller;
 
 import com.thinkerscave.shared.dto.ApiResponse;
+import com.thinkerscave.staff.dto.request.BulkResponsibilityAssignmentRequest;
 import com.thinkerscave.staff.dto.request.ResponsibilityRequest;
 import com.thinkerscave.staff.dto.response.ResponsibilityAssignmentResponse;
 import com.thinkerscave.staff.dto.response.ResponsibilityResponse;
@@ -24,6 +25,7 @@ import java.util.Map;
 public class ResponsibilityController {
 
     private final ResponsibilityService responsibilityService;
+    private final ResponsibilityAssignmentService assignmentService;
 
     @PostMapping
     @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
@@ -47,10 +49,11 @@ public class ResponsibilityController {
 
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Get all active responsibilities")
-    public ResponseEntity<ApiResponse<List<ResponsibilityResponse>>> getResponsibilityList() {
+    @Operation(summary = "Get responsibilities")
+    public ResponseEntity<ApiResponse<List<ResponsibilityResponse>>> getResponsibilityList(
+            @RequestParam(defaultValue = "false") boolean includeInactive) {
         return ResponseEntity.ok(ApiResponse.success("Responsibilities retrieved",
-                responsibilityService.getResponsibilityList()));
+                responsibilityService.getResponsibilityList(includeInactive)));
     }
 
     @GetMapping("/{id}")
@@ -59,6 +62,24 @@ public class ResponsibilityController {
     public ResponseEntity<ApiResponse<ResponsibilityResponse>> getResponsibilityById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Responsibility retrieved",
                 responsibilityService.getResponsibilityById(id)));
+    }
+
+    @GetMapping("/{id}/assignments")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @Operation(summary = "Staff currently assigned to this responsibility")
+    public ResponseEntity<ApiResponse<List<ResponsibilityAssignmentResponse>>> getAssignedStaff(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Assigned staff retrieved",
+                assignmentService.getResponsibilityStaff(id)));
+    }
+
+    @PostMapping("/{id}/assignments")
+    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @Operation(summary = "Assign this responsibility to one or more staff")
+    public ResponseEntity<ApiResponse<Void>> assignStaff(
+            @PathVariable Long id,
+            @Valid @RequestBody BulkResponsibilityAssignmentRequest request) {
+        assignmentService.assignStaff(id, request);
+        return ResponseEntity.ok(ApiResponse.noContent("Staff assigned to responsibility"));
     }
 
     @PatchMapping("/{id}/activate")

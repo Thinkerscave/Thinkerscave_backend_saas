@@ -36,7 +36,7 @@ public class OrganizationController {
             @RequestParam(required = false) InstitutionType institutionType,
             @RequestParam(required = false) Long customerId,
             @RequestParam(required = false) String search,
-            @PageableDefault(size = 20, sort = "createdOn") Pageable pageable) {
+            @PageableDefault(size = 10, sort = "createdOn") Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Organizations retrieved",
                 organizationService.getOrganizations(status, institutionType, customerId, search, pageable)));
     }

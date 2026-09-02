@@ -17,6 +17,7 @@ import com.thinkerscave.platform.enums.CustomerStatus;
 import com.thinkerscave.platform.enums.OrganizationStatus;
 import com.thinkerscave.platform.repository.OrganizationRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
+import com.thinkerscave.security.dto.ClientEnvironment;
 import com.thinkerscave.security.dto.LoginContext;
 import com.thinkerscave.security.dto.request.LoginRequest;
 import com.thinkerscave.security.dto.response.AuthResponse;
@@ -75,6 +76,13 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public AuthResponse login(LoginRequest request, LoginContext loginContext) {
+        return login(request, loginContext, ClientEnvironment.empty());
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse login(LoginRequest request, LoginContext loginContext, ClientEnvironment client) {
+        ClientEnvironment env = client != null ? client : ClientEnvironment.empty();
         ResolvedLoginUser resolved = resolveUserForLogin(request.getUsernameOrEmail(), loginContext);
         User user = resolved.user();
         // Public-schema accounts (owners, and some org admins/staff whose tenant users table
@@ -84,7 +92,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (Boolean.TRUE.equals(user.getAccountLocked())) {
             if (!crossSchemaUser) {
-                loginFailureAuditService.recordLoginFailure(user.getId(), "Account locked");
+                loginFailureAuditService.recordLoginFailure(user.getId(), "Account locked", env);
             }
             throw new BadRequestException("Account is locked due to too many failed login attempts. Contact an administrator.");
         }
@@ -95,9 +103,9 @@ public class AuthServiceImpl implements AuthService {
         } catch (AuthenticationException ex) {
             if (crossSchemaUser) {
                 runInPublicSchema(() -> publicSchemaUserLookupService.recordFailedLoginAndLockout(
-                        user.getId(), "Invalid password", resolveMaxFailedAttempts(user, loginContext)));
+                        user.getId(), "Invalid password", resolveMaxFailedAttempts(user, loginContext), env));
             } else {
-                loginFailureAuditService.recordLoginFailure(user.getId(), "Invalid password");
+                loginFailureAuditService.recordLoginFailure(user.getId(), "Invalid password", env);
                 loginFailureAuditService.applyFailedLoginLockout(user.getId(), resolveMaxFailedAttempts(user, loginContext));
             }
             // Uniform message + small delay frustrates brute force without leaking account state
@@ -125,7 +133,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (crossSchemaUser) {
             runInPublicSchema(() -> publicSchemaUserLookupService.recordSuccessfulLogin(
-                    user.getId(), refreshToken, request.getDeviceName()));
+                    user.getId(), refreshToken, env));
         } else {
             user.setFailedLoginAttempts(0);
             user.setAccountLocked(false);
@@ -135,14 +143,16 @@ public class AuthServiceImpl implements AuthService {
             UserSession session = UserSession.builder()
                     .user(user)
                     .refreshToken(refreshToken)
-                    .deviceName(request.getDeviceName())
-                    .ipAddress("")
+                    .deviceName(env.deviceName())
+                    .browser(env.browser())
+                    .operatingSystem(env.operatingSystem())
+                    .ipAddress(env.ipAddress() != null ? env.ipAddress() : "")
                     .loginAt(LocalDateTime.now())
                     .status(SessionStatus.ACTIVE)
                     .build();
             sessionRepository.save(session);
 
-            recordLoginSuccess(user);
+            recordLoginSuccess(user, env);
         }
 
         return AuthResponse.builder()
@@ -456,11 +466,19 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public void logout(String refreshToken) {
-        sessionRepository.findByRefreshToken(refreshToken).ifPresent(session -> {
-            session.setStatus(SessionStatus.LOGGED_OUT);
-            session.setLogoutAt(LocalDateTime.now());
-            sessionRepository.save(session);
-        });
+        logout(refreshToken, ClientEnvironment.empty());
+    }
+
+    @Override
+    @Transactional
+    public void logout(String refreshToken, ClientEnvironment client) {
+        ClientEnvironment env = client != null ? client : ClientEnvironment.empty();
+        Optional<UserSession> ambient = sessionRepository.findByRefreshToken(refreshToken);
+        if (ambient.isPresent()) {
+            closeSession(ambient.get(), env);
+            return;
+        }
+        runInPublicSchema(() -> publicSchemaUserLookupService.logout(refreshToken, env));
     }
 
     @Override
@@ -482,18 +500,46 @@ public class AuthServiceImpl implements AuthService {
     public void terminateSession(Long sessionId) {
         UserSession session = sessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+        closeSession(session, ClientEnvironment.empty());
+    }
+
+    private void closeSession(UserSession session, ClientEnvironment env) {
         session.setStatus(SessionStatus.LOGGED_OUT);
         session.setLogoutAt(LocalDateTime.now());
         sessionRepository.save(session);
+        markLogout(session.getUser() != null ? session.getUser().getId() : null, env);
     }
 
-    private void recordLoginSuccess(User user) {
-        LoginHistory history = LoginHistory.builder()
+    private void recordLoginSuccess(User user, ClientEnvironment env) {
+        loginHistoryRepository.save(buildHistory(user, LoginStatus.SUCCESS, null, env));
+    }
+
+    private void markLogout(Long userId, ClientEnvironment env) {
+        if (userId == null) {
+            return;
+        }
+        loginHistoryRepository.findTopByUser_IdAndStatusAndLogoutTimeIsNullOrderByLoginTimeDesc(userId, LoginStatus.SUCCESS)
+                .ifPresent(history -> {
+                    history.setLogoutTime(LocalDateTime.now());
+                    if (env != null && env.ipAddress() != null && !env.ipAddress().isBlank()) {
+                        history.setLogoutIpAddress(env.ipAddress());
+                    }
+                    loginHistoryRepository.save(history);
+                });
+    }
+
+    private LoginHistory buildHistory(User user, LoginStatus status, String failureReason, ClientEnvironment env) {
+        ClientEnvironment client = env != null ? env : ClientEnvironment.empty();
+        return LoginHistory.builder()
                 .user(user)
-                .status(LoginStatus.SUCCESS)
+                .status(status)
                 .loginTime(LocalDateTime.now())
+                .failureReason(failureReason)
+                .ipAddress(client.ipAddress())
+                .deviceName(client.deviceName())
+                .browser(client.browser())
+                .operatingSystem(client.operatingSystem())
                 .build();
-        loginHistoryRepository.save(history);
     }
 
     private int resolveMaxFailedAttempts(User user, LoginContext loginContext) {

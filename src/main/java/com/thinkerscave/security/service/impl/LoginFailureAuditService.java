@@ -5,6 +5,7 @@ import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.enums.LoginStatus;
 import com.thinkerscave.access.repository.LoginHistoryRepository;
 import com.thinkerscave.access.repository.UserRepository;
+import com.thinkerscave.security.dto.ClientEnvironment;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -32,12 +33,22 @@ public class LoginFailureAuditService {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordLoginFailure(Long userId, String reason) {
+        recordLoginFailure(userId, reason, ClientEnvironment.empty());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordLoginFailure(Long userId, String reason, ClientEnvironment client) {
+        ClientEnvironment env = client != null ? client : ClientEnvironment.empty();
         User managedUser = userRepository.findById(userId).orElseThrow();
         loginHistoryRepository.save(LoginHistory.builder()
                 .user(managedUser)
                 .status(LoginStatus.FAILED)
                 .loginTime(java.time.LocalDateTime.now())
                 .failureReason(reason)
+                .ipAddress(env.ipAddress())
+                .deviceName(env.deviceName())
+                .browser(env.browser())
+                .operatingSystem(env.operatingSystem())
                 .build());
     }
 

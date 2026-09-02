@@ -10,8 +10,10 @@ import java.time.LocalDateTime;
 public class InquiryTimelineItemResponse {
 
     private String eventType;
+    private String action;
     private String title;
     private String description;
     private String performedBy;
     private LocalDateTime performedOn;
+    private LocalDateTime performedAt;
 }

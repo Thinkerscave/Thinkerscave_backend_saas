@@ -80,7 +80,7 @@ public class PayrollController {
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) PayrollStatus status,
             @RequestParam(required = false) Long staffId,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Payroll list retrieved",
                 payrollService.getPayrollList(year, month, status, staffId, pageable)));
     }

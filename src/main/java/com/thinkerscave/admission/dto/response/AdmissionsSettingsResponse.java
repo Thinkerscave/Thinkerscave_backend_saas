@@ -15,4 +15,5 @@ public class AdmissionsSettingsResponse {
     private List<String> requiredDocuments;
     private Map<String, String> numbering;
     private Map<String, String> reminderRules;
+    private String assignmentMode;
 }

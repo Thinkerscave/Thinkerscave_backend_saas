@@ -11,6 +11,7 @@ import java.util.List;
 public interface UserMapper {
 
     @Mapping(target = "roles", expression = "java(mapRoles(user))")
+    @Mapping(target = "createdOn", source = "createdOn")
     UserSummaryResponse toSummary(User user);
 
     List<UserSummaryResponse> toSummaryList(List<User> users);

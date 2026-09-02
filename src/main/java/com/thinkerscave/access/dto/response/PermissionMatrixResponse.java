@@ -15,6 +15,9 @@ public class PermissionMatrixResponse {
     private Long roleId;
     private String roleCode;
     private String roleName;
+    private Long responsibilityId;
+    private String responsibilityCode;
+    private String responsibilityName;
     private Long organizationId;
     private List<PermissionRow> rows;
 
@@ -29,6 +32,7 @@ public class PermissionMatrixResponse {
         private String menuType;
         private Long parentMenuId;
         private String parentMenuName;
+        private Integer displayOrder;
         private Boolean canView;
         private Boolean canManage;
         private Boolean canApprove;

@@ -97,7 +97,7 @@ public class StudentAttendanceController {
     @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF', 'STUDENT', 'PARENT')")
     public ResponseEntity<ApiResponse<Page<StudentAttendanceResponse>>> getStudentHistory(
             @PathVariable Long studentId,
-            @PageableDefault(size = 20, sort = "attendanceDate", direction = Sort.Direction.DESC) Pageable pageable) {
+            @PageableDefault(size = 10, sort = "attendanceDate", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Student history retrieved",
                 studentAttendanceService.getStudentHistory(studentId, pageable)));

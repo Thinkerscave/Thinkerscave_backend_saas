@@ -28,7 +28,7 @@ public class TenantRegistryController {
     public ResponseEntity<ApiResponse<Page<TenantRegistryResponse>>> getTenants(
             @RequestParam(required = false) ProvisionStatus status,
             @RequestParam(required = false) String search,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 10) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success("Tenant registry retrieved",
                 tenantService.getTenants(status, search, pageable)));
     }

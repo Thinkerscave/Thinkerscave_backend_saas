@@ -11,4 +11,8 @@ public class InquiryQuickActionResponse {
     private long dueToday;
     private long dueTomorrow;
     private long dueThisWeek;
+    private long todaysCalls;
+    private long todaysMeetings;
+    private long overdueFollowUps;
+    private long admissionReady;
 }

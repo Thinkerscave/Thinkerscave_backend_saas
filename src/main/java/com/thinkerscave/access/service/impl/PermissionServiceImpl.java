@@ -103,6 +103,9 @@ public class PermissionServiceImpl implements PermissionService {
                             .menuId(existing.getMenuId())
                             .menuCode(existing.getMenuCode())
                             .menuName(existing.getMenuName())
+                            .menuType(existing.getMenuType())
+                            .parentMenuId(existing.getParentMenuId())
+                            .parentMenuName(existing.getParentMenuName())
                             .canView(Boolean.TRUE.equals(existing.getCanView()) || Boolean.TRUE.equals(incoming.getCanView()))
                             .canManage(Boolean.TRUE.equals(existing.getCanManage()) || Boolean.TRUE.equals(incoming.getCanManage()))
                             .canApprove(Boolean.TRUE.equals(existing.getCanApprove()) || Boolean.TRUE.equals(incoming.getCanApprove()))
@@ -168,10 +171,14 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     private EffectivePermissionResponse buildEffective(Menu menu, Boolean view, Boolean manage, Boolean approve, boolean isOverride) {
+        Menu parent = menu.getParentMenu();
         return EffectivePermissionResponse.builder()
                 .menuId(menu.getId())
                 .menuCode(menu.getMenuCode())
                 .menuName(menu.getMenuName())
+                .menuType(menu.getMenuType() != null ? menu.getMenuType().name() : null)
+                .parentMenuId(parent != null ? parent.getId() : null)
+                .parentMenuName(parent != null ? parent.getMenuName() : null)
                 .canView(Boolean.TRUE.equals(view))
                 .canManage(Boolean.TRUE.equals(manage))
                 .canApprove(Boolean.TRUE.equals(approve))

@@ -1,5 +1,6 @@
 package com.thinkerscave.admission.service;
 
+import com.thinkerscave.admission.dto.request.CompleteFollowUpRequest;
 import com.thinkerscave.admission.dto.request.CounselingNoteRequest;
 import com.thinkerscave.admission.dto.request.FollowUpRequest;
 import com.thinkerscave.admission.dto.request.InquiryRequest;
@@ -55,6 +56,12 @@ public interface InquiryService {
     FollowUpResponse updateFollowUp(Long followUpId, FollowUpRequest request);
 
     FollowUpResponse completeFollowUp(Long followUpId);
+
+    FollowUpResponse completeFollowUp(Long followUpId, CompleteFollowUpRequest request);
+
+    FollowUpResponse cancelFollowUp(Long followUpId, String remarks);
+
+    List<FollowUpResponse> getUpcomingFollowUps();
 
     CounselingNoteResponse addCounselingNote(Long inquiryId, CounselingNoteRequest request);
 

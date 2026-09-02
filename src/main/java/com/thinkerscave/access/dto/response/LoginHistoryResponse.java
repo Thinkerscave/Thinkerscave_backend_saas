@@ -21,6 +21,8 @@ public class LoginHistoryResponse {
     private LocalDateTime loginTime;
     private LocalDateTime logoutTime;
     private String ipAddress;
+    private String logoutIpAddress;
+    private String deviceName;
     private String browser;
     private String operatingSystem;
     private String failureReason;

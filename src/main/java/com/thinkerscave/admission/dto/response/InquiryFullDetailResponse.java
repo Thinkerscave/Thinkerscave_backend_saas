@@ -13,4 +13,10 @@ public class InquiryFullDetailResponse {
     private List<FollowUpResponse> followUps;
     private List<CounselingNoteResponse> counselingNotes;
     private List<InquiryTimelineItemResponse> timeline;
+    private Long applicationId;
+    private String applicationNumber;
+    private String applicationStatus;
+    private Long studentId;
+    private String studentCode;
+    private String admissionNumber;
 }
