@@ -2,8 +2,10 @@ package com.thinkerscave.security.controller;
 
 import com.thinkerscave.platform.dto.response.PublicOrganizationOptionResponse;
 import com.thinkerscave.platform.service.OrganizationService;
+import com.thinkerscave.security.dto.ClientEnvironment;
 import com.thinkerscave.security.dto.LoginContext;
 import com.thinkerscave.security.dto.request.LoginRequest;
+import com.thinkerscave.security.util.ClientEnvironmentResolver;
 import com.thinkerscave.security.dto.request.OtpResetPasswordRequest;
 import com.thinkerscave.security.dto.response.AuthResponse;
 import com.thinkerscave.security.service.AuthService;
@@ -68,7 +70,10 @@ public class AuthController {
                 httpRequest.getHeader(LoginContext.HEADER),
                 httpRequest.getHeader("X-Tenant-ID"),
                 httpRequest.getHeader("X-Organization-ID"));
-        AuthResponse authResponse = authService.login(request, loginContext);
+        AuthResponse authResponse = authService.login(
+                request,
+                loginContext,
+                ClientEnvironmentResolver.from(httpRequest, request.getDeviceName()));
         return ResponseEntity.ok(ApiResponse.success("Login successful", applyRefreshCookie(authResponse, httpResponse)));
     }
 
@@ -109,7 +114,7 @@ public class AuthController {
             HttpServletResponse httpResponse) {
         String token = refreshTokenCookieHelper.resolveRefreshToken(httpRequest, refreshToken);
         if (StringUtils.hasText(token)) {
-            authService.logout(token);
+            authService.logout(token, ClientEnvironmentResolver.from(httpRequest, null));
         }
         refreshTokenCookieHelper.clearRefreshTokenCookie(httpResponse);
         return ResponseEntity.ok(ApiResponse.noContent("Logged out successfully"));

@@ -36,7 +36,8 @@ public class PostgresTenantSchemaPatcher implements ApplicationRunner {
                     StandardCharsets.UTF_8);
             jdbcTemplate.execute(crmSql);
             jdbcTemplate.execute(SESSION_AND_NOTES_SQL);
-            log.info("PostgreSQL tenant schema patch applied (admissions CRM + user_sessions + counseling_note).");
+            jdbcTemplate.execute(LOGIN_HISTORY_RETENTION_SQL);
+            log.info("PostgreSQL tenant schema patch applied (admissions CRM + user_sessions + counseling_note + login history retention).");
         } catch (Exception ex) {
             log.warn("PostgreSQL tenant schema patch failed: {}", ex.getMessage());
         }
@@ -135,6 +136,49 @@ public class PostgresTenantSchemaPatcher implements ApplicationRunner {
                         EXECUTE format('ALTER TABLE %I.application_admission ALTER COLUMN organization_id DROP NOT NULL', s);
                     END IF;
                 END LOOP;
+            END $$;
+            """;
+
+    private static final String LOGIN_HISTORY_RETENTION_SQL = """
+            DO $$
+            DECLARE
+                s text;
+            BEGIN
+                FOR s IN
+                    SELECT nspname
+                    FROM pg_namespace
+                    WHERE nspname = 'public'
+                       OR nspname LIKE 'tenant_%'
+                LOOP
+                    IF EXISTS (
+                        SELECT 1 FROM information_schema.tables
+                        WHERE table_schema = s AND table_name = 'login_history'
+                    ) THEN
+                        EXECUTE format('ALTER TABLE %I.login_history ADD COLUMN IF NOT EXISTS device_name varchar(200)', s);
+                        EXECUTE format('ALTER TABLE %I.login_history ADD COLUMN IF NOT EXISTS logout_ip_address varchar(100)', s);
+                        EXECUTE format('CREATE INDEX IF NOT EXISTS idx_login_history_login_time ON %I.login_history (login_time)', s);
+                    END IF;
+                END LOOP;
+
+                CREATE TABLE IF NOT EXISTS public.retention_purge_log (
+                    id bigserial PRIMARY KEY,
+                    task_key varchar(64) NOT NULL,
+                    retention_days int NOT NULL,
+                    cutoff_at timestamp NOT NULL,
+                    deleted_count int NOT NULL DEFAULT 0,
+                    trigger_type varchar(32) NOT NULL,
+                    organization_id bigint,
+                    actor_username varchar(100),
+                    summary varchar(500),
+                    ran_at timestamp NOT NULL,
+                    created_by varchar(100),
+                    created_on timestamp,
+                    updated_by varchar(100),
+                    updated_on timestamp,
+                    version bigint NOT NULL DEFAULT 0
+                );
+                CREATE INDEX IF NOT EXISTS idx_retention_purge_task_ran
+                    ON public.retention_purge_log (task_key, ran_at);
             END $$;
             """;
 }

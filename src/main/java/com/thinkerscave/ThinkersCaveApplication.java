@@ -1,7 +1,9 @@
 package com.thinkerscave;
 
+import com.thinkerscave.retention.config.RetentionProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
@@ -27,6 +29,7 @@ import java.util.TimeZone;
         "com.thinkerscave.document",
         "com.thinkerscave.onboarding",
         "com.thinkerscave.platform",
+        "com.thinkerscave.retention",
         "com.thinkerscave.security",
         "com.thinkerscave.shared",
         "com.thinkerscave.staff",
@@ -34,6 +37,7 @@ import java.util.TimeZone;
 })
 @EnableAsync
 @EnableScheduling
+@EnableConfigurationProperties(RetentionProperties.class)
 public class ThinkersCaveApplication {
 
     public static void main(String[] args) {

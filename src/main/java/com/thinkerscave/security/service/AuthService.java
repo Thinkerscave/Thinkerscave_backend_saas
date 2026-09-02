@@ -1,5 +1,6 @@
 package com.thinkerscave.security.service;
 
+import com.thinkerscave.security.dto.ClientEnvironment;
 import com.thinkerscave.security.dto.LoginContext;
 import com.thinkerscave.security.dto.request.LoginRequest;
 import com.thinkerscave.security.dto.response.AuthResponse;
@@ -14,6 +15,8 @@ public interface AuthService {
 
     AuthResponse login(LoginRequest request, LoginContext loginContext);
 
+    AuthResponse login(LoginRequest request, LoginContext loginContext, ClientEnvironment client);
+
     /**
      * @param preferredTenant optional {@code X-Tenant-ID} from the refresh request — preserved when
      *                        valid for the user (avoids flipping Owners back to their first org)
@@ -22,6 +25,8 @@ public interface AuthService {
     AuthResponse refreshToken(String refreshToken, String preferredTenant, Long preferredOrgId);
 
     void logout(String refreshToken);
+
+    void logout(String refreshToken, ClientEnvironment client);
 
     void logoutAllSessions(Long userId);
 

@@ -10,6 +10,7 @@ import com.thinkerscave.platform.entity.Organization;
 import com.thinkerscave.platform.entity.TenantRegistry;
 import com.thinkerscave.platform.repository.OrganizationRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
+import com.thinkerscave.security.dto.ClientEnvironment;
 import com.thinkerscave.security.entity.UserSession;
 import com.thinkerscave.security.enums.SessionStatus;
 import com.thinkerscave.security.repository.UserSessionRepository;
@@ -148,7 +149,8 @@ public class PublicSchemaUserLookupService {
 
     /** Must be called with TenantContext already set to "public" — see notes above. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void recordSuccessfulLogin(Long userId, String refreshToken, String deviceName) {
+    public void recordSuccessfulLogin(Long userId, String refreshToken, ClientEnvironment client) {
+        ClientEnvironment env = client != null ? client : ClientEnvironment.empty();
         User managedUser = userRepository.findById(userId).orElseThrow();
         managedUser.setFailedLoginAttempts(0);
         managedUser.setAccountLocked(false);
@@ -158,8 +160,10 @@ public class PublicSchemaUserLookupService {
         sessionRepository.save(UserSession.builder()
                 .user(managedUser)
                 .refreshToken(refreshToken)
-                .deviceName(deviceName)
-                .ipAddress("")
+                .deviceName(env.deviceName())
+                .browser(env.browser())
+                .operatingSystem(env.operatingSystem())
+                .ipAddress(env.ipAddress() != null ? env.ipAddress() : "")
                 .loginAt(LocalDateTime.now())
                 .status(SessionStatus.ACTIVE)
                 .build());
@@ -168,18 +172,57 @@ public class PublicSchemaUserLookupService {
                 .user(managedUser)
                 .status(LoginStatus.SUCCESS)
                 .loginTime(LocalDateTime.now())
+                .ipAddress(env.ipAddress())
+                .deviceName(env.deviceName())
+                .browser(env.browser())
+                .operatingSystem(env.operatingSystem())
                 .build());
+    }
+
+    public void recordSuccessfulLogin(Long userId, String refreshToken, String deviceName) {
+        recordSuccessfulLogin(userId, refreshToken, ClientEnvironment.of(null, null, deviceName));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void logout(String refreshToken, ClientEnvironment client) {
+        ClientEnvironment env = client != null ? client : ClientEnvironment.empty();
+        sessionRepository.findByRefreshToken(refreshToken).ifPresent(session -> {
+            session.setStatus(SessionStatus.LOGGED_OUT);
+            session.setLogoutAt(LocalDateTime.now());
+            sessionRepository.save(session);
+            Long userId = session.getUser() != null ? session.getUser().getId() : null;
+            if (userId != null) {
+                loginHistoryRepository.findTopByUser_IdAndStatusAndLogoutTimeIsNullOrderByLoginTimeDesc(userId, LoginStatus.SUCCESS)
+                        .ifPresent(history -> {
+                            history.setLogoutTime(LocalDateTime.now());
+                            if (env.ipAddress() != null && !env.ipAddress().isBlank()) {
+                                history.setLogoutIpAddress(env.ipAddress());
+                            }
+                            loginHistoryRepository.save(history);
+                        });
+            }
+        });
     }
 
     /** Must be called with TenantContext already set to "public" — see notes above. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordFailedLoginAndLockout(Long userId, String reason, int maxFailedAttempts) {
+        recordFailedLoginAndLockout(userId, reason, maxFailedAttempts, ClientEnvironment.empty());
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordFailedLoginAndLockout(Long userId, String reason, int maxFailedAttempts, ClientEnvironment client) {
+        ClientEnvironment env = client != null ? client : ClientEnvironment.empty();
         User managedUser = userRepository.findById(userId).orElseThrow();
         loginHistoryRepository.save(LoginHistory.builder()
                 .user(managedUser)
                 .status(LoginStatus.FAILED)
                 .loginTime(LocalDateTime.now())
                 .failureReason(reason)
+                .ipAddress(env.ipAddress())
+                .deviceName(env.deviceName())
+                .browser(env.browser())
+                .operatingSystem(env.operatingSystem())
                 .build());
 
         managedUser.setFailedLoginAttempts(managedUser.getFailedLoginAttempts() + 1);
