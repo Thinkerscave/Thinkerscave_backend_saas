@@ -26,10 +26,12 @@ public class CustomerContact extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @EqualsAndHashCode.Include
     @Column(name = "id")
     private Long id;
 
+    // Identity key for equals/hashCode: `id` is null until flush, so two unsaved contacts
+    // added to Customer's HashSet would collide and one would be silently dropped.
+    @EqualsAndHashCode.Include
     @Column(name = "contact_code", nullable = false, unique = true, length = 50)
     private String contactCode;
 

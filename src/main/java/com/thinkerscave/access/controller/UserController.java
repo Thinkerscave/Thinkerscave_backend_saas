@@ -2,9 +2,13 @@ package com.thinkerscave.access.controller;
 
 import com.thinkerscave.access.dto.request.*;
 import com.thinkerscave.access.dto.response.*;
+import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.enums.RoleType;
 import com.thinkerscave.access.enums.UserStatus;
+import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.access.service.UserManagementService;
+import com.thinkerscave.security.service.impl.PublicSchemaUserLookupService;
+import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.dto.ApiResponse;
 import com.thinkerscave.shared.util.PageRequestUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,10 +19,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/access/organizations/{organizationId}/users")
@@ -27,6 +37,8 @@ import java.util.List;
 public class UserController {
 
     private final UserManagementService userManagementService;
+    private final UserRepository userRepository;
+    private final PublicSchemaUserLookupService publicSchemaUserLookupService;
 
     @PostMapping
     @Operation(summary = "Create a new user in the organization")
@@ -167,10 +179,56 @@ public class UserController {
 
     @GetMapping("/{userId}/effective-permissions")
     @Operation(summary = "Get effective permissions for a user (role + user overrides merged)")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<List<EffectivePermissionResponse>>> getEffectivePermissions(
             @PathVariable Long organizationId,
             @PathVariable Long userId) {
+        assertCanViewEffectivePermissions(userId);
         return ResponseEntity.ok(ApiResponse.success(userManagementService.getEffectivePermissions(organizationId, userId)));
+    }
+
+    /**
+     * IDOR guard: a non-admin caller may only fetch their own effective permissions.
+     */
+    private void assertCanViewEffectivePermissions(Long requestedUserId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Not authenticated");
+        }
+        if (hasAnyAuthority(authentication, "SUPER_ADMIN", "ORGANIZATION_ADMIN", "ORGANIZATION_OWNER")) {
+            return;
+        }
+        User caller = resolveCaller(authentication.getName())
+                .orElseThrow(() -> new AccessDeniedException("Caller not resolvable"));
+        if (!caller.getId().equals(requestedUserId)) {
+            throw new AccessDeniedException("Not authorized to view this user's permissions");
+        }
+    }
+
+    private Optional<User> resolveCaller(String usernameOrEmail) {
+        Optional<User> ambient = userRepository.findByUsername(usernameOrEmail)
+                .or(() -> userRepository.findByEmail(usernameOrEmail));
+        if (ambient.isPresent()) {
+            return ambient;
+        }
+        String previousTenant = TenantContext.getTenant();
+        try {
+            TenantContext.setTenant("public");
+            return publicSchemaUserLookupService.findAnyInPublicSchema(usernameOrEmail);
+        } finally {
+            TenantContext.setTenant(previousTenant);
+        }
+    }
+
+    private boolean hasAnyAuthority(Authentication authentication, String... authorities) {
+        Collection<? extends GrantedAuthority> granted = authentication.getAuthorities();
+        for (String authority : authorities) {
+            for (GrantedAuthority ga : granted) {
+                if (authority.equals(ga.getAuthority())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

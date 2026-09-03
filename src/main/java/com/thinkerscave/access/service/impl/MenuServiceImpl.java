@@ -29,6 +29,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -257,7 +260,10 @@ public class MenuServiceImpl implements MenuService {
         // Fetch all active menus in a single query and group children by parent id in-memory
         // to avoid an N+1 query pattern (one query per menu node) which caused the sidebar
         // endpoint to take 50+ seconds against a remote/high-latency database.
-        List<Menu> allActiveMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc();
+        boolean platformCaller = isPlatformCaller();
+        List<Menu> allActiveMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
+            .filter(menu -> includeMenuForCaller(menu, platformCaller))
+            .toList();
         Map<Long, List<Menu>> childrenByParentId = allActiveMenus.stream()
                 .filter(m -> m.getParentMenu() != null)
                 .collect(Collectors.groupingBy(m -> m.getParentMenu().getId()));
@@ -265,7 +271,32 @@ public class MenuServiceImpl implements MenuService {
                 .filter(m -> m.getParentMenu() == null)
                 .toList();
 
-        return buildSidebarTree(topLevelMenus, permMap, organizationId, childrenByParentId);
+        return buildSidebarTree(topLevelMenus, permMap, organizationId, childrenByParentId, platformCaller);
+    }
+
+    private boolean includeMenuForCaller(Menu menu, boolean platformCaller) {
+        MenuScope scope = menu.getMenuScope();
+        if (platformCaller) {
+            return scope == MenuScope.PLATFORM;
+        }
+        return scope != MenuScope.PLATFORM;
+    }
+
+    private boolean isPlatformCaller() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities() == null) {
+            return false;
+        }
+        for (GrantedAuthority authority : authentication.getAuthorities()) {
+            String value = authority.getAuthority();
+            if ("SUPER_ADMIN".equals(value)
+                    || "PLATFORM_ADMIN".equals(value)
+                    || "THINKERSCAVE_INTERNAL".equals(value)
+                    || "INTERNAL_TEAM".equals(value)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ─── Tree Builders ────────────────────────────────────────────────────
@@ -296,17 +327,22 @@ public class MenuServiceImpl implements MenuService {
     private List<SidebarItemResponse> buildSidebarTree(List<Menu> parents,
             Map<Long, com.thinkerscave.access.dto.response.EffectivePermissionResponse> permMap,
             Long organizationId,
-            Map<Long, List<Menu>> childrenByParentId) {
+            Map<Long, List<Menu>> childrenByParentId,
+            boolean platformCaller) {
         List<SidebarItemResponse> result = new ArrayList<>();
         for (Menu parent : parents) {
             if (!Boolean.TRUE.equals(parent.getShowInSidebar())) continue;
 
             com.thinkerscave.access.dto.response.EffectivePermissionResponse perm = permMap.get(parent.getId());
             List<Menu> children = childrenByParentId.getOrDefault(parent.getId(), List.of());
-            List<SidebarItemResponse> childNodes = buildSidebarTree(children, permMap, organizationId, childrenByParentId);
+            List<SidebarItemResponse> childNodes = buildSidebarTree(children, permMap, organizationId, childrenByParentId, platformCaller);
 
-            boolean hasAccess = perm != null || !childNodes.isEmpty();
+            boolean hasAccess = platformCaller || perm != null || !childNodes.isEmpty();
             if (!hasAccess) continue;
+
+            boolean canView = platformCaller || (perm != null && Boolean.TRUE.equals(perm.getCanView()));
+            boolean canManage = platformCaller || (perm != null && Boolean.TRUE.equals(perm.getCanManage()));
+            boolean canApprove = platformCaller || (perm != null && Boolean.TRUE.equals(perm.getCanApprove()));
 
             result.add(SidebarItemResponse.builder()
                     .id(parent.getId())
@@ -316,9 +352,9 @@ public class MenuServiceImpl implements MenuService {
                     .icon(parent.getIcon())
                     .displayOrder(parent.getDisplayOrder())
                     .defaultPage(parent.getDefaultPage())
-                    .canView(perm != null ? perm.getCanView() : false)
-                    .canManage(perm != null ? perm.getCanManage() : false)
-                    .canApprove(perm != null ? perm.getCanApprove() : false)
+                    .canView(canView)
+                    .canManage(canManage)
+                    .canApprove(canApprove)
                     .children(childNodes)
                     .build());
         }
