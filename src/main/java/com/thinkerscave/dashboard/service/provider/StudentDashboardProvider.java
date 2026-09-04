@@ -9,7 +9,7 @@ import com.thinkerscave.dashboard.dto.response.WidgetDTO;
 import com.thinkerscave.dashboard.dto.response.widgetdata.*;
 import com.thinkerscave.dashboard.enums.DataMode;
 import com.thinkerscave.dashboard.enums.WidgetType;
-import com.thinkerscave.dashboard.service.SampleWidgetFactory;
+import com.thinkerscave.dashboard.service.DashboardTimetableHelper;
 import com.thinkerscave.dashboard.util.RoleLabels;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.student.entity.Student;
@@ -26,7 +26,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Student dashboard — today's schedule, attendance and academic snapshot.
+ * Student dashboard — today's schedule, attendance and academic snapshot,
+ * all sourced from real org/student-scoped data.
  */
 @Component
 @RequiredArgsConstructor
@@ -36,7 +37,7 @@ public class StudentDashboardProvider extends AbstractDashboardWidgetProvider im
     private final StudentEnrollmentRepository studentEnrollmentRepository;
     private final StudentAttendanceRepository studentAttendanceRepository;
     private final NoticeRepository noticeRepository;
-    private final SampleWidgetFactory sampleWidgetFactory;
+    private final DashboardTimetableHelper timetableHelper;
 
     @Override
     public List<WidgetDTO<?>> getWidgets(User user) {
@@ -44,20 +45,19 @@ public class StudentDashboardProvider extends AbstractDashboardWidgetProvider im
         StudentEnrollment enrollment = student != null
                 ? studentEnrollmentRepository.findActiveWithClassByStudentId(student.getStudentId()).orElse(null)
                 : null;
+        Long sectionId = enrollment != null && enrollment.getSection() != null ? enrollment.getSection().getSectionId() : null;
+        List<TimetableSlotItem> todaySlots = timetableHelper.todaySlotsForSection(sectionId);
 
         return List.of(
                 welcomeHeader(user, student),
-                kpiGrid(student),
+                kpiGrid(student, todaySlots),
                 quickActions(),
-                todaysTimetable(enrollment),
+                todaysTimetable(todaySlots),
                 attendanceOverview(student),
-                examinationSummaryPreview(),
                 schoolNotices(),
                 recentAnnouncements(),
                 upcomingEvents(),
-                academicCalendar(),
-                libraryPreview(),
-                transportPreview()
+                academicCalendar()
         );
     }
 
@@ -72,7 +72,7 @@ public class StudentDashboardProvider extends AbstractDashboardWidgetProvider im
                         .build());
     }
 
-    private WidgetDTO<KpiGridData> kpiGrid(Student student) {
+    private WidgetDTO<KpiGridData> kpiGrid(Student student, List<TimetableSlotItem> todaySlots) {
         return safeWidget("kpi-grid", WidgetType.KPI_GRID, "Your snapshot", 4, DataMode.LIVE, () -> {
             double attendancePct = attendancePercentage(student);
             long noticeCount = 0;
@@ -84,10 +84,8 @@ public class StudentDashboardProvider extends AbstractDashboardWidgetProvider im
 
             return KpiGridData.builder().items(List.of(
                     KpiItem.builder().label("Attendance").value(String.format("%.0f%%", attendancePct)).icon("pi-calendar-plus").tone(attendancePct >= 75 ? "success" : "danger").build(),
-                    KpiItem.builder().label("Assignments").value("3 due").icon("pi-file-edit").tone("warning").sample(true).build(),
-                    KpiItem.builder().label("Upcoming Exams").value("2").icon("pi-pencil").tone("info").sample(true).build(),
-                    KpiItem.builder().label("Fee Balance").value("₹12.5K").icon("pi-wallet").tone("danger").sample(true).build(),
-                    KpiItem.builder().label("Notifications").value(String.valueOf(noticeCount)).icon("pi-bell").tone("primary").build()
+                    KpiItem.builder().label("Today's Classes").value(String.valueOf(todaySlots.size())).icon("pi-book").tone("primary").build(),
+                    KpiItem.builder().label("Notifications").value(String.valueOf(noticeCount)).icon("pi-bell").tone("info").build()
             )).build();
         });
     }
@@ -102,11 +100,11 @@ public class StudentDashboardProvider extends AbstractDashboardWidgetProvider im
                 )).build());
     }
 
-    private WidgetDTO<TimetableData> todaysTimetable(StudentEnrollment enrollment) {
+    private WidgetDTO<TimetableData> todaysTimetable(List<TimetableSlotItem> todaySlots) {
         return safeWidget("todays-timetable", WidgetType.TIMETABLE, "Today's timetable", 4, DataMode.LIVE, () ->
                 TimetableData.builder()
                         .dayLabel(LocalDate.now().getDayOfWeek().toString())
-                        .slots(Collections.emptyList())
+                        .slots(todaySlots)
                         .build());
     }
 
@@ -132,11 +130,6 @@ public class StudentDashboardProvider extends AbstractDashboardWidgetProvider im
                     .date(to)
                     .build();
         });
-    }
-
-    private WidgetDTO<ExaminationSummaryData> examinationSummaryPreview() {
-        return safeWidget("examination-summary", WidgetType.EXAMINATION_SUMMARY, "Upcoming exams", "Future scope preview",
-                2, DataMode.SAMPLE, sampleWidgetFactory::examinationSummary);
     }
 
     private WidgetDTO<NotificationsData> schoolNotices() {
@@ -173,16 +166,6 @@ public class StudentDashboardProvider extends AbstractDashboardWidgetProvider im
     private WidgetDTO<CalendarData> academicCalendar() {
         return safeWidget("academic-calendar", WidgetType.CALENDAR, "Academic calendar", 4, DataMode.LIVE, () ->
                 CalendarData.builder().items(Collections.emptyList()).build());
-    }
-
-    private WidgetDTO<LibrarySummaryData> libraryPreview() {
-        return safeWidget("library-summary", WidgetType.LIBRARY_SUMMARY, "Library", "Future scope preview",
-                2, DataMode.SAMPLE, sampleWidgetFactory::librarySummary);
-    }
-
-    private WidgetDTO<TransportSummaryData> transportPreview() {
-        return safeWidget("transport-summary", WidgetType.TRANSPORT_SUMMARY, "Transport", "Future scope preview",
-                2, DataMode.SAMPLE, sampleWidgetFactory::transportSummary);
     }
 
     private double attendancePercentage(Student student) {

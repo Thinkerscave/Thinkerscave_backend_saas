@@ -9,7 +9,6 @@ import com.thinkerscave.dashboard.dto.response.WidgetDTO;
 import com.thinkerscave.dashboard.dto.response.widgetdata.*;
 import com.thinkerscave.dashboard.enums.DataMode;
 import com.thinkerscave.dashboard.enums.WidgetType;
-import com.thinkerscave.dashboard.service.SampleWidgetFactory;
 import com.thinkerscave.dashboard.util.ChartBucketUtil;
 import com.thinkerscave.dashboard.util.RoleLabels;
 import com.thinkerscave.platform.entity.Organization;
@@ -44,7 +43,6 @@ public class SuperAdminDashboardProvider extends AbstractDashboardWidgetProvider
     private final OrganizationSubscriptionRepository organizationSubscriptionRepository;
     private final UserRepository userRepository;
     private final AuditLogRepository auditLogRepository;
-    private final SampleWidgetFactory sampleWidgetFactory;
 
     @Override
     public List<WidgetDTO<?>> getWidgets(User user) {
@@ -55,11 +53,9 @@ public class SuperAdminDashboardProvider extends AbstractDashboardWidgetProvider
                 organizationGrowthChart(),
                 newOrganizationsChart(),
                 userGrowthChart(),
-                systemHealth(),
                 recentOrganizations(),
                 recentActivity(),
-                topOrganizations(),
-                supportTicketsPreview()
+                topOrganizations()
         );
     }
 
@@ -88,8 +84,7 @@ public class SuperAdminDashboardProvider extends AbstractDashboardWidgetProvider
                     KpiItem.builder().label("Active Organizations").value(String.valueOf(activeOrgs)).icon("pi-check-circle").tone("success").build(),
                     KpiItem.builder().label("Total Users").value(String.valueOf(totalUsers)).icon("pi-users").tone("info").build(),
                     KpiItem.builder().label("Active Subscriptions").value(String.valueOf(activeSubscriptions)).icon("pi-credit-card").tone("warning").build(),
-                    KpiItem.builder().label("Recurring Revenue").value(formatCurrency(recurringRevenue)).icon("pi-money-bill").tone("success").build(),
-                    KpiItem.builder().label("Support Tickets").value("3").icon("pi-ticket").tone("danger").sample(true).build()
+                    KpiItem.builder().label("Recurring Revenue").value(formatCurrency(recurringRevenue)).icon("pi-money-bill").tone("success").build()
             )).build();
         });
     }
@@ -131,19 +126,6 @@ public class SuperAdminDashboardProvider extends AbstractDashboardWidgetProvider
                     .map(User::getCreatedOn).collect(Collectors.toList());
             return ChartBucketUtil.monthlyCounts(timestamps, 6, "New users", "area");
         });
-    }
-
-    private WidgetDTO<SystemHealthData> systemHealth() {
-        return safeWidget("system-health", WidgetType.SYSTEM_HEALTH, "System health", 2, DataMode.SAMPLE, () ->
-                SystemHealthData.builder()
-                        .overallStatus("Operational")
-                        .checks(List.of(
-                                StatListItem.builder().label("API Gateway").value("Operational").icon("pi-check-circle").tone("success").build(),
-                                StatListItem.builder().label("Database").value("Operational").icon("pi-check-circle").tone("success").build(),
-                                StatListItem.builder().label("Background Jobs").value("Operational").icon("pi-check-circle").tone("success").build(),
-                                StatListItem.builder().label("Email Delivery").value("Degraded").icon("pi-exclamation-triangle").tone("warning").build()
-                        ))
-                        .build());
     }
 
     private WidgetDTO<RecentRecordsData> recentOrganizations() {
@@ -217,11 +199,6 @@ public class SuperAdminDashboardProvider extends AbstractDashboardWidgetProvider
                     .collect(Collectors.toList());
             return TopOrganizationsData.builder().items(items).build();
         });
-    }
-
-    private WidgetDTO<SupportTicketsData> supportTicketsPreview() {
-        return safeWidget("support-tickets-preview", WidgetType.SUPPORT_TICKETS, "Support tickets", "Future scope preview",
-                2, DataMode.SAMPLE, sampleWidgetFactory::supportTickets);
     }
 
     private String displayName(User user) {

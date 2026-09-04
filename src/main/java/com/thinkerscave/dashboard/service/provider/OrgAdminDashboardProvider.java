@@ -16,7 +16,6 @@ import com.thinkerscave.dashboard.dto.response.WidgetDTO;
 import com.thinkerscave.dashboard.dto.response.widgetdata.*;
 import com.thinkerscave.dashboard.enums.DataMode;
 import com.thinkerscave.dashboard.enums.WidgetType;
-import com.thinkerscave.dashboard.service.SampleWidgetFactory;
 import com.thinkerscave.dashboard.util.ChartBucketUtil;
 import com.thinkerscave.dashboard.util.RoleLabels;
 import com.thinkerscave.onboarding.dto.OnboardingChecklistItemResponse;
@@ -51,7 +50,6 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
     private final ApplicationAdmissionRepository applicationAdmissionRepository;
     private final NoticeRepository noticeRepository;
     private final AuditLogRepository auditLogRepository;
-    private final SampleWidgetFactory sampleWidgetFactory;
     private final OnboardingService onboardingService;
     private final OrganizationRepository organizationRepository;
 
@@ -63,13 +61,11 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
                 quickActions(),
                 attendanceOverviewChart(),
                 admissionTrendChart(),
-                feeCollectionDonut(),
                 todaysTasks(),
                 recentAdmissions(),
                 upcomingEvents(),
                 recentActivities(),
-                announcements(),
-                leaveSummaryPreview()
+                announcements()
         );
     }
 
@@ -135,9 +131,7 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
                     KpiItem.builder().label("Students").value(String.valueOf(totalStudents)).icon("pi-users").tone("primary").build(),
                     KpiItem.builder().label("Staff").value(String.valueOf(totalStaff)).icon("pi-id-card").tone("info").build(),
                     KpiItem.builder().label("Today's Attendance").value(String.valueOf(presentToday)).icon("pi-calendar-plus").tone("success").build(),
-                    KpiItem.builder().label("Pending Admissions").value(String.valueOf(pendingAdmissions)).icon("pi-user-plus").tone("warning").build(),
-                    KpiItem.builder().label("Pending Fees").value("₹85K").icon("pi-exclamation-circle").tone("danger").sample(true).build(),
-                    KpiItem.builder().label("Leave Requests").value("4").icon("pi-calendar-times").tone("warning").sample(true).build()
+                    KpiItem.builder().label("Pending Admissions").value(String.valueOf(pendingAdmissions)).icon("pi-user-plus").tone("warning").build()
             )).build();
         });
     }
@@ -175,15 +169,6 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
         });
     }
 
-    private WidgetDTO<ChartData> feeCollectionDonut() {
-        return safeWidget("fee-collection-donut", WidgetType.CHART, "Fee collection", "Preview — this term", 2, DataMode.SAMPLE, () ->
-                ChartData.builder().chartType("donut")
-                        .labels(List.of("Collected", "Pending", "Overdue"))
-                        .series(List.of(ChartSeries.builder().name("Fees").data(List.of(72.0, 20.0, 8.0)).build()))
-                        .unit("%")
-                        .build());
-    }
-
     private WidgetDTO<PendingTasksData> todaysTasks() {
         return safeWidget("todays-tasks", WidgetType.PENDING_TASKS, "Today's tasks", 2, DataMode.LIVE, () -> {
             Long orgId = OrganizationContext.getOrganizationId();
@@ -191,8 +176,7 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
             long pendingAttendanceClasses = studentAttendanceRepository.countClassesWithPendingAttendance(orgId, LocalDate.now());
             return PendingTasksData.builder().items(List.of(
                     TaskItem.builder().title(pendingAttendanceClasses + " classes haven't marked today's attendance").priority("high").completed(false).link("/app/attendance/students").build(),
-                    TaskItem.builder().title(pendingApps + " admission applications awaiting review").priority("medium").completed(false).link("/app/admission/applications").build(),
-                    TaskItem.builder().title("Approve pending staff leave requests").priority("low").completed(false).sample(true).build()
+                    TaskItem.builder().title(pendingApps + " admission applications awaiting review").priority("medium").completed(false).link("/app/admission/applications").build()
             )).build();
         });
     }
@@ -242,11 +226,6 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
                             .publishedAt(n.getPublishDate()).pinned(n.isPinned()).build()).collect(Collectors.toList()))
                     .build();
         });
-    }
-
-    private WidgetDTO<LeaveSummaryData> leaveSummaryPreview() {
-        return safeWidget("leave-summary-preview", WidgetType.LEAVE_SUMMARY, "Leave requests", "Future scope preview",
-                2, DataMode.SAMPLE, sampleWidgetFactory::leaveSummary);
     }
 
     private String displayName(User user) {
