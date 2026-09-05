@@ -17,7 +17,6 @@ import com.thinkerscave.dashboard.dto.response.WidgetDTO;
 import com.thinkerscave.dashboard.dto.response.widgetdata.*;
 import com.thinkerscave.dashboard.enums.DataMode;
 import com.thinkerscave.dashboard.enums.WidgetType;
-import com.thinkerscave.dashboard.service.SampleWidgetFactory;
 import com.thinkerscave.dashboard.util.ChartBucketUtil;
 import com.thinkerscave.dashboard.util.RoleLabels;
 import com.thinkerscave.onboarding.dto.OnboardingChecklistItemResponse;
@@ -55,7 +54,6 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
     private final ApplicationAdmissionRepository applicationAdmissionRepository;
     private final NoticeRepository noticeRepository;
     private final AuditLogRepository auditLogRepository;
-    private final SampleWidgetFactory sampleWidgetFactory;
     private final OnboardingService onboardingService;
     private final OrganizationRepository organizationRepository;
 
@@ -67,7 +65,6 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
                 quickActions(),
                 studentGrowthChart(),
                 admissionTrendChart(),
-                feeCollectionTrendChart(),
                 recentAdmissions(),
                 pendingApprovals(),
                 recentActivity(),
@@ -139,9 +136,7 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
                     KpiItem.builder().label("Students").value(String.valueOf(totalStudents)).icon("pi-users").tone("primary").build(),
                     KpiItem.builder().label("Staff").value(String.valueOf(totalStaff)).icon("pi-id-card").tone("info").build(),
                     KpiItem.builder().label("Today's Attendance").value(String.valueOf(presentToday)).icon("pi-calendar-plus").tone("success").build(),
-                    KpiItem.builder().label("New Admissions").value(String.valueOf(newAdmissionsToday)).icon("pi-user-plus").tone("warning").build(),
-                    KpiItem.builder().label("Fee Collection").value("₹3.2L").icon("pi-wallet").tone("success").sample(true).build(),
-                    KpiItem.builder().label("Pending Fees").value("₹85K").icon("pi-exclamation-circle").tone("danger").sample(true).build()
+                    KpiItem.builder().label("New Admissions").value(String.valueOf(newAdmissionsToday)).icon("pi-user-plus").tone("warning").build()
             )).build();
         });
     }
@@ -174,12 +169,6 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
         });
     }
 
-    private WidgetDTO<ChartData> feeCollectionTrendChart() {
-        return safeWidget("fee-collection-trend", WidgetType.CHART, "Fee collection trend", "Preview — last 6 months",
-                2, DataMode.SAMPLE, () -> sampleWidgetFactory.trendChart(
-                        "Fee collected (₹K)", "area", new double[]{240, 265, 250, 290, 310, 320}));
-    }
-
     private WidgetDTO<RecentRecordsData> recentAdmissions() {
         return safeWidget("recent-admissions", WidgetType.RECENT_RECORDS, "Recent admissions", 2, DataMode.LIVE, () -> {
             Long orgId = OrganizationContext.getOrganizationId();
@@ -204,8 +193,7 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
             long docsPending = applicationAdmissionRepository.countByStatus(ApplicationStatus.DOCUMENTS_PENDING);
             return PendingTasksData.builder().items(List.of(
                     TaskItem.builder().title(pendingApps + " admission applications awaiting review").priority("high").completed(false).link("/app/admission/applications").build(),
-                    TaskItem.builder().title(docsPending + " applications pending documents").priority("medium").completed(false).link("/app/admission/applications").build(),
-                    TaskItem.builder().title("Review staff leave requests").priority("low").completed(false).sample(true).build()
+                    TaskItem.builder().title(docsPending + " applications pending documents").priority("medium").completed(false).link("/app/admission/applications").build()
             )).build();
         });
     }

@@ -1,6 +1,10 @@
 package com.thinkerscave.dashboard.service.provider;
 
 import com.thinkerscave.access.entity.User;
+import com.thinkerscave.academics.entity.TeacherAllocation;
+import com.thinkerscave.academics.entity.TeacherAllocationTeacher;
+import com.thinkerscave.academics.repository.AcademicYearRepository;
+import com.thinkerscave.academics.repository.TeacherAllocationTeacherRepository;
 import com.thinkerscave.attendance.entity.StaffAttendance;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
 import com.thinkerscave.attendance.repository.StaffAttendanceRepository;
@@ -12,12 +16,12 @@ import com.thinkerscave.dashboard.dto.response.WidgetDTO;
 import com.thinkerscave.dashboard.dto.response.widgetdata.*;
 import com.thinkerscave.dashboard.enums.DataMode;
 import com.thinkerscave.dashboard.enums.WidgetType;
-import com.thinkerscave.dashboard.service.SampleWidgetFactory;
+import com.thinkerscave.dashboard.service.DashboardTimetableHelper;
 import com.thinkerscave.dashboard.util.RoleLabels;
 import com.thinkerscave.shared.context.OrganizationContext;
-import com.thinkerscave.staff.entity.Payroll;
 import com.thinkerscave.staff.entity.Staff;
 import com.thinkerscave.staff.repository.PayrollRepository;
+import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -25,12 +29,14 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
  * Teacher/Staff dashboard. Centers around the sign-in/out attendance
- * widget and today's teaching schedule.
+ * widget and today's teaching schedule — all real, org/staff-scoped data.
  */
 @Component
 @RequiredArgsConstructor
@@ -41,24 +47,28 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
     private final StudentAttendanceRepository studentAttendanceRepository;
     private final PayrollRepository payrollRepository;
     private final NoticeRepository noticeRepository;
-    private final SampleWidgetFactory sampleWidgetFactory;
+    private final DashboardTimetableHelper timetableHelper;
+    private final TeacherAllocationTeacherRepository teacherAllocationTeacherRepository;
+    private final AcademicYearRepository academicYearRepository;
+    private final ResponsibilityAssignmentRepository responsibilityAssignmentRepository;
 
     @Override
     public List<WidgetDTO<?>> getWidgets(User user) {
         Staff staff = user != null ? staffRepository.findByUser_Id(user.getId()).orElse(null) : null;
+        List<TimetableSlotItem> todaySlots = staff != null
+                ? timetableHelper.todaySlotsForTeacher(staff.getStaffId()) : List.of();
 
         return List.of(
                 welcomeHeader(user, staff),
-                kpiGrid(staff),
+                kpiGrid(staff, todaySlots),
                 staffAttendanceToggle(staff),
                 quickActions(),
-                todaysTimetable(staff),
+                todaysTimetable(todaySlots),
                 studentAttendanceToday(),
-                pendingTasks(),
                 myClassesOverview(staff),
+                myResponsibilities(staff),
                 announcements(),
-                upcomingEvents(),
-                leaveSummaryPreview()
+                upcomingEvents()
         );
     }
 
@@ -73,7 +83,7 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
                         .build());
     }
 
-    private WidgetDTO<KpiGridData> kpiGrid(Staff staff) {
+    private WidgetDTO<KpiGridData> kpiGrid(Staff staff, List<TimetableSlotItem> todaySlots) {
         return safeWidget("kpi-grid", WidgetType.KPI_GRID, "Your day at a glance", 4, DataMode.LIVE, () -> {
             String payrollStatus = "N/A";
             if (staff != null) {
@@ -84,12 +94,21 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
                         .orElse("NOT GENERATED");
             }
 
+            long classesCompleted = todaySlots.stream()
+                    .filter(s -> s.getEndTime() != null && s.getEndTime().isBefore(java.time.LocalTime.now()))
+                    .count();
+
+            Long orgId = OrganizationContext.getOrganizationId();
+            long attendancePending = todaySlots.stream()
+                    .map(TimetableSlotItem::getClassName)
+                    .filter(java.util.Objects::nonNull)
+                    .distinct()
+                    .count();
+
             return KpiGridData.builder().items(List.of(
-                    KpiItem.builder().label("Today's Classes").value("0").icon("pi-book").tone("primary").build(),
-                    KpiItem.builder().label("Classes Completed").value("0").icon("pi-check-circle").tone("success").sample(true).build(),
-                    KpiItem.builder().label("Attendance Pending").value("1").icon("pi-exclamation-circle").tone("warning").sample(true).build(),
-                    KpiItem.builder().label("Leave Balance").value("12 days").icon("pi-calendar-times").tone("info").sample(true).build(),
-                    KpiItem.builder().label("Upcoming Exams").value("2").icon("pi-pencil").tone("warning").sample(true).build(),
+                    KpiItem.builder().label("Today's Classes").value(String.valueOf(todaySlots.size())).icon("pi-book").tone("primary").build(),
+                    KpiItem.builder().label("Classes Completed").value(String.valueOf(classesCompleted)).icon("pi-check-circle").tone("success").build(),
+                    KpiItem.builder().label("Distinct Classes Today").value(String.valueOf(attendancePending)).icon("pi-exclamation-circle").tone("warning").build(),
                     KpiItem.builder().label("Payroll Status").value(payrollStatus).icon("pi-money-bill").tone("success").build()
             )).build();
         });
@@ -126,11 +145,11 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
                 )).build());
     }
 
-    private WidgetDTO<TimetableData> todaysTimetable(Staff staff) {
+    private WidgetDTO<TimetableData> todaysTimetable(List<TimetableSlotItem> todaySlots) {
         return safeWidget("todays-timetable", WidgetType.TIMETABLE, "Today's timetable", 4, DataMode.LIVE, () ->
                 TimetableData.builder()
                         .dayLabel(LocalDate.now().getDayOfWeek().toString())
-                        .slots(Collections.emptyList())
+                        .slots(todaySlots)
                         .build());
     }
 
@@ -150,18 +169,53 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
         });
     }
 
-    private WidgetDTO<PendingTasksData> pendingTasks() {
-        return safeWidget("pending-tasks", WidgetType.PENDING_TASKS, "Pending tasks", 2, DataMode.SAMPLE, () ->
-                PendingTasksData.builder().items(List.of(
-                        TaskItem.builder().title("Submit attendance for Class 8-B").priority("high").completed(false).sample(true).build(),
-                        TaskItem.builder().title("Grade Unit Test papers — Section A").priority("medium").completed(false).sample(true).build(),
-                        TaskItem.builder().title("Parent-teacher meeting prep").priority("low").completed(false).sample(true).build()
-                )).build());
+    private WidgetDTO<StatListData> myClassesOverview(Staff staff) {
+        return safeWidget("my-classes-overview", WidgetType.STAT_LIST, "My classes overview", 2, DataMode.LIVE, () -> {
+            if (staff == null) {
+                return StatListData.builder().items(Collections.emptyList()).build();
+            }
+            Long yearId = academicYearRepository.findByCurrentYearTrue()
+                    .map(y -> y.getAcademicYearId()).orElse(null);
+            if (yearId == null) {
+                return StatListData.builder().items(Collections.emptyList()).build();
+            }
+            List<TeacherAllocationTeacher> allocations = teacherAllocationTeacherRepository
+                    .findActiveByStaffAndYear(staff.getStaffId(), yearId);
+
+            Map<String, Integer> subjectCountBySection = new LinkedHashMap<>();
+            for (TeacherAllocationTeacher tat : allocations) {
+                TeacherAllocation ta = tat.getTeacherAllocation();
+                String key = ta.getSection().getAcademicClass().getName() + " " + ta.getSection().getName();
+                subjectCountBySection.merge(key, 1, Integer::sum);
+            }
+
+            return StatListData.builder().items(subjectCountBySection.entrySet().stream()
+                    .map(e -> StatListItem.builder()
+                            .label(e.getKey())
+                            .value(e.getValue() + (e.getValue() == 1 ? " subject" : " subjects"))
+                            .icon("pi-book")
+                            .tone("primary")
+                            .build())
+                    .collect(Collectors.toList())).build();
+        });
     }
 
-    private WidgetDTO<StatListData> myClassesOverview(Staff staff) {
-        return safeWidget("my-classes-overview", WidgetType.STAT_LIST, "My classes overview", 2, DataMode.LIVE, () ->
-                StatListData.builder().items(Collections.emptyList()).build());
+    private WidgetDTO<StatListData> myResponsibilities(Staff staff) {
+        return safeWidget("my-responsibilities", WidgetType.STAT_LIST, "My responsibilities", 2, DataMode.LIVE, () -> {
+            if (staff == null) {
+                return StatListData.builder().items(Collections.emptyList()).build();
+            }
+            var assignments = responsibilityAssignmentRepository
+                    .findByStaff_StaffIdAndActiveTrueOrderByEffectiveFromDesc(staff.getStaffId());
+            return StatListData.builder().items(assignments.stream()
+                    .map(a -> StatListItem.builder()
+                            .label(a.getResponsibility().getResponsibilityName())
+                            .value(a.getScope() != null ? a.getScope() : "—")
+                            .icon("pi-sitemap")
+                            .tone("info")
+                            .build())
+                    .collect(Collectors.toList())).build();
+        });
     }
 
     private WidgetDTO<AnnouncementsData> announcements() {
@@ -180,11 +234,6 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
     private WidgetDTO<CalendarData> upcomingEvents() {
         return safeWidget("upcoming-events", WidgetType.EVENTS, "Upcoming events", 2, DataMode.LIVE, () ->
                 CalendarData.builder().items(Collections.emptyList()).build());
-    }
-
-    private WidgetDTO<LeaveSummaryData> leaveSummaryPreview() {
-        return safeWidget("leave-summary-preview", WidgetType.LEAVE_SUMMARY, "Leave balance", "Future scope preview",
-                2, DataMode.SAMPLE, sampleWidgetFactory::leaveSummary);
     }
 
     private String displayName(User user) {

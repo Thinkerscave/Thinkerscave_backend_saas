@@ -9,7 +9,7 @@ import com.thinkerscave.dashboard.dto.response.WidgetDTO;
 import com.thinkerscave.dashboard.dto.response.widgetdata.*;
 import com.thinkerscave.dashboard.enums.DataMode;
 import com.thinkerscave.dashboard.enums.WidgetType;
-import com.thinkerscave.dashboard.service.SampleWidgetFactory;
+import com.thinkerscave.dashboard.service.DashboardTimetableHelper;
 import com.thinkerscave.dashboard.util.RoleLabels;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.student.entity.Parent;
@@ -41,7 +41,7 @@ public class ParentDashboardProvider extends AbstractDashboardWidgetProvider imp
     private final StudentEnrollmentRepository studentEnrollmentRepository;
     private final StudentAttendanceRepository studentAttendanceRepository;
     private final NoticeRepository noticeRepository;
-    private final SampleWidgetFactory sampleWidgetFactory;
+    private final DashboardTimetableHelper timetableHelper;
 
     @Override
     public List<WidgetDTO<?>> getWidgets(User user) {
@@ -53,13 +53,15 @@ public class ParentDashboardProvider extends AbstractDashboardWidgetProvider imp
         StudentEnrollment enrollment = primaryChild != null
                 ? studentEnrollmentRepository.findActiveWithClassByStudentId(primaryChild.getStudentId()).orElse(null)
                 : null;
+        Long sectionId = enrollment != null && enrollment.getSection() != null ? enrollment.getSection().getSectionId() : null;
+        List<TimetableSlotItem> todaySlots = timetableHelper.todaySlotsForSection(sectionId);
 
         return List.of(
                 welcomeHeader(user, parent),
                 childProfile(links, primaryChild, enrollment),
-                kpiGrid(primaryChild),
+                kpiGrid(primaryChild, todaySlots),
                 quickActions(),
-                todaysSchedule(enrollment),
+                todaysSchedule(todaySlots),
                 attendanceOverview(primaryChild),
                 recentAnnouncements(),
                 upcomingEvents(),
@@ -97,15 +99,12 @@ public class ParentDashboardProvider extends AbstractDashboardWidgetProvider imp
                 }).collect(Collectors.toList())).build());
     }
 
-    private WidgetDTO<KpiGridData> kpiGrid(Student primaryChild) {
+    private WidgetDTO<KpiGridData> kpiGrid(Student primaryChild, List<TimetableSlotItem> todaySlots) {
         return safeWidget("kpi-grid", WidgetType.KPI_GRID, "Your child's snapshot", 4, DataMode.LIVE, () -> {
             double attendancePct = attendancePercentage(primaryChild);
             return KpiGridData.builder().items(List.of(
                     KpiItem.builder().label("Attendance").value(String.format("%.0f%%", attendancePct)).icon("pi-calendar-plus").tone(attendancePct >= 75 ? "success" : "danger").build(),
-                    KpiItem.builder().label("Homework").value("2 pending").icon("pi-file-edit").tone("warning").sample(true).build(),
-                    KpiItem.builder().label("Upcoming Exams").value("2").icon("pi-pencil").tone("info").sample(true).build(),
-                    KpiItem.builder().label("Fee Balance").value("₹12.5K").icon("pi-wallet").tone("danger").sample(true).build(),
-                    KpiItem.builder().label("Leave Requests").value("0").icon("pi-calendar-times").tone("success").sample(true).build()
+                    KpiItem.builder().label("Today's Classes").value(String.valueOf(todaySlots.size())).icon("pi-book").tone("primary").build()
             )).build();
         });
     }
@@ -120,11 +119,11 @@ public class ParentDashboardProvider extends AbstractDashboardWidgetProvider imp
                 )).build());
     }
 
-    private WidgetDTO<TimetableData> todaysSchedule(StudentEnrollment enrollment) {
+    private WidgetDTO<TimetableData> todaysSchedule(List<TimetableSlotItem> todaySlots) {
         return safeWidget("todays-schedule", WidgetType.TIMETABLE, "Today's schedule", 4, DataMode.LIVE, () ->
                 TimetableData.builder()
                         .dayLabel(LocalDate.now().getDayOfWeek().toString())
-                        .slots(Collections.emptyList())
+                        .slots(todaySlots)
                         .build());
     }
 
