@@ -277,7 +277,7 @@ public class MenuServiceImpl implements MenuService {
     private boolean includeMenuForCaller(Menu menu, boolean platformCaller) {
         MenuScope scope = menu.getMenuScope();
         if (platformCaller) {
-            return scope == MenuScope.PLATFORM;
+            return scope == MenuScope.PLATFORM || scope == MenuScope.CORE;
         }
         return scope != MenuScope.PLATFORM;
     }
@@ -337,12 +337,12 @@ public class MenuServiceImpl implements MenuService {
             List<Menu> children = childrenByParentId.getOrDefault(parent.getId(), List.of());
             List<SidebarItemResponse> childNodes = buildSidebarTree(children, permMap, organizationId, childrenByParentId, platformCaller);
 
-            boolean hasAccess = platformCaller || perm != null || !childNodes.isEmpty();
+            boolean hasAccess = perm != null || !childNodes.isEmpty();
             if (!hasAccess) continue;
 
-            boolean canView = platformCaller || (perm != null && Boolean.TRUE.equals(perm.getCanView()));
-            boolean canManage = platformCaller || (perm != null && Boolean.TRUE.equals(perm.getCanManage()));
-            boolean canApprove = platformCaller || (perm != null && Boolean.TRUE.equals(perm.getCanApprove()));
+            boolean canView = perm != null && Boolean.TRUE.equals(perm.getCanView());
+            boolean canManage = perm != null && Boolean.TRUE.equals(perm.getCanManage());
+            boolean canApprove = perm != null && Boolean.TRUE.equals(perm.getCanApprove());
 
             result.add(SidebarItemResponse.builder()
                     .id(parent.getId())

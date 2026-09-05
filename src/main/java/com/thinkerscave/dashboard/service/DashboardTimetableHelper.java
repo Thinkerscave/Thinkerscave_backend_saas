@@ -11,6 +11,7 @@ import com.thinkerscave.academics.repository.TimetableVersionRepository;
 import com.thinkerscave.dashboard.dto.response.widgetdata.TimetableSlotItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.Comparator;
@@ -36,6 +37,7 @@ public class DashboardTimetableHelper {
     private final TimetableEntryRepository timetableEntryRepository;
     private final TeacherAllocationTeacherRepository teacherAllocationTeacherRepository;
 
+    @Transactional(readOnly = true)
     public List<TimetableSlotItem> todaySlotsForTeacher(Long staffId) {
         if (staffId == null) {
             return List.of();
@@ -64,6 +66,7 @@ public class DashboardTimetableHelper {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<TimetableSlotItem> todaySlotsForSection(Long sectionId) {
         if (sectionId == null) {
             return List.of();
