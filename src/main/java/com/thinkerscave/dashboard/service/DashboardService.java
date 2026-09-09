@@ -63,7 +63,7 @@ public class DashboardService {
         // Admission KPIs
         long openInquiries = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.NEW) +
                 inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.INTERESTED) +
-                inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.COUNSELING);
+                inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.CONTACTED);
         long pendingApps = applicationRepository.countByStatus(ApplicationStatus.UNDER_REVIEW);
         long newInquiriesToday = inquiryRepository.countByStatusAndDeletedFalse(InquiryStatus.NEW);
 

@@ -2,6 +2,8 @@ package com.thinkerscave.admission.entity;
 
 import com.thinkerscave.admission.enums.FollowUpType;
 import com.thinkerscave.admission.enums.InquiryStatus;
+import com.thinkerscave.admission.enums.LeadSource;
+import com.thinkerscave.admission.entity.converter.LeadSourceAttributeConverter;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
@@ -42,6 +44,12 @@ public class Inquiry extends Auditable {
     @Column(name = "name", nullable = false, length = 100)
     private String name;
 
+        @Column(name = "student_name", nullable = false, length = 100)
+        private String studentName;
+
+        @Column(name = "parent_contact_name", nullable = false, length = 100)
+        private String parentContactName;
+
     @Column(name = "mobile_number", nullable = false, length = 20)
     private String mobileNumber;
 
@@ -63,8 +71,9 @@ public class Inquiry extends Auditable {
     @Column(name = "address", columnDefinition = "TEXT")
     private String address;
 
-    @Column(name = "inquiry_source", length = 50)
-    private String inquirySource;
+    @Convert(converter = LeadSourceAttributeConverter.class)
+    @Column(name = "inquiry_source", nullable = false, length = 30)
+    private LeadSource inquirySource;
 
     @Column(name = "referred_by", length = 100)
     private String referredBy;

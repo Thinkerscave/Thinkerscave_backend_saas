@@ -4,6 +4,7 @@ import com.thinkerscave.admission.dto.request.AdmissionsSettingsRequest;
 import com.thinkerscave.admission.dto.response.AdmissionsSettingsResponse;
 import com.thinkerscave.admission.entity.AdmissionsSetting;
 import com.thinkerscave.admission.enums.InquiryStatus;
+import com.thinkerscave.admission.enums.LeadSource;
 import com.thinkerscave.admission.repository.AdmissionsSettingRepository;
 import com.thinkerscave.admission.service.AdmissionsSettingService;
 import com.thinkerscave.shared.context.OrganizationContext;
@@ -22,7 +23,7 @@ import java.util.stream.Collectors;
 public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
 
     private static final List<String> DEFAULT_SOURCES =
-            List.of("Website", "Walk-in", "Referral", "Social Media", "Campaign", "Phone", "Other");
+            Arrays.stream(LeadSource.values()).map(Enum::name).toList();
     private static final List<String> DEFAULT_STATUSES = Arrays.stream(InquiryStatus.values())
             .map(Enum::name)
             .toList();

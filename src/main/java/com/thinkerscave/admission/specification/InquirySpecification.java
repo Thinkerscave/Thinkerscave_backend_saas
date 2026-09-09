@@ -26,8 +26,8 @@ public final class InquirySpecification {
                 predicates.add(cb.equal(root.get("status"), request.getStatus()));
             }
 
-            if (hasText(request.getSource())) {
-                predicates.add(cb.equal(cb.lower(root.get("inquirySource")), request.getSource().trim().toLowerCase()));
+            if (request.getSource() != null) {
+                predicates.add(cb.equal(root.get("inquirySource"), request.getSource()));
             }
 
             if (hasText(request.getClassInterestedIn())) {

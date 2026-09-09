@@ -2,6 +2,7 @@ package com.thinkerscave.admission.dto.response;
 
 import com.thinkerscave.admission.enums.FollowUpType;
 import com.thinkerscave.admission.enums.InquiryStatus;
+import com.thinkerscave.admission.enums.LeadSource;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Data;
@@ -17,13 +18,15 @@ public class InquiryResponse {
     private Long inquiryId;
     private String inquiryNumber;
     private String name;
+    private String studentName;
+    private String parentContactName;
     private String mobileNumber;
     private String email;
     private String classInterestedIn;
     private Long academicYearId;
     private Long classId;
     private String address;
-    private String inquirySource;
+    private LeadSource inquirySource;
     private String referredBy;
     private String comments;
     private Long assignedCounselorId;

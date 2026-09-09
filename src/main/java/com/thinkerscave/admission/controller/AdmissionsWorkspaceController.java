@@ -22,8 +22,6 @@ import com.thinkerscave.admission.service.ApplicationAdmissionService;
 import com.thinkerscave.admission.service.InquiryService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import com.thinkerscave.staff.dto.response.StaffSummaryResponse;
-import com.thinkerscave.staff.enums.EmploymentStatus;
-import com.thinkerscave.staff.service.StaffService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -54,7 +52,6 @@ public class AdmissionsWorkspaceController {
     private final InquiryService inquiryService;
     private final ApplicationAdmissionService applicationService;
     private final AdmissionsSettingService settingService;
-    private final StaffService staffService;
 
     @GetMapping("/inquiries/kpi")
     @Operation(summary = "Workspace inquiry KPI")
@@ -94,7 +91,7 @@ public class AdmissionsWorkspaceController {
             @PathVariable Long id,
             @Valid @RequestBody AssignCounselorRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Counselor assigned",
-                inquiryService.assignCounselor(id, request.getCounselorId())));
+            inquiryService.assignCounselor(id, request.getCounselorId(), request.getReason())));
     }
 
     @PostMapping("/inquiries/{id}/mark-interested")
@@ -111,7 +108,7 @@ public class AdmissionsWorkspaceController {
         if (reason != null && !reason.isBlank()) {
             return ResponseEntity.ok(ApiResponse.success("Inquiry marked closed", inquiryService.markLost(id, reason)));
         }
-        return ResponseEntity.ok(ApiResponse.success("Inquiry marked closed", inquiryService.updateStatus(id, InquiryStatus.CLOSED)));
+        return ResponseEntity.ok(ApiResponse.success("Inquiry marked closed", inquiryService.updateStatus(id, InquiryStatus.LOST)));
     }
 
     @GetMapping("/inquiries/{id}/counseling-notes")
@@ -152,8 +149,7 @@ public class AdmissionsWorkspaceController {
     public ResponseEntity<ApiResponse<Page<StaffSummaryResponse>>> counselors(
             @RequestParam(required = false) String keyword,
             @PageableDefault(size = 10, sort = "createdOn") Pageable pageable) {
-        Page<StaffSummaryResponse> page = staffService.getStaffList(
-                null, null, EmploymentStatus.ACTIVE, null, keyword, pageable);
+        Page<StaffSummaryResponse> page = inquiryService.getEligibleCounselors(keyword, pageable);
         return ResponseEntity.ok(ApiResponse.success("Counselors loaded", page));
     }
 

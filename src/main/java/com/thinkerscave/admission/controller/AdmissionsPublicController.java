@@ -3,11 +3,13 @@ package com.thinkerscave.admission.controller;
 import com.thinkerscave.academics.dto.response.LookupDTO;
 import com.thinkerscave.academics.service.AcademicsLookupService;
 import com.thinkerscave.admission.dto.request.InquiryRequest;
-import com.thinkerscave.admission.dto.request.PublicInquiryRequest;
+import com.thinkerscave.admission.dto.request.PublicAdmissionInquiryRequest;
 import com.thinkerscave.admission.dto.response.InquiryResponse;
 import com.thinkerscave.admission.dto.response.PublicAdmissionsFormConfig;
+import com.thinkerscave.admission.enums.LeadSource;
 import com.thinkerscave.admission.service.InquiryService;
 import com.thinkerscave.shared.dto.ApiResponse;
+import com.thinkerscave.shared.exceptions.BadRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -60,41 +62,40 @@ public class AdmissionsPublicController {
         return ResponseEntity.ok(ApiResponse.success("Classes loaded", classes));
     }
 
-    @PostMapping("/inquiry")
-    @Operation(summary = "Create inquiry from public website form")
-    public ResponseEntity<ApiResponse<InquiryResponse>> createPublicInquiry(@Valid @RequestBody PublicInquiryRequest request) {
-        return ResponseEntity.ok(ApiResponse.created("Inquiry submitted", inquiryService.create(toInquiryRequest(request))));
-    }
-
     @PostMapping("/inquiries")
-    @Operation(summary = "Alias for public inquiry submission")
-    public ResponseEntity<ApiResponse<InquiryResponse>> createPublicInquiryAlias(@Valid @RequestBody PublicInquiryRequest request) {
-        return createPublicInquiry(request);
+    @Operation(summary = "Submit an admission enquiry from the public website")
+    public ResponseEntity<ApiResponse<InquiryResponse>> createInquiry(@Valid @RequestBody PublicAdmissionInquiryRequest request) {
+        return ResponseEntity.ok(ApiResponse.created("Enquiry submitted successfully",
+                inquiryService.create(toInquiryRequest(request))));
     }
 
-    private InquiryRequest toInquiryRequest(PublicInquiryRequest request) {
+    private InquiryRequest toInquiryRequest(PublicAdmissionInquiryRequest request) {
         InquiryRequest mapped = new InquiryRequest();
-        mapped.setName(request.getName());
-        mapped.setMobileNumber(request.getMobileNumber());
-        mapped.setEmail(request.getEmail());
-        mapped.setAcademicYearId(request.getAcademicYearId());
-        mapped.setClassId(request.getClassId());
-        mapped.setAddress(request.getAddress());
-        mapped.setInquirySource(StringUtils.hasText(request.getInquirySource()) ? request.getInquirySource() : "Website");
-        mapped.setComments(request.getComments());
+        mapped.setName(StringUtils.hasText(request.getStudentName()) ? request.getStudentName().trim() : "");
+        mapped.setParentContactName(StringUtils.hasText(request.getStudentName()) ? request.getStudentName().trim() : "Website Enquiry");
+        mapped.setMobileNumber(request.getMobileNumber().trim());
 
-        String className = request.getClassInterestedIn();
-        if (!StringUtils.hasText(className) && request.getClassId() != null && request.getAcademicYearId() != null) {
-            className = academicsLookupService.getClassesByYear(request.getAcademicYearId()).stream()
-                    .filter(item -> request.getClassId().equals(item.getId()))
-                    .map(LookupDTO::getName)
-                    .findFirst()
-                    .orElse(null);
+        String className = null;
+        Long academicYearId = null;
+        for (LookupDTO year : academicsLookupService.getActiveAcademicYears()) {
+            for (LookupDTO cls : academicsLookupService.getClassesByYear(year.getId())) {
+                if (cls.getId().equals(request.getClassId())) {
+                    className = cls.getName();
+                    academicYearId = year.getId();
+                    break;
+                }
+            }
+            if (className != null) {
+                break;
+            }
         }
         if (!StringUtils.hasText(className)) {
-            throw new com.thinkerscave.shared.exceptions.BadRequestException("Please select a class");
+            throw new BadRequestException("Please select a valid class");
         }
+        mapped.setAcademicYearId(academicYearId);
+        mapped.setClassId(request.getClassId());
         mapped.setClassInterestedIn(className);
+        mapped.setInquirySource(LeadSource.WEBSITE);
         return mapped;
     }
 }

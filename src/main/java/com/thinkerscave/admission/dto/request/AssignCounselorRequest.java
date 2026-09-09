@@ -8,4 +8,6 @@ public class AssignCounselorRequest {
 
     @NotNull
     private Long counselorId;
+
+    private String reason;
 }

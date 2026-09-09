@@ -327,7 +327,7 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         app.setStudentId(student.getStudentId());
         app.setStatus(ApplicationStatus.ENROLLED);
         repository.save(app);
-        markInquiry(app.getInquiryId(), InquiryStatus.CONVERTED);
+        markInquiry(app.getInquiryId(), InquiryStatus.APPLICATION_SUBMITTED);
 
         return EnrollmentResultResponse.builder()
                 .applicationId(app.getApplicationId())
