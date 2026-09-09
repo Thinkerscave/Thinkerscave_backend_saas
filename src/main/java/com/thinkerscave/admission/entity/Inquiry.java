@@ -102,4 +102,39 @@ public class Inquiry extends Auditable {
 
     @Column(name = "next_follow_up_date")
     private LocalDate nextFollowUpDate;
+
+    // ─── Progressive enrichment (filled in later via Lead 360, not at creation) ─────────
+
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
+
+    @Column(name = "gender", length = 20)
+    private String gender;
+
+    /** Student's current class today, distinct from classInterestedIn (the class being applied for). */
+    @Column(name = "current_class", length = 50)
+    private String currentClass;
+
+    @Column(name = "previous_school", length = 150)
+    private String previousSchool;
+
+    @Column(name = "alternate_mobile_number", length = 20)
+    private String alternateMobileNumber;
+
+    /** e.g. Father / Mother / Guardian. */
+    @Column(name = "contact_relationship", length = 30)
+    private String contactRelationship;
+
+    @Column(name = "campus_preference", length = 100)
+    private String campusPreference;
+
+    /** Free-form tri-state text: e.g. YES / NO / NOT_SURE. */
+    @Column(name = "transport_required", length = 20)
+    private String transportRequired;
+
+    @Column(name = "hostel_required", length = 20)
+    private String hostelRequired;
+
+    @Column(name = "other_requirements", columnDefinition = "TEXT")
+    private String otherRequirements;
 }

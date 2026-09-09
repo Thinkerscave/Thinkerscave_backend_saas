@@ -50,6 +50,18 @@ public class InquiryRequest {
     private LocalDate nextFollowUpDate;
     private Boolean allowPotentialDuplicate;
 
+    // ─── Progressive enrichment (all optional — set later via Lead 360 Edit Lead) ─────
+    private LocalDate dateOfBirth;
+    private String gender;
+    private String currentClass;
+    private String previousSchool;
+    private String alternateMobileNumber;
+    private String contactRelationship;
+    private String campusPreference;
+    private String transportRequired;
+    private String hostelRequired;
+    private String otherRequirements;
+
     @AssertTrue(message = "Referred by is required when source is Referral")
     public boolean isReferralDetailsValid() {
         if (inquirySource != LeadSource.REFERRAL) {

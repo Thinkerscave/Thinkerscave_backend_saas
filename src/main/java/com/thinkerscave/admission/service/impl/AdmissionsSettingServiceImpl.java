@@ -96,6 +96,12 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
 
     @Override
     @Transactional
+    public String assignmentMode() {
+        return blankToDefault(loadOrCreate().getAssignmentMode(), "MANUAL");
+    }
+
+    @Override
+    @Transactional
     public List<String> requiredDocuments() {
         return split(loadOrCreate().getRequiredDocuments(), DEFAULT_DOCS);
     }

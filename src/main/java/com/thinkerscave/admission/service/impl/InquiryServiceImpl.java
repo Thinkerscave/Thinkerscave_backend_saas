@@ -27,11 +27,13 @@ import com.thinkerscave.admission.enums.FollowUpLifecycleStatus;
 import com.thinkerscave.admission.enums.FollowUpType;
 import com.thinkerscave.admission.enums.InquiryStatus;
 import com.thinkerscave.admission.enums.LeadSource;
+import com.thinkerscave.admission.repository.AdmissionsSettingRepository;
 import com.thinkerscave.admission.repository.ApplicationAdmissionRepository;
 import com.thinkerscave.admission.repository.CounselingNoteRepository;
 import com.thinkerscave.admission.repository.InquiryFollowUpRepository;
 import com.thinkerscave.admission.repository.InquiryRepository;
 import com.thinkerscave.admission.repository.LeadCounselorAssignmentRepository;
+import com.thinkerscave.admission.entity.AdmissionsSetting;
 import com.thinkerscave.admission.service.AdmissionsSettingService;
 import com.thinkerscave.admission.service.InquiryService;
 import com.thinkerscave.admission.specification.InquirySpecification;
@@ -50,11 +52,15 @@ import com.thinkerscave.staff.entity.ResponsibilityAssignment;
 import com.thinkerscave.staff.enums.EmploymentStatus;
 import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
+import com.thinkerscave.student.entity.Student;
+import com.thinkerscave.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -97,6 +103,8 @@ public class InquiryServiceImpl implements InquiryService {
     private final AuditWriteService auditWriteService;
     private final AuditLogRepository auditLogRepository;
     private final StaffRepository staffRepository;
+    private final AdmissionsSettingRepository admissionsSettingRepository;
+    private final StudentRepository studentRepository;
 
     @Override
     @Transactional
@@ -120,6 +128,10 @@ public class InquiryServiceImpl implements InquiryService {
         Inquiry saved = inquiryRepository.save(inquiry);
         auditWriteService.record(AuditEventType.CREATE, "LEAD_CREATED", "INQUIRY", String.valueOf(saved.getInquiryId()),
             "Lead created: " + saved.getStudentName());
+
+        if (saved.getAssignedCounselorId() == null) {
+            autoAssignCounselorIfEnabled(saved);
+        }
         return toResponse(saved);
     }
 
@@ -146,14 +158,14 @@ public class InquiryServiceImpl implements InquiryService {
     public Page<InquiryResponse> getAll(Pageable pageable) {
         LeadSearchRequest enforced = applyVisibilityScope(new LeadSearchRequest());
         return inquiryRepository
-            .findAll(InquirySpecification.filter(enforced), pageable)
+            .findAll(InquirySpecification.filter(enforced), applyScopeSort(enforced, pageable))
                 .map(this::toResponse);
     }
 
     @Override
     public Page<InquiryResponse> search(LeadSearchRequest request, Pageable pageable) {
         LeadSearchRequest enforced = applyVisibilityScope(request == null ? new LeadSearchRequest() : request);
-        return inquiryRepository.findAll(InquirySpecification.filter(enforced), pageable)
+        return inquiryRepository.findAll(InquirySpecification.filter(enforced), applyScopeSort(enforced, pageable))
                 .map(this::toResponse);
     }
 
@@ -197,6 +209,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public InquiryResponse markLost(Long inquiryId, String reason) {
+        requireManageLeads();
         Inquiry inquiry = getInquiry(inquiryId);
         inquiry.setStatus(InquiryStatus.LOST);
         if (reason != null && !reason.isBlank()) {
@@ -205,7 +218,24 @@ public class InquiryServiceImpl implements InquiryService {
         }
         Inquiry saved = inquiryRepository.save(inquiry);
         auditWriteService.record(AuditEventType.STATE_CHANGE, "LEAD_MARKED_LOST", "INQUIRY", String.valueOf(inquiryId),
-            "Lead marked lost");
+            "Lead marked lost" + (StringUtils.hasText(reason) ? ": " + reason.trim() : ""));
+        return toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public InquiryResponse reopenLead(Long inquiryId) {
+        requireManageLeads();
+        Inquiry inquiry = getInquiry(inquiryId);
+        if (inquiry.getStatus() != InquiryStatus.LOST) {
+            throw new BadRequestException("Only a lost lead can be reopened");
+        }
+        // Re-enter the pipeline at CONTACTED — the lead was previously engaged, so NEW
+        // would understate history. Lost reason/history is preserved in comments (never deleted).
+        inquiry.setStatus(InquiryStatus.CONTACTED);
+        Inquiry saved = inquiryRepository.save(inquiry);
+        auditWriteService.record(AuditEventType.STATE_CHANGE, "LEAD_REOPENED", "INQUIRY", String.valueOf(inquiryId),
+            "Lead reopened from Lost");
         return toResponse(saved);
     }
 
@@ -440,6 +470,14 @@ public class InquiryServiceImpl implements InquiryService {
 
         CounselingNote note = new CounselingNote();
         note.setInquiry(inquiry);
+        note.setSessionAt(request.getSessionAt() != null ? request.getSessionAt() : LocalDateTime.now());
+        note.setMode(request.getMode());
+        // Default to the logged-in counselor when the caller is staff and no explicit
+        // counselor was supplied (admins picking on behalf of a counselor pass it explicitly).
+        Long counselorStaffId = request.getCounselorStaffId() != null
+                ? request.getCounselorStaffId()
+                : currentStaffId();
+        note.setCounselorStaffId(counselorStaffId);
         note.setStudentRequirements(request.getStudentRequirements());
         note.setParentConcerns(request.getParentConcerns());
         note.setCampusVisitInfo(request.getCampusVisitInfo());
@@ -447,7 +485,7 @@ public class InquiryServiceImpl implements InquiryService {
         note.setNotes(request.getNotes());
         CounselingNote saved = counselingNoteRepository.save(note);
         auditWriteService.record(AuditEventType.UPDATE, "COUNSELING_ADDED", "INQUIRY", String.valueOf(inquiryId),
-            "Counseling note added");
+            "Counseling note added" + (counselorStaffId != null ? " by " + resolveCounselorName(counselorStaffId) : ""));
         return toCounselingResponse(saved);
     }
 
@@ -583,8 +621,9 @@ public class InquiryServiceImpl implements InquiryService {
     public byte[] exportLeadsCsv(LeadSearchRequest request) {
         requireViewLeads();
         LeadSearchRequest enforced = applyVisibilityScope(request == null ? new LeadSearchRequest() : request);
+        Comparator<Inquiry> byScope = scopeSortComparator(enforced.getScope());
         List<InquiryResponse> rows = inquiryRepository.findAll(InquirySpecification.filter(enforced)).stream()
-                .sorted(Comparator.comparing(Inquiry::getCreatedOn, Comparator.nullsLast(Comparator.reverseOrder())))
+                .sorted(byScope)
                 .map(this::toResponse)
                 .toList();
 
@@ -612,6 +651,8 @@ public class InquiryServiceImpl implements InquiryService {
             public InquiryFullDetailResponse getFullDetail(Long inquiryId) {
             InquiryResponse inquiry = getById(inquiryId);
             var application = applicationRepository.findByInquiryId(inquiryId).orElse(null);
+            Long studentId = application != null ? application.getStudentId() : null;
+            Student student = studentId != null ? studentRepository.findById(studentId).orElse(null) : null;
             return InquiryFullDetailResponse.builder()
                 .inquiry(inquiry)
                 .followUps(getFollowUps(inquiryId))
@@ -620,76 +661,121 @@ public class InquiryServiceImpl implements InquiryService {
                 .applicationId(application != null ? application.getApplicationId() : null)
                 .applicationNumber(application != null ? application.getApplicationNumber() : null)
                 .applicationStatus(application != null && application.getStatus() != null ? application.getStatus().name() : null)
-                .studentId(application != null ? application.getStudentId() : null)
-                .studentCode(null)
-                .admissionNumber(null)
+                .studentId(studentId)
+                .studentCode(student != null ? student.getStudentCode() : null)
+                .admissionNumber(student != null ? student.getAdmissionNumber() : null)
                 .build();
             }
 
         @Override
         public List<InquiryTimelineItemResponse> getTimeline(Long inquiryId) {
+            return getTimeline(inquiryId, null, null, null);
+        }
+
+        @Override
+        public List<InquiryTimelineItemResponse> getTimeline(Long inquiryId, String type, LocalDate from, LocalDate to) {
         Inquiry inquiry = getInquiry(inquiryId);
 
             List<InquiryTimelineItemResponse> timeline = new ArrayList<>();
-            boolean fromWebsite = inquiry.getInquirySource() == LeadSource.WEBSITE;
-            timeline.add(InquiryTimelineItemResponse.builder()
-                .eventType("LEAD_CREATED")
-                .action("LEAD_CREATED")
-                .title(fromWebsite ? "Enquiry received from website" : "Lead created")
-                .description(fromWebsite
-                    ? "Admission enquiry was submitted from the public website."
-                    : "Lead was created in admissions CRM")
-                .performedBy(inquiry.getCreatedBy())
-                .performedOn(inquiry.getCreatedOn())
-                .performedAt(inquiry.getCreatedOn())
-                .build());
 
-            followUpRepository.findByInquiryInquiryIdOrderByFollowUpDateDesc(inquiryId).forEach(fu ->
+            // Every real lead action (create, update, status change, assignment, follow-up,
+            // counseling, application) is already written to the audit trail by the service
+            // methods above — this is the single source of truth for Activity, so it is never
+            // duplicated with a second, separately-built entity-based item (see ACTIVITY DATA
+            // INTEGRITY requirement: only real actions should ever appear here).
+            List<AuditLog> auditEvents = auditLogRepository.findByEntityTypeAndEntityIdOrderByOccurredAtDesc(
+                    "INQUIRY", String.valueOf(inquiryId));
+            boolean hasCreateEvent = auditEvents.stream().anyMatch(e -> "LEAD_CREATED".equals(e.getAction()));
+
+            for (AuditLog logEntry : auditEvents) {
+                String action = logEntry.getAction();
+                LocalDateTime when = logEntry.getOccurredAt() != null
+                        ? LocalDateTime.ofInstant(logEntry.getOccurredAt(), java.time.ZoneId.systemDefault())
+                        : null;
                 timeline.add(InquiryTimelineItemResponse.builder()
-                    .eventType("FOLLOW_UP")
-                    .action("FOLLOW_UP")
-                    .title("Follow-up: " + fu.getFollowUpType().name())
-                    .description(fu.getRemarks())
-                    .performedBy(fu.getCreatedBy())
-                    .performedOn(fu.getFollowUpDate())
-                    .performedAt(fu.getFollowUpDate())
-                    .build())
-            );
-
-            counselingNoteRepository.findByInquiryInquiryIdOrderByCreatedOnDesc(inquiryId).forEach(note ->
-                timeline.add(InquiryTimelineItemResponse.builder()
-                    .eventType("COUNSELING_NOTE")
-                    .action("COUNSELING_NOTE")
-                    .title("Counseling note added")
-                    .description(note.getNotes())
-                    .performedBy(note.getCreatedBy())
-                    .performedOn(note.getCreatedOn())
-                    .performedAt(note.getCreatedOn())
-                    .build())
-            );
-
-                    List<AuditLog> auditEvents = auditLogRepository.findByEntityTypeAndEntityIdOrderByOccurredAtDesc(
-                        "INQUIRY", String.valueOf(inquiryId));
-                    for (AuditLog logEntry : auditEvents) {
-                    timeline.add(InquiryTimelineItemResponse.builder()
                         .eventType(logEntry.getEventType() != null ? logEntry.getEventType().name() : "EVENT")
-                        .action(logEntry.getAction())
-                        .title(logEntry.getSummary())
-                        .description(logEntry.getChanges())
+                        .action(action)
+                        .category(activityCategory(action))
+                        .title(activityTitle(action))
+                        .description(logEntry.getSummary())
                         .performedBy(logEntry.getActorUsername())
-                        .performedAt(logEntry.getOccurredAt() != null
-                            ? LocalDateTime.ofInstant(logEntry.getOccurredAt(), java.time.ZoneId.systemDefault())
-                            : null)
-                        .performedOn(logEntry.getOccurredAt() != null
-                            ? LocalDateTime.ofInstant(logEntry.getOccurredAt(), java.time.ZoneId.systemDefault())
-                            : null)
+                        .performedAt(when)
+                        .performedOn(when)
                         .build());
-                    }
+            }
+
+            // Fallback for leads created before the audit trail existed on this tenant.
+            if (!hasCreateEvent) {
+                boolean fromWebsite = inquiry.getInquirySource() == LeadSource.WEBSITE;
+                timeline.add(InquiryTimelineItemResponse.builder()
+                        .eventType("CREATE")
+                        .action("LEAD_CREATED")
+                        .category("LEAD")
+                        .title("Lead Created")
+                        .description(fromWebsite
+                                ? "Admission enquiry was submitted from the public website."
+                                : "Lead was created in admissions CRM.")
+                        .performedBy(inquiry.getCreatedBy())
+                        .performedOn(inquiry.getCreatedOn())
+                        .performedAt(inquiry.getCreatedOn())
+                        .build());
+            }
 
             timeline.sort(Comparator.comparing(InquiryTimelineItemResponse::getPerformedOn,
                 Comparator.nullsLast(Comparator.reverseOrder())));
-            return timeline;
+
+            String typeFilter = StringUtils.hasText(type) ? type.trim().toUpperCase() : null;
+            return timeline.stream()
+                    .filter(item -> typeFilter == null
+                            || typeFilter.equals(item.getCategory())
+                            || typeFilter.equals(item.getAction()))
+                    .filter(item -> from == null || item.getPerformedOn() == null
+                            || !item.getPerformedOn().toLocalDate().isBefore(from))
+                    .filter(item -> to == null || item.getPerformedOn() == null
+                            || !item.getPerformedOn().toLocalDate().isAfter(to))
+                    .toList();
             }
+
+    /** Coarse category used to drive the Activity "type" filter dropdown. */
+    private String activityCategory(String action) {
+        if (action == null) {
+            return "OTHER";
+        }
+        if (action.startsWith("FOLLOW_UP")) return "FOLLOW_UP";
+        if (action.startsWith("COUNSELOR")) return "ASSIGNMENT";
+        if (action.startsWith("COUNSELING")) return "COUNSELING";
+        if (action.startsWith("APPLICATION") || action.startsWith("ENROLLMENT")) return "APPLICATION";
+        if (action.contains("STATUS") || action.contains("LOST") || action.contains("REOPENED")) return "STATUS";
+        if (action.startsWith("LEAD")) return "LEAD";
+        return "OTHER";
+    }
+
+    /** Human-readable title for known lead activity action codes (falls back to a humanized form). */
+    private String activityTitle(String action) {
+        if (action == null) {
+            return "Activity";
+        }
+        return switch (action) {
+            case "LEAD_CREATED" -> "Lead Created";
+            case "LEAD_UPDATED" -> "Lead Updated";
+            case "LEAD_ARCHIVED" -> "Lead Archived";
+            case "LEAD_STATUS_CHANGED" -> "Status Changed";
+            case "LEAD_MARKED_LOST" -> "Marked Lost";
+            case "LEAD_REOPENED" -> "Lead Reopened";
+            case "COUNSELOR_ASSIGNED" -> "Counselor Assigned";
+            case "COUNSELOR_REASSIGNED" -> "Counselor Reassigned";
+            case "APPLICATION_STARTED" -> "Application Started";
+            case "FOLLOW_UP_SCHEDULED" -> "Follow-up Scheduled";
+            case "FOLLOW_UP_UPDATED" -> "Follow-up Updated";
+            case "FOLLOW_UP_COMPLETED" -> "Follow-up Completed";
+            case "FOLLOW_UP_CANCELLED" -> "Follow-up Cancelled";
+            case "COUNSELING_ADDED" -> "Counseling Note Added";
+            case "LEAD_EXPORT_CSV" -> "Leads Exported";
+            default -> java.util.Arrays.stream(action.split("_"))
+                    .map(w -> w.isEmpty() ? w : w.charAt(0) + w.substring(1).toLowerCase())
+                    .collect(Collectors.joining(" "));
+        };
+    }
 
     // ─── Private helpers ──────────────────────────────────────────────────────
 
@@ -719,6 +805,18 @@ public class InquiryServiceImpl implements InquiryService {
         if (request.getNextFollowUpDate() != null) {
             inquiry.setNextFollowUpDate(request.getNextFollowUpDate());
         }
+        // Progressive enrichment — only overwrite when the caller actually sends a value,
+        // so partial "Edit Lead" section saves never wipe out previously enriched fields.
+        if (request.getDateOfBirth() != null) inquiry.setDateOfBirth(request.getDateOfBirth());
+        if (request.getGender() != null) inquiry.setGender(request.getGender());
+        if (request.getCurrentClass() != null) inquiry.setCurrentClass(request.getCurrentClass());
+        if (request.getPreviousSchool() != null) inquiry.setPreviousSchool(request.getPreviousSchool());
+        if (request.getAlternateMobileNumber() != null) inquiry.setAlternateMobileNumber(request.getAlternateMobileNumber());
+        if (request.getContactRelationship() != null) inquiry.setContactRelationship(request.getContactRelationship());
+        if (request.getCampusPreference() != null) inquiry.setCampusPreference(request.getCampusPreference());
+        if (request.getTransportRequired() != null) inquiry.setTransportRequired(request.getTransportRequired());
+        if (request.getHostelRequired() != null) inquiry.setHostelRequired(request.getHostelRequired());
+        if (request.getOtherRequirements() != null) inquiry.setOtherRequirements(request.getOtherRequirements());
     }
 
     private InquiryResponse toResponse(Inquiry i) {
@@ -745,6 +843,16 @@ public class InquiryServiceImpl implements InquiryService {
                 .nextFollowUpDate(i.getNextFollowUpDate())
                 .createdOn(i.getCreatedOn())
                 .createdBy(i.getCreatedBy())
+                .dateOfBirth(i.getDateOfBirth())
+                .gender(i.getGender())
+                .currentClass(i.getCurrentClass())
+                .previousSchool(i.getPreviousSchool())
+                .alternateMobileNumber(i.getAlternateMobileNumber())
+                .contactRelationship(i.getContactRelationship())
+                .campusPreference(i.getCampusPreference())
+                .transportRequired(i.getTransportRequired())
+                .hostelRequired(i.getHostelRequired())
+                .otherRequirements(i.getOtherRequirements())
                 .build();
     }
 
@@ -775,6 +883,65 @@ public class InquiryServiceImpl implements InquiryService {
             throw new BadRequestException("Class does not belong to selected academic year");
         }
         return academicClass;
+    }
+
+    /**
+     * Backend-only sequential round-robin auto-assignment, run transactionally as part of
+     * lead creation. Only activates when the tenant's Admissions setting "assignmentMode" is
+     * ROUND_ROBIN (default is MANUAL, preserving existing behavior unless an admin opts in).
+     * If there are no eligible counselors, the lead is simply left Unassigned — creation never fails.
+     */
+    private void autoAssignCounselorIfEnabled(Inquiry inquiry) {
+        if (!"ROUND_ROBIN".equalsIgnoreCase(settingService.assignmentMode())) {
+            return;
+        }
+        List<Staff> eligible = resolveEligibleCounselorsOrdered();
+        if (eligible.isEmpty()) {
+            return;
+        }
+
+        Long rawOrgId = OrganizationContext.getOrganizationId();
+        final Long orgId = rawOrgId == null ? 0L : rawOrgId;
+        // Pessimistic row lock held for the remainder of this transaction — concurrent lead
+        // creations serialize on this row so each gets a distinct, non-colliding cursor value.
+        AdmissionsSetting setting = admissionsSettingRepository.findByOrganizationIdForUpdate(orgId)
+                .orElseGet(() -> admissionsSettingRepository.findByOrganizationId(orgId).orElse(null));
+        if (setting == null) {
+            return;
+        }
+        long index = setting.getNextCounselorIndex() == null ? 0L : setting.getNextCounselorIndex();
+        setting.setNextCounselorIndex(index + 1);
+        admissionsSettingRepository.save(setting);
+
+        Staff chosen = eligible.get((int) (index % eligible.size()));
+        inquiry.setAssignedCounselorId(chosen.getStaffId());
+        inquiryRepository.save(inquiry);
+
+        LeadCounselorAssignment history = new LeadCounselorAssignment();
+        history.setInquiryId(inquiry.getInquiryId());
+        history.setPreviousCounselorStaffId(null);
+        history.setNewCounselorStaffId(chosen.getStaffId());
+        history.setReason("Auto-assigned via round robin");
+        history.setAssignedByUserId(null);
+        history.setAssignedByUsername("System");
+        history.setAssignedOn(LocalDateTime.now());
+        history.setActive(true);
+        leadCounselorAssignmentRepository.save(history);
+
+        auditWriteService.record(AuditEventType.STATE_CHANGE, "COUNSELOR_ASSIGNED", "INQUIRY",
+                String.valueOf(inquiry.getInquiryId()),
+                "Counselor auto-assigned (round robin): " + staffDisplayName(chosen));
+    }
+
+    private List<Staff> resolveEligibleCounselorsOrdered() {
+        return responsibilityAssignmentRepository
+                .findEligibleStaffByResponsibilityCode(COUNSELOR_RESPONSIBILITY_CODE, LocalDate.now())
+                .stream()
+                .map(ResponsibilityAssignment::getStaff)
+                .filter(staff -> hasAdmissionsLeadAccess(staff, "VIEW"))
+                .distinct()
+                .sorted(Comparator.comparing(Staff::getStaffId))
+                .toList();
     }
 
     private Staff requireEligibleCounselor(Long counselorId) {
@@ -819,28 +986,61 @@ public class InquiryServiceImpl implements InquiryService {
         }
     }
 
+    /**
+     * Scope semantics (available to every Leads-page user — no role/privilege gating):
+     * <ul>
+     *   <li>MY — leads created by the current authenticated user ({@code createdBy})</li>
+     *   <li>ALL — all non-deleted leads in the current tenant schema</li>
+     * </ul>
+     * When scope is omitted (other callers), no creator filter is applied.
+     */
     private LeadSearchRequest applyVisibilityScope(LeadSearchRequest request) {
         requireViewLeads();
         LeadSearchRequest effective = request == null ? new LeadSearchRequest() : request;
+        // Never trust a client-supplied createdBy — only the authenticated actor.
+        effective.setCreatedBy(null);
 
-        if (hasElevatedRole()) {
-            return effective;
-        }
-
-        Long staffId = currentStaffId();
-        if (staffId == null) {
-            return effective;
-        }
-
-        boolean hasCounselorRole = responsibilityAssignmentRepository.hasActiveResponsibilityCode(
-                staffId, COUNSELOR_RESPONSIBILITY_CODE, LocalDate.now());
-        boolean canViewAll = canManageLeads();
-        boolean requestedAll = effective.getScope() != null && "ALL".equalsIgnoreCase(effective.getScope());
-
-        if (hasCounselorRole && (!canViewAll || !requestedAll)) {
-            effective.setCounselorId(staffId);
+        String scope = effective.getScope() == null ? "" : effective.getScope().trim();
+        if ("MY".equalsIgnoreCase(scope)) {
+            String username = currentUsername();
+            if (!StringUtils.hasText(username)) {
+                // No authenticated principal → empty MY result set (predicate that never matches).
+                effective.setCreatedBy("__unauthenticated__");
+            } else {
+                effective.setCreatedBy(username.trim());
+            }
         }
         return effective;
+    }
+
+    /** Server-side sort before pagination — ignores client sort for scope tabs. */
+    private Pageable applyScopeSort(LeadSearchRequest request, Pageable pageable) {
+        String scope = request == null || request.getScope() == null ? "" : request.getScope().trim();
+        Sort sort;
+        if ("ALL".equalsIgnoreCase(scope)) {
+            // Next follow-up ASC, nulls last; then newest created first.
+            sort = Sort.by(
+                    Sort.Order.asc("nextFollowUpDate").nullsLast(),
+                    Sort.Order.desc("createdOn")
+            );
+        } else if ("MY".equalsIgnoreCase(scope)) {
+            sort = Sort.by(Sort.Order.desc("createdOn"));
+        } else {
+            // Unscoped callers keep their requested sort (fallback createdOn desc).
+            sort = pageable.getSort().isSorted()
+                    ? pageable.getSort()
+                    : Sort.by(Sort.Order.desc("createdOn"));
+        }
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), sort);
+    }
+
+    private Comparator<Inquiry> scopeSortComparator(String scope) {
+        if (scope != null && "ALL".equalsIgnoreCase(scope.trim())) {
+            return Comparator
+                    .comparing(Inquiry::getNextFollowUpDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(Inquiry::getCreatedOn, Comparator.nullsLast(Comparator.reverseOrder()));
+        }
+        return Comparator.comparing(Inquiry::getCreatedOn, Comparator.nullsLast(Comparator.reverseOrder()));
     }
 
     private boolean canManageLeads() {
@@ -950,6 +1150,10 @@ public class InquiryServiceImpl implements InquiryService {
         return CounselingNoteResponse.builder()
                 .noteId(n.getNoteId())
                 .inquiryId(n.getInquiry().getInquiryId())
+                .sessionAt(n.getSessionAt() != null ? n.getSessionAt() : n.getCreatedOn())
+                .mode(n.getMode())
+                .counselorStaffId(n.getCounselorStaffId())
+                .counselorName(resolveCounselorName(n.getCounselorStaffId()))
                 .studentRequirements(n.getStudentRequirements())
                 .parentConcerns(n.getParentConcerns())
                 .campusVisitInfo(n.getCampusVisitInfo())

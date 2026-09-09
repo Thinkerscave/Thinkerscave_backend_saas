@@ -111,6 +111,13 @@ public class AdmissionsLeadController {
         return ResponseEntity.ok(ApiResponse.success("Lead marked as lost", inquiryService.markLost(id, request.getReason())));
     }
 
+    @PostMapping("/{id}/reopen")
+    @Operation(summary = "Reopen a lost lead")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    public ResponseEntity<ApiResponse<InquiryResponse>> reopen(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Lead reopened", inquiryService.reopenLead(id)));
+    }
+
     @PostMapping("/{id}/convert-to-application")
     @Operation(summary = "Convert lead to application")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")

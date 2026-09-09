@@ -54,6 +54,10 @@ public final class InquirySpecification {
                 predicates.add(cb.lessThanOrEqualTo(root.get("nextFollowUpDate"), request.getFollowUpTo()));
             }
 
+            if (hasText(request.getCreatedBy())) {
+                predicates.add(cb.equal(cb.lower(root.get("createdBy")), request.getCreatedBy().trim().toLowerCase()));
+            }
+
             if (hasText(request.getKeyword())) {
                 String like = "%" + request.getKeyword().trim().toLowerCase() + "%";
                 predicates.add(cb.or(
@@ -62,7 +66,9 @@ public final class InquirySpecification {
                         cb.like(cb.lower(cb.coalesce(root.get("email"), "")), like),
                         cb.like(cb.lower(cb.coalesce(root.get("inquiryNumber"), "")), like),
                         cb.like(cb.lower(cb.coalesce(root.get("comments"), "")), like),
-                        cb.like(cb.lower(cb.coalesce(root.get("referredBy"), "")), like)
+                        cb.like(cb.lower(cb.coalesce(root.get("referredBy"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.get("studentName"), "")), like),
+                        cb.like(cb.lower(cb.coalesce(root.get("parentContactName"), "")), like)
                 ));
             }
 

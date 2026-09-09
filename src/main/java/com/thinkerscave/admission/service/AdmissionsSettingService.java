@@ -15,5 +15,8 @@ public interface AdmissionsSettingService {
 
     String admissionPrefix();
 
+    /** "MANUAL" or "ROUND_ROBIN" — controls whether new leads are auto-assigned a counselor. */
+    String assignmentMode();
+
     java.util.List<String> requiredDocuments();
 }

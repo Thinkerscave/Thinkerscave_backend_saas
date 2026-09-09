@@ -81,8 +81,12 @@ public class AdmissionsWorkspaceController {
 
     @GetMapping("/inquiries/{id}/timeline")
     @Operation(summary = "Workspace inquiry timeline")
-    public ResponseEntity<ApiResponse<List<InquiryTimelineItemResponse>>> timeline(@PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success("Timeline loaded", inquiryService.getTimeline(id)));
+    public ResponseEntity<ApiResponse<List<InquiryTimelineItemResponse>>> timeline(
+            @PathVariable Long id,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+        return ResponseEntity.ok(ApiResponse.success("Timeline loaded", inquiryService.getTimeline(id, type, from, to)));
     }
 
     @PutMapping("/inquiries/{id}/assign-counselor")

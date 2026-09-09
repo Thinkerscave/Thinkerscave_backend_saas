@@ -37,4 +37,16 @@ public class InquiryResponse {
     private LocalDate nextFollowUpDate;
     private LocalDateTime createdOn;
     private String createdBy;
+
+    // ─── Progressive enrichment ────────────────────────────────────────────────
+    private LocalDate dateOfBirth;
+    private String gender;
+    private String currentClass;
+    private String previousSchool;
+    private String alternateMobileNumber;
+    private String contactRelationship;
+    private String campusPreference;
+    private String transportRequired;
+    private String hostelRequired;
+    private String otherRequirements;
 }

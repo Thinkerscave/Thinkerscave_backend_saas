@@ -42,6 +42,8 @@ public interface InquiryService {
 
     InquiryResponse markLost(Long inquiryId, String reason);
 
+    InquiryResponse reopenLead(Long inquiryId);
+
     InquiryResponse assignCounselor(Long inquiryId, Long counselorId, String reason);
 
     com.thinkerscave.admission.dto.response.ApplicationAdmissionResponse convertToApplication(Long inquiryId);
@@ -77,6 +79,8 @@ public interface InquiryService {
     InquiryFullDetailResponse getFullDetail(Long inquiryId);
 
     List<InquiryTimelineItemResponse> getTimeline(Long inquiryId);
+
+    List<InquiryTimelineItemResponse> getTimeline(Long inquiryId, String type, java.time.LocalDate from, java.time.LocalDate to);
 
     Page<StaffSummaryResponse> getEligibleCounselors(String keyword, Pageable pageable);
 
