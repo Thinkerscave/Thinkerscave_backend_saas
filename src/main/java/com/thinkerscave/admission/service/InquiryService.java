@@ -56,6 +56,10 @@ public interface InquiryService {
 
     List<FollowUpResponse> getOverdueFollowUps();
 
+    List<FollowUpResponse> getUpcomingFollowUps();
+
+    List<FollowUpResponse> getCompletedFollowUps();
+
     FollowUpResponse updateFollowUp(Long followUpId, FollowUpRequest request);
 
     FollowUpResponse completeFollowUp(Long followUpId);
@@ -63,8 +67,6 @@ public interface InquiryService {
     FollowUpResponse completeFollowUp(Long followUpId, CompleteFollowUpRequest request);
 
     FollowUpResponse cancelFollowUp(Long followUpId, String remarks);
-
-    List<FollowUpResponse> getUpcomingFollowUps();
 
     CounselingNoteResponse addCounselingNote(Long inquiryId, CounselingNoteRequest request);
 

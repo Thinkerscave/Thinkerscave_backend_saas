@@ -173,6 +173,8 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
     }
 
     private void seedMenusAndPermissions(Organization organization, Role superAdminRole) {
+        purgeObsoletePlatformMenus();
+
         Menu dashboard = ensureMenu("DASHBOARD", "Dashboard", "Role-based workspace home",
                 "/app", "pi pi-home", MenuType.PAGE, null, 1,
                 MenuScope.CORE, null);
@@ -222,16 +224,18 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 MenuScope.PLATFORM, null);
 
         Menu access = ensureMenu("ACCESS_MANAGEMENT", "Access Management",
-                "Users, roles and security governance", null, "pi pi-lock", MenuType.MODULE, null, 7,
+                "Users, roles, responsibilities and security governance", null, "pi pi-lock", MenuType.MODULE, null, 7,
                 MenuScope.CORE, null);
         Menu accessUsers = ensureMenu("ACCESS_USERS", "Users", "Manage users",
                 "/app/access-management/users", "pi pi-users", MenuType.PAGE, access, 1, MenuScope.CORE, null);
         Menu accessRoles = ensureMenu("ACCESS_ROLES", "Roles", "Manage roles",
                 "/app/access-management/roles", "pi pi-user-edit", MenuType.PAGE, access, 2, MenuScope.CORE, null);
+        Menu accessResponsibilities = ensureMenu("ACCESS_RESPONSIBILITIES", "Responsibilities", "Manage responsibilities",
+                "/app/access-management/responsibilities", "pi pi-sitemap", MenuType.PAGE, access, 3, MenuScope.CORE, null);
         Menu accessSecurity = ensureMenu("ACCESS_SECURITY_POLICY", "Security Policy", "Security policy configuration",
-                "/app/access-management/security-policy", "pi pi-lock", MenuType.PAGE, access, 3, MenuScope.CORE, null);
+                "/app/access-management/security-policy", "pi pi-lock", MenuType.PAGE, access, 4, MenuScope.CORE, null);
         Menu accessHistory = ensureMenu("ACCESS_LOGIN_HISTORY", "Login History", "Login history",
-                "/app/access-management/login-history", "pi pi-history", MenuType.PAGE, access, 4, MenuScope.CORE, null);
+                "/app/access-management/login-history", "pi pi-history", MenuType.PAGE, access, 5, MenuScope.CORE, null);
 
         grant(organization, superAdminRole, dashboard, true, true, false);
         grant(organization, superAdminRole, onboarding, true, true, false);
@@ -247,11 +251,43 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
         grant(organization, superAdminRole, platformCatalog, true, true, false);
         grant(organization, superAdminRole, menuManagement, true, true, true);
         grant(organization, superAdminRole, features, true, true, true);
-                grant(organization, superAdminRole, access, true, true, false);
-                grant(organization, superAdminRole, accessUsers, true, true, true);
-                grant(organization, superAdminRole, accessRoles, true, true, true);
-                grant(organization, superAdminRole, accessSecurity, true, true, true);
-                grant(organization, superAdminRole, accessHistory, true, true, false);
+        grant(organization, superAdminRole, access, true, true, false);
+        grant(organization, superAdminRole, accessUsers, true, true, true);
+        grant(organization, superAdminRole, accessRoles, true, true, true);
+        grant(organization, superAdminRole, accessResponsibilities, true, true, true);
+        grant(organization, superAdminRole, accessSecurity, true, true, true);
+        grant(organization, superAdminRole, accessHistory, true, true, false);
+    }
+
+    /**
+     * Removes legacy duplicate Super Admin menu roots that still appear beside the
+     * canonical Subscription Management / Tenant Management modules.
+     */
+    private void purgeObsoletePlatformMenus() {
+        List<String> obsoleteCodes = List.of(
+                "SUBSCRIPTIONS_GROUP",
+                "PLATFORM_GROUP",
+                "PLATFORM_DASHBOARD",
+                "PROVISIONING_TEMPLATES",
+                "TENANT_SUBSCRIPTIONS",
+                "TENANT_PROMOTIONS"
+        );
+        menuRepository.findByMenuCodeIn(obsoleteCodes).stream()
+                .sorted((left, right) -> Boolean.compare(left.getParentMenu() == null, right.getParentMenu() == null))
+                .forEach(menu -> {
+                    if (menuRepository.existsById(menu.getId())) {
+                        // Reparent canonical children before deleting obsolete roots.
+                        if ("SUBSCRIPTIONS_GROUP".equals(menu.getMenuCode())
+                                || "PLATFORM_GROUP".equals(menu.getMenuCode())) {
+                            menuRepository.findByParentMenu_Id(menu.getId()).forEach(child -> {
+                                // Children are re-attached by ensureMenu() after purge; clear parent only.
+                                child.setParentMenu(null);
+                                menuRepository.save(child);
+                            });
+                        }
+                        purgeMenu(menu);
+                    }
+                });
     }
 
     private Menu ensureMenu(String code, String name, String description, String route, String icon,
@@ -468,7 +504,8 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "INQUIRY_CENTER",
                 "ADMISSION_CENTER",
                 "ADMISSIONS_INQUIRY_CENTER",
-                "ADMISSIONS_ADMISSION_CENTER"
+                "ADMISSIONS_ADMISSION_CENTER",
+                "ACCESS_DASHBOARD"
         );
         menuRepository.findByMenuCodeIn(obsoleteCodes).stream()
                 .sorted((left, right) -> Boolean.compare(left.getParentMenu() == null, right.getParentMenu() == null))

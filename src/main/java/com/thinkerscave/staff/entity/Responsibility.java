@@ -50,6 +50,14 @@ public class Responsibility extends Auditable {
     @Column(name = "system_defined", nullable = false)
     private Boolean systemDefined = false;
 
+    /**
+     * When false, organization admins may assign/remove staff but cannot rename,
+     * delete, or deactivate this responsibility definition. Platform/system rows
+     * such as COUNSELOR use false. Custom org-created rows default to true.
+     */
+    @Column(name = "organization_editable", nullable = false)
+    private Boolean organizationEditable = true;
+
     @Column(name = "display_order")
     private Integer displayOrder;
 

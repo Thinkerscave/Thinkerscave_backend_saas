@@ -34,6 +34,7 @@ import com.thinkerscave.admission.repository.InquiryFollowUpRepository;
 import com.thinkerscave.admission.repository.InquiryRepository;
 import com.thinkerscave.admission.repository.LeadCounselorAssignmentRepository;
 import com.thinkerscave.admission.entity.AdmissionsSetting;
+import com.thinkerscave.admission.scheduling.FollowUpSlotPlanner;
 import com.thinkerscave.admission.service.AdmissionsSettingService;
 import com.thinkerscave.admission.service.InquiryService;
 import com.thinkerscave.admission.specification.InquirySpecification;
@@ -74,10 +75,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
@@ -89,6 +92,7 @@ public class InquiryServiceImpl implements InquiryService {
 
     private static final String COUNSELOR_RESPONSIBILITY_CODE = "COUNSELOR";
     private static final String RESOURCE_ADMISSIONS_LEADS = "ADMISSIONS_LEADS";
+    private static final String RESOURCE_ADMISSIONS_FOLLOW_UPS = "ADMISSIONS_FOLLOW_UPS";
 
     private final InquiryRepository inquiryRepository;
     private final InquiryFollowUpRepository followUpRepository;
@@ -105,6 +109,7 @@ public class InquiryServiceImpl implements InquiryService {
     private final StaffRepository staffRepository;
     private final AdmissionsSettingRepository admissionsSettingRepository;
     private final StudentRepository studentRepository;
+    private final FollowUpSlotPlanner followUpSlotPlanner;
 
     @Override
     @Transactional
@@ -271,6 +276,7 @@ public class InquiryServiceImpl implements InquiryService {
                 ? "Counselor assigned: " + staffDisplayName(counselor)
                 : "Counselor reassigned to " + staffDisplayName(counselor);
         auditWriteService.record(AuditEventType.STATE_CHANGE, event, "INQUIRY", String.valueOf(inquiryId), summary);
+        ensureFirstFollowUpScheduled(saved, counselor);
         return toResponse(saved);
     }
 
@@ -316,25 +322,31 @@ public class InquiryServiceImpl implements InquiryService {
     @Transactional
     public FollowUpResponse addFollowUp(Long inquiryId, FollowUpRequest request) {
         Inquiry inquiry = getInquiry(inquiryId);
+        if (inquiry.getStatus() == InquiryStatus.LOST) {
+            throw new BadRequestException("Cannot schedule a follow-up on a lost lead");
+        }
+        LocalDateTime scheduledAt = request.getFollowUpDate();
+        if (scheduledAt == null && request.getNextFollowUpDate() != null) {
+            scheduledAt = request.getNextFollowUpDate().atTime(10, 0);
+        }
+        if (scheduledAt == null) {
+            throw new BadRequestException("Scheduled date & time is required");
+        }
 
         InquiryFollowUp followUp = new InquiryFollowUp();
         followUp.setInquiry(inquiry);
         followUp.setFollowUpType(request.getFollowUpType());
         followUp.setRemarks(request.getRemarks());
-        followUp.setStatusAfter(request.getStatusAfter());
-        followUp.setFollowUpDate(request.getFollowUpDate() != null ? request.getFollowUpDate() : LocalDateTime.now());
-        followUp.setNextFollowUpDate(request.getNextFollowUpDate());
+        followUp.setFollowUpDate(scheduledAt);
+        // Keep denormalized date aligned for queue queries that still read nextFollowUpDate.
+        followUp.setNextFollowUpDate(scheduledAt.toLocalDate());
         followUp.setLifecycleStatus(FollowUpLifecycleStatus.SCHEDULED);
         followUp = followUpRepository.save(followUp);
 
-        // Update inquiry state
-        inquiry.setLastFollowUpDate(followUp.getFollowUpDate());
-        inquiry.setLastFollowUpType(followUp.getFollowUpType());
-        if (request.getNextFollowUpDate() != null) inquiry.setNextFollowUpDate(request.getNextFollowUpDate());
-        if (request.getStatusAfter() != null) inquiry.setStatus(request.getStatusAfter());
+        inquiry.setNextFollowUpDate(scheduledAt.toLocalDate());
         inquiryRepository.save(inquiry);
         auditWriteService.record(AuditEventType.UPDATE, "FOLLOW_UP_SCHEDULED", "INQUIRY", String.valueOf(inquiryId),
-            "Follow-up scheduled: " + followUp.getFollowUpType());
+            "Follow-up scheduled: " + followUp.getFollowUpType() + " on " + scheduledAt);
 
         return toFollowUpResponse(followUp);
     }
@@ -348,20 +360,40 @@ public class InquiryServiceImpl implements InquiryService {
 
     @Override
     public List<FollowUpResponse> getTodayFollowUps() {
-        return followUpRepository.findDueOnDate(LocalDate.now())
-                .stream().map(this::toFollowUpResponse).collect(Collectors.toList());
+        return resolveCounselorQueueOwnerId()
+                .map(counselorId -> {
+                    LocalDate today = LocalDate.now();
+                    return followUpRepository.findTodayForCounselor(
+                                    counselorId, today.atStartOfDay(), today.plusDays(1).atStartOfDay())
+                            .stream().map(this::toFollowUpResponse).collect(Collectors.toList());
+                })
+                .orElseGet(Collections::emptyList);
     }
 
     @Override
     public List<FollowUpResponse> getOverdueFollowUps() {
-        return followUpRepository.findOverdue(LocalDate.now())
-                .stream().map(this::toFollowUpResponse).collect(Collectors.toList());
+        return resolveCounselorQueueOwnerId()
+                .map(counselorId -> followUpRepository.findOverdueForCounselor(
+                                counselorId, LocalDate.now().atStartOfDay())
+                        .stream().map(this::toFollowUpResponse).collect(Collectors.toList()))
+                .orElseGet(Collections::emptyList);
     }
 
     @Override
     public List<FollowUpResponse> getUpcomingFollowUps() {
-        return followUpRepository.findUpcoming(LocalDate.now())
-                .stream().map(this::toFollowUpResponse).collect(Collectors.toList());
+        return resolveCounselorQueueOwnerId()
+                .map(counselorId -> followUpRepository.findUpcomingForCounselor(
+                                counselorId, LocalDate.now().plusDays(1).atStartOfDay())
+                        .stream().map(this::toFollowUpResponse).collect(Collectors.toList()))
+                .orElseGet(Collections::emptyList);
+    }
+
+    @Override
+    public List<FollowUpResponse> getCompletedFollowUps() {
+        return resolveCounselorQueueOwnerId()
+                .map(counselorId -> followUpRepository.findCompletedForCounselor(counselorId)
+                        .stream().map(this::toFollowUpResponse).collect(Collectors.toList()))
+                .orElseGet(Collections::emptyList);
     }
 
     @Override
@@ -369,6 +401,7 @@ public class InquiryServiceImpl implements InquiryService {
     public FollowUpResponse updateFollowUp(Long followUpId, FollowUpRequest request) {
         InquiryFollowUp followUp = followUpRepository.findById(followUpId)
                 .orElseThrow(() -> new ResourceNotFoundException("Follow-up not found: " + followUpId));
+        requireCounselorOwnsFollowUp(followUp);
 
         if (request.getFollowUpType() != null) {
             followUp.setFollowUpType(request.getFollowUpType());
@@ -378,24 +411,26 @@ public class InquiryServiceImpl implements InquiryService {
         if (request.getFollowUpDate() != null) {
             followUp.setFollowUpDate(request.getFollowUpDate());
         }
-        followUp.setNextFollowUpDate(request.getNextFollowUpDate());
         if (request.getNextFollowUpDate() != null
                 && followUp.getLifecycleStatus() != FollowUpLifecycleStatus.COMPLETED
                 && followUp.getLifecycleStatus() != FollowUpLifecycleStatus.CANCELLED) {
-            followUp.setLifecycleStatus(FollowUpLifecycleStatus.RESCHEDULED);
+            followUp.setLifecycleStatus(FollowUpLifecycleStatus.SCHEDULED);
+            followUp.setNextFollowUpDate(request.getNextFollowUpDate());
+        }
+        if (request.getFollowUpDate() != null) {
+            followUp.setNextFollowUpDate(request.getFollowUpDate().toLocalDate());
+            if (followUp.getLifecycleStatus() != FollowUpLifecycleStatus.COMPLETED
+                    && followUp.getLifecycleStatus() != FollowUpLifecycleStatus.CANCELLED) {
+                followUp.setLifecycleStatus(FollowUpLifecycleStatus.SCHEDULED);
+            }
         }
         followUp = followUpRepository.save(followUp);
 
         Inquiry inquiry = followUp.getInquiry();
-        if (followUp.getStatusAfter() != null) {
-            inquiry.setStatus(followUp.getStatusAfter());
-        }
-        inquiry.setLastFollowUpDate(followUp.getFollowUpDate());
-        inquiry.setLastFollowUpType(followUp.getFollowUpType());
         inquiry.setNextFollowUpDate(followUp.getNextFollowUpDate());
         inquiryRepository.save(inquiry);
         auditWriteService.record(AuditEventType.UPDATE, "FOLLOW_UP_UPDATED", "INQUIRY", String.valueOf(inquiry.getInquiryId()),
-            "Follow-up updated");
+            "Follow-up rescheduled");
         return toFollowUpResponse(followUp);
     }
 
@@ -410,6 +445,7 @@ public class InquiryServiceImpl implements InquiryService {
     public FollowUpResponse completeFollowUp(Long followUpId, CompleteFollowUpRequest request) {
         InquiryFollowUp followUp = followUpRepository.findById(followUpId)
                 .orElseThrow(() -> new ResourceNotFoundException("Follow-up not found: " + followUpId));
+        requireCounselorOwnsFollowUp(followUp);
         Inquiry inquiry = followUp.getInquiry();
         followUp.setLifecycleStatus(FollowUpLifecycleStatus.COMPLETED);
         followUp.setCompletedOn(LocalDateTime.now());
@@ -448,6 +484,7 @@ public class InquiryServiceImpl implements InquiryService {
     public FollowUpResponse cancelFollowUp(Long followUpId, String remarks) {
         InquiryFollowUp followUp = followUpRepository.findById(followUpId)
                 .orElseThrow(() -> new ResourceNotFoundException("Follow-up not found: " + followUpId));
+        requireCounselorOwnsFollowUp(followUp);
         followUp.setLifecycleStatus(FollowUpLifecycleStatus.CANCELLED);
         followUp.setCompletedOn(LocalDateTime.now());
         followUp.setCompletedBy(currentUsername());
@@ -472,8 +509,6 @@ public class InquiryServiceImpl implements InquiryService {
         note.setInquiry(inquiry);
         note.setSessionAt(request.getSessionAt() != null ? request.getSessionAt() : LocalDateTime.now());
         note.setMode(request.getMode());
-        // Default to the logged-in counselor when the caller is staff and no explicit
-        // counselor was supplied (admins picking on behalf of a counselor pass it explicitly).
         Long counselorStaffId = request.getCounselorStaffId() != null
                 ? request.getCounselorStaffId()
                 : currentStaffId();
@@ -484,9 +519,75 @@ public class InquiryServiceImpl implements InquiryService {
         note.setRecommendations(request.getRecommendations());
         note.setNotes(request.getNotes());
         CounselingNote saved = counselingNoteRepository.save(note);
+
         auditWriteService.record(AuditEventType.UPDATE, "COUNSELING_ADDED", "INQUIRY", String.valueOf(inquiryId),
             "Counseling note added" + (counselorStaffId != null ? " by " + resolveCounselorName(counselorStaffId) : ""));
+
+        // Complete only when this note is explicitly associated with a pending follow-up.
+        InquiryFollowUp pending = resolvePendingFollowUp(inquiryId, request.getFollowUpId());
+        if (pending != null) {
+            pending.setLifecycleStatus(FollowUpLifecycleStatus.COMPLETED);
+            pending.setCompletedOn(LocalDateTime.now());
+            pending.setCompletedBy(currentUsername());
+            pending.setOutcome("Completed via counseling note");
+            followUpRepository.save(pending);
+            inquiry.setLastFollowUpDate(note.getSessionAt());
+            inquiry.setLastFollowUpType(pending.getFollowUpType());
+            auditWriteService.record(AuditEventType.UPDATE, "FOLLOW_UP_COMPLETED", "INQUIRY", String.valueOf(inquiryId),
+                "Follow-up completed via counseling note");
+        }
+
+        if (request.getLeadStatus() != null && request.getLeadStatus() != inquiry.getStatus()) {
+            InquiryStatus previous = inquiry.getStatus();
+            inquiry.setStatus(request.getLeadStatus());
+            auditWriteService.record(AuditEventType.STATE_CHANGE, "LEAD_STATUS_CHANGED", "INQUIRY",
+                    String.valueOf(inquiryId),
+                    "Status changed from " + previous + " to " + request.getLeadStatus() + " via counseling");
+        }
+
+        if (request.getNextFollowUpAt() != null) {
+            InquiryFollowUp next = new InquiryFollowUp();
+            next.setInquiry(inquiry);
+            next.setFollowUpType(request.getMode() != null ? request.getMode() : FollowUpType.CALL);
+            next.setRemarks("Scheduled from counseling note");
+            next.setFollowUpDate(request.getNextFollowUpAt());
+            next.setNextFollowUpDate(request.getNextFollowUpAt().toLocalDate());
+            next.setLifecycleStatus(FollowUpLifecycleStatus.SCHEDULED);
+            followUpRepository.save(next);
+            inquiry.setNextFollowUpDate(request.getNextFollowUpAt().toLocalDate());
+            auditWriteService.record(AuditEventType.UPDATE, "FOLLOW_UP_SCHEDULED", "INQUIRY", String.valueOf(inquiryId),
+                "Next follow-up scheduled from counseling: " + request.getNextFollowUpAt());
+        } else if (pending != null) {
+            // Pending FU was completed and no replacement scheduled — clear denormalized next date
+            // unless another scheduled follow-up still exists.
+            boolean stillScheduled = followUpRepository
+                    .findByInquiryInquiryIdOrderByFollowUpDateDesc(inquiryId)
+                    .stream()
+                    .anyMatch(f -> f.getLifecycleStatus() == FollowUpLifecycleStatus.SCHEDULED
+                            || f.getLifecycleStatus() == FollowUpLifecycleStatus.RESCHEDULED);
+            if (!stillScheduled) {
+                inquiry.setNextFollowUpDate(null);
+            }
+        }
+
+        inquiryRepository.save(inquiry);
         return toCounselingResponse(saved);
+    }
+
+    private InquiryFollowUp resolvePendingFollowUp(Long inquiryId, Long followUpId) {
+        if (followUpId == null) {
+            return null;
+        }
+        InquiryFollowUp followUp = followUpRepository.findById(followUpId)
+                .orElseThrow(() -> new ResourceNotFoundException("Follow-up not found: " + followUpId));
+        if (!inquiryId.equals(followUp.getInquiry().getInquiryId())) {
+            throw new BadRequestException("Follow-up does not belong to this lead");
+        }
+        if (followUp.getLifecycleStatus() == FollowUpLifecycleStatus.COMPLETED
+                || followUp.getLifecycleStatus() == FollowUpLifecycleStatus.CANCELLED) {
+            return null;
+        }
+        return followUp;
     }
 
     @Override
@@ -595,7 +696,6 @@ public class InquiryServiceImpl implements InquiryService {
                 .findEligibleStaffByResponsibilityCode(COUNSELOR_RESPONSIBILITY_CODE, LocalDate.now())
                 .stream()
                 .map(ResponsibilityAssignment::getStaff)
-                .filter(staff -> hasAdmissionsLeadAccess(staff, "VIEW"))
                 .filter(staff -> {
                     if (!StringUtils.hasText(keyword)) {
                         return true;
@@ -769,7 +869,7 @@ public class InquiryServiceImpl implements InquiryService {
             case "FOLLOW_UP_UPDATED" -> "Follow-up Updated";
             case "FOLLOW_UP_COMPLETED" -> "Follow-up Completed";
             case "FOLLOW_UP_CANCELLED" -> "Follow-up Cancelled";
-            case "COUNSELING_ADDED" -> "Counseling Note Added";
+            case "COUNSELING_ADDED" -> "Counseling Completed";
             case "LEAD_EXPORT_CSV" -> "Leads Exported";
             default -> java.util.Arrays.stream(action.split("_"))
                     .map(w -> w.isEmpty() ? w : w.charAt(0) + w.substring(1).toLowerCase())
@@ -931,6 +1031,46 @@ public class InquiryServiceImpl implements InquiryService {
         auditWriteService.record(AuditEventType.STATE_CHANGE, "COUNSELOR_ASSIGNED", "INQUIRY",
                 String.valueOf(inquiry.getInquiryId()),
                 "Counselor auto-assigned (round robin): " + staffDisplayName(chosen));
+        ensureFirstFollowUpScheduled(inquiry, chosen);
+    }
+
+    /**
+     * Creates the first scheduled follow-up when a counselor is assigned and the lead has none yet.
+     * Slot selection prefers same business day when the counselor's relative load allows, otherwise
+     * the next lighter business day — never beyond 2 business days (SLA).
+     */
+    private void ensureFirstFollowUpScheduled(Inquiry inquiry, Staff counselor) {
+        if (inquiry == null || counselor == null || counselor.getStaffId() == null) {
+            return;
+        }
+        if (inquiry.getStatus() == InquiryStatus.LOST) {
+            return;
+        }
+        if (followUpRepository.existsByInquiryInquiryIdAndLifecycleStatus(
+                inquiry.getInquiryId(), FollowUpLifecycleStatus.SCHEDULED)) {
+            return;
+        }
+
+        Long counselorId = counselor.getStaffId();
+        LocalDateTime scheduledAt = followUpSlotPlanner.suggestFirstFollowUpAt(day ->
+                followUpRepository.countScheduledForCounselorBetween(
+                        counselorId, day.atStartOfDay(), day.plusDays(1).atStartOfDay()));
+
+        InquiryFollowUp followUp = new InquiryFollowUp();
+        followUp.setInquiry(inquiry);
+        followUp.setFollowUpType(FollowUpType.CALL);
+        followUp.setRemarks("Auto-scheduled first follow-up after counselor assignment");
+        followUp.setFollowUpDate(scheduledAt);
+        followUp.setNextFollowUpDate(scheduledAt.toLocalDate());
+        followUp.setLifecycleStatus(FollowUpLifecycleStatus.SCHEDULED);
+        followUpRepository.save(followUp);
+
+        inquiry.setNextFollowUpDate(scheduledAt.toLocalDate());
+        inquiryRepository.save(inquiry);
+
+        auditWriteService.record(AuditEventType.UPDATE, "FOLLOW_UP_SCHEDULED", "INQUIRY",
+                String.valueOf(inquiry.getInquiryId()),
+                "First follow-up auto-scheduled for " + scheduledAt.toLocalDate());
     }
 
     private List<Staff> resolveEligibleCounselorsOrdered() {
@@ -938,7 +1078,6 @@ public class InquiryServiceImpl implements InquiryService {
                 .findEligibleStaffByResponsibilityCode(COUNSELOR_RESPONSIBILITY_CODE, LocalDate.now())
                 .stream()
                 .map(ResponsibilityAssignment::getStaff)
-                .filter(staff -> hasAdmissionsLeadAccess(staff, "VIEW"))
                 .distinct()
                 .sorted(Comparator.comparing(Staff::getStaffId))
                 .toList();
@@ -956,10 +1095,7 @@ public class InquiryServiceImpl implements InquiryService {
         boolean hasResponsibility = responsibilityAssignmentRepository.hasActiveResponsibilityCode(
                 counselorId, COUNSELOR_RESPONSIBILITY_CODE, LocalDate.now());
         if (!hasResponsibility) {
-            throw new BadRequestException("Selected staff is not assigned counselor responsibility");
-        }
-        if (!hasAdmissionsLeadAccess(staff, "VIEW")) {
-            throw new BadRequestException("Selected counselor does not have admissions access");
+            throw new BadRequestException("Selected staff is not assigned the COUNSELOR responsibility");
         }
         return staff;
     }
@@ -973,6 +1109,64 @@ public class InquiryServiceImpl implements InquiryService {
         if (user == null || orgId == null || !permissionService.hasPermission(user.getId(), orgId, RESOURCE_ADMISSIONS_LEADS, "VIEW")) {
             throw new AccessDeniedException("ADMISSIONS_LEADS:VIEW required");
         }
+    }
+
+    /**
+     * Counselor work-queue owner: linked staff with active COUNSELOR responsibility.
+     * Org Admin / Owner / other users without that ownership get no queue data
+     * (empty lists) — elevated roles do not broaden another counselor's queue.
+     */
+    private Optional<Long> resolveCounselorQueueOwnerId() {
+        requireFollowUpsAccess();
+        Long staffId = currentStaffId();
+        if (staffId == null) {
+            return Optional.empty();
+        }
+        boolean isCounselor = responsibilityAssignmentRepository.hasActiveResponsibilityCode(
+                staffId, COUNSELOR_RESPONSIBILITY_CODE, LocalDate.now());
+        if (!isCounselor) {
+            return Optional.empty();
+        }
+        return Optional.of(staffId);
+    }
+
+    private void requireFollowUpsAccess() {
+        if (hasElevatedRole()) {
+            return;
+        }
+        User user = currentUser();
+        Long orgId = OrganizationContext.getOrganizationId();
+        if (user == null || orgId == null) {
+            throw new AccessDeniedException("ADMISSIONS_FOLLOW_UPS:VIEW required");
+        }
+        boolean canViewFollowUps = permissionService.hasPermission(
+                user.getId(), orgId, RESOURCE_ADMISSIONS_FOLLOW_UPS, "VIEW");
+        boolean canViewLeads = permissionService.hasPermission(
+                user.getId(), orgId, RESOURCE_ADMISSIONS_LEADS, "VIEW");
+        if (!canViewFollowUps && !canViewLeads) {
+            throw new AccessDeniedException("ADMISSIONS_FOLLOW_UPS:VIEW required");
+        }
+    }
+
+    /**
+     * Mutating a follow-up requires either the assigned counselor (COUNSELOR responsibility)
+     * or an existing leads MANAGE privilege (elevated / permission architecture).
+     * Queue list endpoints never broaden ownership via MANAGE.
+     */
+    private void requireCounselorOwnsFollowUp(InquiryFollowUp followUp) {
+        Inquiry inquiry = followUp.getInquiry();
+        Long staffId = currentStaffId();
+        if (staffId != null
+                && responsibilityAssignmentRepository.hasActiveResponsibilityCode(
+                        staffId, COUNSELOR_RESPONSIBILITY_CODE, LocalDate.now())
+                && inquiry != null
+                && staffId.equals(inquiry.getAssignedCounselorId())) {
+            return;
+        }
+        if (canManageLeads()) {
+            return;
+        }
+        throw new AccessDeniedException("Only the assigned counselor can manage this follow-up");
     }
 
     private void requireManageLeads() {

@@ -1,6 +1,7 @@
 package com.thinkerscave.admission.dto.request;
 
 import com.thinkerscave.admission.enums.FollowUpType;
+import com.thinkerscave.admission.enums.InquiryStatus;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -31,4 +32,19 @@ public class CounselingNoteRequest {
 
     @NotBlank(message = "Notes are required")
     private String notes;
+
+    /** Optional lead status update applied when the counseling note is saved. */
+    private InquiryStatus leadStatus;
+
+    /**
+     * Optional next planned follow-up datetime. When provided, a new SCHEDULED
+     * follow-up is created after this counseling interaction.
+     */
+    private LocalDateTime nextFollowUpAt;
+
+    /**
+     * Optional pending follow-up to complete as part of this counseling note.
+     * When omitted, the earliest SCHEDULED/RESCHEDULED follow-up for the lead is completed.
+     */
+    private Long followUpId;
 }

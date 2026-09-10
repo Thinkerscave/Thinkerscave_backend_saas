@@ -10,7 +10,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
-@Schema(description = "Record a follow-up interaction for an inquiry")
+@Schema(description = "Schedule a planned follow-up for an inquiry (not a completed interaction)")
 public class FollowUpRequest {
 
     @NotNull(message = "Follow-up type is required")
@@ -18,10 +18,12 @@ public class FollowUpRequest {
 
     private String remarks;
 
-    @Schema(description = "Updated status after this interaction")
+    @Schema(description = "Deprecated for schedule flow — status changes happen via counseling notes")
     private InquiryStatus statusAfter;
 
+    @Schema(description = "When the planned follow-up should occur")
     private LocalDateTime followUpDate;
 
+    @Schema(description = "Deprecated for schedule flow — use followUpDate as the planned slot")
     private LocalDate nextFollowUpDate;
 }
