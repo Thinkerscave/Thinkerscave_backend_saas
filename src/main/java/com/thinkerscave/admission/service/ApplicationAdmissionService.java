@@ -8,6 +8,7 @@ import com.thinkerscave.admission.dto.response.ApplicationAdmissionResponse;
 import com.thinkerscave.admission.dto.response.ApplicationDocumentResponse;
 import com.thinkerscave.admission.dto.response.ApplicationProgressResponse;
 import com.thinkerscave.admission.dto.response.EnrollmentResultResponse;
+import com.thinkerscave.admission.dto.response.FamilyMatchResponse;
 import com.thinkerscave.admission.enums.ApplicationStatus;
 import com.thinkerscave.admission.enums.DocumentCheckStatus;
 import org.springframework.core.io.Resource;
@@ -40,6 +41,11 @@ public interface ApplicationAdmissionService {
     ApplicationAdmissionResponse approve(Long applicationId, String comments);
 
     ApplicationAdmissionResponse reject(Long applicationId, String comments);
+
+    /** Return application to applicant/counselor for corrections (Approve privilege). */
+    ApplicationAdmissionResponse requestCorrection(Long applicationId, String reason);
+
+    FamilyMatchResponse findFamilyMatch(String mobile, String email);
 
     ApplicationProgressResponse getProgress(Long applicationId);
 

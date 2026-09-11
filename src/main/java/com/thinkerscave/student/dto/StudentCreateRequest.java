@@ -52,6 +52,9 @@ public class StudentCreateRequest {
     // PARENT DETAILS
     // ==========================
 
+    /** When set, link this existing parent instead of creating a new one. */
+    private Long existingParentId;
+
     @NotBlank
     private String parentFirstName;
 

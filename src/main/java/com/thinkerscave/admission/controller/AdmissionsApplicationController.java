@@ -8,6 +8,7 @@ import com.thinkerscave.admission.dto.response.ApplicationAdmissionResponse;
 import com.thinkerscave.admission.dto.response.ApplicationDocumentResponse;
 import com.thinkerscave.admission.dto.response.ApplicationProgressResponse;
 import com.thinkerscave.admission.dto.response.EnrollmentResultResponse;
+import com.thinkerscave.admission.dto.response.FamilyMatchResponse;
 import com.thinkerscave.admission.enums.ApplicationStatus;
 import com.thinkerscave.admission.enums.DocumentCheckStatus;
 import com.thinkerscave.admission.service.ApplicationAdmissionService;
@@ -81,6 +82,15 @@ public class AdmissionsApplicationController {
         return ResponseEntity.ok(ApiResponse.success("Application search completed", applicationService.search(request, pageable)));
     }
 
+    @GetMapping("/family-match")
+    @Operation(summary = "Find existing family/parent by mobile or email for sibling linking")
+    public ResponseEntity<ApiResponse<FamilyMatchResponse>> familyMatch(
+            @RequestParam(required = false) String mobile,
+            @RequestParam(required = false) String email) {
+        return ResponseEntity.ok(ApiResponse.success("Family match result",
+                applicationService.findFamilyMatch(mobile, email)));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Get application detail")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> getById(@PathVariable Long id) {
@@ -101,6 +111,15 @@ public class AdmissionsApplicationController {
             @PathVariable Long id,
             @RequestParam(required = false) String remarks) {
         return ResponseEntity.ok(ApiResponse.success("Application approved", applicationService.approve(id, remarks)));
+    }
+
+    @PostMapping("/{id}/request-correction")
+    @Operation(summary = "Send application back for correction (ACTION_REQUIRED)")
+    public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> requestCorrection(
+            @PathVariable Long id,
+            @RequestParam String reason) {
+        return ResponseEntity.ok(ApiResponse.success("Correction requested",
+                applicationService.requestCorrection(id, reason)));
     }
 
     @PostMapping("/{id}/reject")

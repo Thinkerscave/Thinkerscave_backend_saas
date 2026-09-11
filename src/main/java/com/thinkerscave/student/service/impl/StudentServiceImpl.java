@@ -107,27 +107,9 @@ public class StudentServiceImpl implements StudentService {
                 dto.getEmail(), dto.getMobileNumber(), null, null, null, TYPE_STUDENT);
         User studentUser = userService.createUser(studentContext, studentRole);
 
-        UserCreationContext guardianContext = new UserCreationContext(
-                dto.getParentFirstName(), dto.getParentMiddleName(), dto.getParentLastName(),
-                dto.getParentEmail(), dto.getParentMobileNumber(), null, null, null, TYPE_GUARDIAN);
-        User parentUser = userService.createUser(guardianContext, parentRole);
-
-        String parentCode = "PAR" + System.currentTimeMillis();
         String studentCode = "STU" + System.currentTimeMillis();
 
-        Parent parent = new Parent();
-        parent.setParentCode(parentCode);
-        parent.setFirstName(dto.getParentFirstName());
-        parent.setMiddleName(dto.getParentMiddleName());
-        parent.setLastName(dto.getParentLastName());
-        parent.setMobileNumber(dto.getParentMobileNumber());
-        parent.setEmail(dto.getParentEmail());
-        parent.setOccupation(dto.getParentOccupation());
-        parent.setOrganizationName(dto.getParentOrganizationName());
-        parent.setQualification(dto.getParentQualification());
-        parent.setAnnualIncome(dto.getAnnualIncome());
-        parent.setUser(parentUser);
-        parent = parentRepository.save(parent);
+        Parent parent = resolveOrCreateParent(dto, parentRole);
 
         Student student = new Student();
         student.setStudentCode(studentCode);
@@ -568,6 +550,39 @@ public class StudentServiceImpl implements StudentService {
         List<StudentParent> links = studentParentRepository.findByStudentStudentId(studentId);
         return links.stream().filter(StudentParent::getPrimaryContact).findFirst()
                 .or(() -> links.stream().findFirst());
+    }
+
+    private Parent resolveOrCreateParent(StudentCreateRequest dto, Role parentRole) {
+        if (dto.getExistingParentId() != null) {
+            return parentRepository.findById(dto.getExistingParentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent not found: " + dto.getExistingParentId()));
+        }
+        String mobile = dto.getParentMobileNumber() != null ? dto.getParentMobileNumber().trim() : null;
+        if (mobile != null && !mobile.isBlank()) {
+            java.util.Optional<Parent> existing = parentRepository.findByMobileNumber(mobile);
+            if (existing.isPresent()) {
+                return existing.get();
+            }
+        }
+
+        UserCreationContext guardianContext = new UserCreationContext(
+                dto.getParentFirstName(), dto.getParentMiddleName(), dto.getParentLastName(),
+                dto.getParentEmail(), dto.getParentMobileNumber(), null, null, null, TYPE_GUARDIAN);
+        User parentUser = userService.createUser(guardianContext, parentRole);
+
+        Parent parent = new Parent();
+        parent.setParentCode("PAR" + System.currentTimeMillis());
+        parent.setFirstName(dto.getParentFirstName());
+        parent.setMiddleName(dto.getParentMiddleName());
+        parent.setLastName(dto.getParentLastName());
+        parent.setMobileNumber(dto.getParentMobileNumber());
+        parent.setEmail(dto.getParentEmail());
+        parent.setOccupation(dto.getParentOccupation());
+        parent.setOrganizationName(dto.getParentOrganizationName());
+        parent.setQualification(dto.getParentQualification());
+        parent.setAnnualIncome(dto.getAnnualIncome());
+        parent.setUser(parentUser);
+        return parentRepository.save(parent);
     }
 
     private String buildFullName(String firstName, String middleName, String lastName) {

@@ -360,39 +360,54 @@ public class InquiryServiceImpl implements InquiryService {
 
     @Override
     public List<FollowUpResponse> getTodayFollowUps() {
-        return resolveCounselorQueueOwnerId()
-                .map(counselorId -> {
+        return resolveFollowUpQueueCounselorFilter()
+                .map(counselorFilter -> {
                     LocalDate today = LocalDate.now();
-                    return followUpRepository.findTodayForCounselor(
-                                    counselorId, today.atStartOfDay(), today.plusDays(1).atStartOfDay())
-                            .stream().map(this::toFollowUpResponse).collect(Collectors.toList());
+                    LocalDateTime dayStart = today.atStartOfDay();
+                    LocalDateTime dayEnd = today.plusDays(1).atStartOfDay();
+                    List<InquiryFollowUp> rows = counselorFilter.isPresent()
+                            ? followUpRepository.findTodayForCounselor(counselorFilter.get(), dayStart, dayEnd)
+                            : followUpRepository.findTodayOrgWide(dayStart, dayEnd);
+                    return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
                 })
                 .orElseGet(Collections::emptyList);
     }
 
     @Override
     public List<FollowUpResponse> getOverdueFollowUps() {
-        return resolveCounselorQueueOwnerId()
-                .map(counselorId -> followUpRepository.findOverdueForCounselor(
-                                counselorId, LocalDate.now().atStartOfDay())
-                        .stream().map(this::toFollowUpResponse).collect(Collectors.toList()))
+        return resolveFollowUpQueueCounselorFilter()
+                .map(counselorFilter -> {
+                    LocalDateTime dayStart = LocalDate.now().atStartOfDay();
+                    List<InquiryFollowUp> rows = counselorFilter.isPresent()
+                            ? followUpRepository.findOverdueForCounselor(counselorFilter.get(), dayStart)
+                            : followUpRepository.findOverdueOrgWide(dayStart);
+                    return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
+                })
                 .orElseGet(Collections::emptyList);
     }
 
     @Override
     public List<FollowUpResponse> getUpcomingFollowUps() {
-        return resolveCounselorQueueOwnerId()
-                .map(counselorId -> followUpRepository.findUpcomingForCounselor(
-                                counselorId, LocalDate.now().plusDays(1).atStartOfDay())
-                        .stream().map(this::toFollowUpResponse).collect(Collectors.toList()))
+        return resolveFollowUpQueueCounselorFilter()
+                .map(counselorFilter -> {
+                    LocalDateTime dayEnd = LocalDate.now().plusDays(1).atStartOfDay();
+                    List<InquiryFollowUp> rows = counselorFilter.isPresent()
+                            ? followUpRepository.findUpcomingForCounselor(counselorFilter.get(), dayEnd)
+                            : followUpRepository.findUpcomingOrgWide(dayEnd);
+                    return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
+                })
                 .orElseGet(Collections::emptyList);
     }
 
     @Override
     public List<FollowUpResponse> getCompletedFollowUps() {
-        return resolveCounselorQueueOwnerId()
-                .map(counselorId -> followUpRepository.findCompletedForCounselor(counselorId)
-                        .stream().map(this::toFollowUpResponse).collect(Collectors.toList()))
+        return resolveFollowUpQueueCounselorFilter()
+                .map(counselorFilter -> {
+                    List<InquiryFollowUp> rows = counselorFilter.isPresent()
+                            ? followUpRepository.findCompletedForCounselor(counselorFilter.get())
+                            : followUpRepository.findCompletedOrgWide();
+                    return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
+                })
                 .orElseGet(Collections::emptyList);
     }
 
@@ -1112,26 +1127,39 @@ public class InquiryServiceImpl implements InquiryService {
     }
 
     /**
-     * Counselor work-queue owner: linked staff with active COUNSELOR responsibility.
-     * Org Admin / Owner / other users without that ownership get no queue data
-     * (empty lists) — elevated roles do not broaden another counselor's queue.
+     * Resolves Follow-ups work-queue visibility.
+     * <ul>
+     *   <li>Empty outer Optional → caller gets no queue data</li>
+     *   <li>Inner Optional present → filter to that counselor staff id</li>
+     *   <li>Inner Optional empty → org-wide queue (elevated / FOLLOW_UPS:MANAGE)</li>
+     * </ul>
+     * Counselors never receive another counselor's items.
      */
-    private Optional<Long> resolveCounselorQueueOwnerId() {
+    private Optional<Optional<Long>> resolveFollowUpQueueCounselorFilter() {
         requireFollowUpsAccess();
         Long staffId = currentStaffId();
-        if (staffId == null) {
-            return Optional.empty();
+        if (staffId != null && hasActiveCounselorResponsibility(staffId)) {
+            return Optional.of(Optional.of(staffId));
         }
-        boolean isCounselor = responsibilityAssignmentRepository.hasActiveResponsibilityCode(
+        // Explicit architecture: elevated roles or FOLLOW_UPS:MANAGE may see the org queue.
+        if (hasElevatedRole() || canManageFollowUps()) {
+            return Optional.of(Optional.empty());
+        }
+        return Optional.empty();
+    }
+
+    private boolean hasActiveCounselorResponsibility(Long staffId) {
+        return responsibilityAssignmentRepository.hasActiveResponsibilityCode(
                 staffId, COUNSELOR_RESPONSIBILITY_CODE, LocalDate.now());
-        if (!isCounselor) {
-            return Optional.empty();
-        }
-        return Optional.of(staffId);
     }
 
     private void requireFollowUpsAccess() {
         if (hasElevatedRole()) {
+            return;
+        }
+        Long staffId = currentStaffId();
+        // COUNSELOR responsibility is enough to open the counselor's own queue.
+        if (staffId != null && hasActiveCounselorResponsibility(staffId)) {
             return;
         }
         User user = currentUser();
@@ -1148,22 +1176,31 @@ public class InquiryServiceImpl implements InquiryService {
         }
     }
 
+    private boolean canManageFollowUps() {
+        if (hasElevatedRole()) {
+            return true;
+        }
+        User user = currentUser();
+        Long orgId = OrganizationContext.getOrganizationId();
+        return user != null && orgId != null
+                && permissionService.hasPermission(user.getId(), orgId, RESOURCE_ADMISSIONS_FOLLOW_UPS, "MANAGE");
+    }
+
     /**
      * Mutating a follow-up requires either the assigned counselor (COUNSELOR responsibility)
      * or an existing leads MANAGE privilege (elevated / permission architecture).
-     * Queue list endpoints never broaden ownership via MANAGE.
+     * Queue list endpoints never broaden ownership via MANAGE for counselor actors.
      */
     private void requireCounselorOwnsFollowUp(InquiryFollowUp followUp) {
         Inquiry inquiry = followUp.getInquiry();
         Long staffId = currentStaffId();
         if (staffId != null
-                && responsibilityAssignmentRepository.hasActiveResponsibilityCode(
-                        staffId, COUNSELOR_RESPONSIBILITY_CODE, LocalDate.now())
+                && hasActiveCounselorResponsibility(staffId)
                 && inquiry != null
                 && staffId.equals(inquiry.getAssignedCounselorId())) {
             return;
         }
-        if (canManageLeads()) {
+        if (canManageLeads() || canManageFollowUps()) {
             return;
         }
         throw new AccessDeniedException("Only the assigned counselor can manage this follow-up");
@@ -1275,10 +1312,21 @@ public class InquiryServiceImpl implements InquiryService {
 
     private Long currentStaffId() {
         Long userId = currentUserId();
-        if (userId == null) {
-            return null;
+        if (userId != null) {
+            Optional<Long> byUser = staffRepository.findByUser_Id(userId).map(Staff::getStaffId);
+            if (byUser.isPresent()) {
+                return byUser.get();
+            }
         }
-        return staffRepository.findByUser_Id(userId).map(Staff::getStaffId).orElse(null);
+        // Fallback: demo / backfilled staff may share email with the login user
+        // even when user_id linkage is missing or stale.
+        User user = currentUser();
+        if (user != null && StringUtils.hasText(user.getEmail())) {
+            return staffRepository.findByEmail(user.getEmail().trim())
+                    .map(Staff::getStaffId)
+                    .orElse(null);
+        }
+        return null;
     }
 
     private boolean hasElevatedRole() {

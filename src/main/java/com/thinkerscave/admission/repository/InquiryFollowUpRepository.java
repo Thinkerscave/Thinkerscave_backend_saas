@@ -42,13 +42,12 @@ public interface InquiryFollowUpRepository extends JpaRepository<InquiryFollowUp
         """)
     List<InquiryFollowUp> findOverdue(@Param("date") java.time.LocalDate date);
 
-    /**
-     * Counselor work queue — Today: SCHEDULED follow-ups whose planned slot falls on [dayStart, dayEnd).
-     */
+    // Counselor-scoped work queue — avoid `:param IS NULL OR …` (PostgreSQL type errors).
+
     @Query("""
         SELECT f
         FROM InquiryFollowUp f
-        JOIN f.inquiry i
+        JOIN FETCH f.inquiry i
         WHERE i.deleted = false
           AND i.assignedCounselorId = :counselorId
           AND (f.lifecycleStatus IS NULL
@@ -63,13 +62,10 @@ public interface InquiryFollowUpRepository extends JpaRepository<InquiryFollowUp
             @Param("dayStart") LocalDateTime dayStart,
             @Param("dayEnd") LocalDateTime dayEnd);
 
-    /**
-     * Counselor work queue — Overdue: SCHEDULED follow-ups planned before today.
-     */
     @Query("""
         SELECT f
         FROM InquiryFollowUp f
-        JOIN f.inquiry i
+        JOIN FETCH f.inquiry i
         WHERE i.deleted = false
           AND i.assignedCounselorId = :counselorId
           AND (f.lifecycleStatus IS NULL
@@ -82,13 +78,10 @@ public interface InquiryFollowUpRepository extends JpaRepository<InquiryFollowUp
             @Param("counselorId") Long counselorId,
             @Param("dayStart") LocalDateTime dayStart);
 
-    /**
-     * Counselor work queue — Upcoming: SCHEDULED follow-ups planned after today.
-     */
     @Query("""
         SELECT f
         FROM InquiryFollowUp f
-        JOIN f.inquiry i
+        JOIN FETCH f.inquiry i
         WHERE i.deleted = false
           AND i.assignedCounselorId = :counselorId
           AND (f.lifecycleStatus IS NULL
@@ -101,19 +94,70 @@ public interface InquiryFollowUpRepository extends JpaRepository<InquiryFollowUp
             @Param("counselorId") Long counselorId,
             @Param("dayEnd") LocalDateTime dayEnd);
 
-    /**
-     * Counselor work queue — Completed: completed follow-ups for leads assigned to the counselor.
-     */
     @Query("""
         SELECT f
         FROM InquiryFollowUp f
-        JOIN f.inquiry i
+        JOIN FETCH f.inquiry i
         WHERE i.deleted = false
           AND i.assignedCounselorId = :counselorId
           AND f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.COMPLETED
         ORDER BY f.completedOn DESC, f.followUpDate DESC
         """)
     List<InquiryFollowUp> findCompletedForCounselor(@Param("counselorId") Long counselorId);
+
+    // Org-wide work queue (elevated / FOLLOW_UPS:MANAGE)
+
+    @Query("""
+        SELECT f
+        FROM InquiryFollowUp f
+        JOIN FETCH f.inquiry i
+        WHERE i.deleted = false
+          AND (f.lifecycleStatus IS NULL
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.SCHEDULED
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.RESCHEDULED)
+          AND f.followUpDate >= :dayStart
+          AND f.followUpDate < :dayEnd
+        ORDER BY f.followUpDate ASC
+        """)
+    List<InquiryFollowUp> findTodayOrgWide(
+            @Param("dayStart") LocalDateTime dayStart,
+            @Param("dayEnd") LocalDateTime dayEnd);
+
+    @Query("""
+        SELECT f
+        FROM InquiryFollowUp f
+        JOIN FETCH f.inquiry i
+        WHERE i.deleted = false
+          AND (f.lifecycleStatus IS NULL
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.SCHEDULED
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.RESCHEDULED)
+          AND f.followUpDate < :dayStart
+        ORDER BY f.followUpDate ASC
+        """)
+    List<InquiryFollowUp> findOverdueOrgWide(@Param("dayStart") LocalDateTime dayStart);
+
+    @Query("""
+        SELECT f
+        FROM InquiryFollowUp f
+        JOIN FETCH f.inquiry i
+        WHERE i.deleted = false
+          AND (f.lifecycleStatus IS NULL
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.SCHEDULED
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.RESCHEDULED)
+          AND f.followUpDate >= :dayEnd
+        ORDER BY f.followUpDate ASC
+        """)
+    List<InquiryFollowUp> findUpcomingOrgWide(@Param("dayEnd") LocalDateTime dayEnd);
+
+    @Query("""
+        SELECT f
+        FROM InquiryFollowUp f
+        JOIN FETCH f.inquiry i
+        WHERE i.deleted = false
+          AND f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.COMPLETED
+        ORDER BY f.completedOn DESC, f.followUpDate DESC
+        """)
+    List<InquiryFollowUp> findCompletedOrgWide();
 
     boolean existsByInquiryInquiryIdAndLifecycleStatus(Long inquiryId, FollowUpLifecycleStatus lifecycleStatus);
 
