@@ -2,6 +2,7 @@ package com.thinkerscave.admission.entity;
 
 import com.thinkerscave.admission.enums.FollowUpType;
 import com.thinkerscave.admission.enums.InquiryStatus;
+import com.thinkerscave.admission.enums.InquiryStatusConverter;
 import com.thinkerscave.admission.enums.LeadSource;
 import com.thinkerscave.admission.entity.converter.LeadSourceAttributeConverter;
 import com.thinkerscave.shared.entity.Auditable;
@@ -86,7 +87,7 @@ public class Inquiry extends Auditable {
     @Column(name = "assigned_counselor_id")
     private Long assignedCounselorId;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = InquiryStatusConverter.class)
     @Column(name = "status", nullable = false, length = 30)
     private InquiryStatus status = InquiryStatus.NEW;
 

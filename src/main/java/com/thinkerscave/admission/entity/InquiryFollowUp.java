@@ -3,6 +3,7 @@ package com.thinkerscave.admission.entity;
 import com.thinkerscave.admission.enums.FollowUpLifecycleStatus;
 import com.thinkerscave.admission.enums.FollowUpType;
 import com.thinkerscave.admission.enums.InquiryStatus;
+import com.thinkerscave.admission.enums.InquiryStatusConverter;
 import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;
@@ -46,7 +47,7 @@ public class InquiryFollowUp extends Auditable {
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
 
-    @Enumerated(EnumType.STRING)
+    @Convert(converter = InquiryStatusConverter.class)
     @Column(name = "status_after", length = 30)
     private InquiryStatus statusAfter;
 
