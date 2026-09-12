@@ -5,6 +5,7 @@ import com.thinkerscave.admission.dto.request.ApplicationSearchRequest;
 import com.thinkerscave.admission.dto.request.EnrollApplicationRequest;
 import com.thinkerscave.admission.dto.request.RecordFeeRequest;
 import com.thinkerscave.admission.dto.response.ApplicationAdmissionResponse;
+import com.thinkerscave.admission.dto.response.ApplicationDocumentFile;
 import com.thinkerscave.admission.dto.response.ApplicationDocumentResponse;
 import com.thinkerscave.admission.dto.response.ApplicationProgressResponse;
 import com.thinkerscave.admission.dto.response.EnrollmentResultResponse;
@@ -20,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -186,9 +188,10 @@ public class AdmissionsApplicationController {
     public ResponseEntity<ApiResponse<ApplicationDocumentResponse>> uploadDocument(
             @PathVariable Long id,
             @RequestPart("file") MultipartFile file,
-            @RequestParam(required = false) String documentType) {
+            @RequestParam(required = false) String documentType,
+            @RequestParam(required = false) String remarks) {
         return ResponseEntity.ok(ApiResponse.created("Document uploaded",
-                applicationService.uploadDocument(id, file, documentType)));
+                applicationService.uploadDocument(id, file, documentType, remarks)));
     }
 
     @PostMapping("/documents/{documentId}/verify")
@@ -209,12 +212,21 @@ public class AdmissionsApplicationController {
     }
 
     @GetMapping("/documents/{documentId}/download")
-    @Operation(summary = "Download an application document")
+    @Operation(summary = "Download / preview an application document")
     public ResponseEntity<Resource> downloadDocument(@PathVariable Long documentId) {
-        Resource resource = applicationService.downloadDocument(documentId);
+        ApplicationDocumentFile file = applicationService.downloadDocument(documentId);
+        MediaType mediaType;
+        try {
+            mediaType = MediaType.parseMediaType(file.contentType());
+        } catch (Exception ex) {
+            mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        }
+        ContentDisposition disposition = ContentDisposition.inline()
+                .filename(file.originalName(), java.nio.charset.StandardCharsets.UTF_8)
+                .build();
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(resource);
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(mediaType)
+                .body(file.resource());
     }
 }

@@ -13,6 +13,7 @@ import com.thinkerscave.admission.dto.request.ApplicationSearchRequest;
 import com.thinkerscave.admission.dto.request.EnrollApplicationRequest;
 import com.thinkerscave.admission.dto.request.RecordFeeRequest;
 import com.thinkerscave.admission.dto.response.ApplicationAdmissionResponse;
+import com.thinkerscave.admission.dto.response.ApplicationDocumentFile;
 import com.thinkerscave.admission.dto.response.ApplicationDocumentResponse;
 import com.thinkerscave.admission.dto.response.ApplicationProgressResponse;
 import com.thinkerscave.admission.dto.response.EnrollmentResultResponse;
@@ -29,6 +30,7 @@ import com.thinkerscave.admission.repository.InquiryRepository;
 import com.thinkerscave.admission.service.AdmissionsSettingService;
 import com.thinkerscave.admission.service.ApplicationAdmissionService;
 import com.thinkerscave.admission.specification.ApplicationAdmissionSpecification;
+import com.thinkerscave.admission.util.RequiredDocumentsResolver;
 import com.thinkerscave.audit.enums.AuditEventType;
 import com.thinkerscave.audit.service.AuditWriteService;
 import com.thinkerscave.shared.context.OrganizationContext;
@@ -48,9 +50,10 @@ import com.thinkerscave.student.repository.StudentRepository;
 import com.thinkerscave.student.service.StudentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -218,6 +221,20 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         requireApproveApplications();
         ApplicationAdmission app = getApplication(applicationId);
         validateStatusChange(app.getStatus(), status);
+        if (status == ApplicationStatus.APPROVED) {
+            if (!REVIEWABLE.contains(app.getStatus())) {
+                throw new BadRequestException("Application cannot be approved from status " + app.getStatus());
+            }
+            validateForApprove(app);
+        }
+        if (status == ApplicationStatus.ACTION_REQUIRED) {
+            if (!REVIEWABLE.contains(app.getStatus()) && app.getStatus() != ApplicationStatus.SUBMITTED) {
+                throw new BadRequestException("Correction can only be requested while the application is under review");
+            }
+            if (comments == null || comments.isBlank()) {
+                throw new BadRequestException("A correction reason is required");
+            }
+        }
         app.setStatus(status);
         if (comments != null) {
             app.setInternalComments(comments);
@@ -487,7 +504,8 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
 
     @Override
     @Transactional
-    public ApplicationDocumentResponse uploadDocument(Long applicationId, MultipartFile file, String documentType) {
+    public ApplicationDocumentResponse uploadDocument(
+            Long applicationId, MultipartFile file, String documentType, String remarks) {
         requireManageApplications();
         ApplicationAdmission app = getApplication(applicationId);
         if (app.getStatus() == ApplicationStatus.ENROLLED || app.getStatus() == ApplicationStatus.REJECTED
@@ -502,6 +520,9 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
             doc.setOriginalName(file.getOriginalFilename());
             doc.setStoredPath(path);
             doc.setStatus(DocumentCheckStatus.PENDING);
+            if (hasText(remarks)) {
+                doc.setRemarks(remarks.trim());
+            }
             ApplicationDocumentResponse response = toDocumentResponse(documentRepository.save(doc));
             auditWriteService.record(AuditEventType.UPDATE, "DOCUMENT_UPLOADED", "APPLICATION",
                     String.valueOf(applicationId), "Document uploaded: " + response.getDocumentType());
@@ -542,14 +563,26 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         requireManageApplications();
         AdmissionApplicationDocument doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
+        String storedPath = doc.getStoredPath();
         documentRepository.delete(doc);
+        fileStorageService.deleteQuietly(storedPath);
     }
 
     @Override
-    public Resource downloadDocument(Long documentId) {
+    public ApplicationDocumentFile downloadDocument(Long documentId) {
+        requireViewApplications();
         AdmissionApplicationDocument doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
-        return fileStorageService.loadAsResource(doc.getStoredPath());
+        String originalName = StringUtils.hasText(doc.getOriginalName())
+                ? doc.getOriginalName()
+                : "document-" + documentId;
+        MediaType mediaType = MediaTypeFactory.getMediaType(originalName)
+                .orElse(MediaType.APPLICATION_OCTET_STREAM);
+        return new ApplicationDocumentFile(
+                fileStorageService.loadAsResource(doc.getStoredPath()),
+                originalName,
+                mediaType.toString()
+        );
     }
 
     private ApplicationAdmissionResponse submitNew(ApplicationAdmissionRequest request) {
@@ -670,7 +703,13 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         if (app.getDateOfBirth() == null) {
             throw new BadRequestException("Date of birth is required before approval");
         }
-        List<String> required = settingService.requiredDocuments();
+        ApplicationProfileDetails profile = readProfile(app.getProfileDetails());
+        List<String> required = RequiredDocumentsResolver.resolve(
+                settingService.requiredDocuments(),
+                app.getApplyingForClass(),
+                profile != null ? profile.getHasPreviousSchooling() : null,
+                profile != null ? profile.getTcNumber() : null,
+                profile != null ? profile.getPreviousSchoolName() : null);
         if (required.isEmpty()) {
             return;
         }

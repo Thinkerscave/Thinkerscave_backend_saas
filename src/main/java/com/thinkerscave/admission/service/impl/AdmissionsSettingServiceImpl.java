@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,8 +53,14 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
         if (request.getInquiryStatuses() != null) {
             setting.setInquiryStatuses(join(request.getInquiryStatuses()));
         }
-        if (request.getRequiredDocuments() != null) {
-            setting.setRequiredDocuments(join(request.getRequiredDocuments()));
+        if (request.getRequiredDocuments() != null || request.getOptionalDocuments() != null) {
+            List<String> required = request.getRequiredDocuments() != null
+                    ? request.getRequiredDocuments()
+                    : parseDocumentBundle(setting.getRequiredDocuments()).required();
+            List<String> optional = request.getOptionalDocuments() != null
+                    ? request.getOptionalDocuments()
+                    : parseDocumentBundle(setting.getRequiredDocuments()).optional();
+            setting.setRequiredDocuments(encodeDocumentBundle(required, optional));
         }
         if (request.getNumbering() != null) {
             if (request.getNumbering().get("leadPrefix") != null) {
@@ -67,10 +74,14 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
             }
         }
         if (request.getReminderRules() != null) {
-            if (request.getReminderRules().get("defaultMode") != null) {
+            if (request.getReminderRules().get("leadIdleDays") != null) {
+                setting.setReminderMode(normalizeDays(request.getReminderRules().get("leadIdleDays"), "3"));
+            } else if (request.getReminderRules().get("defaultMode") != null) {
                 setting.setReminderMode(request.getReminderRules().get("defaultMode"));
             }
-            if (request.getReminderRules().get("defaultLeadTime") != null) {
+            if (request.getReminderRules().get("missedFollowUpDays") != null) {
+                setting.setReminderLeadTime(normalizeDays(request.getReminderRules().get("missedFollowUpDays"), "2"));
+            } else if (request.getReminderRules().get("defaultLeadTime") != null) {
                 setting.setReminderLeadTime(request.getReminderRules().get("defaultLeadTime"));
             }
         }
@@ -113,7 +124,7 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
     @Override
     @Transactional
     public List<String> requiredDocuments() {
-        return split(loadOrCreate().getRequiredDocuments(), DEFAULT_DOCS);
+        return parseDocumentBundle(loadOrCreate().getRequiredDocuments()).required();
     }
 
     /**
@@ -144,12 +155,12 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
         created.setOrganizationId(orgId != null ? orgId : 0L);
         created.setInquirySources(join(DEFAULT_SOURCES));
         created.setInquiryStatuses(join(DEFAULT_STATUSES));
-        created.setRequiredDocuments(join(DEFAULT_DOCS));
+        created.setRequiredDocuments(encodeDocumentBundle(DEFAULT_DOCS, List.of()));
         created.setLeadPrefix("LD");
         created.setApplicationPrefix("APP");
         created.setAdmissionPrefix("ADM");
-        created.setReminderMode("AUTO");
-        created.setReminderLeadTime("24H");
+        created.setReminderMode("3");
+        created.setReminderLeadTime("2");
         created.setAssignmentMode(MODE_MANUAL);
         created.setNextCounselorIndex(0L);
         return repository.save(created);
@@ -161,14 +172,19 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
         numbering.put("applicationPrefix", blankToDefault(setting.getApplicationPrefix(), "APP"));
         numbering.put("admissionPrefix", blankToDefault(setting.getAdmissionPrefix(), "ADM"));
 
+        DocumentBundle docs = parseDocumentBundle(setting.getRequiredDocuments());
         Map<String, String> reminders = new LinkedHashMap<>();
-        reminders.put("defaultMode", blankToDefault(setting.getReminderMode(), "AUTO"));
-        reminders.put("defaultLeadTime", blankToDefault(setting.getReminderLeadTime(), "24H"));
+        reminders.put("leadIdleDays", parseStoredDays(setting.getReminderMode(), "3"));
+        reminders.put("missedFollowUpDays", parseStoredDays(setting.getReminderLeadTime(), "2"));
+        // Keep legacy keys for older clients.
+        reminders.put("defaultMode", "AUTO");
+        reminders.put("defaultLeadTime", "24H");
 
         return AdmissionsSettingsResponse.builder()
                 .inquirySources(split(setting.getInquirySources(), DEFAULT_SOURCES))
                 .inquiryStatuses(split(setting.getInquiryStatuses(), DEFAULT_STATUSES))
-                .requiredDocuments(split(setting.getRequiredDocuments(), DEFAULT_DOCS))
+                .requiredDocuments(docs.required())
+                .optionalDocuments(docs.optional())
                 .numbering(numbering)
                 .reminderRules(reminders)
                 .assignmentMode(normalizeAssignmentMode(setting.getAssignmentMode()))
@@ -184,6 +200,96 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
             return MODE_ROUND_ROBIN;
         }
         return MODE_MANUAL;
+    }
+
+    private static String encodeDocumentBundle(List<String> required, List<String> optional) {
+        List<String> parts = new ArrayList<>();
+        if (required != null) {
+            for (String type : required) {
+                String normalized = normalizeDoc(type);
+                if (!normalized.isEmpty()) {
+                    parts.add("M:" + normalized);
+                }
+            }
+        }
+        if (optional != null) {
+            for (String type : optional) {
+                String normalized = normalizeDoc(type);
+                if (!normalized.isEmpty()) {
+                    parts.add("O:" + normalized);
+                }
+            }
+        }
+        return String.join("|", parts);
+    }
+
+    private static DocumentBundle parseDocumentBundle(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return new DocumentBundle(DEFAULT_DOCS, List.of());
+        }
+        List<String> required = new ArrayList<>();
+        List<String> optional = new ArrayList<>();
+        for (String part : raw.split("\\|")) {
+            String token = part == null ? "" : part.trim();
+            if (token.isEmpty()) {
+                continue;
+            }
+            if (token.regionMatches(true, 0, "O:", 0, 2)) {
+                String type = normalizeDoc(token.substring(2));
+                if (!type.isEmpty() && !optional.contains(type) && !required.contains(type)) {
+                    optional.add(type);
+                }
+            } else if (token.regionMatches(true, 0, "M:", 0, 2)) {
+                String type = normalizeDoc(token.substring(2));
+                if (!type.isEmpty() && !required.contains(type)) {
+                    required.add(type);
+                    optional.remove(type);
+                }
+            } else {
+                String type = normalizeDoc(token);
+                if (!type.isEmpty() && !required.contains(type)) {
+                    required.add(type);
+                }
+            }
+        }
+        if (required.isEmpty() && optional.isEmpty()) {
+            return new DocumentBundle(DEFAULT_DOCS, List.of());
+        }
+        return new DocumentBundle(List.copyOf(required), List.copyOf(optional));
+    }
+
+    private static String normalizeDoc(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim().toUpperCase(Locale.ROOT).replaceAll("\\s+", "_");
+    }
+
+    private static String normalizeDays(String raw, String fallback) {
+        try {
+            int days = Integer.parseInt(raw == null ? "" : raw.trim().replaceAll("[^0-9]", ""));
+            if (days < 1) {
+                return fallback;
+            }
+            if (days > 30) {
+                return "30";
+            }
+            return String.valueOf(days);
+        } catch (NumberFormatException ex) {
+            return fallback;
+        }
+    }
+
+    private static String parseStoredDays(String raw, String fallback) {
+        if (raw == null || raw.isBlank()) {
+            return fallback;
+        }
+        String trimmed = raw.trim();
+        if ("AUTO".equalsIgnoreCase(trimmed) || "MANUAL".equalsIgnoreCase(trimmed)
+                || trimmed.toUpperCase(Locale.ROOT).endsWith("H")) {
+            return fallback;
+        }
+        return normalizeDays(trimmed, fallback);
     }
 
     private static String join(List<String> values) {
@@ -205,5 +311,8 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
 
     private static String blankToDefault(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private record DocumentBundle(List<String> required, List<String> optional) {
     }
 }

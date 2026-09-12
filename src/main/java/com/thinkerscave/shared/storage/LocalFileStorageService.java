@@ -48,6 +48,7 @@ public class LocalFileStorageService {
         try (var inputStream = file.getInputStream()) {
             Files.copy(inputStream, destination, StandardCopyOption.REPLACE_EXISTING);
         }
+        log.info("Stored upload under {} as {}", rootLocation, storedName);
         return destination.toString();
     }
 
@@ -72,6 +73,22 @@ public class LocalFileStorageService {
             return resource;
         } catch (MalformedURLException e) {
             throw new BadRequestException("Invalid document path");
+        }
+    }
+
+    /** Best-effort delete after DB row removal; ignores missing files. */
+    public void deleteQuietly(String absolutePath) {
+        if (!StringUtils.hasText(absolutePath) || absolutePath.contains("..")) {
+            return;
+        }
+        try {
+            Path path = Paths.get(absolutePath).normalize().toAbsolutePath();
+            if (!path.startsWith(rootLocation) && !Files.isRegularFile(path)) {
+                return;
+            }
+            Files.deleteIfExists(path);
+        } catch (Exception ex) {
+            log.warn("Could not delete stored file {}: {}", absolutePath, ex.getMessage());
         }
     }
 
