@@ -15,12 +15,16 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
+
+    public static final String MODE_MANUAL = "MANUAL";
+    public static final String MODE_ROUND_ROBIN = "ROUND_ROBIN";
 
     private static final List<String> DEFAULT_SOURCES =
             Arrays.stream(LeadSource.values()).map(Enum::name).toList();
@@ -71,7 +75,7 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
             }
         }
         if (request.getAssignmentMode() != null && !request.getAssignmentMode().isBlank()) {
-            setting.setAssignmentMode(request.getAssignmentMode().trim());
+            setting.setAssignmentMode(normalizeAssignmentMode(request.getAssignmentMode()));
         }
         return toResponse(repository.save(setting));
     }
@@ -97,7 +101,13 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
     @Override
     @Transactional
     public String assignmentMode() {
-        return blankToDefault(loadOrCreate().getAssignmentMode(), "MANUAL");
+        return normalizeAssignmentMode(loadOrCreate().getAssignmentMode());
+    }
+
+    @Override
+    @Transactional
+    public boolean isRoundRobinEnabled() {
+        return MODE_ROUND_ROBIN.equals(assignmentMode());
     }
 
     @Override
@@ -106,26 +116,43 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
         return split(loadOrCreate().getRequiredDocuments(), DEFAULT_DOCS);
     }
 
+    /**
+     * Schema-per-tenant: each school schema has one admissions_setting row.
+     * Prefer the current org id when present, otherwise reuse the schema singleton.
+     */
     private AdmissionsSetting loadOrCreate() {
         Long orgId = OrganizationContext.getOrganizationId();
-        if (orgId == null) {
-            orgId = 0L;
+
+        if (orgId != null) {
+            var byOrg = repository.findByOrganizationId(orgId);
+            if (byOrg.isPresent()) {
+                return byOrg.get();
+            }
         }
-        Long resolvedOrgId = orgId;
-        return repository.findByOrganizationId(resolvedOrgId).orElseGet(() -> {
-            AdmissionsSetting created = new AdmissionsSetting();
-            created.setOrganizationId(resolvedOrgId);
-            created.setInquirySources(join(DEFAULT_SOURCES));
-            created.setInquiryStatuses(join(DEFAULT_STATUSES));
-            created.setRequiredDocuments(join(DEFAULT_DOCS));
-            created.setLeadPrefix("LD");
-            created.setApplicationPrefix("APP");
-            created.setAdmissionPrefix("ADM");
-            created.setReminderMode("AUTO");
-            created.setReminderLeadTime("24H");
-            created.setAssignmentMode("MANUAL");
-            return repository.save(created);
-        });
+
+        var existing = repository.findFirstByOrderBySettingIdAsc();
+        if (existing.isPresent()) {
+            AdmissionsSetting setting = existing.get();
+            if (orgId != null && !orgId.equals(setting.getOrganizationId())) {
+                setting.setOrganizationId(orgId);
+                return repository.save(setting);
+            }
+            return setting;
+        }
+
+        AdmissionsSetting created = new AdmissionsSetting();
+        created.setOrganizationId(orgId != null ? orgId : 0L);
+        created.setInquirySources(join(DEFAULT_SOURCES));
+        created.setInquiryStatuses(join(DEFAULT_STATUSES));
+        created.setRequiredDocuments(join(DEFAULT_DOCS));
+        created.setLeadPrefix("LD");
+        created.setApplicationPrefix("APP");
+        created.setAdmissionPrefix("ADM");
+        created.setReminderMode("AUTO");
+        created.setReminderLeadTime("24H");
+        created.setAssignmentMode(MODE_MANUAL);
+        created.setNextCounselorIndex(0L);
+        return repository.save(created);
     }
 
     private AdmissionsSettingsResponse toResponse(AdmissionsSetting setting) {
@@ -144,8 +171,19 @@ public class AdmissionsSettingServiceImpl implements AdmissionsSettingService {
                 .requiredDocuments(split(setting.getRequiredDocuments(), DEFAULT_DOCS))
                 .numbering(numbering)
                 .reminderRules(reminders)
-                .assignmentMode(blankToDefault(setting.getAssignmentMode(), "MANUAL"))
+                .assignmentMode(normalizeAssignmentMode(setting.getAssignmentMode()))
                 .build();
+    }
+
+    static String normalizeAssignmentMode(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return MODE_MANUAL;
+        }
+        String mode = raw.trim().toUpperCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        if ("AUTO".equals(mode) || "AUTOMATIC".equals(mode) || "ROUNDROBIN".equals(mode) || "ROUND_ROBIN".equals(mode)) {
+            return MODE_ROUND_ROBIN;
+        }
+        return MODE_MANUAL;
     }
 
     private static String join(List<String> values) {

@@ -15,8 +15,11 @@ public interface AdmissionsSettingService {
 
     String admissionPrefix();
 
-    /** "MANUAL" or "ROUND_ROBIN" — controls whether new leads are auto-assigned a counselor. */
+    /** Normalized assignment mode: {@code MANUAL} or {@code ROUND_ROBIN}. */
     String assignmentMode();
+
+    /** True when new leads should be auto-assigned via sequential round-robin. */
+    boolean isRoundRobinEnabled();
 
     java.util.List<String> requiredDocuments();
 }

@@ -31,6 +31,8 @@ public class InquiryResponse {
     private String comments;
     private Long assignedCounselorId;
     private String assignedCounselorName;
+    /** When the current counselor assignment became active. */
+    private LocalDateTime assignedOn;
     private InquiryStatus status;
     private LocalDateTime lastFollowUpDate;
     private FollowUpType lastFollowUpType;

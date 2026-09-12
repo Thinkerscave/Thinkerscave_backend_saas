@@ -146,11 +146,14 @@ public class InquiryServiceImpl implements InquiryService {
         Inquiry inquiry = getInquiry(inquiryId);
         validateLeadRequest(request);
         AcademicClass academicClass = requireActiveClass(request.getClassId(), request.getAcademicYearId());
+        String changeSummary = buildLeadChangeSummary(inquiry, request, academicClass.getName());
         mapRequest(request, inquiry);
         inquiry.setClassInterestedIn(academicClass.getName());
         Inquiry saved = inquiryRepository.save(inquiry);
         auditWriteService.record(AuditEventType.UPDATE, "LEAD_UPDATED", "INQUIRY", String.valueOf(saved.getInquiryId()),
-                "Lead updated: " + saved.getStudentName());
+                StringUtils.hasText(changeSummary)
+                        ? "Lead details updated: " + changeSummary
+                        : "Lead details updated: " + saved.getStudentName());
         return toResponse(saved);
     }
 
@@ -418,34 +421,44 @@ public class InquiryServiceImpl implements InquiryService {
                 .orElseThrow(() -> new ResourceNotFoundException("Follow-up not found: " + followUpId));
         requireCounselorOwnsFollowUp(followUp);
 
+        LocalDateTime previousAt = followUp.getFollowUpDate();
+        boolean dateChanged = false;
+
         if (request.getFollowUpType() != null) {
             followUp.setFollowUpType(request.getFollowUpType());
         }
         followUp.setRemarks(request.getRemarks());
         followUp.setStatusAfter(request.getStatusAfter());
         if (request.getFollowUpDate() != null) {
+            dateChanged = previousAt == null || !request.getFollowUpDate().equals(previousAt);
             followUp.setFollowUpDate(request.getFollowUpDate());
-        }
-        if (request.getNextFollowUpDate() != null
-                && followUp.getLifecycleStatus() != FollowUpLifecycleStatus.COMPLETED
-                && followUp.getLifecycleStatus() != FollowUpLifecycleStatus.CANCELLED) {
-            followUp.setLifecycleStatus(FollowUpLifecycleStatus.SCHEDULED);
-            followUp.setNextFollowUpDate(request.getNextFollowUpDate());
-        }
-        if (request.getFollowUpDate() != null) {
             followUp.setNextFollowUpDate(request.getFollowUpDate().toLocalDate());
             if (followUp.getLifecycleStatus() != FollowUpLifecycleStatus.COMPLETED
                     && followUp.getLifecycleStatus() != FollowUpLifecycleStatus.CANCELLED) {
-                followUp.setLifecycleStatus(FollowUpLifecycleStatus.SCHEDULED);
+                followUp.setLifecycleStatus(dateChanged
+                        ? FollowUpLifecycleStatus.RESCHEDULED
+                        : FollowUpLifecycleStatus.SCHEDULED);
             }
+        } else if (request.getNextFollowUpDate() != null
+                && followUp.getLifecycleStatus() != FollowUpLifecycleStatus.COMPLETED
+                && followUp.getLifecycleStatus() != FollowUpLifecycleStatus.CANCELLED) {
+            followUp.setLifecycleStatus(FollowUpLifecycleStatus.RESCHEDULED);
+            followUp.setNextFollowUpDate(request.getNextFollowUpDate());
+            dateChanged = true;
         }
         followUp = followUpRepository.save(followUp);
 
         Inquiry inquiry = followUp.getInquiry();
         inquiry.setNextFollowUpDate(followUp.getNextFollowUpDate());
         inquiryRepository.save(inquiry);
-        auditWriteService.record(AuditEventType.UPDATE, "FOLLOW_UP_UPDATED", "INQUIRY", String.valueOf(inquiry.getInquiryId()),
-            "Follow-up rescheduled");
+        String summary = dateChanged
+                ? "Follow-up rescheduled from " + formatWhen(previousAt) + " to " + formatWhen(followUp.getFollowUpDate())
+                : "Follow-up details updated";
+        auditWriteService.record(AuditEventType.UPDATE,
+                dateChanged ? "FOLLOW_UP_RESCHEDULED" : "FOLLOW_UP_UPDATED",
+                "INQUIRY",
+                String.valueOf(inquiry.getInquiryId()),
+                summary);
         return toFollowUpResponse(followUp);
     }
 
@@ -472,9 +485,16 @@ public class InquiryServiceImpl implements InquiryService {
             if (request.getRemarks() != null) {
                 followUp.setRemarks(request.getRemarks());
             }
-            if (request.getStatusAfter() != null) {
+            if (request.getStatusAfter() != null && request.getStatusAfter() != inquiry.getStatus()) {
+                InquiryStatus previous = inquiry.getStatus();
                 followUp.setStatusAfter(request.getStatusAfter());
                 inquiry.setStatus(request.getStatusAfter());
+                auditWriteService.record(AuditEventType.STATE_CHANGE, "LEAD_STATUS_CHANGED", "INQUIRY",
+                        String.valueOf(inquiry.getInquiryId()),
+                        "Status changed from " + previous + " to " + request.getStatusAfter()
+                                + " after follow-up completion");
+            } else if (request.getStatusAfter() != null) {
+                followUp.setStatusAfter(request.getStatusAfter());
             }
             if (request.getNextFollowUpDate() != null) {
                 followUp.setNextFollowUpDate(request.getNextFollowUpDate());
@@ -793,11 +813,6 @@ public class InquiryServiceImpl implements InquiryService {
 
             List<InquiryTimelineItemResponse> timeline = new ArrayList<>();
 
-            // Every real lead action (create, update, status change, assignment, follow-up,
-            // counseling, application) is already written to the audit trail by the service
-            // methods above — this is the single source of truth for Activity, so it is never
-            // duplicated with a second, separately-built entity-based item (see ACTIVITY DATA
-            // INTEGRITY requirement: only real actions should ever appear here).
             List<AuditLog> auditEvents = auditLogRepository.findByEntityTypeAndEntityIdOrderByOccurredAtDesc(
                     "INQUIRY", String.valueOf(inquiryId));
             boolean hasCreateEvent = auditEvents.stream().anyMatch(e -> "LEAD_CREATED".equals(e.getAction()));
@@ -819,8 +834,12 @@ public class InquiryServiceImpl implements InquiryService {
                         .build());
             }
 
-            // Fallback for leads created before the audit trail existed on this tenant.
-            if (!hasCreateEvent) {
+            // Domain backfill covers events written before sync audit / silent async failures.
+            appendMissingAssignmentHistory(timeline, inquiryId);
+            appendMissingFollowUpHistory(timeline, inquiryId);
+            appendMissingCounselingHistory(timeline, inquiryId);
+
+            if (!hasCreateEvent && timeline.stream().noneMatch(i -> "LEAD_CREATED".equals(i.getAction()))) {
                 boolean fromWebsite = inquiry.getInquirySource() == LeadSource.WEBSITE;
                 timeline.add(InquiryTimelineItemResponse.builder()
                         .eventType("CREATE")
@@ -850,6 +869,117 @@ public class InquiryServiceImpl implements InquiryService {
                             || !item.getPerformedOn().toLocalDate().isAfter(to))
                     .toList();
             }
+
+    private void appendMissingAssignmentHistory(List<InquiryTimelineItemResponse> timeline, Long inquiryId) {
+        boolean hasAssignment = timeline.stream().anyMatch(i -> "ASSIGNMENT".equals(i.getCategory()));
+        if (hasAssignment) {
+            return;
+        }
+        for (LeadCounselorAssignment row : leadCounselorAssignmentRepository.findByInquiryIdOrderByAssignedOnDesc(inquiryId)) {
+            boolean reassigned = row.getPreviousCounselorStaffId() != null;
+            String action = reassigned ? "COUNSELOR_REASSIGNED" : "COUNSELOR_ASSIGNED";
+            String toName = resolveCounselorName(row.getNewCounselorStaffId());
+            String fromName = resolveCounselorName(row.getPreviousCounselorStaffId());
+            String description = reassigned
+                    ? "Counselor changed from " + (fromName != null ? fromName : "Unassigned")
+                    + " to " + (toName != null ? toName : "—")
+                    : "Counselor assigned: " + (toName != null ? toName : "—");
+            if (StringUtils.hasText(row.getReason())) {
+                description = description + " (" + row.getReason() + ")";
+            }
+            timeline.add(InquiryTimelineItemResponse.builder()
+                    .eventType("STATE_CHANGE")
+                    .action(action)
+                    .category("ASSIGNMENT")
+                    .title(activityTitle(action))
+                    .description(description)
+                    .performedBy(row.getAssignedByUsername() != null ? row.getAssignedByUsername() : "System")
+                    .performedAt(row.getAssignedOn())
+                    .performedOn(row.getAssignedOn())
+                    .build());
+        }
+    }
+
+    private void appendMissingFollowUpHistory(List<InquiryTimelineItemResponse> timeline, Long inquiryId) {
+        boolean hasFollowUp = timeline.stream().anyMatch(i -> "FOLLOW_UP".equals(i.getCategory()));
+        if (hasFollowUp) {
+            return;
+        }
+        for (InquiryFollowUp fu : followUpRepository.findByInquiryInquiryIdOrderByFollowUpDateDesc(inquiryId)) {
+            FollowUpLifecycleStatus life = fu.getLifecycleStatus();
+            String action;
+            String title;
+            String description;
+            LocalDateTime when;
+            if (life == FollowUpLifecycleStatus.COMPLETED) {
+                action = "FOLLOW_UP_COMPLETED";
+                title = "Follow-up Completed";
+                description = "Follow-up completed"
+                        + (fu.getFollowUpType() != null ? " (" + fu.getFollowUpType() + ")" : "");
+                when = fu.getCompletedOn() != null ? fu.getCompletedOn() : fu.getFollowUpDate();
+            } else if (life == FollowUpLifecycleStatus.CANCELLED) {
+                action = "FOLLOW_UP_CANCELLED";
+                title = "Follow-up Cancelled";
+                description = "Follow-up cancelled";
+                when = fu.getUpdatedOn() != null ? fu.getUpdatedOn() : fu.getFollowUpDate();
+            } else if (life == FollowUpLifecycleStatus.RESCHEDULED) {
+                action = "FOLLOW_UP_RESCHEDULED";
+                title = "Follow-up Rescheduled";
+                description = "Follow-up rescheduled to " + formatWhen(fu.getFollowUpDate());
+                when = fu.getUpdatedOn() != null ? fu.getUpdatedOn() : fu.getFollowUpDate();
+            } else {
+                action = "FOLLOW_UP_SCHEDULED";
+                title = "Follow-up Scheduled";
+                description = "Follow-up scheduled"
+                        + (fu.getFollowUpType() != null ? ": " + fu.getFollowUpType() : "")
+                        + " on " + formatWhen(fu.getFollowUpDate());
+                when = fu.getCreatedOn() != null ? fu.getCreatedOn() : fu.getFollowUpDate();
+            }
+            if (StringUtils.hasText(fu.getRemarks())) {
+                description = description + " — " + fu.getRemarks();
+            }
+            timeline.add(InquiryTimelineItemResponse.builder()
+                    .eventType("UPDATE")
+                    .action(action)
+                    .category("FOLLOW_UP")
+                    .title(title)
+                    .description(description)
+                    .performedBy(fu.getCompletedBy() != null ? fu.getCompletedBy() : fu.getCreatedBy())
+                    .performedAt(when)
+                    .performedOn(when)
+                    .build());
+        }
+    }
+
+    private void appendMissingCounselingHistory(List<InquiryTimelineItemResponse> timeline, Long inquiryId) {
+        boolean hasCounseling = timeline.stream().anyMatch(i -> "COUNSELING".equals(i.getCategory()));
+        if (hasCounseling) {
+            return;
+        }
+        for (CounselingNote note : counselingNoteRepository.findByInquiryInquiryIdOrderByCreatedOnDesc(inquiryId)) {
+            String counselor = resolveCounselorName(note.getCounselorStaffId());
+            String description = "Counseling session recorded"
+                    + (note.getMode() != null ? " via " + note.getMode() : "")
+                    + (counselor != null ? " by " + counselor : "");
+            if (StringUtils.hasText(note.getNotes())) {
+                String excerpt = note.getNotes().length() > 120
+                        ? note.getNotes().substring(0, 117) + "..."
+                        : note.getNotes();
+                description = description + " — " + excerpt;
+            }
+            LocalDateTime when = note.getSessionAt() != null ? note.getSessionAt() : note.getCreatedOn();
+            timeline.add(InquiryTimelineItemResponse.builder()
+                    .eventType("UPDATE")
+                    .action("COUNSELING_ADDED")
+                    .category("COUNSELING")
+                    .title("Counseling Note Added")
+                    .description(description)
+                    .performedBy(note.getCreatedBy())
+                    .performedAt(when)
+                    .performedOn(when)
+                    .build());
+        }
+    }
 
     /** Coarse category used to drive the Activity "type" filter dropdown. */
     private String activityCategory(String action) {
@@ -882,14 +1012,53 @@ public class InquiryServiceImpl implements InquiryService {
             case "APPLICATION_STARTED" -> "Application Started";
             case "FOLLOW_UP_SCHEDULED" -> "Follow-up Scheduled";
             case "FOLLOW_UP_UPDATED" -> "Follow-up Updated";
+            case "FOLLOW_UP_RESCHEDULED" -> "Follow-up Rescheduled";
             case "FOLLOW_UP_COMPLETED" -> "Follow-up Completed";
             case "FOLLOW_UP_CANCELLED" -> "Follow-up Cancelled";
-            case "COUNSELING_ADDED" -> "Counseling Completed";
+            case "COUNSELING_ADDED" -> "Counseling Note Added";
             case "LEAD_EXPORT_CSV" -> "Leads Exported";
             default -> java.util.Arrays.stream(action.split("_"))
                     .map(w -> w.isEmpty() ? w : w.charAt(0) + w.substring(1).toLowerCase())
                     .collect(Collectors.joining(" "));
         };
+    }
+
+    private String buildLeadChangeSummary(Inquiry before, InquiryRequest request, String className) {
+        List<String> changes = new ArrayList<>();
+        addChange(changes, "Student name", before.getStudentName(), request.getName());
+        addChange(changes, "Parent name", before.getParentContactName(), request.getParentContactName());
+        addChange(changes, "Mobile", before.getMobileNumber(), request.getMobileNumber());
+        addChange(changes, "Email", before.getEmail(), request.getEmail());
+        addChange(changes, "Class", before.getClassInterestedIn(), className);
+        addChange(changes, "Gender", before.getGender(), request.getGender());
+        addChange(changes, "Current class", before.getCurrentClass(), request.getCurrentClass());
+        addChange(changes, "Previous school", before.getPreviousSchool(), request.getPreviousSchool());
+        addChange(changes, "Relationship", before.getContactRelationship(), request.getContactRelationship());
+        addChange(changes, "Address", before.getAddress(), request.getAddress());
+        addChange(changes, "Campus preference", before.getCampusPreference(), request.getCampusPreference());
+        addChange(changes, "Transport", before.getTransportRequired(), request.getTransportRequired());
+        addChange(changes, "Hostel", before.getHostelRequired(), request.getHostelRequired());
+        addChange(changes, "Notes", before.getComments(), request.getComments());
+        if (changes.isEmpty()) {
+            return null;
+        }
+        return String.join("; ", changes.stream().limit(8).toList());
+    }
+
+    private static void addChange(List<String> changes, String label, Object previous, Object next) {
+        String left = previous == null ? "" : String.valueOf(previous).trim();
+        String right = next == null ? "" : String.valueOf(next).trim();
+        if (left.equals(right)) {
+            return;
+        }
+        if (left.isEmpty() && right.isEmpty()) {
+            return;
+        }
+        changes.add(label + ": \"" + (left.isEmpty() ? "—" : left) + "\" → \"" + (right.isEmpty() ? "—" : right) + "\"");
+    }
+
+    private static String formatWhen(LocalDateTime value) {
+        return value == null ? "—" : value.toString().replace('T', ' ');
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────
@@ -952,6 +1121,7 @@ public class InquiryServiceImpl implements InquiryService {
                 .comments(i.getComments())
                 .assignedCounselorId(i.getAssignedCounselorId())
                 .assignedCounselorName(resolveCounselorName(i.getAssignedCounselorId()))
+                .assignedOn(resolveAssignedOn(i.getInquiryId(), i.getAssignedCounselorId()))
                 .status(i.getStatus())
                 .lastFollowUpDate(i.getLastFollowUpDate())
                 .lastFollowUpType(i.getLastFollowUpType())
@@ -969,6 +1139,23 @@ public class InquiryServiceImpl implements InquiryService {
                 .hostelRequired(i.getHostelRequired())
                 .otherRequirements(i.getOtherRequirements())
                 .build();
+    }
+
+    private LocalDateTime resolveAssignedOn(Long inquiryId, Long counselorId) {
+        if (inquiryId == null || counselorId == null) {
+            return null;
+        }
+        return leadCounselorAssignmentRepository.findByInquiryIdAndActiveTrueOrderByAssignedOnDesc(inquiryId)
+                .stream()
+                .filter(a -> counselorId.equals(a.getNewCounselorStaffId()))
+                .map(LeadCounselorAssignment::getAssignedOn)
+                .findFirst()
+                .orElseGet(() -> leadCounselorAssignmentRepository.findByInquiryIdOrderByAssignedOnDesc(inquiryId)
+                        .stream()
+                        .filter(a -> counselorId.equals(a.getNewCounselorStaffId()))
+                        .map(LeadCounselorAssignment::getAssignedOn)
+                        .findFirst()
+                        .orElse(null));
     }
 
     private void validateLeadRequest(InquiryRequest request) {
@@ -1002,26 +1189,24 @@ public class InquiryServiceImpl implements InquiryService {
 
     /**
      * Backend-only sequential round-robin auto-assignment, run transactionally as part of
-     * lead creation. Only activates when the tenant's Admissions setting "assignmentMode" is
-     * ROUND_ROBIN (default is MANUAL, preserving existing behavior unless an admin opts in).
-     * If there are no eligible counselors, the lead is simply left Unassigned — creation never fails.
+     * lead creation. Activates when Admissions setting assignment mode is ROUND_ROBIN.
+     * If there are no eligible counselors, the lead stays Unassigned — creation never fails.
      */
     private void autoAssignCounselorIfEnabled(Inquiry inquiry) {
-        if (!"ROUND_ROBIN".equalsIgnoreCase(settingService.assignmentMode())) {
+        if (!settingService.isRoundRobinEnabled()) {
             return;
         }
         List<Staff> eligible = resolveEligibleCounselorsOrdered();
         if (eligible.isEmpty()) {
+            log.warn("Round-robin enabled but no eligible COUNSELOR staff found; lead {} left unassigned",
+                    inquiry.getInquiryId());
             return;
         }
 
-        Long rawOrgId = OrganizationContext.getOrganizationId();
-        final Long orgId = rawOrgId == null ? 0L : rawOrgId;
-        // Pessimistic row lock held for the remainder of this transaction — concurrent lead
-        // creations serialize on this row so each gets a distinct, non-colliding cursor value.
-        AdmissionsSetting setting = admissionsSettingRepository.findByOrganizationIdForUpdate(orgId)
-                .orElseGet(() -> admissionsSettingRepository.findByOrganizationId(orgId).orElse(null));
+        AdmissionsSetting setting = lockTenantAssignmentSettings();
         if (setting == null) {
+            log.warn("Round-robin enabled but admissions settings row missing; lead {} left unassigned",
+                    inquiry.getInquiryId());
             return;
         }
         long index = setting.getNextCounselorIndex() == null ? 0L : setting.getNextCounselorIndex();
@@ -1047,6 +1232,31 @@ public class InquiryServiceImpl implements InquiryService {
                 String.valueOf(inquiry.getInquiryId()),
                 "Counselor auto-assigned (round robin): " + staffDisplayName(chosen));
         ensureFirstFollowUpScheduled(inquiry, chosen);
+    }
+
+    /**
+     * Prefer org-scoped lock; fall back to schema singleton lock (schema-per-tenant).
+     */
+    private AdmissionsSetting lockTenantAssignmentSettings() {
+        Long orgId = OrganizationContext.getOrganizationId();
+        if (orgId != null) {
+            AdmissionsSetting byOrg = admissionsSettingRepository.findByOrganizationIdForUpdate(orgId).orElse(null);
+            if (byOrg != null) {
+                return byOrg;
+            }
+        }
+        List<AdmissionsSetting> locked = admissionsSettingRepository.findAllForUpdate();
+        if (!locked.isEmpty()) {
+            AdmissionsSetting setting = locked.get(0);
+            if (orgId != null && !orgId.equals(setting.getOrganizationId())) {
+                setting.setOrganizationId(orgId);
+            }
+            return setting;
+        }
+        // Ensure a row exists, then lock it.
+        settingService.getSettings();
+        locked = admissionsSettingRepository.findAllForUpdate();
+        return locked.isEmpty() ? null : locked.get(0);
     }
 
     /**
