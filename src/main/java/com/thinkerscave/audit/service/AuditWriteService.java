@@ -20,9 +20,9 @@ import java.time.Instant;
 
 /**
  * Write side of the audit subsystem.
- * All operations run in a SEPARATE transaction (propagation REQUIRES_NEW) so
- * an audit entry is always persisted even if the caller transaction rolls back.
- * Calls are also async so they don't block the main request thread.
+ * Business audit writes run in a SEPARATE transaction (REQUIRES_NEW) and are synchronous
+ * so Lead 360 Activity can read them immediately with the correct tenant/user context.
+ * Security audit remains async.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,13 +32,27 @@ public class AuditWriteService {
     private final AuditLogRepository auditLogRepository;
     private final SecurityAuditLogRepository securityAuditLogRepository;
 
-    @Async
+    /**
+     * Persists an audit row in a separate transaction so history survives caller rollbacks
+     * and is visible immediately to Lead 360 Activity (must be synchronous — async lost
+     * OrganizationContext / SecurityContext after the HTTP filter cleared them).
+     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void record(AuditEventType eventType,
                        String action,
                        String entityType,
                        String entityId,
                        String summary) {
+        recordSync(eventType, action, entityType, entityId, summary);
+    }
+
+    /** Alias kept for call sites that need an explicit sync write. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordSync(AuditEventType eventType,
+                           String action,
+                           String entityType,
+                           String entityId,
+                           String summary) {
         try {
             String actor = currentUsername();
             AuditLog entry = AuditLog.builder()

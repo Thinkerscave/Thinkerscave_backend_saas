@@ -30,7 +30,10 @@ public class AcademicsLookupServiceImpl implements AcademicsLookupService {
                         List.of(AcademicYearStatus.CURRENT, AcademicYearStatus.APPROVED, AcademicYearStatus.PREPARING))
                 .stream()
                 .filter(y -> Boolean.TRUE.equals(y.getActive()))
-                .map(y -> new LookupDTO(y.getAcademicYearId(), y.getName()))
+                .map(y -> new LookupDTO(
+                        y.getAcademicYearId(),
+                        y.getName(),
+                        y.getStatus() != null ? y.getStatus().name() : null))
                 .toList();
     }
 

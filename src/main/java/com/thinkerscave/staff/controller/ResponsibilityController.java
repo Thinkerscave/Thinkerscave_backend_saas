@@ -24,11 +24,14 @@ import java.util.Map;
 @Tag(name = "Responsibility Management", description = "APIs for managing staff responsibilities")
 public class ResponsibilityController {
 
+    private static final String RESP_ROLES =
+            "hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')";
+
     private final ResponsibilityService responsibilityService;
     private final ResponsibilityAssignmentService assignmentService;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize(RESP_ROLES)
     @Operation(summary = "Create a new responsibility")
     public ResponseEntity<ApiResponse<Map<String, Long>>> createResponsibility(
             @Valid @RequestBody ResponsibilityRequest request) {
@@ -38,7 +41,7 @@ public class ResponsibilityController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize(RESP_ROLES)
     @Operation(summary = "Update responsibility")
     public ResponseEntity<ApiResponse<Void>> updateResponsibility(
             @PathVariable Long id,
@@ -48,7 +51,7 @@ public class ResponsibilityController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize(RESP_ROLES)
     @Operation(summary = "Get responsibilities")
     public ResponseEntity<ApiResponse<List<ResponsibilityResponse>>> getResponsibilityList(
             @RequestParam(defaultValue = "false") boolean includeInactive) {
@@ -57,7 +60,7 @@ public class ResponsibilityController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize(RESP_ROLES)
     @Operation(summary = "Get responsibility by ID")
     public ResponseEntity<ApiResponse<ResponsibilityResponse>> getResponsibilityById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Responsibility retrieved",
@@ -65,7 +68,7 @@ public class ResponsibilityController {
     }
 
     @GetMapping("/{id}/assignments")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize(RESP_ROLES)
     @Operation(summary = "Staff currently assigned to this responsibility")
     public ResponseEntity<ApiResponse<List<ResponsibilityAssignmentResponse>>> getAssignedStaff(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Assigned staff retrieved",
@@ -73,7 +76,7 @@ public class ResponsibilityController {
     }
 
     @PostMapping("/{id}/assignments")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize(RESP_ROLES)
     @Operation(summary = "Assign this responsibility to one or more staff")
     public ResponseEntity<ApiResponse<Void>> assignStaff(
             @PathVariable Long id,
@@ -83,7 +86,7 @@ public class ResponsibilityController {
     }
 
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize(RESP_ROLES)
     @Operation(summary = "Activate a responsibility")
     public ResponseEntity<ApiResponse<Void>> activateResponsibility(@PathVariable Long id) {
         responsibilityService.activateResponsibility(id);
@@ -91,7 +94,7 @@ public class ResponsibilityController {
     }
 
     @PatchMapping("/{id}/deactivate")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize(RESP_ROLES)
     @Operation(summary = "Deactivate a responsibility")
     public ResponseEntity<ApiResponse<Void>> deactivateResponsibility(@PathVariable Long id) {
         responsibilityService.deactivateResponsibility(id);

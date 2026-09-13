@@ -14,6 +14,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -86,8 +88,19 @@ public class AdmissionsLeadController {
             @PathVariable Long id,
             @Valid @RequestBody AssignCounselorRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Counselor assigned",
-                inquiryService.assignCounselor(id, request.getCounselorId())));
+            inquiryService.assignCounselor(id, request.getCounselorId(), request.getReason())));
     }
+
+        @PostMapping("/export/csv")
+        @Operation(summary = "Export leads as CSV")
+        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+        public ResponseEntity<byte[]> exportCsv(@RequestBody(required = false) LeadSearchRequest request) {
+        byte[] bytes = inquiryService.exportLeadsCsv(request);
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=admissions-leads.csv")
+            .contentType(MediaType.parseMediaType("text/csv"))
+            .body(bytes);
+        }
 
     @PostMapping("/{id}/mark-lost")
     @Operation(summary = "Mark lead as lost")
@@ -96,6 +109,13 @@ public class AdmissionsLeadController {
             @PathVariable Long id,
             @Valid @RequestBody MarkLostRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Lead marked as lost", inquiryService.markLost(id, request.getReason())));
+    }
+
+    @PostMapping("/{id}/reopen")
+    @Operation(summary = "Reopen a lost lead")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    public ResponseEntity<ApiResponse<InquiryResponse>> reopen(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Lead reopened", inquiryService.reopenLead(id)));
     }
 
     @PostMapping("/{id}/convert-to-application")

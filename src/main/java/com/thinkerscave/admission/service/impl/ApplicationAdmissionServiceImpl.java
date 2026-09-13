@@ -2,6 +2,7 @@ package com.thinkerscave.admission.service.impl;
 
 import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.repository.UserRepository;
+import com.thinkerscave.access.service.PermissionService;
 import com.thinkerscave.academics.dto.response.LookupDTO;
 import com.thinkerscave.academics.service.AcademicsLookupService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -12,11 +13,14 @@ import com.thinkerscave.admission.dto.request.ApplicationSearchRequest;
 import com.thinkerscave.admission.dto.request.EnrollApplicationRequest;
 import com.thinkerscave.admission.dto.request.RecordFeeRequest;
 import com.thinkerscave.admission.dto.response.ApplicationAdmissionResponse;
+import com.thinkerscave.admission.dto.response.ApplicationDocumentFile;
 import com.thinkerscave.admission.dto.response.ApplicationDocumentResponse;
 import com.thinkerscave.admission.dto.response.ApplicationProgressResponse;
 import com.thinkerscave.admission.dto.response.EnrollmentResultResponse;
+import com.thinkerscave.admission.dto.response.FamilyMatchResponse;
 import com.thinkerscave.admission.entity.AdmissionApplicationDocument;
 import com.thinkerscave.admission.entity.ApplicationAdmission;
+import com.thinkerscave.admission.entity.Inquiry;
 import com.thinkerscave.admission.enums.ApplicationStatus;
 import com.thinkerscave.admission.enums.DocumentCheckStatus;
 import com.thinkerscave.admission.enums.FeePaymentStatus;
@@ -27,22 +31,40 @@ import com.thinkerscave.admission.repository.InquiryRepository;
 import com.thinkerscave.admission.service.AdmissionsSettingService;
 import com.thinkerscave.admission.service.ApplicationAdmissionService;
 import com.thinkerscave.admission.specification.ApplicationAdmissionSpecification;
+import com.thinkerscave.admission.util.RequiredDocumentsResolver;
+import com.thinkerscave.audit.enums.AuditEventType;
+import com.thinkerscave.audit.service.AuditWriteService;
+import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.shared.storage.LocalFileStorageService;
+import com.thinkerscave.staff.entity.Staff;
+import com.thinkerscave.staff.repository.StaffRepository;
+import com.thinkerscave.student.dto.ImportedStudentDocument;
 import com.thinkerscave.student.dto.StudentCreateRequest;
 import com.thinkerscave.student.dto.StudentResponseDTO;
+import com.thinkerscave.student.entity.Parent;
+import com.thinkerscave.student.entity.Student;
+import com.thinkerscave.student.entity.StudentEnrollment;
+import com.thinkerscave.student.entity.StudentParent;
+import com.thinkerscave.student.repository.ParentRepository;
+import com.thinkerscave.student.repository.StudentEnrollmentRepository;
+import com.thinkerscave.student.repository.StudentParentRepository;
 import com.thinkerscave.student.repository.StudentRepository;
 import com.thinkerscave.student.service.StudentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
+import org.springframework.http.MediaTypeFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -61,13 +83,23 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionService {
 
-    private static final Set<ApplicationStatus> EDITABLE = EnumSet.of(ApplicationStatus.DRAFT);
+    private static final Set<ApplicationStatus> EDITABLE = EnumSet.of(
+            ApplicationStatus.DRAFT,
+            ApplicationStatus.ACTION_REQUIRED,
+            ApplicationStatus.DOCUMENTS_PENDING
+    );
+    private static final Set<ApplicationStatus> SUBMITTABLE = EnumSet.of(
+            ApplicationStatus.DRAFT,
+            ApplicationStatus.ACTION_REQUIRED,
+            ApplicationStatus.DOCUMENTS_PENDING
+    );
     private static final Set<ApplicationStatus> REVIEWABLE = EnumSet.of(
             ApplicationStatus.SUBMITTED,
             ApplicationStatus.UNDER_REVIEW,
             ApplicationStatus.DOCUMENTS_PENDING,
             ApplicationStatus.FEE_PENDING
     );
+    private static final String RESOURCE_ADMISSIONS_APPLICATIONS = "ADMISSIONS_APPLICATIONS";
 
     private final ApplicationAdmissionRepository repository;
     private final AdmissionApplicationDocumentRepository documentRepository;
@@ -75,22 +107,47 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     private final InquiryRepository inquiryRepository;
     private final StudentService studentService;
     private final StudentRepository studentRepository;
+    private final ParentRepository parentRepository;
+    private final StudentParentRepository studentParentRepository;
+    private final StudentEnrollmentRepository studentEnrollmentRepository;
     private final AdmissionsSettingService settingService;
     private final AcademicsLookupService academicsLookupService;
     private final LocalFileStorageService fileStorageService;
     private final UserRepository userRepository;
+    private final StaffRepository staffRepository;
+    private final PermissionService permissionService;
+    private final AuditWriteService auditWriteService;
 
     @Override
     @Transactional
     public ApplicationAdmissionResponse saveDraft(ApplicationAdmissionRequest request) {
-        ApplicationAdmission app = buildApplication(request);
+        requireManageApplications();
+        ApplicationAdmission app;
+        if (request.getInquiryId() != null) {
+            app = repository.findByInquiryId(request.getInquiryId()).orElse(null);
+            if (app != null) {
+                if (!EDITABLE.contains(app.getStatus())) {
+                    throw new BadRequestException("Only draft or correction applications can be saved as draft");
+                }
+                mapRequest(request, app);
+                ApplicationAdmission saved = repository.save(app);
+                auditWriteService.record(AuditEventType.UPDATE, "APPLICATION_UPDATED", "APPLICATION",
+                        String.valueOf(saved.getApplicationId()), "Application draft updated");
+                return toResponse(saved);
+            }
+        }
+        app = buildApplication(request);
         app.setStatus(ApplicationStatus.DRAFT);
-        return toResponse(repository.save(app));
+        ApplicationAdmission saved = repository.save(app);
+        auditWriteService.record(AuditEventType.CREATE, "APPLICATION_STARTED", "APPLICATION",
+                String.valueOf(saved.getApplicationId()), "Application draft created");
+        return toResponse(saved);
     }
 
     @Override
     @Transactional
     public ApplicationAdmissionResponse submit(ApplicationAdmissionRequest request) {
+        requireManageApplications();
         if (request.getInquiryId() != null) {
             return repository.findByInquiryId(request.getInquiryId())
                     .map(existing -> submitExisting(existing.getApplicationId(), request))
@@ -102,70 +159,116 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     @Override
     @Transactional
     public ApplicationAdmissionResponse submitExisting(Long applicationId, ApplicationAdmissionRequest request) {
+        requireManageApplications();
         ApplicationAdmission app = getApplication(applicationId);
-        if (app.getStatus() != ApplicationStatus.DRAFT) {
-            throw new BadRequestException("Only draft applications can be submitted");
+        assertCanAccessApplication(app);
+        if (!SUBMITTABLE.contains(app.getStatus())) {
+            throw new BadRequestException("Only draft or correction applications can be submitted");
         }
         if (request != null && hasText(request.getApplicantName())) {
             mapRequest(request, app);
         }
         validateForSubmit(app);
+        boolean resubmit = app.getStatus() == ApplicationStatus.ACTION_REQUIRED
+                || app.getStatus() == ApplicationStatus.DOCUMENTS_PENDING;
         app.setStatus(ApplicationStatus.SUBMITTED);
         ApplicationAdmission saved = repository.save(app);
         markInquiry(saved.getInquiryId(), InquiryStatus.APPLICATION_SUBMITTED);
+        auditWriteService.record(AuditEventType.STATE_CHANGE,
+                resubmit ? "APPLICATION_RESUBMITTED" : "APPLICATION_SUBMITTED",
+                "APPLICATION", String.valueOf(saved.getApplicationId()),
+                resubmit ? "Application resubmitted after correction" : "Application submitted for review");
         return toResponse(saved);
     }
 
     @Override
     @Transactional
     public ApplicationAdmissionResponse update(Long applicationId, ApplicationAdmissionRequest request) {
+        requireManageApplications();
         ApplicationAdmission app = getApplication(applicationId);
+        assertCanAccessApplication(app);
         if (!EDITABLE.contains(app.getStatus())) {
-            throw new BadRequestException("Only DRAFT applications can be edited");
+            throw new BadRequestException("Approved or closed applications cannot be edited in Admissions");
         }
         mapRequest(request, app);
-        return toResponse(repository.save(app));
+        ApplicationAdmission saved = repository.save(app);
+        auditWriteService.record(AuditEventType.UPDATE, "APPLICATION_UPDATED", "APPLICATION",
+                String.valueOf(saved.getApplicationId()), "Application updated");
+        return toResponse(saved);
     }
 
     @Override
     public ApplicationAdmissionResponse getById(Long applicationId) {
-        return toResponse(getApplication(applicationId));
+        requireViewApplications();
+        ApplicationAdmission app = getApplication(applicationId);
+        assertCanAccessApplication(app);
+        return toResponse(app);
     }
 
     @Override
     public Page<ApplicationAdmissionResponse> getAll(Pageable pageable) {
-        return repository.findByOrderByCreatedOnDesc(pageable).map(this::toResponse);
+        requireViewApplications();
+        ApplicationSearchRequest scoped = applyVisibilityScope(new ApplicationSearchRequest());
+        return repository.findAll(ApplicationAdmissionSpecification.filter(scoped), pageable)
+                .map(this::toResponse);
     }
 
     @Override
     public Page<ApplicationAdmissionResponse> getByStatus(ApplicationStatus status, Pageable pageable) {
-        return repository.findByStatusOrderByCreatedOnDesc(status, pageable).map(this::toResponse);
+        requireViewApplications();
+        ApplicationSearchRequest request = new ApplicationSearchRequest();
+        request.setStatus(status);
+        ApplicationSearchRequest scoped = applyVisibilityScope(request);
+        return repository.findAll(ApplicationAdmissionSpecification.filter(scoped), pageable)
+                .map(this::toResponse);
     }
 
     @Override
     public Page<ApplicationAdmissionResponse> search(ApplicationSearchRequest request, Pageable pageable) {
-        return repository.findAll(ApplicationAdmissionSpecification.filter(request), pageable)
+        requireViewApplications();
+        ApplicationSearchRequest scoped = applyVisibilityScope(request);
+        return repository.findAll(ApplicationAdmissionSpecification.filter(scoped), pageable)
                 .map(this::toResponse);
     }
 
     @Override
     @Transactional
     public ApplicationAdmissionResponse updateStatus(Long applicationId, ApplicationStatus status, String comments) {
+        requireApproveApplications();
         ApplicationAdmission app = getApplication(applicationId);
         validateStatusChange(app.getStatus(), status);
+        if (status == ApplicationStatus.APPROVED) {
+            if (!REVIEWABLE.contains(app.getStatus())) {
+                throw new BadRequestException("Application cannot be approved from status " + app.getStatus());
+            }
+            validateForApprove(app);
+        }
+        if (status == ApplicationStatus.ACTION_REQUIRED) {
+            if (!REVIEWABLE.contains(app.getStatus()) && app.getStatus() != ApplicationStatus.SUBMITTED) {
+                throw new BadRequestException("Correction can only be requested while the application is under review");
+            }
+            if (comments == null || comments.isBlank()) {
+                throw new BadRequestException("A correction reason is required");
+            }
+        }
         app.setStatus(status);
         if (comments != null) {
             app.setInternalComments(comments);
         }
-        if (status == ApplicationStatus.APPROVED || status == ApplicationStatus.REJECTED) {
+        if (status == ApplicationStatus.APPROVED || status == ApplicationStatus.REJECTED
+                || status == ApplicationStatus.ACTION_REQUIRED) {
             stampReviewer(app);
         }
-        return toResponse(repository.save(app));
+        ApplicationAdmission saved = repository.save(app);
+        auditWriteService.record(AuditEventType.STATE_CHANGE, "APPLICATION_STATUS_CHANGED", "APPLICATION",
+                String.valueOf(saved.getApplicationId()), "Status → " + status);
+        return toResponse(saved);
     }
 
     @Override
     @Transactional
     public ApplicationAdmissionResponse approve(Long applicationId, String comments) {
+        requireApproveApplications();
         ApplicationAdmission app = getApplication(applicationId);
         if (!REVIEWABLE.contains(app.getStatus())) {
             throw new BadRequestException("Application cannot be approved from status " + app.getStatus());
@@ -176,12 +279,16 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
             app.setInternalComments(comments.trim());
         }
         stampReviewer(app);
-        return toResponse(repository.save(app));
+        ApplicationAdmission saved = repository.save(app);
+        auditWriteService.record(AuditEventType.STATE_CHANGE, "APPLICATION_APPROVED", "APPLICATION",
+                String.valueOf(saved.getApplicationId()), "Admission approved");
+        return toResponse(saved);
     }
 
     @Override
     @Transactional
     public ApplicationAdmissionResponse reject(Long applicationId, String comments) {
+        requireApproveApplications();
         ApplicationAdmission app = getApplication(applicationId);
         if (app.getStatus() == ApplicationStatus.ENROLLED || app.getStatus() == ApplicationStatus.APPROVED) {
             throw new BadRequestException("Approved or enrolled applications cannot be rejected");
@@ -196,7 +303,72 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         stampReviewer(app);
         ApplicationAdmission saved = repository.save(app);
         markInquiry(saved.getInquiryId(), InquiryStatus.LOST);
+        auditWriteService.record(AuditEventType.STATE_CHANGE, "APPLICATION_REJECTED", "APPLICATION",
+                String.valueOf(saved.getApplicationId()), "Application rejected");
         return toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public ApplicationAdmissionResponse requestCorrection(Long applicationId, String reason) {
+        requireApproveApplications();
+        if (!StringUtils.hasText(reason)) {
+            throw new BadRequestException("A correction reason is required");
+        }
+        ApplicationAdmission app = getApplication(applicationId);
+        if (!REVIEWABLE.contains(app.getStatus()) && app.getStatus() != ApplicationStatus.SUBMITTED) {
+            throw new BadRequestException("Application cannot be sent back from status " + app.getStatus());
+        }
+        app.setStatus(ApplicationStatus.ACTION_REQUIRED);
+        app.setInternalComments(reason.trim());
+        stampReviewer(app);
+        ApplicationAdmission saved = repository.save(app);
+        auditWriteService.record(AuditEventType.STATE_CHANGE, "APPLICATION_CORRECTION_REQUESTED", "APPLICATION",
+                String.valueOf(saved.getApplicationId()), reason.trim());
+        return toResponse(saved);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FamilyMatchResponse findFamilyMatch(String mobile, String email) {
+        requireViewApplications();
+        String normalizedMobile = digitsOnly(mobile);
+        Parent parent = null;
+        if (hasText(normalizedMobile)) {
+            parent = parentRepository.findByMobileNumber(normalizedMobile).orElse(null);
+        }
+        if (parent == null && hasText(email)) {
+            parent = parentRepository.findFirstByEmailIgnoreCase(email.trim()).orElse(null);
+        }
+        if (parent == null) {
+            return FamilyMatchResponse.builder().matched(false).build();
+        }
+        List<FamilyMatchResponse.SiblingSummary> siblings = studentParentRepository
+                .findByParent_ParentIdAndActiveTrue(parent.getParentId())
+                .stream()
+                .map(StudentParent::getStudent)
+                .filter(s -> s != null)
+                .map(student -> {
+                    String className = studentEnrollmentRepository
+                            .findActiveWithClassByStudentId(student.getStudentId())
+                            .map(this::enrollmentClassLabel)
+                            .orElse(null);
+                    return FamilyMatchResponse.SiblingSummary.builder()
+                            .studentId(student.getStudentId())
+                            .studentName(studentFullName(student))
+                            .studentCode(student.getStudentCode())
+                            .className(className)
+                            .build();
+                })
+                .collect(Collectors.toList());
+        return FamilyMatchResponse.builder()
+                .matched(true)
+                .parentId(parent.getParentId())
+                .parentName(parentFullName(parent))
+                .mobileNumber(parent.getMobileNumber())
+                .email(parent.getEmail())
+                .students(siblings)
+                .build();
     }
 
     @Override
@@ -288,6 +460,7 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     @Override
     @Transactional
     public EnrollmentResultResponse enroll(Long applicationId, EnrollApplicationRequest request) {
+        requireApproveApplications();
         ApplicationAdmission app = getApplication(applicationId);
         if (app.getStatus() != ApplicationStatus.APPROVED) {
             throw new BadRequestException("Only approved applications can be enrolled");
@@ -320,6 +493,21 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
             throw new BadRequestException("Could not create the student record");
         }
 
+        List<ImportedStudentDocument> copiedDocs = documentRepository
+                .findByApplicationApplicationIdOrderByCreatedOnDesc(applicationId)
+                .stream()
+                .filter(doc -> doc.getStoredPath() != null && !doc.getStoredPath().isBlank())
+                .map(doc -> new ImportedStudentDocument(
+                        doc.getDocumentType(),
+                        doc.getOriginalName(),
+                        doc.getStoredPath(),
+                        doc.getStatus(),
+                        doc.getDocumentId(),
+                        doc.getRemarks()))
+                .collect(Collectors.toList());
+        studentService.importStoredDocuments(student.getStudentId(), copiedDocs);
+        studentService.syncPhotoFromDocuments(student.getStudentId());
+
         app.setAcademicYearId(request.getAcademicYearId());
         app.setClassId(request.getClassId());
         app.setSectionId(request.getSectionId());
@@ -327,7 +515,10 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         app.setStudentId(student.getStudentId());
         app.setStatus(ApplicationStatus.ENROLLED);
         repository.save(app);
-        markInquiry(app.getInquiryId(), InquiryStatus.CONVERTED);
+        markInquiry(app.getInquiryId(), InquiryStatus.APPLICATION_SUBMITTED);
+        auditWriteService.record(AuditEventType.STATE_CHANGE, "ENROLLMENT_COMPLETED", "APPLICATION",
+                String.valueOf(app.getApplicationId()),
+                "Student enrolled: " + student.getStudentId());
 
         return EnrollmentResultResponse.builder()
                 .applicationId(app.getApplicationId())
@@ -344,7 +535,9 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
 
     @Override
     @Transactional
-    public ApplicationDocumentResponse uploadDocument(Long applicationId, MultipartFile file, String documentType) {
+    public ApplicationDocumentResponse uploadDocument(
+            Long applicationId, MultipartFile file, String documentType, String remarks) {
+        requireManageApplications();
         ApplicationAdmission app = getApplication(applicationId);
         if (app.getStatus() == ApplicationStatus.ENROLLED || app.getStatus() == ApplicationStatus.REJECTED
                 || app.getStatus() == ApplicationStatus.CANCELLED) {
@@ -358,7 +551,13 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
             doc.setOriginalName(file.getOriginalFilename());
             doc.setStoredPath(path);
             doc.setStatus(DocumentCheckStatus.PENDING);
-            return toDocumentResponse(documentRepository.save(doc));
+            if (hasText(remarks)) {
+                doc.setRemarks(remarks.trim());
+            }
+            ApplicationDocumentResponse response = toDocumentResponse(documentRepository.save(doc));
+            auditWriteService.record(AuditEventType.UPDATE, "DOCUMENT_UPLOADED", "APPLICATION",
+                    String.valueOf(applicationId), "Document uploaded: " + response.getDocumentType());
+            return response;
         } catch (IOException ex) {
             throw new BadRequestException("Could not store the document");
         }
@@ -376,26 +575,49 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     @Override
     @Transactional
     public ApplicationDocumentResponse updateDocumentStatus(Long documentId, DocumentCheckStatus status, String remarks) {
+        requireApproveApplications();
         AdmissionApplicationDocument doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
         doc.setStatus(status);
-        doc.setRemarks(remarks);
-        return toDocumentResponse(documentRepository.save(doc));
+        if (remarks != null && !remarks.isBlank()) {
+            doc.setRemarks(remarks.trim());
+        } else if (status == DocumentCheckStatus.REJECTED) {
+            // Rejection without reason keeps existing label/remarks untouched.
+        }
+        ApplicationDocumentResponse response = toDocumentResponse(documentRepository.save(doc));
+        String event = status == DocumentCheckStatus.VERIFIED ? "DOCUMENT_VERIFIED" : "DOCUMENT_REJECTED";
+        auditWriteService.record(AuditEventType.UPDATE, event, "APPLICATION",
+                String.valueOf(doc.getApplication().getApplicationId()),
+                doc.getDocumentType() + (remarks != null ? ": " + remarks : ""));
+        return response;
     }
 
     @Override
     @Transactional
     public void deleteDocument(Long documentId) {
+        requireManageApplications();
         AdmissionApplicationDocument doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
+        String storedPath = doc.getStoredPath();
         documentRepository.delete(doc);
+        fileStorageService.deleteQuietly(storedPath);
     }
 
     @Override
-    public Resource downloadDocument(Long documentId) {
+    public ApplicationDocumentFile downloadDocument(Long documentId) {
+        requireViewApplications();
         AdmissionApplicationDocument doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
-        return fileStorageService.loadAsResource(doc.getStoredPath());
+        String originalName = StringUtils.hasText(doc.getOriginalName())
+                ? doc.getOriginalName()
+                : "document-" + documentId;
+        MediaType mediaType = MediaTypeFactory.getMediaType(originalName)
+                .orElse(MediaType.APPLICATION_OCTET_STREAM);
+        return new ApplicationDocumentFile(
+                fileStorageService.loadAsResource(doc.getStoredPath()),
+                originalName,
+                mediaType.toString()
+        );
     }
 
     private ApplicationAdmissionResponse submitNew(ApplicationAdmissionRequest request) {
@@ -416,21 +638,51 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
 
     private void mapRequest(ApplicationAdmissionRequest request, ApplicationAdmission app) {
         app.setInquiryId(request.getInquiryId());
-        app.setApplicantName(request.getApplicantName());
-        app.setDateOfBirth(request.getDateOfBirth());
-        app.setGender(request.getGender());
+        if (hasText(request.getApplicantName())) {
+            app.setApplicantName(request.getApplicantName().trim());
+        } else if (!hasText(app.getApplicantName())) {
+            app.setApplicantName("Draft Applicant");
+        }
+        if (request.getDateOfBirth() != null) {
+            app.setDateOfBirth(request.getDateOfBirth());
+        }
+        if (request.getGender() != null) {
+            app.setGender(request.getGender());
+        }
         app.setApplyingForClass(resolveClassName(request));
-        app.setAcademicYearId(request.getAcademicYearId());
-        app.setClassId(request.getClassId());
-        app.setSectionId(request.getSectionId());
-        app.setEmail(request.getEmail());
-        app.setContactNumber(request.getContactNumber());
-        app.setAddress(request.getAddress());
-        app.setParentName(request.getParentName());
-        app.setParentContact(request.getParentContact());
-        app.setParentEmail(request.getParentEmail());
-        app.setInternalComments(request.getInternalComments());
-        app.setProfileDetails(writeProfile(request.getProfile()));
+        if (request.getAcademicYearId() != null) {
+            app.setAcademicYearId(request.getAcademicYearId());
+        }
+        if (request.getClassId() != null) {
+            app.setClassId(request.getClassId());
+        }
+        if (request.getSectionId() != null) {
+            app.setSectionId(request.getSectionId());
+        }
+        if (request.getEmail() != null) {
+            app.setEmail(request.getEmail());
+        }
+        if (request.getContactNumber() != null) {
+            app.setContactNumber(request.getContactNumber());
+        }
+        if (request.getAddress() != null) {
+            app.setAddress(request.getAddress());
+        }
+        if (request.getParentName() != null) {
+            app.setParentName(request.getParentName());
+        }
+        if (request.getParentContact() != null) {
+            app.setParentContact(request.getParentContact());
+        }
+        if (request.getParentEmail() != null) {
+            app.setParentEmail(request.getParentEmail());
+        }
+        if (request.getInternalComments() != null) {
+            app.setInternalComments(request.getInternalComments());
+        }
+        if (request.getProfile() != null) {
+            app.setProfileDetails(writeProfile(request.getProfile()));
+        }
     }
 
     private String resolveClassName(ApplicationAdmissionRequest request) {
@@ -486,7 +738,13 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         if (app.getDateOfBirth() == null) {
             throw new BadRequestException("Date of birth is required before approval");
         }
-        List<String> required = settingService.requiredDocuments();
+        ApplicationProfileDetails profile = readProfile(app.getProfileDetails());
+        List<String> required = RequiredDocumentsResolver.resolve(
+                settingService.requiredDocuments(),
+                app.getApplyingForClass(),
+                profile != null ? profile.getHasPreviousSchooling() : null,
+                profile != null ? profile.getTcNumber() : null,
+                profile != null ? profile.getPreviousSchoolName() : null);
         if (required.isEmpty()) {
             return;
         }
@@ -516,16 +774,22 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
             ApplicationAdmission app, EnrollApplicationRequest enroll, String admissionNumber) {
         String[] studentNames = splitName(app.getApplicantName());
         String[] parentNames = splitName(hasText(app.getParentName()) ? app.getParentName() : "Guardian " + studentNames[1]);
+        ApplicationProfileDetails profile = readProfile(app.getProfileDetails());
 
         StudentCreateRequest request = new StudentCreateRequest();
         request.setAdmissionNumber(admissionNumber);
+        request.setApplicationId(app.getApplicationId());
         request.setFirstName(studentNames[0]);
         request.setLastName(studentNames[1]);
         request.setGender(hasText(app.getGender()) ? app.getGender() : "OTHER");
         request.setDateOfBirth(app.getDateOfBirth());
         request.setMobileNumber(digitsOnly(app.getContactNumber()));
-        request.setEmail(app.getEmail());
-        request.setRemarks(app.getInternalComments());
+        if (hasText(app.getEmail())) {
+            request.setEmail(app.getEmail());
+        }
+        if (hasText(app.getInternalComments())) {
+            request.setRemarks(app.getInternalComments());
+        }
         request.setParentFirstName(parentNames[0]);
         request.setParentLastName(parentNames[1]);
         request.setParentMobileNumber(digitsOnly(app.getParentContact()));
@@ -536,6 +800,86 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         request.setAcademicYearId(enroll.getAcademicYearId());
         request.setClassId(enroll.getClassId());
         request.setSectionId(enroll.getSectionId());
+        request.setEnrollmentDate(LocalDate.now());
+
+        if (profile != null) {
+            if (profile.getLinkedParentId() != null) {
+                request.setExistingParentId(profile.getLinkedParentId());
+            }
+            if (hasText(profile.getBloodGroup())) request.setBloodGroup(profile.getBloodGroup());
+            if (hasText(profile.getReligion())) request.setReligion(profile.getReligion());
+            if (hasText(profile.getNationality())) request.setNationality(profile.getNationality());
+            if (hasText(profile.getMotherTongue())) request.setMotherTongue(profile.getMotherTongue());
+            if (hasText(profile.getCategory())) request.setCategory(profile.getCategory());
+            if (hasText(profile.getPlaceOfBirth())) request.setPlaceOfBirth(profile.getPlaceOfBirth());
+            if (hasText(profile.getIdentityDocumentType())) request.setIdentityDocumentType(profile.getIdentityDocumentType());
+            if (hasText(profile.getIdentityDocumentNumber())) {
+                request.setIdentityDocumentNumber(profile.getIdentityDocumentNumber());
+            } else if (hasText(profile.getAadhaarNumber())) {
+                request.setIdentityDocumentType(hasText(profile.getIdentityDocumentType())
+                        ? profile.getIdentityDocumentType() : "AADHAAR");
+                request.setIdentityDocumentNumber(profile.getAadhaarNumber());
+            }
+            if (hasText(profile.getFatherOccupation())) request.setParentOccupation(profile.getFatherOccupation());
+            if (hasText(profile.getParentRelationship())) {
+                request.setParentRelationship(profile.getParentRelationship());
+            }
+            // Addresses — never overwrite with blanks
+            if (hasText(profile.getAddressLine1()) || hasText(profile.getCity()) || hasText(profile.getPinCode())) {
+                request.setCurrentAddressLine1(profile.getAddressLine1());
+                request.setCurrentAddressLine2(profile.getAddressLine2());
+                request.setCurrentCity(profile.getCity());
+                request.setCurrentState(profile.getState());
+                request.setCurrentCountry(profile.getCountry());
+                request.setCurrentPostalCode(profile.getPinCode());
+            } else if (hasText(app.getAddress())) {
+                request.setCurrentAddressLine1(app.getAddress());
+            }
+            Boolean same = profile.getSameAsPresentAddress();
+            request.setSameAddress(Boolean.TRUE.equals(same));
+            if (!Boolean.TRUE.equals(same)
+                    && (hasText(profile.getPermanentAddressLine1()) || hasText(profile.getPermanentCity())
+                    || hasText(profile.getPermanentPinCode()))) {
+                request.setPermanentAddressLine1(profile.getPermanentAddressLine1());
+                request.setPermanentAddressLine2(profile.getPermanentAddressLine2());
+                request.setPermanentCity(profile.getPermanentCity());
+                request.setPermanentState(profile.getPermanentState());
+                request.setPermanentCountry(profile.getPermanentCountry());
+                request.setPermanentPostalCode(profile.getPermanentPinCode());
+            }
+            // Mother / secondary guardian
+            if (hasText(profile.getMotherName()) && hasText(profile.getMotherContact())) {
+                String[] mother = splitName(profile.getMotherName());
+                request.setSecondaryParentFirstName(mother[0]);
+                request.setSecondaryParentLastName(mother[1]);
+                request.setSecondaryParentMobileNumber(digitsOnly(profile.getMotherContact()));
+                request.setSecondaryParentEmail(profile.getMotherEmail());
+                request.setSecondaryParentOccupation(profile.getMotherOccupation());
+                request.setSecondaryParentRelationship(
+                        hasText(profile.getMotherRelationship()) ? profile.getMotherRelationship() : "MOTHER");
+            } else if (hasText(profile.getSecondaryGuardianName()) && hasText(profile.getSecondaryGuardianMobile())) {
+                String[] guardian = splitName(profile.getSecondaryGuardianName());
+                request.setSecondaryParentFirstName(guardian[0]);
+                request.setSecondaryParentLastName(guardian[1]);
+                request.setSecondaryParentMobileNumber(digitsOnly(profile.getSecondaryGuardianMobile()));
+                request.setSecondaryParentEmail(profile.getSecondaryGuardianEmail());
+                request.setSecondaryParentOccupation(profile.getSecondaryGuardianOccupation());
+                request.setSecondaryParentRelationship(
+                        hasText(profile.getSecondaryGuardianRelationship())
+                                ? profile.getSecondaryGuardianRelationship() : "GUARDIAN");
+            }
+            if (hasText(profile.getEmergencyContactName())) {
+                request.setEmergencyContactName(profile.getEmergencyContactName());
+            }
+            if (hasText(profile.getEmergencyContactMobile())) {
+                request.setEmergencyContactPhone(profile.getEmergencyContactMobile());
+            }
+            if (hasText(profile.getEmergencyContactRelationship())) {
+                request.setEmergencyContactRelation(profile.getEmergencyContactRelationship());
+            }
+        } else if (hasText(app.getAddress())) {
+            request.setCurrentAddressLine1(app.getAddress());
+        }
         return request;
     }
 
@@ -668,7 +1012,10 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         if (username == null) {
             return null;
         }
-        return userRepository.findByUsername(username).map(User::getId).orElse(null);
+        return userRepository.findByUsername(username)
+                .or(() -> userRepository.findByEmail(username))
+                .map(User::getId)
+                .orElse(null);
     }
 
     private String currentUsername() {
@@ -676,8 +1023,173 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         return auth == null ? null : auth.getName();
     }
 
+    private boolean hasElevatedRole() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) {
+            return false;
+        }
+        return auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(a -> "SUPER_ADMIN".equals(a)
+                        || "ORGANIZATION_OWNER".equals(a)
+                        || "ORGANIZATION_ADMIN".equals(a));
+    }
+
+    private void requireViewApplications() {
+        requireApplicationPrivilege("VIEW");
+    }
+
+    private void requireManageApplications() {
+        requireApplicationPrivilege("MANAGE");
+    }
+
+    private void requireApproveApplications() {
+        requireApplicationPrivilege("APPROVE");
+    }
+
+    private boolean canApproveApplications() {
+        if (hasElevatedRole()) {
+            return true;
+        }
+        Long userId = currentUserId();
+        Long orgId = OrganizationContext.getOrganizationId();
+        return userId != null && orgId != null
+                && permissionService.hasPermission(userId, orgId, RESOURCE_ADMISSIONS_APPLICATIONS, "APPROVE");
+    }
+
+    /**
+     * Approvers and org admins see every application. Counselors / VIEW users are limited
+     * to applications they created or whose linked inquiry is assigned to them.
+     */
+    private ApplicationSearchRequest applyVisibilityScope(ApplicationSearchRequest request) {
+        ApplicationSearchRequest effective = request == null ? new ApplicationSearchRequest() : request;
+        // Never trust client-supplied ownership filters.
+        effective.setCreatedBy(null);
+        effective.setAssignedCounselorId(null);
+
+        if (canApproveApplications()) {
+            return effective;
+        }
+
+        effective.setScope("MY");
+        String username = currentUsername();
+        if (hasText(username)) {
+            effective.setCreatedBy(username.trim());
+        } else {
+            effective.setCreatedBy("__unauthenticated__");
+        }
+        Long staffId = currentStaffId();
+        if (staffId != null) {
+            effective.setAssignedCounselorId(staffId);
+        }
+        return effective;
+    }
+
+    private void assertCanAccessApplication(ApplicationAdmission app) {
+        if (canApproveApplications()) {
+            return;
+        }
+        String username = currentUsername();
+        if (hasText(username) && hasText(app.getCreatedBy())
+                && username.trim().equalsIgnoreCase(app.getCreatedBy().trim())) {
+            return;
+        }
+        Long staffId = currentStaffId();
+        if (staffId != null && app.getInquiryId() != null) {
+            boolean assigned = inquiryRepository.findById(app.getInquiryId())
+                    .map(Inquiry::getAssignedCounselorId)
+                    .map(staffId::equals)
+                    .orElse(false);
+            if (assigned) {
+                return;
+            }
+        }
+        throw new AccessDeniedException("You can only access applications assigned to you");
+    }
+
+    private Long currentStaffId() {
+        Long userId = currentUserId();
+        if (userId != null) {
+            java.util.Optional<Long> byUser = staffRepository.findByUser_Id(userId).map(Staff::getStaffId);
+            if (byUser.isPresent()) {
+                return byUser.get();
+            }
+        }
+        String username = currentUsername();
+        if (!hasText(username)) {
+            return null;
+        }
+        return userRepository.findByUsername(username.trim())
+                .or(() -> userRepository.findByEmail(username.trim()))
+                .filter(u -> hasText(u.getEmail()))
+                .flatMap(u -> staffRepository.findByEmail(u.getEmail().trim()))
+                .map(Staff::getStaffId)
+                .orElse(null);
+    }
+
+    private void requireApplicationPrivilege(String privilege) {
+        if (hasElevatedRole()) {
+            return;
+        }
+        Long userId = currentUserId();
+        Long orgId = OrganizationContext.getOrganizationId();
+        if (userId == null || orgId == null
+                || !permissionService.hasPermission(userId, orgId, RESOURCE_ADMISSIONS_APPLICATIONS, privilege)) {
+            throw new AccessDeniedException("ADMISSIONS_APPLICATIONS:" + privilege + " required");
+        }
+    }
+
     private static boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
+    }
+
+    private String enrollmentClassLabel(StudentEnrollment enrollment) {
+        if (enrollment == null || enrollment.getClassEntity() == null) {
+            return null;
+        }
+        String name = enrollment.getClassEntity().getClassName();
+        if (enrollment.getSection() != null && hasText(enrollment.getSection().getName())) {
+            return name + " · " + enrollment.getSection().getName();
+        }
+        return name;
+    }
+
+    private static String studentFullName(Student student) {
+        if (student == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        if (hasText(student.getFirstName())) {
+            sb.append(student.getFirstName().trim());
+        }
+        if (hasText(student.getMiddleName())) {
+            if (!sb.isEmpty()) sb.append(' ');
+            sb.append(student.getMiddleName().trim());
+        }
+        if (hasText(student.getLastName())) {
+            if (!sb.isEmpty()) sb.append(' ');
+            sb.append(student.getLastName().trim());
+        }
+        return sb.toString();
+    }
+
+    private static String parentFullName(Parent parent) {
+        if (parent == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        if (hasText(parent.getFirstName())) {
+            sb.append(parent.getFirstName().trim());
+        }
+        if (hasText(parent.getMiddleName())) {
+            if (!sb.isEmpty()) sb.append(' ');
+            sb.append(parent.getMiddleName().trim());
+        }
+        if (hasText(parent.getLastName())) {
+            if (!sb.isEmpty()) sb.append(' ');
+            sb.append(parent.getLastName().trim());
+        }
+        return sb.toString();
     }
 
     private String writeProfile(ApplicationProfileDetails profile) {

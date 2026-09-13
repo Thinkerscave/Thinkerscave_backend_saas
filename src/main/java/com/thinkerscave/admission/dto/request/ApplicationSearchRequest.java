@@ -12,4 +12,17 @@ public class ApplicationSearchRequest {
     private ApplicationStatus status;
     private List<ApplicationStatus> statuses;
     private String applyingForClass;
+
+    /**
+     * MY = applications owned by the current counselor/user.
+     * ALL = organization-wide (approvers / elevated roles only).
+     * Server may force MY when the caller lacks APPROVE.
+     */
+    private String scope;
+
+    /** Set by service for MY scope — matches Auditable.createdBy (username). */
+    private String createdBy;
+
+    /** Set by service for MY scope — matches Inquiry.assignedCounselorId. */
+    private Long assignedCounselorId;
 }

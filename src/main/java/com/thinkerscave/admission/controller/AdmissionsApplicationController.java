@@ -5,9 +5,11 @@ import com.thinkerscave.admission.dto.request.ApplicationSearchRequest;
 import com.thinkerscave.admission.dto.request.EnrollApplicationRequest;
 import com.thinkerscave.admission.dto.request.RecordFeeRequest;
 import com.thinkerscave.admission.dto.response.ApplicationAdmissionResponse;
+import com.thinkerscave.admission.dto.response.ApplicationDocumentFile;
 import com.thinkerscave.admission.dto.response.ApplicationDocumentResponse;
 import com.thinkerscave.admission.dto.response.ApplicationProgressResponse;
 import com.thinkerscave.admission.dto.response.EnrollmentResultResponse;
+import com.thinkerscave.admission.dto.response.FamilyMatchResponse;
 import com.thinkerscave.admission.enums.ApplicationStatus;
 import com.thinkerscave.admission.enums.DocumentCheckStatus;
 import com.thinkerscave.admission.service.ApplicationAdmissionService;
@@ -19,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -81,6 +84,15 @@ public class AdmissionsApplicationController {
         return ResponseEntity.ok(ApiResponse.success("Application search completed", applicationService.search(request, pageable)));
     }
 
+    @GetMapping("/family-match")
+    @Operation(summary = "Find existing family/parent by mobile or email for sibling linking")
+    public ResponseEntity<ApiResponse<FamilyMatchResponse>> familyMatch(
+            @RequestParam(required = false) String mobile,
+            @RequestParam(required = false) String email) {
+        return ResponseEntity.ok(ApiResponse.success("Family match result",
+                applicationService.findFamilyMatch(mobile, email)));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Get application detail")
     public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> getById(@PathVariable Long id) {
@@ -101,6 +113,15 @@ public class AdmissionsApplicationController {
             @PathVariable Long id,
             @RequestParam(required = false) String remarks) {
         return ResponseEntity.ok(ApiResponse.success("Application approved", applicationService.approve(id, remarks)));
+    }
+
+    @PostMapping("/{id}/request-correction")
+    @Operation(summary = "Send application back for correction (ACTION_REQUIRED)")
+    public ResponseEntity<ApiResponse<ApplicationAdmissionResponse>> requestCorrection(
+            @PathVariable Long id,
+            @RequestParam String reason) {
+        return ResponseEntity.ok(ApiResponse.success("Correction requested",
+                applicationService.requestCorrection(id, reason)));
     }
 
     @PostMapping("/{id}/reject")
@@ -167,9 +188,10 @@ public class AdmissionsApplicationController {
     public ResponseEntity<ApiResponse<ApplicationDocumentResponse>> uploadDocument(
             @PathVariable Long id,
             @RequestPart("file") MultipartFile file,
-            @RequestParam(required = false) String documentType) {
+            @RequestParam(required = false) String documentType,
+            @RequestParam(required = false) String remarks) {
         return ResponseEntity.ok(ApiResponse.created("Document uploaded",
-                applicationService.uploadDocument(id, file, documentType)));
+                applicationService.uploadDocument(id, file, documentType, remarks)));
     }
 
     @PostMapping("/documents/{documentId}/verify")
@@ -190,12 +212,21 @@ public class AdmissionsApplicationController {
     }
 
     @GetMapping("/documents/{documentId}/download")
-    @Operation(summary = "Download an application document")
+    @Operation(summary = "Download / preview an application document")
     public ResponseEntity<Resource> downloadDocument(@PathVariable Long documentId) {
-        Resource resource = applicationService.downloadDocument(documentId);
+        ApplicationDocumentFile file = applicationService.downloadDocument(documentId);
+        MediaType mediaType;
+        try {
+            mediaType = MediaType.parseMediaType(file.contentType());
+        } catch (Exception ex) {
+            mediaType = MediaType.APPLICATION_OCTET_STREAM;
+        }
+        ContentDisposition disposition = ContentDisposition.inline()
+                .filename(file.originalName(), java.nio.charset.StandardCharsets.UTF_8)
+                .build();
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .body(resource);
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentType(mediaType)
+                .body(file.resource());
     }
 }

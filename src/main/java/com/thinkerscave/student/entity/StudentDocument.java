@@ -1,7 +1,10 @@
 package com.thinkerscave.student.entity;
 
+import com.thinkerscave.admission.enums.DocumentCheckStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -31,6 +34,17 @@ public class StudentDocument {
 
     @Column(name = "document_path", nullable = false, length = 255)
     private String documentPath;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 30)
+    private DocumentCheckStatus status = DocumentCheckStatus.PENDING;
+
+    @Column(name = "remarks", length = 500)
+    private String remarks;
+
+    /** Optional link back to the admissions document that was copied on enroll. */
+    @Column(name = "source_application_document_id")
+    private Long sourceApplicationDocumentId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_id", nullable = false)

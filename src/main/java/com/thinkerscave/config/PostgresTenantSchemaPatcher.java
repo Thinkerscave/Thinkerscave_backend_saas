@@ -31,16 +31,24 @@ public class PostgresTenantSchemaPatcher implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) {
         try {
-            String crmSql = StreamUtils.copyToString(
-                    new ClassPathResource("db/migration/V1_33__admissions_crm_production_columns.sql").getInputStream(),
-                    StandardCharsets.UTF_8);
-            jdbcTemplate.execute(crmSql);
+            applySqlResource("db/migration/V1_33__admissions_crm_production_columns.sql");
+            try {
+                applySqlResource("db/migration/V1_34__admissions_lead360_alignment.sql");
+            } catch (Exception lead360Error) {
+                log.warn("Lead360 alignment migration had issues; applying compatibility fallback: {}", lead360Error.getMessage());
+            }
+            jdbcTemplate.execute(LEAD360_COMPATIBILITY_SQL);
             jdbcTemplate.execute(SESSION_AND_NOTES_SQL);
             jdbcTemplate.execute(LOGIN_HISTORY_RETENTION_SQL);
-            log.info("PostgreSQL tenant schema patch applied (admissions CRM + user_sessions + counseling_note + login history retention).");
+            log.info("PostgreSQL tenant schema patch applied (admissions CRM + lead360 alignment + user_sessions + counseling_note + login history retention).");
         } catch (Exception ex) {
             log.warn("PostgreSQL tenant schema patch failed: {}", ex.getMessage());
         }
+    }
+
+    private void applySqlResource(String classpathFile) throws Exception {
+        String sql = StreamUtils.copyToString(new ClassPathResource(classpathFile).getInputStream(), StandardCharsets.UTF_8);
+        jdbcTemplate.execute(sql);
     }
 
     private static final String SESSION_AND_NOTES_SQL = """
@@ -135,6 +143,50 @@ public class PostgresTenantSchemaPatcher implements ApplicationRunner {
                     ) THEN
                         EXECUTE format('ALTER TABLE %I.application_admission ALTER COLUMN organization_id DROP NOT NULL', s);
                     END IF;
+                END LOOP;
+            END $$;
+            """;
+
+    private static final String LEAD360_COMPATIBILITY_SQL = """
+            DO $$
+            DECLARE
+                s text;
+            BEGIN
+                FOR s IN
+                    SELECT nspname
+                    FROM pg_namespace
+                    WHERE nspname = 'public'
+                       OR nspname LIKE 'tenant_%'
+                LOOP
+                    IF EXISTS (
+                        SELECT 1
+                        FROM information_schema.tables
+                        WHERE table_schema = s
+                          AND table_name = 'inquiry'
+                    ) THEN
+                        EXECUTE format('ALTER TABLE %I.inquiry ADD COLUMN IF NOT EXISTS student_name varchar(100)', s);
+                        EXECUTE format('ALTER TABLE %I.inquiry ADD COLUMN IF NOT EXISTS parent_contact_name varchar(100)', s);
+                        EXECUTE format('UPDATE %I.inquiry SET student_name = COALESCE(NULLIF(TRIM(student_name), ''''), NULLIF(TRIM(name), '''')) WHERE student_name IS NULL OR TRIM(student_name) = ''''', s);
+                        EXECUTE format('UPDATE %I.inquiry SET parent_contact_name = COALESCE(NULLIF(TRIM(parent_contact_name), ''''), NULLIF(TRIM(name), '''')) WHERE parent_contact_name IS NULL OR TRIM(parent_contact_name) = ''''', s);
+                    END IF;
+
+                    EXECUTE format(
+                        'CREATE TABLE IF NOT EXISTS %I.lead_counselor_assignment (
+                            assignment_id bigserial PRIMARY KEY,
+                            inquiry_id bigint NOT NULL,
+                            previous_counselor_staff_id bigint,
+                            new_counselor_staff_id bigint NOT NULL,
+                            reason varchar(300),
+                            assigned_by_user_id bigint,
+                            assigned_by_username varchar(100),
+                            assigned_on timestamp NOT NULL,
+                            active boolean NOT NULL DEFAULT true,
+                            created_by varchar(100),
+                            created_on timestamp,
+                            updated_by varchar(100),
+                            updated_on timestamp,
+                            version bigint NOT NULL DEFAULT 0
+                        )', s);
                 END LOOP;
             END $$;
             """;

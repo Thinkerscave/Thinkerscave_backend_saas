@@ -12,6 +12,8 @@ public interface ParentRepository extends JpaRepository<Parent, Long> {
 
 	Optional<Parent> findByMobileNumber(String mobileNumber);
 
+	Optional<Parent> findFirstByEmailIgnoreCase(String email);
+
 	boolean existsByParentCode(String parentCode);
 
 	/** Used to resolve the logged-in Parent's record for the Parent dashboard. */

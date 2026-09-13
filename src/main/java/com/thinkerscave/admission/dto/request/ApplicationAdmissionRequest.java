@@ -2,7 +2,6 @@ package com.thinkerscave.admission.dto.request;
 
 import com.thinkerscave.admission.dto.ApplicationProfileDetails;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -11,7 +10,7 @@ import java.time.LocalDate;
 @Schema(description = "Submit or draft a student admission application")
 public class ApplicationAdmissionRequest {
 
-    @NotBlank(message = "Applicant name is required")
+    /** Required on submit; drafts may omit while Save Draft preserves partial data. */
     private String applicantName;
 
     private LocalDate dateOfBirth;

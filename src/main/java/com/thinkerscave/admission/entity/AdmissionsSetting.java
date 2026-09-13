@@ -59,4 +59,8 @@ public class AdmissionsSetting extends Auditable {
 
     @Column(name = "assignment_mode", length = 30)
     private String assignmentMode = "MANUAL";
+
+    /** Monotonic cursor used for sequential round-robin counselor assignment. */
+    @Column(name = "next_counselor_index", nullable = false)
+    private Long nextCounselorIndex = 0L;
 }

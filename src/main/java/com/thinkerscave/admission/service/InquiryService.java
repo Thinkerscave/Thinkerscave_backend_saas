@@ -14,6 +14,7 @@ import com.thinkerscave.admission.dto.response.InquiryResponse;
 import com.thinkerscave.admission.dto.response.InquiryTimelineItemResponse;
 import com.thinkerscave.admission.dto.response.InquiryWorkspaceKpiResponse;
 import com.thinkerscave.admission.enums.InquiryStatus;
+import com.thinkerscave.staff.dto.response.StaffSummaryResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -41,7 +42,9 @@ public interface InquiryService {
 
     InquiryResponse markLost(Long inquiryId, String reason);
 
-    InquiryResponse assignCounselor(Long inquiryId, Long counselorId);
+    InquiryResponse reopenLead(Long inquiryId);
+
+    InquiryResponse assignCounselor(Long inquiryId, Long counselorId, String reason);
 
     com.thinkerscave.admission.dto.response.ApplicationAdmissionResponse convertToApplication(Long inquiryId);
 
@@ -53,6 +56,10 @@ public interface InquiryService {
 
     List<FollowUpResponse> getOverdueFollowUps();
 
+    List<FollowUpResponse> getUpcomingFollowUps();
+
+    List<FollowUpResponse> getCompletedFollowUps();
+
     FollowUpResponse updateFollowUp(Long followUpId, FollowUpRequest request);
 
     FollowUpResponse completeFollowUp(Long followUpId);
@@ -60,8 +67,6 @@ public interface InquiryService {
     FollowUpResponse completeFollowUp(Long followUpId, CompleteFollowUpRequest request);
 
     FollowUpResponse cancelFollowUp(Long followUpId, String remarks);
-
-    List<FollowUpResponse> getUpcomingFollowUps();
 
     CounselingNoteResponse addCounselingNote(Long inquiryId, CounselingNoteRequest request);
 
@@ -76,4 +81,10 @@ public interface InquiryService {
     InquiryFullDetailResponse getFullDetail(Long inquiryId);
 
     List<InquiryTimelineItemResponse> getTimeline(Long inquiryId);
+
+    List<InquiryTimelineItemResponse> getTimeline(Long inquiryId, String type, java.time.LocalDate from, java.time.LocalDate to);
+
+    Page<StaffSummaryResponse> getEligibleCounselors(String keyword, Pageable pageable);
+
+    byte[] exportLeadsCsv(LeadSearchRequest request);
 }

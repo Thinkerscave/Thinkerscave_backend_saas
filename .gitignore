@@ -64,6 +64,10 @@ desktop.ini
 /_scratch/
 /.agent-tmp/
 /tmp-agent/
+/.migrate-tmp/
+/.menu-fix-tmp/
+**/.migrate-tmp/
+**/.menu-fix-tmp/
 be-run.log
 be-test-run.log
 *-run.log

@@ -49,6 +49,12 @@ public class AdmissionsFollowUpController {
         return ResponseEntity.ok(ApiResponse.success("Upcoming follow-ups", inquiryService.getUpcomingFollowUps()));
     }
 
+    @GetMapping("/completed")
+    @Operation(summary = "Get completed follow-ups for the logged-in counselor queue")
+    public ResponseEntity<ApiResponse<List<FollowUpResponse>>> completed() {
+        return ResponseEntity.ok(ApiResponse.success("Completed follow-ups", inquiryService.getCompletedFollowUps()));
+    }
+
     @PutMapping("/{id}")
     @Operation(summary = "Update or reschedule follow-up")
     public ResponseEntity<ApiResponse<FollowUpResponse>> update(@PathVariable Long id, @Valid @RequestBody FollowUpRequest request) {

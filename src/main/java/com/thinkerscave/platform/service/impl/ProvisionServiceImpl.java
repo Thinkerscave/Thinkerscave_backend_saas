@@ -727,6 +727,10 @@ public class ProvisionServiceImpl implements ProvisionService {
             copyPlatformRows(schemaName, sourceSchema, "organization_domains", "organization_id = " + organization.getId());
             copyPlatformRows(schemaName, sourceSchema, "organization_configurations", "organization_id = " + organization.getId());
             copyPlatformRows(schemaName, sourceSchema, "organization_subscriptions", "organization_id = " + organization.getId());
+            // System-defined COUNSELOR staff responsibility must exist automatically in every
+            // organization so Admissions lead assignment/eligibility works from day one
+            // (see admissions Lead 360 spec: COUNSELOR is a Staff Responsibility, not a Role).
+            copyPlatformRows(schemaName, sourceSchema, "responsibility", "responsibility_code = 'COUNSELOR'");
             // PLATFORM-scope menus (Tenant Management) are Super Admin-only and must
             // never be duplicated into a tenant schema; only CORE/SUBSCRIPTION menus
             // are copied here as the full org-facing catalog.

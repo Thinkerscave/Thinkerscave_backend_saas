@@ -71,4 +71,16 @@ public class StudentDocumentController {
         studentService.deleteDocument(id);
         return ResponseEntity.ok(ApiResponse.success("Document deleted", null));
     }
+
+    @PostMapping("/{id}/verify")
+    @Operation(summary = "Update student document verification status")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    public ResponseEntity<ApiResponse<StudentDocumentDTO>> verify(
+            @PathVariable Long id,
+            @RequestParam String status,
+            @RequestParam(required = false) String remarks) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Document status updated",
+                studentService.updateDocumentStatus(id, status, remarks)));
+    }
 }

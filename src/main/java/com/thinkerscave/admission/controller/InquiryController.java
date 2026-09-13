@@ -108,7 +108,7 @@ public class InquiryController {
     @Operation(summary = "Assign a counselor to an inquiry")
     public ResponseEntity<ApiResponse<InquiryResponse>> assignCounselor(
             @PathVariable Long id, @RequestParam Long counselorId) {
-        return ResponseEntity.ok(ApiResponse.success("Counselor assigned", inquiryService.assignCounselor(id, counselorId)));
+        return ResponseEntity.ok(ApiResponse.success("Counselor assigned", inquiryService.assignCounselor(id, counselorId, null)));
     }
 
     @PutMapping("/{id}/status")

@@ -32,24 +32,15 @@ public class Student extends Auditable {
     @Column(name = "student_id")
     private Long studentId;
 
-    /**
-     * Internal ERP identifier.
-     * Example: STU20250001
-     */
     @Column(name = "student_code", nullable = false, unique = true, length = 50)
     @EqualsAndHashCode.Include
     private String studentCode;
 
-    /**
-     * Admission number assigned by institution.
-     */
     @Column(name = "admission_number", nullable = false, unique = true, length = 50)
     private String admissionNumber;
 
     @Column(name = "roll_number", length = 50)
     private String rollNumber;
-
-    // Personal Details
 
     @Column(name = "first_name", nullable = false, length = 100)
     private String firstName;
@@ -75,7 +66,20 @@ public class Student extends Auditable {
     @Column(name = "mother_tongue", length = 50)
     private String motherTongue;
 
-    // Contact Details
+    @Column(name = "category", length = 50)
+    private String category;
+
+    @Column(name = "place_of_birth", length = 120)
+    private String placeOfBirth;
+
+    @Column(name = "identity_document_type", length = 50)
+    private String identityDocumentType;
+
+    @Column(name = "identity_document_number", length = 80)
+    private String identityDocumentNumber;
+
+    @Column(name = "application_id")
+    private Long applicationId;
 
     @Column(name = "mobile_number")
     private Long mobileNumber;
@@ -86,8 +90,6 @@ public class Student extends Auditable {
     @Column(name = "photo_url", length = 500)
     private String photoUrl;
 
-    // Admission Details
-
     @Column(name = "admission_date")
     private LocalDate admissionDate;
 
@@ -95,15 +97,11 @@ public class Student extends Auditable {
     @Column(name = "status", nullable = false, length = 30)
     private StudentStatus status = StudentStatus.ACTIVE;
 
-    // Future Modules
-
     @Column(name = "transport_required")
     private Boolean transportRequired = false;
 
     @Column(name = "hostel_required")
     private Boolean hostelRequired = false;
-
-    // Address
 
     @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "current_address_id")
@@ -116,13 +114,18 @@ public class Student extends Auditable {
     @Column(name = "same_address")
     private Boolean sameAddress = false;
 
-    // User Login Mapping
+    @Column(name = "emergency_contact_name", length = 150)
+    private String emergencyContactName;
+
+    @Column(name = "emergency_contact_phone", length = 30)
+    private String emergencyContactPhone;
+
+    @Column(name = "emergency_contact_relation", length = 50)
+    private String emergencyContactRelation;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id")
     private User user;
-
-    // Additional Notes
 
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;

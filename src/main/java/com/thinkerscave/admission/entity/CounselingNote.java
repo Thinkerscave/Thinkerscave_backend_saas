@@ -32,6 +32,19 @@ public class CounselingNote extends Auditable {
     @JoinColumn(name = "inquiry_id", nullable = false)
     private Inquiry inquiry;
 
+    /** Actual date/time the counseling session took place (distinct from createdOn/audit timestamp). */
+    @Column(name = "session_at")
+    private java.time.LocalDateTime sessionAt;
+
+    /** Mode of the counseling session. Reuses the existing FollowUpType enum (CALL, WHATSAPP, WALK_IN, etc.). */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mode", length = 20)
+    private com.thinkerscave.admission.enums.FollowUpType mode;
+
+    /** Staff member (with COUNSELOR responsibility) who conducted this session. */
+    @Column(name = "counselor_staff_id")
+    private Long counselorStaffId;
+
     @Column(name = "student_requirements", columnDefinition = "TEXT")
     private String studentRequirements;
 

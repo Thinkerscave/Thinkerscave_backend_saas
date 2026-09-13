@@ -5,12 +5,13 @@ import com.thinkerscave.admission.dto.request.ApplicationSearchRequest;
 import com.thinkerscave.admission.dto.request.EnrollApplicationRequest;
 import com.thinkerscave.admission.dto.request.RecordFeeRequest;
 import com.thinkerscave.admission.dto.response.ApplicationAdmissionResponse;
+import com.thinkerscave.admission.dto.response.ApplicationDocumentFile;
 import com.thinkerscave.admission.dto.response.ApplicationDocumentResponse;
 import com.thinkerscave.admission.dto.response.ApplicationProgressResponse;
 import com.thinkerscave.admission.dto.response.EnrollmentResultResponse;
+import com.thinkerscave.admission.dto.response.FamilyMatchResponse;
 import com.thinkerscave.admission.enums.ApplicationStatus;
 import com.thinkerscave.admission.enums.DocumentCheckStatus;
-import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,6 +42,11 @@ public interface ApplicationAdmissionService {
 
     ApplicationAdmissionResponse reject(Long applicationId, String comments);
 
+    /** Return application to applicant/counselor for corrections (Approve privilege). */
+    ApplicationAdmissionResponse requestCorrection(Long applicationId, String reason);
+
+    FamilyMatchResponse findFamilyMatch(String mobile, String email);
+
     ApplicationProgressResponse getProgress(Long applicationId);
 
     ApplicationAdmissionResponse archive(Long applicationId);
@@ -51,7 +57,7 @@ public interface ApplicationAdmissionService {
 
     EnrollmentResultResponse enroll(Long applicationId, EnrollApplicationRequest request);
 
-    ApplicationDocumentResponse uploadDocument(Long applicationId, MultipartFile file, String documentType);
+    ApplicationDocumentResponse uploadDocument(Long applicationId, MultipartFile file, String documentType, String remarks);
 
     List<ApplicationDocumentResponse> listDocuments(Long applicationId);
 
@@ -59,5 +65,5 @@ public interface ApplicationAdmissionService {
 
     void deleteDocument(Long documentId);
 
-    Resource downloadDocument(Long documentId);
+    ApplicationDocumentFile downloadDocument(Long documentId);
 }

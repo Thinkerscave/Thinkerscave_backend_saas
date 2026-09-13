@@ -178,6 +178,9 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 				String rollNumber    = readCell(row, 11);
 				String fatherName    = readCell(row, 12);
 				String fatherMobile  = readCell(row, 13);
+				String motherName    = readCell(row, 14);
+				String motherMobile  = readCell(row, 15);
+				String currentAddress = readCell(row, 16);
 				String bloodGroup    = readCell(row, 17);
 				String remarks       = readCell(row, 18);
 
@@ -262,6 +265,19 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 				req.setParentFirstName(fatherParts[0]);
 				req.setParentLastName(fatherParts[1]);
 				req.setParentMobileNumber(fatherMobile);
+				req.setParentRelationship("FATHER");
+
+				if (!motherName.isBlank() && !motherMobile.isBlank()) {
+					String[] motherParts = splitName(motherName);
+					req.setSecondaryParentFirstName(motherParts[0]);
+					req.setSecondaryParentLastName(motherParts[1]);
+					req.setSecondaryParentMobileNumber(motherMobile);
+					req.setSecondaryParentRelationship("MOTHER");
+				}
+				if (!currentAddress.isBlank()) {
+					req.setCurrentAddressLine1(currentAddress);
+					req.setSameAddress(true);
+				}
 
 				// ── Persist ────────────────────────────────────────────────
 				try {
