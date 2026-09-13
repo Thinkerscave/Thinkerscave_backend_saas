@@ -16,7 +16,6 @@ public class StudentCreateRequest {
     // STUDENT DETAILS
     // ==========================
 
-    @NotBlank
     private String admissionNumber;
 
     private String rollNumber;
@@ -41,6 +40,14 @@ public class StudentCreateRequest {
 
     private String motherTongue;
 
+    private String category;
+
+    private String placeOfBirth;
+
+    private String identityDocumentType;
+
+    private String identityDocumentNumber;
+
     private String mobileNumber;
 
     @Email
@@ -48,19 +55,23 @@ public class StudentCreateRequest {
 
     private String remarks;
 
+    /** When set, links this student back to the originating admission application. */
+    private Long applicationId;
+
     // ==========================
-    // PARENT DETAILS
+    // PRIMARY PARENT / GUARDIAN
     // ==========================
 
-    /** When set, link this existing parent instead of creating a new one. */
     private Long existingParentId;
+
+    /** FATHER / MOTHER / GUARDIAN / … — defaults to FATHER when blank. */
+    private String parentRelationship;
 
     @NotBlank
     private String parentFirstName;
 
     private String parentMiddleName;
 
-    @NotBlank
     private String parentLastName;
 
     private String parentGender;
@@ -80,16 +91,65 @@ public class StudentCreateRequest {
     private Double annualIncome;
 
     // ==========================
-    // ENROLLMENT DETAILS
+    // SECONDARY PARENT / GUARDIAN (optional)
     // ==========================
 
-    @NotNull
+    private String secondaryParentRelationship;
+
+    private String secondaryParentFirstName;
+
+    private String secondaryParentLastName;
+
+    private String secondaryParentMobileNumber;
+
+    @Email
+    private String secondaryParentEmail;
+
+    private String secondaryParentOccupation;
+
+    // ==========================
+    // ADDRESS
+    // ==========================
+
+    private Boolean sameAddress;
+
+    private String currentAddressLine1;
+
+    private String currentAddressLine2;
+
+    private String currentCity;
+
+    private String currentState;
+
+    private String currentCountry;
+
+    private String currentPostalCode;
+
+    private String permanentAddressLine1;
+
+    private String permanentAddressLine2;
+
+    private String permanentCity;
+
+    private String permanentState;
+
+    private String permanentCountry;
+
+    private String permanentPostalCode;
+
+    // ==========================
+    // ENROLLMENT (optional for onboarding/import)
+    // ==========================
+
     private Long academicYearId;
 
-    @NotNull
     private Long classId;
 
     private Long sectionId;
+
+    private LocalDate enrollmentDate;
+
+    private String enrollmentStatus;
 
     // ==========================
     // MEDICAL DETAILS
@@ -108,4 +168,14 @@ public class StudentCreateRequest {
     private String doctorContact;
 
     private String emergencyNotes;
+
+    // ==========================
+    // EMERGENCY CONTACT (optional long-term profile)
+    // ==========================
+
+    private String emergencyContactName;
+
+    private String emergencyContactPhone;
+
+    private String emergencyContactRelation;
 }

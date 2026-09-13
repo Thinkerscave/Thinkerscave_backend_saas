@@ -15,6 +15,7 @@ import com.thinkerscave.student.dto.MedicalDTO;
 import com.thinkerscave.student.dto.TimelineDTO;
 import com.thinkerscave.student.dto.StudentSearchRequest;
 import com.thinkerscave.student.dto.StudentDocumentDTO;
+import com.thinkerscave.student.dto.ImportedStudentDocument;
 
 public interface StudentService {
 
@@ -49,6 +50,12 @@ public interface StudentService {
     List<StudentDocumentDTO> getStudentDocuments(Long studentId);
 
     StudentDocumentDTO uploadStudentDocument(Long studentId, MultipartFile file, String documentType) throws IOException;
+
+    StudentDocumentDTO updateDocumentStatus(Long documentId, String status, String remarks);
+
+    void importStoredDocuments(Long studentId, List<ImportedStudentDocument> documents);
+
+    void syncPhotoFromDocuments(Long studentId);
 
     void deleteDocument(Long docId);
     

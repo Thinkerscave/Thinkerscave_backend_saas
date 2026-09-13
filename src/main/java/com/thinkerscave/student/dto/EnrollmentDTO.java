@@ -18,4 +18,6 @@ public class EnrollmentDTO {
     private String rollNumber;
 
     private String status;
+
+    private String enrollmentDate;
 }

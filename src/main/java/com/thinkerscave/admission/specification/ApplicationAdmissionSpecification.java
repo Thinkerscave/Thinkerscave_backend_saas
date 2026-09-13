@@ -2,6 +2,7 @@ package com.thinkerscave.admission.specification;
 
 import com.thinkerscave.admission.dto.request.ApplicationSearchRequest;
 import com.thinkerscave.admission.entity.ApplicationAdmission;
+import com.thinkerscave.admission.entity.Inquiry;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.ArrayList;
@@ -40,6 +41,25 @@ public final class ApplicationAdmissionSpecification {
                         cb.like(cb.lower(root.get("email")), like),
                         cb.like(cb.lower(root.get("parentName")), like)
                 ));
+            }
+
+            boolean mineByCreator = hasText(request.getCreatedBy());
+            boolean mineByCounselor = request.getAssignedCounselorId() != null;
+            if (mineByCreator || mineByCounselor) {
+                List<jakarta.persistence.criteria.Predicate> ownership = new ArrayList<>();
+                if (mineByCreator) {
+                    ownership.add(cb.equal(
+                            cb.lower(root.get("createdBy")),
+                            request.getCreatedBy().trim().toLowerCase()));
+                }
+                if (mineByCounselor) {
+                    var inquiryIds = query.subquery(Long.class);
+                    var inquiryRoot = inquiryIds.from(Inquiry.class);
+                    inquiryIds.select(inquiryRoot.get("inquiryId"))
+                            .where(cb.equal(inquiryRoot.get("assignedCounselorId"), request.getAssignedCounselorId()));
+                    ownership.add(root.get("inquiryId").in(inquiryIds));
+                }
+                predicates.add(cb.or(ownership.toArray(new jakarta.persistence.criteria.Predicate[0])));
             }
 
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));

@@ -429,8 +429,6 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "Leads, follow-ups, applications and admissions reporting.");
         Menu admissions = ensureMenu("ADMISSIONS", "Admissions", "Admissions CRM",
                 "/app/admissions", "pi pi-inbox", MenuType.MODULE, null, 12, MenuScope.SUBSCRIPTION, admissionsFeature);
-        ensureMenu("ADMISSIONS_OVERVIEW", "Overview", "Admissions overview",
-                "/app/admissions/overview", "dashboard", MenuType.PAGE, admissions, 0, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_LEADS", "Leads", "Admissions leads",
                 "/app/admissions/leads", "list", MenuType.PAGE, admissions, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("ADMISSIONS_FOLLOW_UPS", "Follow-ups", "Admissions follow-ups",
@@ -505,6 +503,7 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "ADMISSION_CENTER",
                 "ADMISSIONS_INQUIRY_CENTER",
                 "ADMISSIONS_ADMISSION_CENTER",
+                "ADMISSIONS_OVERVIEW",
                 "ACCESS_DASHBOARD"
         );
         menuRepository.findByMenuCodeIn(obsoleteCodes).stream()

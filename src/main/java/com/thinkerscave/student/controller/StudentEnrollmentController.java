@@ -124,6 +124,9 @@ public class StudentEnrollmentController {
         if (e.getAcademicYear() != null) dto.setAcademicYear(e.getAcademicYear().getYearCode());
         if (e.getClassEntity() != null) dto.setClassName(e.getClassEntity().getClassName());
         if (e.getSection() != null) dto.setSectionName(e.getSection().getSectionName());
+        if (e.getCreatedOn() != null) {
+            dto.setEnrollmentDate(e.getCreatedOn().toLocalDate().toString());
+        }
         return dto;
     }
 

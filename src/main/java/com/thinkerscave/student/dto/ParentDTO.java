@@ -18,4 +18,8 @@ public class ParentDTO {
     private String email;
 
     private String occupation;
+
+    private String relationship;
+
+    private Boolean primaryContact;
 }
