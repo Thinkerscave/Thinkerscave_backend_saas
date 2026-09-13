@@ -32,11 +32,43 @@ build/
 ### VS Code ###
 .vscode/
 
-### Environment Variables ###
-###.env ###
-
-### Local Configuration ###
-local.properties
+### Environment / secrets ###
 .env
-.log
-.sh
+.env.local
+.env.*.local
+!.env.example
+local.properties
+
+### Logs (runtime — never commit) ###
+Logs/
+logs/
+*.log
+*.log.*
+
+### Runtime / local data ###
+uploads/
+*.pid
+hs_err_pid*
+replay_pid*
+
+### System files ###
+.DS_Store
+Thumbs.db
+desktop.ini
+
+### Local agent / one-off scratch ###
+/_scratch/
+/.agent-tmp/
+/tmp-agent/
+/.migrate-tmp/
+/.menu-fix-tmp/
+**/.migrate-tmp/
+**/.menu-fix-tmp/
+be-run.log
+be-test-run.log
+*-run.log
+*.pyc
+__pycache__/
+.Python
+.venv/
+venv/
