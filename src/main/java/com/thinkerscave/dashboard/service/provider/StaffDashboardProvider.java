@@ -20,7 +20,6 @@ import com.thinkerscave.dashboard.service.DashboardTimetableHelper;
 import com.thinkerscave.dashboard.util.RoleLabels;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.staff.entity.Staff;
-import com.thinkerscave.staff.repository.PayrollRepository;
 import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +44,6 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
     private final StaffRepository staffRepository;
     private final StaffAttendanceRepository staffAttendanceRepository;
     private final StudentAttendanceRepository studentAttendanceRepository;
-    private final PayrollRepository payrollRepository;
     private final NoticeRepository noticeRepository;
     private final DashboardTimetableHelper timetableHelper;
     private final TeacherAllocationTeacherRepository teacherAllocationTeacherRepository;
@@ -85,20 +83,10 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
 
     private WidgetDTO<KpiGridData> kpiGrid(Staff staff, List<TimetableSlotItem> todaySlots) {
         return safeWidget("kpi-grid", WidgetType.KPI_GRID, "Your day at a glance", 4, DataMode.LIVE, () -> {
-            String payrollStatus = "N/A";
-            if (staff != null) {
-                LocalDate now = LocalDate.now();
-                payrollStatus = payrollRepository.findByStaff_StaffIdAndPayrollYearAndPayrollMonth(
-                                staff.getStaffId(), now.getYear(), now.getMonthValue())
-                        .map(p -> p.getStatus() != null ? p.getStatus().name() : "PENDING")
-                        .orElse("NOT GENERATED");
-            }
-
             long classesCompleted = todaySlots.stream()
                     .filter(s -> s.getEndTime() != null && s.getEndTime().isBefore(java.time.LocalTime.now()))
                     .count();
 
-            Long orgId = OrganizationContext.getOrganizationId();
             long attendancePending = todaySlots.stream()
                     .map(TimetableSlotItem::getClassName)
                     .filter(java.util.Objects::nonNull)
@@ -108,8 +96,7 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
             return KpiGridData.builder().items(List.of(
                     KpiItem.builder().label("Today's Classes").value(String.valueOf(todaySlots.size())).icon("pi-book").tone("primary").build(),
                     KpiItem.builder().label("Classes Completed").value(String.valueOf(classesCompleted)).icon("pi-check-circle").tone("success").build(),
-                    KpiItem.builder().label("Distinct Classes Today").value(String.valueOf(attendancePending)).icon("pi-exclamation-circle").tone("warning").build(),
-                    KpiItem.builder().label("Payroll Status").value(payrollStatus).icon("pi-money-bill").tone("success").build()
+                    KpiItem.builder().label("Distinct Classes Today").value(String.valueOf(attendancePending)).icon("pi-exclamation-circle").tone("warning").build()
             )).build();
         });
     }
@@ -140,7 +127,6 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
                 QuickActionsData.builder().items(List.of(
                         QuickActionItem.builder().label("Mark Student Attendance").icon("pi-calendar-plus").route("/app/attendance/students").tone("primary").build(),
                         QuickActionItem.builder().label("View Timetable").icon("pi-clock").route("/app/academics/timetable").tone("info").build(),
-                        QuickActionItem.builder().label("My Payslips").icon("pi-money-bill").route("/app/staff/my-payroll").tone("success").build(),
                         QuickActionItem.builder().label("Notices").icon("pi-megaphone").route("/app/communication/notices").tone("warning").build()
                 )).build());
     }

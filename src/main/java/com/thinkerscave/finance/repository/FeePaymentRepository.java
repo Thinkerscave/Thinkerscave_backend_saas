@@ -26,12 +26,14 @@ public interface FeePaymentRepository extends JpaRepository<FeePayment, Long> {
     BigDecimal sumPaymentsForYear(@Param("yearId") Long yearId, @Param("studentIds") List<Long> studentIds);
 
     @Query("""
-            SELECT FUNCTION('YEAR', p.paidOn), FUNCTION('MONTH', p.paidOn), COALESCE(SUM(p.amount), 0)
+            SELECT CAST(FUNCTION('date_part', 'year', p.paidOn) AS integer),
+                   CAST(FUNCTION('date_part', 'month', p.paidOn) AS integer),
+                   COALESCE(SUM(p.amount), 0)
             FROM FeePayment p
             WHERE p.academicYearId = :yearId
               AND (:studentIds IS NULL OR p.studentId IN :studentIds)
-            GROUP BY FUNCTION('YEAR', p.paidOn), FUNCTION('MONTH', p.paidOn)
-            ORDER BY FUNCTION('YEAR', p.paidOn), FUNCTION('MONTH', p.paidOn)
+            GROUP BY FUNCTION('date_part', 'year', p.paidOn), FUNCTION('date_part', 'month', p.paidOn)
+            ORDER BY FUNCTION('date_part', 'year', p.paidOn), FUNCTION('date_part', 'month', p.paidOn)
             """)
     List<Object[]> sumCollectedByMonth(@Param("yearId") Long yearId, @Param("studentIds") List<Long> studentIds);
 }

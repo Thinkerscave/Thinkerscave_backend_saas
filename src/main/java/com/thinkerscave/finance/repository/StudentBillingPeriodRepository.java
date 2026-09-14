@@ -64,12 +64,14 @@ public interface StudentBillingPeriodRepository extends JpaRepository<StudentBil
                            @Param("studentIds") List<Long> studentIds);
 
     @Query("""
-            SELECT FUNCTION('YEAR', p.dueDate), FUNCTION('MONTH', p.dueDate), COALESCE(SUM(p.totalAmount), 0)
+            SELECT CAST(FUNCTION('date_part', 'year', p.dueDate) AS integer),
+                   CAST(FUNCTION('date_part', 'month', p.dueDate) AS integer),
+                   COALESCE(SUM(p.totalAmount), 0)
             FROM StudentBillingPeriod p
             WHERE p.academicYearId = :yearId
               AND (:studentIds IS NULL OR p.studentId IN :studentIds)
-            GROUP BY FUNCTION('YEAR', p.dueDate), FUNCTION('MONTH', p.dueDate)
-            ORDER BY FUNCTION('YEAR', p.dueDate), FUNCTION('MONTH', p.dueDate)
+            GROUP BY FUNCTION('date_part', 'year', p.dueDate), FUNCTION('date_part', 'month', p.dueDate)
+            ORDER BY FUNCTION('date_part', 'year', p.dueDate), FUNCTION('date_part', 'month', p.dueDate)
             """)
     List<Object[]> sumDueByMonth(@Param("yearId") Long yearId, @Param("studentIds") List<Long> studentIds);
 }

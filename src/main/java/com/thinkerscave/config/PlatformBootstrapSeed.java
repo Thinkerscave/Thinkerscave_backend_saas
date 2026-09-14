@@ -41,6 +41,7 @@ import java.util.List;
  * Creates platform host org, system roles, privileges, Super Admin menus,
  * role_permissions, and a Super Admin user only when none exists.
  * Existing user passwords are never modified.
+ * PAYROLL_MY (My Payroll) is under Finance (FEES parent), not Staff.
  */
 @Component
 @Profile({"test", "prod"})
@@ -415,8 +416,6 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "/app/staff/directory", "list", MenuType.PAGE, staff, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("STAFF_LEAVE", "Leave Management", "Staff leave and availability",
                 "/app/staff/leave-availability", "event", MenuType.PAGE, staff, 2, MenuScope.SUBSCRIPTION, null);
-        ensureMenu("PAYROLL_MY", "My Payroll", "Staff self-service payroll",
-                "/app/staff/my-payroll", "payments", MenuType.PAGE, staff, 3, MenuScope.SUBSCRIPTION, null, true);
 
         Feature attendanceFeature = ensureFeature("FEAT_ATTENDANCE", "ATTENDANCE_MODULE", "Attendance",
                 "Attendance", "ACADEMIC", 4,
@@ -486,14 +485,16 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "/app/fees", "payments", MenuType.PAGE, fees, 1, MenuScope.SUBSCRIPTION, null, true);
         ensureMenu("PAYROLL", "Payroll", "Finance payroll workspace",
                 "/app/payroll", "payments", MenuType.PAGE, fees, 2, MenuScope.SUBSCRIPTION, financePayrollFeature, true);
+        ensureMenu("PAYROLL_MY", "My Payroll", "Self-service payslips and salary summary",
+                "/app/payroll/me", "payments", MenuType.PAGE, fees, 3, MenuScope.SUBSCRIPTION, financePayrollFeature, true);
         ensureMenu("EXPENSES", "Expenses", "Finance expense workspace",
-                "/app/expenses", "receipt_long", MenuType.PAGE, fees, 3, MenuScope.SUBSCRIPTION, financeExpenseFeature, true);
+                "/app/expenses", "receipt_long", MenuType.PAGE, fees, 4, MenuScope.SUBSCRIPTION, financeExpenseFeature, true);
         ensureMenu("FINANCE_REPORTS", "Reports", "Finance management reports",
-                "/app/fees/reports", "analytics", MenuType.PAGE, fees, 4, MenuScope.SUBSCRIPTION, financeReportsFeature, true);
+                "/app/fees/reports", "analytics", MenuType.PAGE, fees, 5, MenuScope.SUBSCRIPTION, financeReportsFeature, true);
         ensureMenu("FEES_STUDENT_DETAILS", "Student Fee", "Student fee details",
-                "/app/fees/students", "person", MenuType.PAGE, fees, 5, MenuScope.SUBSCRIPTION, null, true);
+                "/app/fees/students", "person", MenuType.PAGE, fees, 6, MenuScope.SUBSCRIPTION, null, true);
         ensureMenu("FEES_SETTINGS", "Settings", "Fee generation, reminders and payment methods",
-                "/app/fees/settings", "settings", MenuType.PAGE, fees, 6, MenuScope.SUBSCRIPTION, null, true);
+                "/app/fees/settings", "settings", MenuType.PAGE, fees, 7, MenuScope.SUBSCRIPTION, null, true);
         // Permission resources (not sidebar navigation)
         ensureMenu("FEES_HEADS", "Fee Heads", "Fee heads permission resource",
                 "/app/fees/heads", "list", MenuType.PAGE, fees, 10, MenuScope.SUBSCRIPTION, null, false);
@@ -558,6 +559,7 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "STUDENTS_DOCUMENTS",
                 "STAFF_DOCUMENTS",
                 "STAFF_ALUMNI",
+                "STAFF_PAYROLL",
                 "EXAMS",
                 "ENROLLMENTS",
                 "FEE_MANAGEMENT",
