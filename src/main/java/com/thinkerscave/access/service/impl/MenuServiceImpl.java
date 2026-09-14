@@ -290,9 +290,7 @@ public class MenuServiceImpl implements MenuService {
         for (GrantedAuthority authority : authentication.getAuthorities()) {
             String value = authority.getAuthority();
             if ("SUPER_ADMIN".equals(value)
-                    || "PLATFORM_ADMIN".equals(value)
-                    || "THINKERSCAVE_INTERNAL".equals(value)
-                    || "INTERNAL_TEAM".equals(value)) {
+                    || "SUPER_ADMIN".equals(value)) {
                 return true;
             }
         }

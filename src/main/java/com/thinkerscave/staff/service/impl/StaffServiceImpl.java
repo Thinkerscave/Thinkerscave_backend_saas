@@ -14,15 +14,12 @@ import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.staff.dto.request.StaffCreateRequest;
 import com.thinkerscave.staff.dto.request.StaffUpdateRequest;
 import com.thinkerscave.staff.dto.response.*;
-import com.thinkerscave.staff.entity.Payroll;
 import com.thinkerscave.staff.entity.Staff;
 import com.thinkerscave.staff.enums.EmploymentCategory;
 import com.thinkerscave.staff.enums.EmploymentStatus;
 import com.thinkerscave.staff.enums.StaffType;
-import com.thinkerscave.staff.repository.PayrollRepository;
 import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
-import com.thinkerscave.staff.repository.StaffSalaryStructureRepository;
 import com.thinkerscave.staff.service.StaffService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +28,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -44,9 +40,7 @@ public class StaffServiceImpl implements StaffService {
     private final UserService userService;
     private final RoleRepository roleRepository;
     private final DocumentRepository documentRepository;
-    private final StaffSalaryStructureRepository salaryStructureRepository;
     private final ResponsibilityAssignmentRepository assignmentRepository;
-    private final PayrollRepository payrollRepository;
 
     @Override
     @Transactional
@@ -246,26 +240,9 @@ public class StaffServiceImpl implements StaffService {
                         .build())
                 .collect(Collectors.toList());
 
-        StaffDetailResponse.SalarySummary salarySummary = salaryStructureRepository
-                .findByStaff_StaffIdAndActiveTrue(staff.getStaffId())
-                .map(s -> StaffDetailResponse.SalarySummary.builder()
-                        .salaryStructureId(s.getSalaryStructureId())
-                        .salaryType(s.getSalaryType().name())
-                        .grossSalary(s.getGrossSalary())
-                        .effectiveFrom(s.getEffectiveFrom())
-                        .build())
-                .orElse(null);
-
-        StaffDetailResponse.PayrollSummary payrollSummary = payrollRepository
-                .findByStaff_StaffIdOrderByPayrollYearDescPayrollMonthDesc(staff.getStaffId())
-                .stream()
-                .findFirst()
-                .map(p -> StaffDetailResponse.PayrollSummary.builder()
-                        .lastPayrollMonth(p.getPayrollYear() + "-" + String.format("%02d", p.getPayrollMonth()))
-                        .lastNetSalary(p.getNetSalary())
-                        .lastPayrollStatus(p.getStatus().name())
-                        .build())
-                .orElse(null);
+        // Salary/payroll summaries live under Finance Payroll — omit legacy Staff payroll reads.
+        StaffDetailResponse.SalarySummary salarySummary = null;
+        StaffDetailResponse.PayrollSummary payrollSummary = null;
 
         List<DocumentResponse> docResponses = docs.stream()
                 .map(d -> DocumentResponse.builder()

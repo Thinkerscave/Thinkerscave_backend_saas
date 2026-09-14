@@ -838,22 +838,43 @@ public class ProvisionServiceImpl implements ProvisionService {
                         "AND m.id IN (" + menuIdList + ") AND m.menu_type = 'PAGE' " +
                         "ON CONFLICT (organization_id, role_id, menu_id) DO NOTHING");
 
-                // Parent role gets view-only access for a minimal demo navigation.
-                jdbcTemplate.execute(
-                    "INSERT INTO \"" + schemaName + "\".\"role_permissions\" " +
-                        "(organization_id, role_id, menu_id, can_view, can_manage, can_approve, created_on, version) " +
-                        "SELECT " + organization.getId() + ", r.id, m.id, true, false, false, now(), 0 " +
-                        "FROM \"" + schemaName + "\".\"roles\" r " +
-                        "INNER JOIN \"" + schemaName + "\".\"menus\" m ON m.menu_code IN (" +
-                        "'DASHBOARD','STUDENTS','STUDENTS_DIRECTORY','ATTENDANCE','ATTENDANCE_STUDENTS'," +
-                        "'COMMUNICATION','COMMUNICATION_NOTICES') " +
-                        "WHERE r.role_code = '" + ROLE_PARENT_CODE + "' " +
-                        "AND m.id IN (" + menuIdList + ") AND m.menu_type = 'PAGE' " +
-                        "ON CONFLICT (organization_id, role_id, menu_id) DO NOTHING");
+        // Non-admin role defaults (for example PARENT) are sourced from platform
+        // role_permissions templates, not hardcoded menu-code lists.
+        seedRolePermissionDefaultsFromPlatformTemplate(schemaName, organization.getId(), menuIdList, ROLE_PARENT_CODE);
 
         log.info("Seeded {} entitled menus and default Owner/Admin permissions for organization {} (schema={})",
                 entitledMenuIds.size(), organization.getOrganizationCode(), schemaName);
     }
+
+            private void seedRolePermissionDefaultsFromPlatformTemplate(
+                String tenantSchema,
+                Long organizationId,
+                String entitledMenuIdsCsv,
+                String roleCode
+            ) {
+            if (tenantSchema == null || tenantSchema.isBlank() || organizationId == null
+                || entitledMenuIdsCsv == null || entitledMenuIdsCsv.isBlank() || roleCode == null || roleCode.isBlank()) {
+                return;
+            }
+
+            String sourceSchema = resolvePlatformSourceSchema();
+
+            jdbcTemplate.execute(
+                "INSERT INTO \"" + tenantSchema + "\".\"role_permissions\" " +
+                    "(organization_id, role_id, menu_id, can_view, can_manage, can_approve, created_on, version) " +
+                    "SELECT " + organizationId + ", tr.id, tm.id, " +
+                    "bool_or(sp.can_view), bool_or(sp.can_manage), bool_or(sp.can_approve), now(), 0 " +
+                    "FROM \"" + sourceSchema + "\".\"role_permissions\" sp " +
+                    "INNER JOIN \"" + sourceSchema + "\".\"roles\" sr ON sr.id = sp.role_id " +
+                    "INNER JOIN \"" + sourceSchema + "\".\"menus\" sm ON sm.id = sp.menu_id " +
+                    "INNER JOIN \"" + tenantSchema + "\".\"roles\" tr ON tr.role_code = sr.role_code " +
+                    "INNER JOIN \"" + tenantSchema + "\".\"menus\" tm ON tm.menu_code = sm.menu_code " +
+                    "WHERE sr.role_code = '" + roleCode + "' " +
+                    "AND tm.id IN (" + entitledMenuIdsCsv + ") " +
+                    "AND tm.menu_type = 'PAGE' " +
+                    "GROUP BY tr.id, tm.id " +
+                    "ON CONFLICT (organization_id, role_id, menu_id) DO NOTHING");
+            }
 
     private void sendProvisioningEmails(
             Customer customer,

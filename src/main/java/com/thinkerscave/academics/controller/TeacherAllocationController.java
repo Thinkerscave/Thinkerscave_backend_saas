@@ -29,7 +29,7 @@ public class TeacherAllocationController {
     private final TeacherAllocationService allocationService;
 
     @GetMapping("/years/{yearId}/teacher-allocations/dashboard")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Teacher Allocation dashboard")
     public ResponseEntity<ApiResponse<TeacherAllocationDashboardResponse>> dashboard(
             @PathVariable Long yearId,

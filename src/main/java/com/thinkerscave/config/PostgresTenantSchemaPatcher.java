@@ -40,7 +40,37 @@ public class PostgresTenantSchemaPatcher implements ApplicationRunner {
             jdbcTemplate.execute(LEAD360_COMPATIBILITY_SQL);
             jdbcTemplate.execute(SESSION_AND_NOTES_SQL);
             jdbcTemplate.execute(LOGIN_HISTORY_RETENTION_SQL);
-            log.info("PostgreSQL tenant schema patch applied (admissions CRM + lead360 alignment + user_sessions + counseling_note + login history retention).");
+            try {
+                applySqlResource("db/migration/V1_38__create_finance_fees.sql");
+            } catch (Exception financeError) {
+                log.warn("Finance fees schema patch had issues: {}", financeError.getMessage());
+            }
+            try {
+                applySqlResource("db/migration/V1_39__create_managed_document.sql");
+            } catch (Exception managedDocError) {
+                log.warn("Managed document schema patch had issues: {}", managedDocError.getMessage());
+            }
+            try {
+                applySqlResource("db/migration/V1_40__create_finance_payroll.sql");
+            } catch (Exception payrollError) {
+                log.warn("Finance payroll schema patch had issues: {}", payrollError.getMessage());
+            }
+            try {
+                applySqlResource("db/migration/V1_41__migrate_legacy_staff_payroll.sql");
+            } catch (Exception payrollMigrateError) {
+                log.warn("Legacy payroll migration patch had issues: {}", payrollMigrateError.getMessage());
+            }
+            try {
+                applySqlResource("db/migration/V1_42__create_finance_expense.sql");
+            } catch (Exception expenseError) {
+                log.warn("Finance expense schema patch had issues: {}", expenseError.getMessage());
+            }
+            try {
+                applySqlResource("db/migration/V1_43__finance_reports_indexes.sql");
+            } catch (Exception reportIndexError) {
+                log.warn("Finance reports index patch had issues: {}", reportIndexError.getMessage());
+            }
+            log.info("PostgreSQL tenant schema patch applied (admissions CRM + lead360 + sessions + finance fees + payroll + expense + report indexes).");
         } catch (Exception ex) {
             log.warn("PostgreSQL tenant schema patch failed: {}", ex.getMessage());
         }

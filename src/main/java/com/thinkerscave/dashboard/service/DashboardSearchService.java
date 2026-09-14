@@ -89,16 +89,15 @@ public class DashboardSearchService {
         if (hasAuthority("STUDENT", "PARENT")) {
             return SearchScope.NONE;
         }
-        if (hasAuthority("SUPER_ADMIN", "PLATFORM_ADMIN", "THINKERSCAVE_INTERNAL", "INTERNAL_TEAM")
+        if (hasAuthority("SUPER_ADMIN")
                 || OrganizationContext.getOrganizationId() == null && hasAuthority("SUPER_ADMIN")) {
             return SearchScope.PLATFORM;
         }
         if (hasAuthority(
-                "ORGANIZATION_ADMIN", "ORGANIZATION_OWNER", "INSTITUTION_ADMIN", "COLLEGE_ADMIN",
-                "ADMIN", "PRINCIPAL", "HR_MANAGER", "ACADEMIC_COORDINATOR", "RECEPTIONIST")) {
+                "ORGANIZATION_ADMIN", "ORGANIZATION_OWNER")) {
             return SearchScope.ORGANIZATION;
         }
-        if (hasAuthority("TEACHER", "STAFF")) {
+        if (hasAuthority("STAFF")) {
             return SearchScope.TEACHER;
         }
         return OrganizationContext.getOrganizationId() == null ? SearchScope.PLATFORM : SearchScope.ORGANIZATION;

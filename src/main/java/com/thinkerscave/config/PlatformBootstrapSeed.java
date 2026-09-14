@@ -292,6 +292,12 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
 
     private Menu ensureMenu(String code, String name, String description, String route, String icon,
                             MenuType type, Menu parent, int order, MenuScope scope, Feature feature) {
+        return ensureMenu(code, name, description, route, icon, type, parent, order, scope, feature, true);
+    }
+
+    private Menu ensureMenu(String code, String name, String description, String route, String icon,
+                            MenuType type, Menu parent, int order, MenuScope scope, Feature feature,
+                            boolean showInSidebar) {
         Menu menu = menuRepository.findByMenuCode(code).orElseGet(() ->
                 Menu.builder()
                         .menuCode(code)
@@ -305,7 +311,7 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
         menu.setMenuType(type);
         menu.setParentMenu(parent);
         menu.setDisplayOrder(order);
-        menu.setShowInSidebar(true);
+        menu.setShowInSidebar(showInSidebar);
         menu.setActive(true);
         menu.setMenuScope(scope);
         menu.setFeature(feature);
@@ -409,6 +415,8 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "/app/staff/directory", "list", MenuType.PAGE, staff, 1, MenuScope.SUBSCRIPTION, null);
         ensureMenu("STAFF_LEAVE", "Leave Management", "Staff leave and availability",
                 "/app/staff/leave-availability", "event", MenuType.PAGE, staff, 2, MenuScope.SUBSCRIPTION, null);
+        ensureMenu("PAYROLL_MY", "My Payroll", "Staff self-service payroll",
+                "/app/staff/my-payroll", "payments", MenuType.PAGE, staff, 3, MenuScope.SUBSCRIPTION, null, true);
 
         Feature attendanceFeature = ensureFeature("FEAT_ATTENDANCE", "ATTENDANCE_MODULE", "Attendance",
                 "Attendance", "ACADEMIC", 4,
@@ -460,9 +468,82 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
         ensureMenu("COMMUNICATION_CONVERSATIONS", "Conversations", "Conversations",
                 "/app/communication/conversations", "chat", MenuType.PAGE, communication, 3, MenuScope.SUBSCRIPTION, null);
 
+        Feature financeFeature = ensureFeature("FEAT_FINANCE_FEES", "FINANCE_FEES_MODULE", "Finance Fees",
+                "FINANCE", "FINANCE", 11,
+                "Fee heads, structures, collection, receipts and student fee details.");
+        Feature financePayrollFeature = ensureFeature("FEAT_FINANCE_PAYROLL", "FINANCE_PAYROLL_MODULE", "Finance Payroll",
+                "FINANCE", "FINANCE", 12,
+                "Salary components, structures, payroll runs, payments and payslips.");
+        Feature financeExpenseFeature = ensureFeature("FEAT_FINANCE_EXPENSE", "FINANCE_EXPENSE_MODULE", "Finance Expenses",
+                "FINANCE", "FINANCE", 13,
+                "Expense capture, approvals, payments, heads and attachments.");
+        Feature financeReportsFeature = ensureFeature("FEAT_FINANCE_REPORTS", "FINANCE_REPORTS_MODULE", "Finance Reports",
+                "FINANCE", "FINANCE", 14,
+                "Read-only management reporting across fees, payroll and expenses.");
+        Menu fees = ensureMenu("FEES", "Finance", "Fees and student billing",
+                "/app/fees", "pi pi-wallet", MenuType.MODULE, null, 15, MenuScope.SUBSCRIPTION, financeFeature, true);
+        ensureMenu("FEES_MANAGEMENT", "Fees", "Fees workspace and dashboard",
+                "/app/fees", "payments", MenuType.PAGE, fees, 1, MenuScope.SUBSCRIPTION, null, true);
+        ensureMenu("PAYROLL", "Payroll", "Finance payroll workspace",
+                "/app/payroll", "payments", MenuType.PAGE, fees, 2, MenuScope.SUBSCRIPTION, financePayrollFeature, true);
+        ensureMenu("EXPENSES", "Expenses", "Finance expense workspace",
+                "/app/expenses", "receipt_long", MenuType.PAGE, fees, 3, MenuScope.SUBSCRIPTION, financeExpenseFeature, true);
+        ensureMenu("FINANCE_REPORTS", "Reports", "Finance management reports",
+                "/app/fees/reports", "analytics", MenuType.PAGE, fees, 4, MenuScope.SUBSCRIPTION, financeReportsFeature, true);
+        ensureMenu("FEES_STUDENT_DETAILS", "Student Fee", "Student fee details",
+                "/app/fees/students", "person", MenuType.PAGE, fees, 5, MenuScope.SUBSCRIPTION, null, true);
+        ensureMenu("FEES_SETTINGS", "Settings", "Fee generation, reminders and payment methods",
+                "/app/fees/settings", "settings", MenuType.PAGE, fees, 6, MenuScope.SUBSCRIPTION, null, true);
+        // Permission resources (not sidebar navigation)
+        ensureMenu("FEES_HEADS", "Fee Heads", "Fee heads permission resource",
+                "/app/fees/heads", "list", MenuType.PAGE, fees, 10, MenuScope.SUBSCRIPTION, null, false);
+        ensureMenu("FEES_STRUCTURES", "Fee Structures", "Fee structures permission resource",
+                "/app/fees/structures", "account_tree", MenuType.PAGE, fees, 11, MenuScope.SUBSCRIPTION, null, false);
+        ensureMenu("FEES_RECEIPTS", "Receipts", "Receipts permission resource",
+                "/app/fees/receipts", "receipt", MenuType.PAGE, fees, 12, MenuScope.SUBSCRIPTION, null, false);
+        ensureMenu("FEES_OUTSTANDING", "Outstanding", "Outstanding permission resource",
+                "/app/fees/outstanding", "warning", MenuType.PAGE, fees, 13, MenuScope.SUBSCRIPTION, null, false);
+        ensureMenu("FEES_COLLECTION", "Collection", "Fee collection permission resource",
+                "/app/fees/collect", "payments", MenuType.PAGE, fees, 14, MenuScope.SUBSCRIPTION, null, false);
+        ensureMenu("PAYROLL_COMPONENTS", "Payroll Components", "Salary components permission resource",
+                "/app/payroll/components", "list", MenuType.PAGE, fees, 20, MenuScope.SUBSCRIPTION, financePayrollFeature, false);
+        ensureMenu("PAYROLL_STRUCTURES", "Payroll Structures", "Salary structures permission resource",
+                "/app/payroll/structures", "account_tree", MenuType.PAGE, fees, 21, MenuScope.SUBSCRIPTION, financePayrollFeature, false);
+        ensureMenu("PAYROLL_EMPLOYEE_SALARY", "Employee Salary", "Employee salary permission resource",
+                "/app/payroll/employee-salary", "person", MenuType.PAGE, fees, 22, MenuScope.SUBSCRIPTION, financePayrollFeature, false);
+        ensureMenu("PAYROLL_RUN", "Payroll Run", "Payroll run permission resource",
+                "/app/payroll/runs", "play_arrow", MenuType.PAGE, fees, 23, MenuScope.SUBSCRIPTION, financePayrollFeature, false);
+        ensureMenu("PAYROLL_PAYMENT", "Payroll Payment", "Payroll payment permission resource",
+                "/app/payroll/payments", "payments", MenuType.PAGE, fees, 24, MenuScope.SUBSCRIPTION, financePayrollFeature, false);
+        ensureMenu("PAYROLL_PAYSLIP", "Payroll Payslip", "Payslip download permission resource",
+                "/app/payroll/payslips", "receipt", MenuType.PAGE, fees, 25, MenuScope.SUBSCRIPTION, financePayrollFeature, false);
+        ensureMenu("PAYROLL_SETTINGS", "Payroll Settings", "Payroll settings permission resource",
+                "/app/payroll/settings", "settings", MenuType.PAGE, fees, 26, MenuScope.SUBSCRIPTION, financePayrollFeature, false);
+        ensureMenu("EXPENSE_HEADS", "Expense Heads", "Expense heads permission resource",
+                "/app/expenses/heads", "list", MenuType.PAGE, fees, 30, MenuScope.SUBSCRIPTION, financeExpenseFeature, false);
+        ensureMenu("EXPENSE_PAYMENT", "Expense Payment", "Expense payment permission resource",
+                "/app/expenses/payments", "payments", MenuType.PAGE, fees, 31, MenuScope.SUBSCRIPTION, financeExpenseFeature, false);
+        ensureMenu("EXPENSE_APPROVAL", "Expense Approval", "Expense approval permission resource",
+                "/app/expenses/approvals", "approval", MenuType.PAGE, fees, 32, MenuScope.SUBSCRIPTION, financeExpenseFeature, false);
+        ensureMenu("EXPENSE_SETTINGS", "Expense Settings", "Expense settings permission resource",
+                "/app/fees/settings", "settings", MenuType.PAGE, fees, 33, MenuScope.SUBSCRIPTION, financeExpenseFeature, false);
+
+        // Push finance catalog into already-provisioned tenant schemas + reseed entitlements
+        // for orgs whose plan includes FEAT_FINANCE_FEES / FEAT_FINANCE_PAYROLL.
+        for (String code : List.of(
+                "FEES", "FEES_MANAGEMENT", "FEES_STUDENT_DETAILS", "FEES_SETTINGS",
+                "FEES_HEADS", "FEES_STRUCTURES", "FEES_RECEIPTS", "FEES_OUTSTANDING", "FEES_COLLECTION",
+                "PAYROLL", "PAYROLL_COMPONENTS", "PAYROLL_STRUCTURES", "PAYROLL_EMPLOYEE_SALARY",
+                "PAYROLL_RUN", "PAYROLL_PAYMENT", "PAYROLL_PAYSLIP", "PAYROLL_SETTINGS", "PAYROLL_MY",
+                "EXPENSES", "EXPENSE_HEADS", "EXPENSE_PAYMENT", "EXPENSE_APPROVAL", "EXPENSE_SETTINGS",
+                "FINANCE_REPORTS")) {
+            menuRepository.findByMenuCode(code).ifPresent(tenantCatalogSyncService::syncMenu);
+        }
+
         resequenceTopLevelMenus();
         return List.of(academicsFeature, studentsFeature, staffFeature, attendanceFeature, admissionsFeature,
-                promotionFeature, communicationFeature);
+                promotionFeature, communicationFeature, financeFeature, financePayrollFeature, financeExpenseFeature,
+                financeReportsFeature);
     }
 
     private void purgeObsoleteOrganizationMenus() {
@@ -495,13 +576,11 @@ public class PlatformBootstrapSeed implements ApplicationRunner {
                 "FEE_ADJUSTMENTS",
                 "FEE_CONTROLS",
                 "FEE_AUDIT",
-                "FEES",
                 "FEES_OVERVIEW",
                 "FEES_SETUP",
                 "FEES_CONTRACTS",
                 "FEES_LEDGER",
                 "FEES_PAYMENTS",
-                "FEES_RECEIPTS",
                 "FEES_ADJUSTMENTS",
                 "FEES_REPORTS",
                 "ACADEMICS_TEACHER_ARRANGEMENT",

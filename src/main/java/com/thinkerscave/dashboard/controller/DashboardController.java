@@ -28,14 +28,14 @@ public class DashboardController {
     private final DashboardOrchestrationService dashboardOrchestrationService;
 
     @GetMapping("/summary")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF', 'TEACHER', 'PRINCIPAL', 'HR_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF')")
     @Operation(summary = "Aggregated KPI summary for the current organization")
     public ResponseEntity<ApiResponse<DashboardSummaryDTO>> summary() {
         return ResponseEntity.ok(ApiResponse.success("Dashboard summary", dashboardService.getSummary()));
     }
 
     @GetMapping("/search")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'PLATFORM_ADMIN', 'THINKERSCAVE_INTERNAL', 'INTERNAL_TEAM', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF', 'TEACHER', 'PRINCIPAL', 'HR_MANAGER', 'RECEPTIONIST', 'ACADEMIC_COORDINATOR', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF')")
     @Operation(summary = "Role-aware global search")
     public ResponseEntity<ApiResponse<DashboardSearchResponseDTO>> search(@RequestParam String query) {
         return ResponseEntity.ok(ApiResponse.success("Search results", dashboardSearchService.search(query)));

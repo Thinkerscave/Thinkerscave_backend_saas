@@ -29,7 +29,7 @@ public class AcademicCalendarController {
     private final AcademicCalendarService calendarService;
 
     @GetMapping("/years/{yearId}/calendar/events/dashboard")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','STUDENT','PARENT')")
     @Operation(summary = "Academic calendar dashboard for a year")
     public ResponseEntity<ApiResponse<AcademicCalendarDashboardResponse>> dashboard(
             @PathVariable Long yearId,
@@ -45,7 +45,7 @@ public class AcademicCalendarController {
     }
 
     @GetMapping("/years/{yearId}/calendar/events")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','STUDENT','PARENT')")
     @Operation(summary = "List calendar events for a year")
     public ResponseEntity<ApiResponse<List<AcademicCalendarEventResponse>>> list(
             @PathVariable Long yearId,
@@ -61,7 +61,7 @@ public class AcademicCalendarController {
     }
 
     @GetMapping("/calendar/events/{eventId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','STUDENT','PARENT')")
     @Operation(summary = "Get calendar event by ID")
     public ResponseEntity<ApiResponse<AcademicCalendarEventResponse>> getById(@PathVariable Long eventId) {
         return ResponseEntity.ok(ApiResponse.success("Calendar event found", calendarService.getById(eventId)));
@@ -117,7 +117,7 @@ public class AcademicCalendarController {
     }
 
     @GetMapping("/calendar/events/upcoming")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER','STUDENT','PARENT')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','STUDENT','PARENT')")
     @Operation(summary = "Upcoming calendar events")
     public ResponseEntity<ApiResponse<List<AcademicCalendarEventResponse>>> upcoming(
             @RequestParam(required = false) Long academicYearId,

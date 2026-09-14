@@ -157,7 +157,7 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
 
         if (pubVersion.isEmpty()) {
             return MyTimetableResponse.builder()
-                    .role("TEACHER")
+                    .role("STAFF")
                     .academicYearId(yearId)
                     .message("No published timetable available for this academic year")
                     .todaySchedule(Collections.emptyList())
@@ -166,12 +166,12 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
 
         TimetableVersion version = pubVersion.get();
         TimetableGridResponse grid = timetableService.getGrid(
-                version.getTimetableVersionId(), "TEACHER", null, staff.getStaffId(), null);
+                version.getTimetableVersionId(), "STAFF", null, staff.getStaffId(), null);
 
         List<TodayEntry> today = extractTodaySchedule(grid);
 
         return MyTimetableResponse.builder()
-                .role("TEACHER")
+                .role("STAFF")
                 .academicYearId(yearId)
                 .grid(grid)
                 .todaySchedule(today)

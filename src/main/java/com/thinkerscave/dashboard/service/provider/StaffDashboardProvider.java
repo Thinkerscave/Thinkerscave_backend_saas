@@ -140,7 +140,7 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
                 QuickActionsData.builder().items(List.of(
                         QuickActionItem.builder().label("Mark Student Attendance").icon("pi-calendar-plus").route("/app/attendance/students").tone("primary").build(),
                         QuickActionItem.builder().label("View Timetable").icon("pi-clock").route("/app/academics/timetable").tone("info").build(),
-                        QuickActionItem.builder().label("My Payslips").icon("pi-money-bill").route("/app/staff/payroll").tone("success").build(),
+                        QuickActionItem.builder().label("My Payslips").icon("pi-money-bill").route("/app/staff/my-payroll").tone("success").build(),
                         QuickActionItem.builder().label("Notices").icon("pi-megaphone").route("/app/communication/notices").tone("warning").build()
                 )).build());
     }

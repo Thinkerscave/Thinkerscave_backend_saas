@@ -25,6 +25,7 @@ public final class ErrorCodes {
     public static final String CONFLICT = "CONFLICT";
     public static final String ALREADY_EXISTS = "ALREADY_EXISTS";
     public static final String DUPLICATE_RECORD = "DUPLICATE_RECORD";
+    public static final String IDEMPOTENCY_CONFLICT = "IDEMPOTENCY_CONFLICT";
 
     public static final String BUSINESS_RULE_VIOLATION = "BUSINESS_RULE_VIOLATION";
 

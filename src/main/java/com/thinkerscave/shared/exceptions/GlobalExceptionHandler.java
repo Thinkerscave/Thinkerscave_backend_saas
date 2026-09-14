@@ -226,6 +226,20 @@ public class GlobalExceptionHandler {
                             .correlationId(correlationId)
                             .build());
         }
+
+        @ExceptionHandler(IdempotencyConflictException.class)
+        public ResponseEntity<ApiError> handleIdempotencyConflict(
+                IdempotencyConflictException ex,
+                HttpServletRequest request) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiError.builder()
+                            .status(409)
+                            .code(ErrorCodes.IDEMPOTENCY_CONFLICT)
+                            .message(ex.getMessage())
+                            .path(request.getRequestURI())
+                            .correlationId(MDC.get("correlationId"))
+                            .build());
+        }
         
         @ExceptionHandler(FileProcessingException.class)
         public ResponseEntity<ApiError> handleFileProcessing(

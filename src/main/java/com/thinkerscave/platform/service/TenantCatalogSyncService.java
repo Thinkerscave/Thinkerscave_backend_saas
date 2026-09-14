@@ -213,7 +213,9 @@ public class TenantCatalogSyncService {
         jdbcTemplate.execute(
                 "INSERT INTO " + schema + ".\"role_permissions\" "
                         + "(organization_id, role_id, menu_id, can_view, can_manage, can_approve, created_on, version) "
-                        + "SELECT " + organizationId + ", r.id, " + menu.getId() + ", true, true, true, now(), 0 "
+                        + "SELECT " + organizationId + ", r.id, " + menu.getId() + ", true, "
+                        + ("FINANCE_REPORTS".equals(menu.getMenuCode()) ? "false, false" : "true, true")
+                        + ", now(), 0 "
                         + "FROM " + schema + ".\"roles\" r "
                         + "WHERE r.role_code IN ('" + ROLE_ORG_OWNER_CODE + "', '" + ROLE_ORG_ADMIN_CODE + "') "
                         + "ON CONFLICT (organization_id, role_id, menu_id) DO NOTHING");
@@ -236,10 +238,28 @@ public class TenantCatalogSyncService {
                         + ") ";
         List<Long> entitledMenuIds = jdbcTemplate.query(entitledMenusCte + "SELECT id FROM entitled",
                 (rs, rowNum) -> rs.getLong("id"));
-        if (entitledMenuIds.isEmpty()) {
-            return;
-        }
-        String menuIdList = entitledMenuIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+        // Deterministic reconciliation: remove stale owner/admin page permissions and
+        // disable stale organization module rows before adding/updating active entitlements.
+        jdbcTemplate.execute(
+                "DELETE FROM " + schema + ".\"role_permissions\" rp " +
+                        "USING " + schema + ".\"roles\" r, " + schema + ".\"menus\" m " +
+                        "WHERE rp.role_id = r.id " +
+                        "AND rp.menu_id = m.id " +
+                        "AND rp.organization_id = " + organization.getId() + " " +
+                        "AND r.role_code IN ('" + ROLE_ORG_OWNER_CODE + "', '" + ROLE_ORG_ADMIN_CODE + "') " +
+                        "AND m.menu_type = 'PAGE'");
+                if (entitledMenuIds.isEmpty()) {
+                    jdbcTemplate.execute(
+                        "UPDATE " + schema + ".\"organization_modules\" " +
+                            "SET enabled = false " +
+                            "WHERE organization_id = " + organization.getId());
+                    return;
+                }
+                String menuIdList = entitledMenuIds.stream().map(String::valueOf).collect(Collectors.joining(","));
+                jdbcTemplate.execute(
+                    "UPDATE " + schema + ".\"organization_modules\" " +
+                        "SET enabled = CASE WHEN menu_id IN (" + menuIdList + ") THEN true ELSE false END " +
+                        "WHERE organization_id = " + organization.getId());
         jdbcTemplate.execute(
                 "INSERT INTO " + schema + ".\"organization_modules\" "
                         + "(organization_id, menu_id, enabled, created_on, version) "
@@ -249,7 +269,9 @@ public class TenantCatalogSyncService {
         jdbcTemplate.execute(
                 "INSERT INTO " + schema + ".\"role_permissions\" "
                         + "(organization_id, role_id, menu_id, can_view, can_manage, can_approve, created_on, version) "
-                        + "SELECT " + organization.getId() + ", r.id, m.id, true, true, true, now(), 0 "
+                        + "SELECT " + organization.getId() + ", r.id, m.id, true, "
+                        + "CASE WHEN m.menu_code='FINANCE_REPORTS' THEN false ELSE true END, "
+                        + "CASE WHEN m.menu_code='FINANCE_REPORTS' THEN false ELSE true END, now(), 0 "
                         + "FROM " + schema + ".\"roles\" r "
                         + "CROSS JOIN " + schema + ".\"menus\" m "
                         + "WHERE r.role_code IN ('" + ROLE_ORG_OWNER_CODE + "', '" + ROLE_ORG_ADMIN_CODE + "') "

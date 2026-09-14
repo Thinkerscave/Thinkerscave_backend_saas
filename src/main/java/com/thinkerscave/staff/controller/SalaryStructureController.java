@@ -1,64 +1,51 @@
 package com.thinkerscave.staff.controller;
 
 import com.thinkerscave.shared.dto.ApiResponse;
-import com.thinkerscave.staff.dto.request.SalaryStructureRequest;
-import com.thinkerscave.staff.dto.response.SalaryStructureResponse;
-import com.thinkerscave.staff.service.SalaryStructureService;
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
-
+/**
+ * @deprecated Staff salary structure APIs are retired. Use Finance Payroll employee salary / structures.
+ */
+@Deprecated
 @RestController
-@RequiredArgsConstructor
-@Tag(name = "Salary Structure", description = "APIs for managing staff salary structures")
+@Tag(name = "Salary Structure (Deprecated)", description = "Retired — use Finance Payroll APIs")
+@Hidden
 public class SalaryStructureController {
 
-    private final SalaryStructureService salaryStructureService;
+    private static final String GONE_MSG =
+            "Staff salary structure APIs are retired. Use Finance Payroll at /api/v1/payroll/structures and /api/v1/payroll/employees/{staffId}/salary.";
 
     @PostMapping("/api/v1/staff/salary-structures")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Create salary structure for a staff member")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> createSalaryStructure(
-            @Valid @RequestBody SalaryStructureRequest request) {
-        Long id = salaryStructureService.createSalaryStructure(request);
-        SalaryStructureResponse created = salaryStructureService.getCurrentSalaryStructure(request.getStaffId());
-        return ResponseEntity.status(201).body(
-                ApiResponse.created("Salary structure created",
-                        Map.of("salaryStructureId", id, "grossSalary", created.getGrossSalary())));
+    @Operation(summary = "Deprecated")
+    public ResponseEntity<ApiResponse<Void>> createSalaryStructure(@RequestBody(required = false) Object body) {
+        return gone();
     }
 
     @PutMapping("/api/v1/staff/salary-structures/{id}")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Update salary structure")
+    @Operation(summary = "Deprecated")
     public ResponseEntity<ApiResponse<Void>> updateSalaryStructure(
-            @PathVariable Long id,
-            @Valid @RequestBody SalaryStructureRequest request) {
-        salaryStructureService.updateSalaryStructure(id, request);
-        return ResponseEntity.ok(ApiResponse.noContent("Salary structure updated successfully"));
+            @PathVariable Long id, @RequestBody(required = false) Object body) {
+        return gone();
     }
 
     @GetMapping("/api/v1/staff/{staffId}/salary-structure")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Get current active salary structure for a staff member")
-    public ResponseEntity<ApiResponse<SalaryStructureResponse>> getCurrentSalaryStructure(
-            @PathVariable Long staffId) {
-        return ResponseEntity.ok(ApiResponse.success("Salary structure retrieved",
-                salaryStructureService.getCurrentSalaryStructure(staffId)));
+    @Operation(summary = "Deprecated")
+    public ResponseEntity<ApiResponse<Void>> getCurrentSalaryStructure(@PathVariable Long staffId) {
+        return gone();
     }
 
     @GetMapping("/api/v1/staff/{staffId}/salary-history")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Get salary history for a staff member")
-    public ResponseEntity<ApiResponse<List<SalaryStructureResponse>>> getSalaryHistory(
-            @PathVariable Long staffId) {
-        return ResponseEntity.ok(ApiResponse.success("Salary history retrieved",
-                salaryStructureService.getSalaryHistory(staffId)));
+    @Operation(summary = "Deprecated")
+    public ResponseEntity<ApiResponse<Void>> getSalaryHistory(@PathVariable Long staffId) {
+        return gone();
+    }
+
+    private static ResponseEntity<ApiResponse<Void>> gone() {
+        return ResponseEntity.status(HttpStatus.GONE).body(ApiResponse.error(GONE_MSG));
     }
 }
