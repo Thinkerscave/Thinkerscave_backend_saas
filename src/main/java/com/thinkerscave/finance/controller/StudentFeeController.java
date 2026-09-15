@@ -1,6 +1,7 @@
 package com.thinkerscave.finance.controller;
 
 import com.thinkerscave.finance.dto.response.*;
+import com.thinkerscave.finance.security.FinanceAccessGuard;
 import com.thinkerscave.finance.service.StudentFeeService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import com.thinkerscave.shared.dto.PageResponse;
@@ -19,6 +20,7 @@ import java.util.List;
 public class StudentFeeController {
 
     private final StudentFeeService studentFeeService;
+    private final FinanceAccessGuard accessGuard;
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<StudentFeeListItemResponse>>> list(
@@ -29,6 +31,7 @@ public class StudentFeeController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
         return ResponseEntity.ok(ApiResponse.success("Students",
                 studentFeeService.list(q, academicYearId, classId, sectionId, PageRequestUtil.of(page, size, sort))));
     }
@@ -37,17 +40,20 @@ public class StudentFeeController {
     public ResponseEntity<ApiResponse<List<StudentFeeListItemResponse>>> search(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
         return ResponseEntity.ok(ApiResponse.success("Search", studentFeeService.search(q, academicYearId)));
     }
 
     @GetMapping("/linked")
     public ResponseEntity<ApiResponse<List<LinkedStudentResponse>>> linked() {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
         return ResponseEntity.ok(ApiResponse.success("Linked students", studentFeeService.linked()));
     }
 
     @GetMapping("/{studentId}")
     public ResponseEntity<ApiResponse<StudentFeeDetailResponse>> detail(
             @PathVariable Long studentId, @RequestParam(required = false) Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
         return ResponseEntity.ok(ApiResponse.success("Student fee detail",
                 studentFeeService.detail(studentId, academicYearId)));
     }
@@ -55,29 +61,34 @@ public class StudentFeeController {
     @GetMapping("/{studentId}/periods")
     public ResponseEntity<ApiResponse<List<BillingPeriodResponse>>> periods(
             @PathVariable Long studentId, @RequestParam(required = false) Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
         return ResponseEntity.ok(ApiResponse.success("Periods", studentFeeService.periods(studentId, academicYearId)));
     }
 
     @GetMapping("/{studentId}/payments")
     public ResponseEntity<ApiResponse<List<FeePaymentResponse>>> payments(
             @PathVariable Long studentId, @RequestParam(required = false) Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
         return ResponseEntity.ok(ApiResponse.success("Payments", studentFeeService.payments(studentId, academicYearId)));
     }
 
     @GetMapping("/{studentId}/receipts")
     public ResponseEntity<ApiResponse<List<FeeReceiptResponse>>> receipts(
             @PathVariable Long studentId, @RequestParam(required = false) Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
         return ResponseEntity.ok(ApiResponse.success("Receipts", studentFeeService.receipts(studentId, academicYearId)));
     }
 
     @GetMapping("/{studentId}/academic-years")
     public ResponseEntity<ApiResponse<List<AcademicYearOptionResponse>>> years(@PathVariable Long studentId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
         return ResponseEntity.ok(ApiResponse.success("Academic years", studentFeeService.academicYears(studentId)));
     }
 
     @GetMapping("/{studentId}/outstanding")
     public ResponseEntity<ApiResponse<StudentFeeKpiResponse>> outstanding(
             @PathVariable Long studentId, @RequestParam(required = false) Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
         return ResponseEntity.ok(ApiResponse.success("Outstanding",
                 studentFeeService.outstanding(studentId, academicYearId)));
     }

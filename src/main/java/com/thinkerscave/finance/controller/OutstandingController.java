@@ -3,6 +3,7 @@ package com.thinkerscave.finance.controller;
 import com.thinkerscave.finance.dto.response.OutstandingItemResponse;
 import com.thinkerscave.finance.dto.response.OutstandingSummaryResponse;
 import com.thinkerscave.finance.enums.BillingPeriodStatus;
+import com.thinkerscave.finance.security.FinanceAccessGuard;
 import com.thinkerscave.finance.service.FeeOutstandingService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import com.thinkerscave.shared.dto.PageResponse;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class OutstandingController {
 
     private final FeeOutstandingService feeOutstandingService;
+    private final FinanceAccessGuard accessGuard;
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<OutstandingItemResponse>>> list(
@@ -29,6 +31,7 @@ public class OutstandingController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
+            accessGuard.requireView(FinanceAccessGuard.RESOURCE_OUTSTANDING);
         return ResponseEntity.ok(ApiResponse.success("Outstanding",
                 feeOutstandingService.list(academicYearId, classId, sectionId, status,
                         PageRequestUtil.of(page, size, sort))));
@@ -36,6 +39,7 @@ public class OutstandingController {
 
     @GetMapping("/summary")
     public ResponseEntity<ApiResponse<OutstandingSummaryResponse>> summary(@RequestParam Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_OUTSTANDING);
         return ResponseEntity.ok(ApiResponse.success("Outstanding summary",
                 feeOutstandingService.summary(academicYearId)));
     }

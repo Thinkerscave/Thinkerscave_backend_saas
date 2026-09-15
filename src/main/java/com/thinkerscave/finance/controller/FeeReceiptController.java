@@ -1,6 +1,7 @@
 package com.thinkerscave.finance.controller;
 
 import com.thinkerscave.finance.dto.response.FeeReceiptResponse;
+import com.thinkerscave.finance.security.FinanceAccessGuard;
 import com.thinkerscave.finance.service.FeeReceiptService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import com.thinkerscave.shared.dto.PageResponse;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class FeeReceiptController {
 
     private final FeeReceiptService feeReceiptService;
+    private final FinanceAccessGuard accessGuard;
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<FeeReceiptResponse>>> list(
@@ -27,22 +29,26 @@ public class FeeReceiptController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_RECEIPTS);
         return ResponseEntity.ok(ApiResponse.success("Receipts",
                 feeReceiptService.list(q, academicYearId, PageRequestUtil.of(page, size, sort))));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<FeeReceiptResponse>> get(@PathVariable Long id) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_RECEIPTS);
         return ResponseEntity.ok(ApiResponse.success("Receipt", feeReceiptService.get(id)));
     }
 
     @GetMapping("/{id}/preview")
     public ResponseEntity<ApiResponse<FeeReceiptResponse>> preview(@PathVariable Long id) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_RECEIPTS);
         return ResponseEntity.ok(ApiResponse.success("Receipt preview", feeReceiptService.preview(id)));
     }
 
     @GetMapping("/{id}/download")
     public ResponseEntity<byte[]> download(@PathVariable Long id) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_RECEIPTS);
         byte[] bytes = feeReceiptService.pdf(id);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=receipt-" + id + ".pdf")

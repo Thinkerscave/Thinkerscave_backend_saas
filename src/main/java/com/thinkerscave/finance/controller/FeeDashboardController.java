@@ -4,6 +4,7 @@ import com.thinkerscave.finance.dto.response.DashboardKpiResponse;
 import com.thinkerscave.finance.dto.response.FeePaymentResponse;
 import com.thinkerscave.finance.dto.response.FeeReceiptResponse;
 import com.thinkerscave.finance.dto.response.OutstandingItemResponse;
+import com.thinkerscave.finance.security.FinanceAccessGuard;
 import com.thinkerscave.finance.service.FeeDashboardService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import com.thinkerscave.shared.dto.PageResponse;
@@ -23,24 +24,29 @@ import java.util.Map;
 public class FeeDashboardController {
 
     private final FeeDashboardService feeDashboardService;
+    private final FinanceAccessGuard accessGuard;
 
     @GetMapping("/kpis")
     public ResponseEntity<ApiResponse<DashboardKpiResponse>> kpis(@RequestParam Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_MANAGEMENT);
         return ResponseEntity.ok(ApiResponse.success("KPIs", feeDashboardService.kpis(academicYearId)));
     }
 
     @GetMapping("/collection-trend")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> collectionTrend(@RequestParam Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_MANAGEMENT);
         return ResponseEntity.ok(ApiResponse.success("Collection trend", feeDashboardService.collectionTrend(academicYearId)));
     }
 
     @GetMapping("/payment-status")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> paymentStatus(@RequestParam Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_MANAGEMENT);
         return ResponseEntity.ok(ApiResponse.success("Payment status", feeDashboardService.paymentStatus(academicYearId)));
     }
 
     @GetMapping("/upcoming-dues")
     public ResponseEntity<ApiResponse<List<OutstandingItemResponse>>> upcomingDues(@RequestParam Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_MANAGEMENT);
         return ResponseEntity.ok(ApiResponse.success("Upcoming dues", feeDashboardService.upcomingDues(academicYearId)));
     }
 
@@ -49,6 +55,7 @@ public class FeeDashboardController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_MANAGEMENT);
         return ResponseEntity.ok(ApiResponse.success("Recent collections",
                 feeDashboardService.recentCollections(PageRequestUtil.of(page, size, sort))));
     }
@@ -59,6 +66,7 @@ public class FeeDashboardController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_MANAGEMENT);
         return ResponseEntity.ok(ApiResponse.success("Overdue students",
                 feeDashboardService.overdueStudents(academicYearId, PageRequestUtil.of(page, size, sort))));
     }
@@ -69,6 +77,7 @@ public class FeeDashboardController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_MANAGEMENT);
         return ResponseEntity.ok(ApiResponse.success("Upcoming period dues",
                 feeDashboardService.upcomingPeriodDues(academicYearId, PageRequestUtil.of(page, size, sort))));
     }
@@ -78,6 +87,7 @@ public class FeeDashboardController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_MANAGEMENT);
         return ResponseEntity.ok(ApiResponse.success("Recent receipts",
                 feeDashboardService.recentReceipts(PageRequestUtil.of(page, size, sort))));
     }
