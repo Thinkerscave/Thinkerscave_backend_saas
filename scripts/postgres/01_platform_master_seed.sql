@@ -1,9 +1,14 @@
 -- =============================================================================
--- ThinkersCave SaaS — PostgreSQL PLATFORM MASTER SEED
+-- ThinkersCave SaaS — PostgreSQL PLATFORM MASTER SEED (REFERENCE ONLY)
 -- =============================================================================
--- Purpose : Fresh production bootstrap so Super Admin can log in and see menus.
+-- IMPORTANT: This file is NEVER loaded by the Spring Boot application.
+--            Operators run it manually when preparing a database.
+--
+-- Purpose : Platform master data so Super Admin can log in and see menus.
 -- Assumes : All application tables already exist (empty or nearly empty).
--- Scope   : Master / platform data ONLY (no students, subjects, attendance, etc.)
+-- Scope   : Master / platform data ONLY (roles, privileges, Super Admin,
+--           menus/features baseline, code sequences, catalog seeds).
+--           No students, subjects, attendance, demo schools, etc.
 --
 -- Login (Thinkers Department / PLATFORM login — not institution login):
 --   Username : superadmin
@@ -156,7 +161,7 @@ UPDATE menus SET active = FALSE, show_in_sidebar = FALSE
 -- =============================================================================
 -- 5) SUPER ADMIN USER + ROLE MAPPING
 -- Creates superadmin only when id=1 is missing. Never overwrites an existing password.
--- Bootstrap password for a brand-new row only; align with PlatformBootstrapSeed (admin@123).
+-- Bootstrap password for a brand-new row only (admin@123).
 -- =============================================================================
 
 INSERT INTO users (

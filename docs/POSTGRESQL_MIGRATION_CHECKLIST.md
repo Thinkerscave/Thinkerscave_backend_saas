@@ -19,7 +19,7 @@
 
 ### A. Schema & SQL dialect
 - [ ] Audit all native SQL / `@Query` for MySQL-only functions (`IFNULL`, `GROUP_CONCAT`, backticks)
-- [ ] Convert Flyway scripts under `db/migration` to PostgreSQL-compatible DDL (or dual dialect folders)
+- [ ] Keep historical schema scripts under `scripts/postgres/archive/migration` as DBA reference (not app classpath)
 - [ ] Replace MySQL `AUTO_INCREMENT` assumptions with PostgreSQL sequences / `IDENTITY`
 - [ ] Review `BOOLEAN`, `TEXT`, `JSON`, `DATETIME` type mappings
 - [ ] Validate indexes/FK/unique constraints on PostgreSQL

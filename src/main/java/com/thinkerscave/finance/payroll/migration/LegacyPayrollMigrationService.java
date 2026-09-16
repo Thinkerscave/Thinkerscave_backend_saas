@@ -7,19 +7,13 @@ import com.thinkerscave.finance.payroll.repository.PayrollRunRepository;
 import com.thinkerscave.finance.payroll.security.PayrollAccessGuard;
 import com.thinkerscave.staff.repository.PayrollRepository;
 import com.thinkerscave.staff.repository.StaffSalaryStructureRepository;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StreamUtils;
-
-import java.nio.charset.StandardCharsets;
 
 /**
- * Inventory + callable migrator for legacy Staff payroll tables.
- * SQL migration V1_41 applies the same transforms at schema patch time.
+ * Inventory for legacy Staff payroll tables.
+ * Schema/data migration is operator-owned (see scripts/postgres/archive/migration/).
  */
 @Service
 @RequiredArgsConstructor
@@ -31,9 +25,6 @@ public class LegacyPayrollMigrationService {
     private final EmployeePayrollRepository employeePayrollRepository;
     private final PayrollRunRepository payrollRunRepository;
     private final PayrollAccessGuard accessGuard;
-
-    @PersistenceContext
-    private EntityManager entityManager;
 
     @Transactional(readOnly = true)
     public LegacyMigrationInventoryResponse inventory() {
@@ -48,19 +39,16 @@ public class LegacyPayrollMigrationService {
     }
 
     /**
-     * Re-applies V1_41 SQL against the current tenant connection (idempotent inserts).
+     * Disabled: the application must not apply SQL migrations at runtime.
+     * Run {@code scripts/postgres/archive/migration/V1_41__migrate_legacy_staff_payroll.sql}
+     * manually against the target schema when needed.
      */
-    @Transactional
+    @Transactional(readOnly = true)
     public LegacyMigrationInventoryResponse migrate() {
         accessGuard.requireManage(PayrollAccessGuard.RESOURCE_SETTINGS);
-        try {
-            String sql = StreamUtils.copyToString(
-                    new ClassPathResource("db/migration/V1_41__migrate_legacy_staff_payroll.sql").getInputStream(),
-                    StandardCharsets.UTF_8);
-            entityManager.createNativeQuery(sql).executeUpdate();
-        } catch (Exception ex) {
-            throw new IllegalStateException("Legacy payroll migration failed: " + ex.getMessage(), ex);
-        }
-        return inventory();
+        throw new IllegalStateException(
+                "Legacy payroll SQL is no longer applied by the application. "
+                        + "Run scripts/postgres/archive/migration/V1_41__migrate_legacy_staff_payroll.sql "
+                        + "manually (psql / DBA), then refresh inventory.");
     }
 }
