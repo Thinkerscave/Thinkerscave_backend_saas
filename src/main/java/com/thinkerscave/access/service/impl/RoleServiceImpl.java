@@ -241,6 +241,7 @@ public class RoleServiceImpl implements RoleService {
                 }).toList();
 
         rolePermissionRepository.saveAll(newPerms);
+        tenantCatalogSyncService.syncRolePermissions(roleId, organizationId);
         log.info("Permission matrix updated for role={} org={} rows={}", roleId, organizationId, newPerms.size());
     }
 
@@ -250,6 +251,7 @@ public class RoleServiceImpl implements RoleService {
         findRoleById(roleId);
         findOrganization(organizationId);
         rolePermissionRepository.deleteByRoleAndOrganizationAndMenu(roleId, organizationId, menuId);
+        tenantCatalogSyncService.syncRolePermissions(roleId, organizationId);
         log.info("Role permission removed for role={} org={} menu={}", roleId, organizationId, menuId);
     }
 

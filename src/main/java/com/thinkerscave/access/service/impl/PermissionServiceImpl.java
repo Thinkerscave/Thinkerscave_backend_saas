@@ -7,6 +7,7 @@ import com.thinkerscave.access.enums.MenuScope;
 import com.thinkerscave.access.enums.RoleType;
 import com.thinkerscave.access.repository.*;
 import com.thinkerscave.access.service.PermissionService;
+import com.thinkerscave.platform.entity.Organization;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.staff.entity.ResponsibilityAssignment;
 import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
@@ -66,7 +67,7 @@ public class PermissionServiceImpl implements PermissionService {
 
         // 3. User-level overrides are authoritative and applied last, but still
         // constrained by organization feature entitlement.
-        List<UserPermission> overrides = userPermissionRepository.findActiveWithMenu(userId);
+        List<UserPermission> overrides = userPermissionRepository.findActiveWithMenu(userId, organizationId);
         for (UserPermission up : overrides) {
             Long menuId = up.getMenu().getId();
             if (!entitledMenuIds.contains(menuId)) {
@@ -103,6 +104,9 @@ public class PermissionServiceImpl implements PermissionService {
             List<ResponsibilityAssignment> assignments = responsibilityAssignmentRepository
                     .findByStaff_StaffIdAndActiveTrueOrderByEffectiveFromDesc(staff.getStaffId());
             for (ResponsibilityAssignment assignment : assignments) {
+                if (assignment.getEffectiveFrom() != null && assignment.getEffectiveFrom().isAfter(today)) {
+                    continue;
+                }
                 if (assignment.getEffectiveTo() != null && assignment.getEffectiveTo().isBefore(today)) {
                     continue;
                 }
@@ -228,10 +232,12 @@ public class PermissionServiceImpl implements PermissionService {
     @Override
     @Transactional
     public void updateUserPermissions(Long userId, Long organizationId, UpdateUserPermissionsRequest request) {
-        userPermissionRepository.deleteAllByUser(userId);
+        userPermissionRepository.deleteAllByUserAndOrganization(userId, organizationId);
 
         User userRef = new User();
         userRef.setId(userId);
+        Organization organizationRef = new Organization();
+        organizationRef.setId(organizationId);
 
         List<UserPermission> overrides = request.getOverrides().stream()
                 .map(ov -> {
@@ -242,6 +248,7 @@ public class PermissionServiceImpl implements PermissionService {
                     return UserPermission.builder()
                             .user(u)
                             .menu(menu)
+                            .organization(organizationRef)
                             .canView(Boolean.TRUE.equals(ov.getCanView()))
                             .canManage(Boolean.TRUE.equals(ov.getCanManage()))
                             .canApprove(Boolean.TRUE.equals(ov.getCanApprove()))
@@ -283,6 +290,8 @@ public class PermissionServiceImpl implements PermissionService {
 
     private EffectivePermissionResponse buildEffective(Menu menu, Boolean view, Boolean manage, Boolean approve, boolean isOverride) {
         Menu parent = menu.getParentMenu();
+        boolean canManage = Boolean.TRUE.equals(manage);
+        boolean canApprove = Boolean.TRUE.equals(approve);
         return EffectivePermissionResponse.builder()
                 .menuId(menu.getId())
                 .menuCode(menu.getMenuCode())
@@ -290,9 +299,9 @@ public class PermissionServiceImpl implements PermissionService {
                 .menuType(menu.getMenuType() != null ? menu.getMenuType().name() : null)
                 .parentMenuId(parent != null ? parent.getId() : null)
                 .parentMenuName(parent != null ? parent.getMenuName() : null)
-                .canView(Boolean.TRUE.equals(view))
-                .canManage(Boolean.TRUE.equals(manage))
-                .canApprove(Boolean.TRUE.equals(approve))
+                .canView(Boolean.TRUE.equals(view) || canManage || canApprove)
+                .canManage(canManage)
+                .canApprove(canApprove)
                 .isOverride(isOverride)
                 .build();
     }

@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -32,4 +33,5 @@ public class ProvisioningJobResponse {
     private String remarks;
     private LocalDateTime createdOn;
     private String createdBy;
+    private List<ProvisioningStepResponse> steps;
 }

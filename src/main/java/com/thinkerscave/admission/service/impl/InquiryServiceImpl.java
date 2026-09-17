@@ -114,6 +114,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public InquiryResponse create(InquiryRequest request) {
+        requireManageLeads();
         validateLeadRequest(request);
         String mobile = request.getMobileNumber().trim();
         if (inquiryRepository.existsByMobileNumberAndDeletedFalse(mobile)
@@ -143,6 +144,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public InquiryResponse update(Long inquiryId, InquiryRequest request) {
+        requireManageLeads();
         Inquiry inquiry = getInquiry(inquiryId);
         validateLeadRequest(request);
         AcademicClass academicClass = requireActiveClass(request.getClassId(), request.getAcademicYearId());
@@ -159,6 +161,7 @@ public class InquiryServiceImpl implements InquiryService {
 
     @Override
     public InquiryResponse getById(Long inquiryId) {
+        requireViewLeads();
         return toResponse(getInquiry(inquiryId));
     }
 
@@ -179,6 +182,7 @@ public class InquiryServiceImpl implements InquiryService {
 
     @Override
     public List<InquiryResponse> getByStatus(InquiryStatus status) {
+        requireViewLeads();
         return inquiryRepository
                 .findByStatusAndDeletedFalseOrderByCreatedOnDesc(status)
                 .stream().map(this::toResponse).collect(Collectors.toList());
@@ -186,6 +190,7 @@ public class InquiryServiceImpl implements InquiryService {
 
     @Override
     public List<InquiryResponse> getPendingFollowUps() {
+        requireViewLeads();
         return inquiryRepository
                 .findByDeletedFalseAndNextFollowUpDateLessThanEqualOrderByNextFollowUpDateAsc(LocalDate.now())
                 .stream().map(this::toResponse).collect(Collectors.toList());
@@ -286,6 +291,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public ApplicationAdmissionResponse convertToApplication(Long inquiryId) {
+        requireManageLeads();
         Inquiry inquiry = getInquiry(inquiryId);
 
         if (applicationRepository.existsByInquiryId(inquiryId)) {
@@ -324,6 +330,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Override
     @Transactional
     public FollowUpResponse addFollowUp(Long inquiryId, FollowUpRequest request) {
+        requireManageLeads();
         Inquiry inquiry = getInquiry(inquiryId);
         if (inquiry.getStatus() == InquiryStatus.LOST) {
             throw new BadRequestException("Cannot schedule a follow-up on a lost lead");
@@ -356,6 +363,7 @@ public class InquiryServiceImpl implements InquiryService {
 
     @Override
     public List<FollowUpResponse> getFollowUps(Long inquiryId) {
+        requireViewLeads();
         return followUpRepository
                 .findByInquiryInquiryIdOrderByFollowUpDateDesc(inquiryId)
                 .stream().map(this::toFollowUpResponse).collect(Collectors.toList());
@@ -1546,9 +1554,7 @@ public class InquiryServiceImpl implements InquiryService {
         }
         return auth.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch(a -> "SUPER_ADMIN".equals(a)
-                        || "ORGANIZATION_OWNER".equals(a)
-                        || "ORGANIZATION_ADMIN".equals(a));
+                .anyMatch("SUPER_ADMIN"::equals);
     }
 
     private StaffSummaryResponse toStaffSummary(Staff staff) {

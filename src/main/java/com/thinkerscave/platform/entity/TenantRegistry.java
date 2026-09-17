@@ -63,6 +63,15 @@ public class TenantRegistry extends Auditable {
     @Column(name = "migration_version", length = 50)
     private String migrationVersion;
 
+    @Column(name = "observed_database_version", length = 50)
+    private String observedDatabaseVersion;
+
+    @Column(name = "catalog_version")
+    private Long catalogVersion;
+
+    @Column(name = "application_version", length = 50)
+    private String applicationVersion;
+
     /**
      * Provisioning Template Version.
      */
@@ -143,6 +152,21 @@ public class TenantRegistry extends Auditable {
     @Builder.Default
     @Column(name = "maintenance_mode")
     private Boolean maintenanceMode = false;
+
+    @Column(name = "maintenance_reason", length = 500)
+    private String maintenanceReason;
+
+    @Column(name = "maintenance_operation", length = 80)
+    private String maintenanceOperation;
+
+    @Column(name = "maintenance_started_at")
+    private LocalDateTime maintenanceStartedAt;
+
+    @Column(name = "health_status", length = 20)
+    private String healthStatus;
+
+    @Column(name = "health_message", length = 1000)
+    private String healthMessage;
 
     /**
      * Whether Tenant is Active.

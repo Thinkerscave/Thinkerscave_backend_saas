@@ -373,6 +373,7 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
 
     @Override
     public ApplicationProgressResponse getProgress(Long applicationId) {
+        requireViewApplications();
         ApplicationAdmission app = getApplication(applicationId);
         int totalSteps = 7;
         int completed = 0;
@@ -412,6 +413,7 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     @Override
     @Transactional
     public ApplicationAdmissionResponse archive(Long applicationId) {
+        requireManageApplications();
         ApplicationAdmission app = getApplication(applicationId);
         if (app.getStatus() != ApplicationStatus.DRAFT && app.getStatus() != ApplicationStatus.SUBMITTED) {
             throw new BadRequestException("Only DRAFT or SUBMITTED applications can be archived");
@@ -426,6 +428,7 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     @Override
     @Transactional
     public ApplicationAdmissionResponse unarchive(Long applicationId) {
+        requireManageApplications();
         ApplicationAdmission app = getApplication(applicationId);
         if (!app.isArchived()) {
             throw new BadRequestException("Application is not archived");
@@ -437,6 +440,7 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     @Override
     @Transactional
     public ApplicationAdmissionResponse recordFee(Long applicationId, RecordFeeRequest request) {
+        requireManageApplications();
         ApplicationAdmission app = getApplication(applicationId);
         if (app.getStatus() == ApplicationStatus.REJECTED || app.getStatus() == ApplicationStatus.CANCELLED) {
             throw new BadRequestException("Cannot record a fee on a closed application");
@@ -565,6 +569,7 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
 
     @Override
     public List<ApplicationDocumentResponse> listDocuments(Long applicationId) {
+        requireViewApplications();
         getApplication(applicationId);
         return documentRepository.findByApplicationApplicationIdOrderByCreatedOnDesc(applicationId)
                 .stream()
@@ -1030,9 +1035,7 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         }
         return auth.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
-                .anyMatch(a -> "SUPER_ADMIN".equals(a)
-                        || "ORGANIZATION_OWNER".equals(a)
-                        || "ORGANIZATION_ADMIN".equals(a));
+                .anyMatch("SUPER_ADMIN"::equals);
     }
 
     private void requireViewApplications() {

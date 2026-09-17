@@ -80,7 +80,9 @@ public class FeatureServiceImpl implements FeatureService {
         if (request.getParentFeatureId() != null) {
             feature.setParentFeature(findById(request.getParentFeatureId()));
         }
-        return toResponse(featureRepository.save(feature));
+        Feature saved = featureRepository.save(feature);
+        tenantCatalogSyncService.syncFeature(saved);
+        return toResponse(saved);
     }
 
     @Override
@@ -114,7 +116,9 @@ public class FeatureServiceImpl implements FeatureService {
         } else {
             feature.setParentFeature(null);
         }
-        return toResponse(featureRepository.save(feature));
+        Feature saved = featureRepository.save(feature);
+        tenantCatalogSyncService.syncFeature(saved);
+        return toResponse(saved);
     }
 
     @Override
@@ -122,7 +126,7 @@ public class FeatureServiceImpl implements FeatureService {
     public void deleteFeature(Long id) {
         Feature feature = findById(id);
         feature.setActive(false);
-        featureRepository.save(feature);
+        tenantCatalogSyncService.syncFeature(featureRepository.save(feature));
         log.info("Feature archived: {}", feature.getFeatureCode());
     }
 

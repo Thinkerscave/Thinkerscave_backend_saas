@@ -1,6 +1,7 @@
 package com.thinkerscave.access.entity;
 
 import com.thinkerscave.shared.entity.Auditable;
+import com.thinkerscave.platform.entity.Organization;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -18,7 +19,8 @@ import lombok.*;
                         name = "uk_user_permission",
                         columnNames = {
                                 "user_id",
-                                "menu_id"
+                                "menu_id",
+                                "organization_id"
                         }
                 )
         },
@@ -47,6 +49,10 @@ public class UserPermission extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "menu_id", nullable = false)
     private Menu menu;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "organization_id")
+    private Organization organization;
 
     /**
      * Override Permissions
