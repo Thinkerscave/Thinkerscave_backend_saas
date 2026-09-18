@@ -12,4 +12,6 @@ public class StaffCreateResponse {
     private Long staffId;
     private String staffCode;
     private Long userId;
+    private String username;
+    private String temporaryPassword;
 }

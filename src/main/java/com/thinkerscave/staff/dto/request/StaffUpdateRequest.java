@@ -44,6 +44,11 @@ public class StaffUpdateRequest {
     @Size(max = 15)
     private String mobileNumber;
 
+    @NotBlank(message = "Email is required")
+@Email
+@Size(max = 150)
+private String email;
+
     @NotNull(message = "Staff type is required")
     private StaffType staffType;
 

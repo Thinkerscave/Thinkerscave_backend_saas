@@ -31,6 +31,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.thinkerscave.access.dto.UserProvisioningResult;
+import com.thinkerscave.security.service.OutboundMessageService;
+import org.springframework.beans.factory.annotation.Value;
+
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -43,6 +47,10 @@ public class StaffServiceImpl implements StaffService {
     private final StaffRepository staffRepository;
     private final UserService userService;
     private final RoleRepository roleRepository;
+    private final OutboundMessageService outboundMessageService;
+
+@Value("${app.platform.login-url:http://localhost:4200/auth/login}")
+private String platformLoginUrl;
     private final DocumentRepository documentRepository;
     private final StaffSalaryStructureRepository salaryStructureRepository;
     private final ResponsibilityAssignmentRepository assignmentRepository;
@@ -67,7 +75,11 @@ public class StaffServiceImpl implements StaffService {
                 request.getEmail(), request.getMobileNumber(),
                 null, null, null, null
         );
-        User user = userService.createUser(context, staffRole);
+       UserProvisioningResult provisioning =
+        userService.createUserWithTemporaryPassword(context, staffRole);
+
+User user = provisioning.getUser();
+String temporaryPassword = provisioning.getTemporaryPassword();
 
         Staff staff = new Staff();
         staff.setUser(user);
@@ -76,12 +88,23 @@ public class StaffServiceImpl implements StaffService {
         staff.setActive(true);
 
         Staff saved = staffRepository.save(staff);
+
+        outboundMessageService.sendStaffWelcome(
+        user.getEmail(),
+        user.getMobileNumber(),
+        user.getFirstName(),
+        platformLoginUrl,
+        user.getUsername(),
+        temporaryPassword
+);
         log.info("Staff created with ID: {}, code: {}", saved.getStaffId(), saved.getStaffCode());
 
         return StaffCreateResponse.builder()
                 .staffId(saved.getStaffId())
                 .staffCode(saved.getStaffCode())
                 .userId(user.getId())
+                .username(user.getUsername())
+                .temporaryPassword(temporaryPassword)
                 .build();
     }
 
@@ -199,6 +222,7 @@ public class StaffServiceImpl implements StaffService {
         staff.setReligion(req.getReligion());
         staff.setNationality(req.getNationality());
         staff.setMobileNumber(req.getMobileNumber());
+        staff.setEmail(req.getEmail());
         staff.setStaffType(req.getStaffType());
         staff.setDesignation(req.getDesignation());
         staff.setEmploymentCategory(req.getEmploymentCategory());
