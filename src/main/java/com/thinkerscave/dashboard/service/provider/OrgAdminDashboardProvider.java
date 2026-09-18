@@ -31,9 +31,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+
 
 /**
  * Day-to-day operational dashboard for an Organization Admin — tasks,
@@ -43,6 +45,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider implements DashboardWidgetProvider {
 
+private static final DateTimeFormatter DASHBOARD_DATE_FORMAT =
+        DateTimeFormatter.ofPattern("dd-MM-yyyy");
     private final StudentRepository studentRepository;
     private final StaffRepository staffRepository;
     private final StudentAttendanceRepository studentAttendanceRepository;
@@ -77,7 +81,7 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
                     .organizationName(resolveOrganizationName())
                     .greeting(RoleLabels.greeting())
                     .avatarUrl(user != null ? user.getProfileImageUrl() : null)
-                    .todayLabel(LocalDate.now().toString());
+                    .todayLabel(LocalDate.now().format(DASHBOARD_DATE_FORMAT));
             applySetupGuide(builder);
             return builder.build();
         });
@@ -152,7 +156,7 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
             Long orgId = OrganizationContext.getOrganizationId();
             LocalDate today = LocalDate.now();
             var summary = studentAttendanceRepository.getDailyAttendanceSummary(orgId, today.minusDays(6), today);
-            List<String> dayLabels = summary.stream().map(r -> ((LocalDate) r[0]).toString()).collect(Collectors.toList());
+            List<String> dayLabels = summary.stream().map(r -> ((LocalDate) r[0]).format(DASHBOARD_DATE_FORMAT)).collect(Collectors.toList());
             List<Double> present = summary.stream().map(r -> ((Number) r[2]).doubleValue()).collect(Collectors.toList());
             return ChartData.builder().chartType("bar").labels(dayLabels)
                     .series(List.of(ChartSeries.builder().name("Present").data(present).build()))
@@ -192,7 +196,9 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
                             .secondaryLabel(a.getApplyingForClass())
                             .statusLabel(a.getStatus() != null ? a.getStatus().name() : "-")
                             .statusTone(a.getStatus() == ApplicationStatus.APPROVED ? "success" : "info")
-                            .timestampLabel(a.getCreatedOn() != null ? a.getCreatedOn().toLocalDate().toString() : "-")
+                           .timestampLabel(a.getCreatedOn() != null
+        ? a.getCreatedOn().toLocalDate().format(DASHBOARD_DATE_FORMAT)
+        : "-")
                             .build()).collect(Collectors.toList()))
                     .build();
         });

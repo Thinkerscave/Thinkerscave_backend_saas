@@ -90,6 +90,43 @@ public class OutboundMessageService {
         boolean smsOk = trySms(mobile, sms);
         log.info("Org admin welcome dispatched emailOk={} smsOk={} email={}", mailOk, smsOk, email);
     }
+public void sendStaffWelcome(
+        String email,
+        String mobile,
+        String staffName,
+        String loginUrl,
+        String username,
+        String temporaryPassword) {
+
+    String subject = "Welcome to ThinkersCave";
+
+    String html = emailService.buildStaffWelcomeEmailBody(
+            staffName,
+            loginUrl,
+            username,
+            temporaryPassword
+    );
+
+    boolean mailOk = emailService.sendHtmlEmailSync(
+            email,
+            subject,
+            html
+    );
+
+    String sms = "Welcome to ThinkersCave. "
+            + "Username: " + safe(username)
+            + " Temp password: " + safe(temporaryPassword)
+            + " Login: " + safe(loginUrl);
+
+    boolean smsOk = trySms(mobile, sms);
+
+    log.info(
+            "Staff welcome dispatched emailOk={} smsOk={} email={}",
+            mailOk,
+            smsOk,
+            email
+    );
+}
 
     public void sendAdminPasswordReset(
             String email,

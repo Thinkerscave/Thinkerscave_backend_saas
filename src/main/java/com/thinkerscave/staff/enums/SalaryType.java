@@ -6,6 +6,7 @@ package com.thinkerscave.staff.enums;
 public enum SalaryType {
 
     MONTHLY,
+    YEARLY,
     DAILY_WAGE
 
 }
