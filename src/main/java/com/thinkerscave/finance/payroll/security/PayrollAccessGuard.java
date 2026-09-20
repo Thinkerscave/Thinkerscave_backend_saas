@@ -13,9 +13,15 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+import java.util.Set;
+
 /**
  * Privilege checks for Finance Payroll APIs. No elevated-role bypass.
  * Privileges: VIEW / MANAGE / APPROVE only (no PAY).
+ *
+ * <p>Nested payroll workspace resources inherit from {@link #RESOURCE_PAYROLL}
+ * and are not separate sidebar submenus.
  */
 @Component
 @RequiredArgsConstructor
@@ -30,6 +36,26 @@ public class PayrollAccessGuard {
     public static final String RESOURCE_PAYSLIP = "PAYROLL_PAYSLIP";
     public static final String RESOURCE_SETTINGS = "PAYROLL_SETTINGS";
     public static final String RESOURCE_MY = "PAYROLL_MY";
+
+    private static final Set<String> PAYROLL_COVERED = Set.of(
+            RESOURCE_COMPONENTS,
+            RESOURCE_STRUCTURES,
+            RESOURCE_EMPLOYEE_SALARY,
+            RESOURCE_RUN,
+            RESOURCE_PAYMENT,
+            RESOURCE_PAYSLIP,
+            RESOURCE_SETTINGS
+    );
+
+    private static final Map<String, String> PARENT_RESOURCE = Map.of(
+            RESOURCE_COMPONENTS, RESOURCE_PAYROLL,
+            RESOURCE_STRUCTURES, RESOURCE_PAYROLL,
+            RESOURCE_EMPLOYEE_SALARY, RESOURCE_PAYROLL,
+            RESOURCE_RUN, RESOURCE_PAYROLL,
+            RESOURCE_PAYMENT, RESOURCE_PAYROLL,
+            RESOURCE_PAYSLIP, RESOURCE_PAYROLL,
+            RESOURCE_SETTINGS, RESOURCE_PAYROLL
+    );
 
     private final PermissionService permissionService;
     private final UserRepository userRepository;
@@ -94,7 +120,15 @@ public class PayrollAccessGuard {
         if (user == null || orgId == null) {
             return false;
         }
-        return permissionService.hasPermission(user.getId(), orgId, resource, privilege);
+        if (permissionService.hasPermission(user.getId(), orgId, resource, privilege)) {
+            return true;
+        }
+        String parent = PARENT_RESOURCE.get(resource);
+        return parent != null && permissionService.hasPermission(user.getId(), orgId, parent, privilege);
+    }
+
+    public static boolean isPayrollCovered(String resource) {
+        return PAYROLL_COVERED.contains(resource);
     }
 
     private void require(String resource, String privilege) {

@@ -107,7 +107,13 @@ public class FeeDashboardServiceImpl implements FeeDashboardService {
     @Override
     public List<OutstandingItemResponse> upcomingDues(Long academicYearId) {
         accessGuard.requireView(FinanceAccessGuard.RESOURCE_MANAGEMENT);
-        return outstandingService.list(academicYearId, null, null, BillingPeriodStatus.DUE, Pageable.ofSize(10)).getContent();
+        // Prefer open DUE rows; fall back to any outstanding so the dashboard is never blank
+        // when generation left older periods unpaid.
+        var due = outstandingService.list(academicYearId, null, null, BillingPeriodStatus.DUE, Pageable.ofSize(12));
+        if (!due.getContent().isEmpty()) {
+            return due.getContent();
+        }
+        return outstandingService.list(academicYearId, null, null, null, Pageable.ofSize(12)).getContent();
     }
 
     @Override

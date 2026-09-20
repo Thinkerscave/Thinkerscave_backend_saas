@@ -40,7 +40,9 @@ public class ResponsibilityPermissionServiceImpl implements ResponsibilityPermis
         Responsibility responsibility = findResponsibility(responsibilityId);
         findOrganization(organizationId);
 
-        List<Menu> allMenus = menuService.findEntitledMenus(organizationId);
+        List<Menu> allMenus = menuService.findEntitledMenus(organizationId).stream()
+                .filter(menu -> !Boolean.FALSE.equals(menu.getShowInSidebar()))
+                .toList();
 
         Map<Long, ResponsibilityPermission> assigned = permissionRepository
                 .findByResponsibility_ResponsibilityIdAndOrganization_Id(responsibilityId, organizationId)

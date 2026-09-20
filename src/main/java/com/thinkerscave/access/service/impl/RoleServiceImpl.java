@@ -168,8 +168,11 @@ public class RoleServiceImpl implements RoleService {
         Role role = findRoleById(roleId);
         findOrganization(organizationId);
 
+        // Only sidebar menus/submenus are assignable — nested workspace resources
+        // (e.g. Fee Heads) inherit from their parent page and must not appear here.
         List<Menu> allMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
             .filter(menu -> menu.getMenuScope() != MenuScope.PLATFORM)
+            .filter(menu -> !Boolean.FALSE.equals(menu.getShowInSidebar()))
                 .toList();
         Map<Long, RolePermission> assigned = rolePermissionRepository.findByRole_IdAndOrganization_Id(roleId, organizationId)
             .stream()
@@ -208,6 +211,7 @@ public class RoleServiceImpl implements RoleService {
 
         Map<Long, Menu> assignableMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
                 .filter(menu -> menu.getMenuScope() != MenuScope.PLATFORM)
+                .filter(menu -> !Boolean.FALSE.equals(menu.getShowInSidebar()))
                 .collect(Collectors.toMap(Menu::getId, Function.identity(), (left, right) -> left));
 
         Map<Long, PermissionState> normalized = new LinkedHashMap<>();

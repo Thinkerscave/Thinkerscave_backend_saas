@@ -1,8 +1,11 @@
 package com.thinkerscave.finance.controller;
 
 import com.thinkerscave.finance.dto.request.CloneFeeStructureRequest;
+import com.thinkerscave.finance.dto.request.ConfigureClassFeeStructureRequest;
+import com.thinkerscave.finance.dto.request.CopyClassFeeStructureRequest;
 import com.thinkerscave.finance.dto.request.FeeStructureRequest;
 import com.thinkerscave.finance.dto.request.StatusUpdateRequest;
+import com.thinkerscave.finance.dto.response.ClassFeeStructureOverviewResponse;
 import com.thinkerscave.finance.dto.response.ClonePreviewResponse;
 import com.thinkerscave.finance.dto.response.FeeStructureResponse;
 import com.thinkerscave.finance.enums.FeeMasterStatus;
@@ -40,6 +43,38 @@ public class FeeStructureController {
         accessGuard.requireView(FinanceAccessGuard.RESOURCE_STRUCTURES);
         return ResponseEntity.ok(ApiResponse.success("Fee structures",
                 feeStructureService.list(q, academicYearId, classId, status, PageRequestUtil.of(page, size, sort))));
+    }
+
+    /** Class-wise overview — every class Configured or Not Configured. */
+    @GetMapping("/class-overview")
+    public ResponseEntity<ApiResponse<PageResponse<ClassFeeStructureOverviewResponse>>> classOverview(
+            @RequestParam Long academicYearId,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String configuredStatus,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sort) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STRUCTURES);
+        return ResponseEntity.ok(ApiResponse.success("Class fee structures",
+                feeStructureService.classOverview(
+                        academicYearId, q, configuredStatus, PageRequestUtil.of(page, size, sort))));
+    }
+
+    @GetMapping("/by-class")
+    public ResponseEntity<ApiResponse<FeeStructureResponse>> getByClass(
+            @RequestParam Long academicYearId,
+            @RequestParam Long classId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STRUCTURES);
+        return ResponseEntity.ok(ApiResponse.success("Class fee structure",
+                feeStructureService.getByClass(academicYearId, classId)));
+    }
+
+    @PostMapping("/configure")
+    public ResponseEntity<ApiResponse<FeeStructureResponse>> configure(
+            @Valid @RequestBody ConfigureClassFeeStructureRequest request) {
+        accessGuard.requireManage(FinanceAccessGuard.RESOURCE_STRUCTURES);
+        return ResponseEntity.ok(ApiResponse.success("Fee structure configured",
+                feeStructureService.configure(request)));
     }
 
     @GetMapping("/{id}")
@@ -88,5 +123,13 @@ public class FeeStructureController {
             @PathVariable Long id, @Valid @RequestBody CloneFeeStructureRequest request) {
         accessGuard.requireManage(FinanceAccessGuard.RESOURCE_STRUCTURES);
         return ResponseEntity.ok(ApiResponse.success("Structures cloned", feeStructureService.clone(id, request)));
+    }
+
+    @PostMapping("/{id}/copy-to-classes")
+    public ResponseEntity<ApiResponse<List<FeeStructureResponse>>> copyToClasses(
+            @PathVariable Long id, @Valid @RequestBody CopyClassFeeStructureRequest request) {
+        accessGuard.requireManage(FinanceAccessGuard.RESOURCE_STRUCTURES);
+        return ResponseEntity.ok(ApiResponse.success("Copied to classes",
+                feeStructureService.copyToClasses(id, request)));
     }
 }

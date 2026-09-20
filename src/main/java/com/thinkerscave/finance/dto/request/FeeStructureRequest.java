@@ -9,7 +9,8 @@ import java.util.List;
 
 @Data
 public class FeeStructureRequest {
-    @NotBlank @Size(max = 150)
+    /** Optional — when blank, server generates "{Class} — {Year}". */
+    @Size(max = 150)
     private String name;
     @NotNull
     private Long academicYearId;
