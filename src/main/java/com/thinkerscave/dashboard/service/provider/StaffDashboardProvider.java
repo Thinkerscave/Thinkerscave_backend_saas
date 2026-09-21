@@ -5,10 +5,9 @@ import com.thinkerscave.academics.entity.TeacherAllocation;
 import com.thinkerscave.academics.entity.TeacherAllocationTeacher;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
 import com.thinkerscave.academics.repository.TeacherAllocationTeacherRepository;
-import com.thinkerscave.attendance.entity.StaffAttendance;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
-import com.thinkerscave.attendance.repository.StaffAttendanceRepository;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
+import com.thinkerscave.attendance.service.StaffAttendanceService;
 import com.thinkerscave.communication.entity.Notice;
 import com.thinkerscave.communication.enums.NoticeStatus;
 import com.thinkerscave.communication.repository.NoticeRepository;
@@ -18,6 +17,7 @@ import com.thinkerscave.dashboard.enums.DataMode;
 import com.thinkerscave.dashboard.enums.WidgetType;
 import com.thinkerscave.dashboard.service.DashboardTimetableHelper;
 import com.thinkerscave.dashboard.util.RoleLabels;
+import com.thinkerscave.dashboard.util.StaffAttendanceWidgetMapper;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.staff.entity.Staff;
 import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
@@ -42,7 +42,7 @@ import java.util.stream.Collectors;
 public class StaffDashboardProvider extends AbstractDashboardWidgetProvider implements DashboardWidgetProvider {
 
     private final StaffRepository staffRepository;
-    private final StaffAttendanceRepository staffAttendanceRepository;
+    private final StaffAttendanceService staffAttendanceService;
     private final StudentAttendanceRepository studentAttendanceRepository;
     private final NoticeRepository noticeRepository;
     private final DashboardTimetableHelper timetableHelper;
@@ -102,24 +102,8 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
     }
 
     private WidgetDTO<StaffAttendanceToggleData> staffAttendanceToggle(Staff staff) {
-        return safeWidget("staff-attendance-toggle", WidgetType.STAFF_ATTENDANCE_TOGGLE, "Attendance", 4, DataMode.LIVE, () -> {
-            if (staff == null) {
-                return StaffAttendanceToggleData.builder().signedIn(false).signedOut(false).build();
-            }
-            Long orgId = OrganizationContext.getOrganizationId();
-            StaffAttendance today = staffAttendanceRepository
-                    .findByOrganizationIdAndStaffIdAndAttendanceDate(orgId, staff.getStaffId(), LocalDate.now())
-                    .orElse(null);
-            return StaffAttendanceToggleData.builder()
-                    .staffId(staff.getStaffId())
-                    .signedIn(today != null && today.getSignInTime() != null)
-                    .signedOut(today != null && today.getSignOutTime() != null)
-                    .signInTime(today != null ? today.getSignInTime() : null)
-                    .signOutTime(today != null ? today.getSignOutTime() : null)
-                    .workingMinutesSoFar(today != null ? today.getWorkingMinutes() : null)
-                    .status(today != null && today.getStatus() != null ? today.getStatus().name() : null)
-                    .build();
-        });
+        return safeWidget("staff-attendance-toggle", WidgetType.STAFF_ATTENDANCE_TOGGLE, "Today's Attendance", 2, DataMode.LIVE, () ->
+                StaffAttendanceWidgetMapper.toToggleData(staffAttendanceService.buildTodayStatus(staff)));
     }
 
     private WidgetDTO<QuickActionsData> quickActions() {

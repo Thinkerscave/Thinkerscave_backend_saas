@@ -1,6 +1,7 @@
 package com.thinkerscave.attendance.dto.response;
 
 import com.thinkerscave.attendance.enums.StaffAttendanceStatus;
+import com.thinkerscave.attendance.enums.StaffAttendanceWidgetState;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Data;
@@ -27,4 +28,7 @@ public class StaffAttendanceResponse {
     private StaffAttendanceStatus status;
     private String remarks;
     private String markedBy;
+    private boolean autoClosed;
+    private boolean active;
+    private StaffAttendanceWidgetState state;
 }

@@ -88,4 +88,8 @@ public class StaffAttendance extends Auditable {
 
     @Column(name = "marked_by", length = 150)
     private String markedBy;
+
+    /** True when the session was closed by the 24-hour auto sign-out process. */
+    @Column(name = "auto_closed", nullable = false)
+    private boolean autoClosed = false;
 }

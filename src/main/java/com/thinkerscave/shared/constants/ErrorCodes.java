@@ -29,6 +29,10 @@ public final class ErrorCodes {
 
     public static final String BUSINESS_RULE_VIOLATION = "BUSINESS_RULE_VIOLATION";
 
+    public static final String ATTENDANCE_NOT_REQUIRED = "ATTENDANCE_NOT_REQUIRED";
+    public static final String ATTENDANCE_ALREADY_COMPLETED = "ATTENDANCE_ALREADY_COMPLETED";
+    public static final String ATTENDANCE_NOT_ACTIVE = "ATTENDANCE_NOT_ACTIVE";
+
     public static final String IMPORT_VALIDATION_ERROR = "IMPORT_VALIDATION_ERROR";
 
     // File Errors

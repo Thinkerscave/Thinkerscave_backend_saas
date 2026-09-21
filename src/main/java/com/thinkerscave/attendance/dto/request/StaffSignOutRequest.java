@@ -1,14 +1,13 @@
 package com.thinkerscave.attendance.dto.request;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-@Schema(description = "Staff self sign-out")
+@Schema(description = "Staff self sign-out. staffId is optional; when omitted the authenticated staff profile is used.")
 public class StaffSignOutRequest {
 
-    @NotNull(message = "Staff ID is required")
+    @Schema(description = "Optional. Must match the authenticated staff member when provided.")
     private Long staffId;
 
     private String remarks;

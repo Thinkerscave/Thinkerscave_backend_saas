@@ -19,6 +19,17 @@ public interface StaffAttendanceRepository extends JpaRepository<StaffAttendance
     Optional<StaffAttendance> findByOrganizationIdAndStaffIdAndAttendanceDate(
             Long orgId, Long staffId, LocalDate date);
 
+    Optional<StaffAttendance> findFirstByOrganizationIdAndStaffIdAndSignOutTimeIsNullAndSignInTimeIsNotNullOrderBySignInTimeDesc(
+            Long orgId, Long staffId);
+
+    @Query("""
+            SELECT sa FROM StaffAttendance sa
+            WHERE sa.signOutTime IS NULL
+              AND sa.signInTime IS NOT NULL
+              AND sa.signInTime <= :cutoff
+            """)
+    List<StaffAttendance> findExpiredActiveSessions(@Param("cutoff") java.time.LocalDateTime cutoff);
+
     List<StaffAttendance> findByOrganizationIdAndAttendanceDateOrderByStaffName(
             Long orgId, LocalDate date);
 
