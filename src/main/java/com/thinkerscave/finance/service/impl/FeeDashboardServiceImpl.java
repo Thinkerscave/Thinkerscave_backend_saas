@@ -172,7 +172,7 @@ public class FeeDashboardServiceImpl implements FeeDashboardService {
     @Override
     public PageResponse<FeeReceiptResponse> recentReceipts(Pageable pageable) {
         accessGuard.requireView(FinanceAccessGuard.RESOURCE_MANAGEMENT);
-        return feeReceiptService.list(null, null, pageable);
+        return feeReceiptService.list(null, null, null, null, null, null, null, null, null, pageable);
     }
 
     private static BigDecimal nz(BigDecimal v) {

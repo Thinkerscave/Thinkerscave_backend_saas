@@ -3,6 +3,8 @@ package com.thinkerscave.finance.dto.response;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @Builder
 public class StudentFeeDetailResponse {
@@ -15,4 +17,5 @@ public class StudentFeeDetailResponse {
     private String academicYearName;
     private StudentFeeKpiResponse kpis;
     private boolean canCollectFee;
+    private List<FeeStructureBreakdownItemResponse> structureBreakdown;
 }

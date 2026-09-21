@@ -1,6 +1,7 @@
 package com.thinkerscave.finance.controller;
 
 import com.thinkerscave.finance.dto.response.*;
+import com.thinkerscave.finance.enums.BillingPeriodStatus;
 import com.thinkerscave.finance.security.FinanceAccessGuard;
 import com.thinkerscave.finance.service.StudentFeeService;
 import com.thinkerscave.shared.dto.ApiResponse;
@@ -28,12 +29,39 @@ public class StudentFeeController {
             @RequestParam(required = false) Long academicYearId,
             @RequestParam(required = false) Long classId,
             @RequestParam(required = false) Long sectionId,
+            @RequestParam(required = false) BillingPeriodStatus status,
+            @RequestParam(required = false) String periodKey,
+            @RequestParam(required = false) Boolean outstandingOnly,
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) String sort) {
         accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
+        String effectiveSort = (sort == null || sort.isBlank()) ? "outstanding,desc" : sort;
         return ResponseEntity.ok(ApiResponse.success("Students",
-                studentFeeService.list(q, academicYearId, classId, sectionId, PageRequestUtil.of(page, size, sort))));
+                studentFeeService.list(q, academicYearId, classId, sectionId, status, periodKey, outstandingOnly,
+                        PageRequestUtil.of(page, size, effectiveSort))));
+    }
+
+    @GetMapping("/summary")
+    public ResponseEntity<ApiResponse<StudentFeeSummaryResponse>> summary(
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) Long academicYearId,
+            @RequestParam(required = false) Long classId,
+            @RequestParam(required = false) Long sectionId,
+            @RequestParam(required = false) BillingPeriodStatus status,
+            @RequestParam(required = false) String periodKey,
+            @RequestParam(required = false) Boolean outstandingOnly) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
+        return ResponseEntity.ok(ApiResponse.success("Student fee summary",
+                studentFeeService.summary(q, academicYearId, classId, sectionId, status, periodKey, outstandingOnly)));
+    }
+
+    @GetMapping("/billing-periods")
+    public ResponseEntity<ApiResponse<List<BillingPeriodOptionResponse>>> billingPeriods(
+            @RequestParam(required = false) Long academicYearId) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
+        return ResponseEntity.ok(ApiResponse.success("Billing periods",
+                studentFeeService.billingPeriodOptions(academicYearId)));
     }
 
     @GetMapping("/search")

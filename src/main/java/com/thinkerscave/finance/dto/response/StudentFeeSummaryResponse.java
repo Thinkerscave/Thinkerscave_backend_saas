@@ -7,10 +7,10 @@ import java.math.BigDecimal;
 
 @Data
 @Builder
-public class StudentFeeKpiResponse {
+public class StudentFeeSummaryResponse {
     private BigDecimal totalFee;
     private BigDecimal paid;
     private BigDecimal outstanding;
     private BigDecimal overdue;
-    private BigDecimal advance;
+    private long studentCount;
 }

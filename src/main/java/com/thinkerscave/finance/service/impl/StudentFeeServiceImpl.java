@@ -4,6 +4,8 @@ import com.thinkerscave.academics.entity.AcademicYear;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
 import com.thinkerscave.finance.dto.response.*;
 import com.thinkerscave.finance.entity.*;
+import com.thinkerscave.finance.enums.BillingPeriodStatus;
+import com.thinkerscave.finance.enums.FeeMasterStatus;
 import com.thinkerscave.finance.repository.*;
 import com.thinkerscave.finance.security.FinanceAccessGuard;
 import com.thinkerscave.finance.security.FinanceDataScopeResolver;
@@ -21,6 +23,7 @@ import com.thinkerscave.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,8 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -46,36 +49,81 @@ public class StudentFeeServiceImpl implements StudentFeeService {
     private final FeePaymentAllocationRepository allocationRepository;
     private final FeeReceiptRepository receiptRepository;
     private final FeeReceiptService feeReceiptService;
+    private final FeeStructureRepository feeStructureRepository;
+    private final FeeStructureItemRepository feeStructureItemRepository;
+    private final FeeHeadRepository feeHeadRepository;
     private final AcademicYearRepository academicYearRepository;
     private final ParentRepository parentRepository;
     private final StudentParentRepository studentParentRepository;
 
     @Override
-    public PageResponse<StudentFeeListItemResponse> list(String q, Long academicYearId, Long classId, Long sectionId, Pageable pageable) {
+    public PageResponse<StudentFeeListItemResponse> list(
+            String q,
+            Long academicYearId,
+            Long classId,
+            Long sectionId,
+            BillingPeriodStatus status,
+            String periodKey,
+            Boolean outstandingOnly,
+            Pageable pageable) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
+        List<StudentFeeListItemResponse> all = collectFiltered(q, academicYearId, classId, sectionId,
+                status, periodKey, outstandingOnly);
+        sortList(all, pageable.getSort());
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), all.size());
+        List<StudentFeeListItemResponse> pageContent = start >= all.size() ? List.of() : all.subList(start, end);
+        return PageResponse.of(new PageImpl<>(pageContent, pageable, all.size()));
+    }
+
+    @Override
+    public StudentFeeSummaryResponse summary(
+            String q,
+            Long academicYearId,
+            Long classId,
+            Long sectionId,
+            BillingPeriodStatus status,
+            String periodKey,
+            Boolean outstandingOnly) {
+        accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
+        List<StudentFeeListItemResponse> all = collectFiltered(q, academicYearId, classId, sectionId,
+                status, periodKey, outstandingOnly);
+        BigDecimal totalFee = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal paid = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal outstanding = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal overdue = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        for (StudentFeeListItemResponse row : all) {
+            totalFee = totalFee.add(nz(row.getTotalFee()));
+            paid = paid.add(nz(row.getPaid()));
+            outstanding = outstanding.add(nz(row.getOutstanding()));
+            overdue = overdue.add(nz(row.getOverdue()));
+        }
+        return StudentFeeSummaryResponse.builder()
+                .totalFee(scale(totalFee))
+                .paid(scale(paid))
+                .outstanding(scale(outstanding))
+                .overdue(scale(overdue))
+                .studentCount(all.size())
+                .build();
+    }
+
+    @Override
+    public List<BillingPeriodOptionResponse> billingPeriodOptions(Long academicYearId) {
         accessGuard.requireView(FinanceAccessGuard.RESOURCE_STUDENT_DETAILS);
         var scope = scopeResolver.resolve();
         if (!scope.canSearchStudents()) {
             throw new AccessDeniedException("Student search requires structured CLASS/SECTION/ORGANIZATION scope");
         }
         Long yearId = academicYearId != null ? academicYearId : currentYearId();
-        List<StudentFeeListItemResponse> all = new ArrayList<>();
-        for (Long studentId : scope.accessibleStudentIds()) {
-            Student student = studentRepository.findById(studentId).orElse(null);
-            if (student == null) continue;
-            if (q != null && !q.isBlank()) {
-                String needle = q.trim().toLowerCase();
-                String hay = (student.getFirstName() + " " + student.getLastName() + " " + student.getAdmissionNumber()).toLowerCase();
-                if (!hay.contains(needle)) continue;
-            }
-            StudentEnrollment enr = enrollmentRepository.findActiveWithClassByStudentId(studentId).orElse(null);
-            if (classId != null && (enr == null || enr.getClassEntity() == null || !classId.equals(enr.getClassEntity().getClassId()))) continue;
-            if (sectionId != null && (enr == null || enr.getSection() == null || !sectionId.equals(enr.getSection().getSectionId()))) continue;
-            all.add(toListItem(student, enr, yearId));
+        List<Long> ids = scope.organizationWide() ? null : new ArrayList<>(scope.accessibleStudentIds());
+        List<BillingPeriodOptionResponse> out = new ArrayList<>();
+        for (Object[] row : billingPeriodRepository.distinctPeriodsForYear(yearId, ids)) {
+            out.add(BillingPeriodOptionResponse.builder()
+                    .periodKey(String.valueOf(row[0]))
+                    .periodLabel(String.valueOf(row[1]))
+                    .build());
         }
-        int start = (int) pageable.getOffset();
-        int end = Math.min(start + pageable.getPageSize(), all.size());
-        List<StudentFeeListItemResponse> pageContent = start >= all.size() ? List.of() : all.subList(start, end);
-        return PageResponse.of(new PageImpl<>(pageContent, pageable, all.size()));
+        return out;
     }
 
     @Override
@@ -119,6 +167,7 @@ public class StudentFeeServiceImpl implements StudentFeeService {
                 .academicYearName(year != null ? year.getName() : null)
                 .kpis(computeKpis(studentId, yearId))
                 .canCollectFee(accessGuard.canManage(FinanceAccessGuard.RESOURCE_COLLECTION))
+                .structureBreakdown(structureBreakdown(enr, yearId))
                 .build();
     }
 
@@ -220,6 +269,73 @@ public class StudentFeeServiceImpl implements StudentFeeService {
         return out;
     }
 
+    private List<StudentFeeListItemResponse> collectFiltered(
+            String q,
+            Long academicYearId,
+            Long classId,
+            Long sectionId,
+            BillingPeriodStatus status,
+            String periodKey,
+            Boolean outstandingOnly) {
+        var scope = scopeResolver.resolve();
+        if (!scope.canSearchStudents()) {
+            throw new AccessDeniedException("Student search requires structured CLASS/SECTION/ORGANIZATION scope");
+        }
+        Long yearId = academicYearId != null ? academicYearId : currentYearId();
+        List<StudentFeeListItemResponse> all = new ArrayList<>();
+        for (Long studentId : scope.accessibleStudentIds()) {
+            Student student = studentRepository.findById(studentId).orElse(null);
+            if (student == null) continue;
+            if (q != null && !q.isBlank()) {
+                String needle = q.trim().toLowerCase();
+                String hay = (student.getFirstName() + " " + student.getLastName() + " " + student.getAdmissionNumber()).toLowerCase();
+                if (!hay.contains(needle)) continue;
+            }
+            StudentEnrollment enr = enrollmentRepository.findActiveWithClassByStudentId(studentId).orElse(null);
+            if (classId != null && (enr == null || enr.getClassEntity() == null || !classId.equals(enr.getClassEntity().getClassId()))) continue;
+            if (sectionId != null && (enr == null || enr.getSection() == null || !sectionId.equals(enr.getSection().getSectionId()))) continue;
+            if (periodKey != null && !periodKey.isBlank()
+                    && !billingPeriodRepository.existsByStudentIdAndAcademicYearIdAndPeriodKey(studentId, yearId, periodKey.trim())) {
+                continue;
+            }
+            StudentFeeListItemResponse item = toListItem(student, enr, yearId);
+            if (Boolean.TRUE.equals(outstandingOnly) && nz(item.getOutstanding()).compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            if (status != null && item.getStatus() != status) {
+                continue;
+            }
+            all.add(item);
+        }
+        return all;
+    }
+
+    private void sortList(List<StudentFeeListItemResponse> all, Sort sort) {
+        if (sort == null || sort.isUnsorted()) {
+            all.sort(Comparator
+                    .comparing((StudentFeeListItemResponse r) -> nz(r.getOutstanding())).reversed()
+                    .thenComparing(r -> r.getStudentName() == null ? "" : r.getStudentName(), String.CASE_INSENSITIVE_ORDER));
+            return;
+        }
+        Sort.Order order = sort.iterator().next();
+        String prop = order.getProperty();
+        Comparator<StudentFeeListItemResponse> cmp = switch (prop) {
+            case "outstanding" -> Comparator.comparing(r -> nz(r.getOutstanding()));
+            case "paid" -> Comparator.comparing(r -> nz(r.getPaid()));
+            case "totalFee" -> Comparator.comparing(r -> nz(r.getTotalFee()));
+            case "overdue" -> Comparator.comparing(r -> nz(r.getOverdue()));
+            case "studentName", "fullName" -> Comparator.comparing(
+                    r -> r.getStudentName() == null ? "" : r.getStudentName(), String.CASE_INSENSITIVE_ORDER);
+            case "admissionNumber" -> Comparator.comparing(
+                    r -> r.getAdmissionNumber() == null ? "" : r.getAdmissionNumber(), String.CASE_INSENSITIVE_ORDER);
+            default -> Comparator.comparing(r -> nz(r.getOutstanding()));
+        };
+        if (order.isDescending()) {
+            cmp = cmp.reversed();
+        }
+        all.sort(cmp.thenComparing(r -> r.getStudentName() == null ? "" : r.getStudentName(), String.CASE_INSENSITIVE_ORDER));
+    }
+
     private StudentFeeListItemResponse toListItem(Student student, StudentEnrollment enr, Long yearId) {
         StudentFeeKpiResponse kpis = computeKpis(student.getStudentId(), yearId);
         return StudentFeeListItemResponse.builder()
@@ -231,23 +347,62 @@ public class StudentFeeServiceImpl implements StudentFeeService {
                 .totalFee(kpis.getTotalFee())
                 .paid(kpis.getPaid())
                 .outstanding(kpis.getOutstanding())
+                .overdue(kpis.getOverdue())
                 .advance(kpis.getAdvance())
+                .status(deriveStatus(kpis))
                 .canCollectFee(accessGuard.canManage(FinanceAccessGuard.RESOURCE_COLLECTION))
                 .build();
+    }
+
+    private BillingPeriodStatus deriveStatus(StudentFeeKpiResponse kpis) {
+        if (nz(kpis.getOverdue()).compareTo(BigDecimal.ZERO) > 0) {
+            return BillingPeriodStatus.OVERDUE;
+        }
+        if (nz(kpis.getOutstanding()).compareTo(BigDecimal.ZERO) <= 0) {
+            return BillingPeriodStatus.PAID;
+        }
+        if (nz(kpis.getPaid()).compareTo(BigDecimal.ZERO) > 0) {
+            return BillingPeriodStatus.PARTIALLY_PAID;
+        }
+        return BillingPeriodStatus.DUE;
     }
 
     private StudentFeeKpiResponse computeKpis(Long studentId, Long yearId) {
         BigDecimal total = scale(billingPeriodRepository.sumTotal(studentId, yearId));
         BigDecimal paid = scale(billingPeriodRepository.sumPaid(studentId, yearId));
         BigDecimal outstanding = scale(billingPeriodRepository.sumBalance(studentId, yearId));
+        BigDecimal overdue = scale(billingPeriodRepository.sumOverdue(studentId, yearId, BillingPeriodStatus.OVERDUE));
         BigDecimal payments = scale(paymentRepository.sumPayments(studentId, yearId));
         BigDecimal allocations = scale(allocationRepository.sumAllocations(studentId, yearId));
         return StudentFeeKpiResponse.builder()
                 .totalFee(total)
                 .paid(paid)
                 .outstanding(outstanding)
+                .overdue(overdue)
                 .advance(payments.subtract(allocations).max(BigDecimal.ZERO.setScale(2)))
                 .build();
+    }
+
+    private List<FeeStructureBreakdownItemResponse> structureBreakdown(StudentEnrollment enr, Long yearId) {
+        if (enr == null || enr.getClassEntity() == null || yearId == null) {
+            return List.of();
+        }
+        return feeStructureRepository
+                .findByAcademicYearIdAndClassIdAndStatus(yearId, enr.getClassEntity().getClassId(), FeeMasterStatus.ACTIVE)
+                .map(structure -> feeStructureItemRepository.findByFeeStructureIdOrderByFeeStructureItemIdAsc(structure.getFeeStructureId())
+                        .stream()
+                        .map(item -> {
+                            String headName = feeHeadRepository.findById(item.getFeeHeadId())
+                                    .map(FeeHead::getName)
+                                    .orElse("Fee Head #" + item.getFeeHeadId());
+                            return FeeStructureBreakdownItemResponse.builder()
+                                    .feeHeadName(headName)
+                                    .frequency(item.getFrequency())
+                                    .amount(item.getAmount())
+                                    .build();
+                        })
+                        .toList())
+                .orElse(List.of());
     }
 
     private BillingPeriodResponse toPeriod(StudentBillingPeriod p) {
@@ -290,5 +445,9 @@ public class StudentFeeServiceImpl implements StudentFeeService {
 
     private static BigDecimal scale(BigDecimal v) {
         return (v == null ? BigDecimal.ZERO : v).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal nz(BigDecimal v) {
+        return v == null ? BigDecimal.ZERO : v;
     }
 }

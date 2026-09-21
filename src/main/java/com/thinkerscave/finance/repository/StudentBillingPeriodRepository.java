@@ -41,6 +41,27 @@ public interface StudentBillingPeriodRepository extends JpaRepository<StudentBil
     BigDecimal sumBalance(@Param("studentId") Long studentId, @Param("yearId") Long yearId);
 
     @Query("""
+            SELECT COALESCE(SUM(p.balanceAmount), 0) FROM StudentBillingPeriod p
+            WHERE p.studentId = :studentId AND p.academicYearId = :yearId
+              AND p.balanceAmount > 0 AND p.status = :status
+            """)
+    BigDecimal sumOverdue(@Param("studentId") Long studentId,
+                          @Param("yearId") Long yearId,
+                          @Param("status") BillingPeriodStatus status);
+
+    boolean existsByStudentIdAndAcademicYearIdAndPeriodKey(Long studentId, Long academicYearId, String periodKey);
+
+    @Query("""
+            SELECT DISTINCT p.periodKey, p.periodLabel, MIN(p.periodStart)
+            FROM StudentBillingPeriod p
+            WHERE p.academicYearId = :yearId
+              AND (:studentIds IS NULL OR p.studentId IN :studentIds)
+            GROUP BY p.periodKey, p.periodLabel
+            ORDER BY MIN(p.periodStart) ASC
+            """)
+    List<Object[]> distinctPeriodsForYear(@Param("yearId") Long yearId, @Param("studentIds") List<Long> studentIds);
+
+    @Query("""
             SELECT COALESCE(SUM(p.totalAmount), 0) FROM StudentBillingPeriod p
             WHERE p.academicYearId = :yearId
               AND (:studentIds IS NULL OR p.studentId IN :studentIds)

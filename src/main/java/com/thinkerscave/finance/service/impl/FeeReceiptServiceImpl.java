@@ -1,8 +1,11 @@
 package com.thinkerscave.finance.service.impl;
 
+import com.thinkerscave.academics.repository.ClassRepository;
+import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.finance.dto.response.FeeReceiptLineResponse;
 import com.thinkerscave.finance.dto.response.FeeReceiptResponse;
 import com.thinkerscave.finance.entity.FeeReceipt;
+import com.thinkerscave.finance.enums.FeeReceiptStatus;
 import com.thinkerscave.finance.repository.FeeReceiptLineRepository;
 import com.thinkerscave.finance.repository.FeeReceiptRepository;
 import com.thinkerscave.finance.security.FinanceAccessGuard;
@@ -17,6 +20,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -30,17 +36,57 @@ public class FeeReceiptServiceImpl implements FeeReceiptService {
     private final FinanceAccessGuard accessGuard;
     private final FinanceDataScopeResolver scopeResolver;
     private final FeeReceiptPdfService feeReceiptPdfService;
+    private final ClassRepository classRepository;
+    private final SectionRepository sectionRepository;
 
     @Override
-    public PageResponse<FeeReceiptResponse> list(String q, Long academicYearId, Pageable pageable) {
+    public PageResponse<FeeReceiptResponse> list(
+            String q,
+            Long academicYearId,
+            Long studentId,
+            Long classId,
+            Long sectionId,
+            String paymentMethod,
+            FeeReceiptStatus status,
+            LocalDate fromDate,
+            LocalDate toDate,
+            Pageable pageable) {
         accessGuard.requireView(FinanceAccessGuard.RESOURCE_RECEIPTS);
         var scope = scopeResolver.resolve();
         if (!scope.canSearchStudents()) {
             throw new AccessDeniedException("Receipt workspace requires searchable staff scope");
         }
-        List<Long> ids = scope.organizationWide() ? null : new ArrayList<>(scope.accessibleStudentIds());
+        List<Long> ids;
+        if (studentId != null) {
+            scopeResolver.assertStudentAccess(studentId);
+            if (scope.organizationWide() || scope.accessibleStudentIds().contains(studentId)) {
+                ids = List.of(studentId);
+            } else {
+                return PageResponse.of(org.springframework.data.domain.Page.empty(pageable), this::toResponse);
+            }
+        } else if (scope.organizationWide()) {
+            ids = null;
+        } else {
+            ids = new ArrayList<>(scope.accessibleStudentIds());
+            if (ids.isEmpty()) {
+                return PageResponse.of(org.springframework.data.domain.Page.empty(pageable), this::toResponse);
+            }
+        }
         String qq = q == null || q.isBlank() ? null : q.trim();
-        return PageResponse.of(receiptRepository.search(qq, academicYearId, ids, pageable), this::toResponse);
+        String method = paymentMethod == null || paymentMethod.isBlank() ? null : paymentMethod.trim();
+        String className = classId == null ? null
+                : classRepository.findById(classId).map(c -> c.getName()).orElse("__missing__");
+        String sectionName = sectionId == null ? null
+                : sectionRepository.findById(sectionId).map(s -> s.getName()).orElse("__missing__");
+        boolean hasExtraFilters = method != null || className != null || sectionName != null || fromDate != null || toDate != null;
+        if (!hasExtraFilters) {
+            return PageResponse.of(receiptRepository.search(qq, academicYearId, ids, pageable), this::toResponse);
+        }
+        LocalDateTime fromOn = fromDate != null ? fromDate.atStartOfDay() : LocalDateTime.of(2000, 1, 1, 0, 0);
+        LocalDateTime toOn = toDate != null ? toDate.atTime(LocalTime.MAX) : LocalDateTime.of(2099, 12, 31, 23, 59, 59);
+        return PageResponse.of(
+                receiptRepository.searchFiltered(qq, academicYearId, ids, method, className, sectionName, fromOn, toOn, pageable),
+                this::toResponse);
     }
 
     @Override
