@@ -8,7 +8,6 @@ import com.thinkerscave.access.mapper.RoleMapper;
 import com.thinkerscave.access.mapper.UserMapper;
 import com.thinkerscave.access.repository.*;
 import com.thinkerscave.access.service.RoleService;
-import com.thinkerscave.access.specification.MenuSpecification;
 import com.thinkerscave.shared.exceptions.*;
 import com.thinkerscave.platform.entity.Organization;
 import com.thinkerscave.platform.repository.OrganizationRepository;
@@ -21,7 +20,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -32,7 +35,6 @@ public class RoleServiceImpl implements RoleService {
     private final RolePermissionRepository rolePermissionRepository;
     private final MenuRepository menuRepository;
     private final OrganizationRepository organizationRepository;
-    private final OrganizationModuleRepository organizationModuleRepository;
     private final RoleMapper roleMapper;
     private final UserMapper userMapper;
     private final UserRoleRepository userRoleRepository;
@@ -164,26 +166,28 @@ public class RoleServiceImpl implements RoleService {
     @Transactional(readOnly = true)
     public PermissionMatrixResponse getPermissionMatrix(Long roleId, Long organizationId) {
         Role role = findRoleById(roleId);
-        Organization org = findOrganization(organizationId);
+        findOrganization(organizationId);
 
-        List<Long> enabledMenuIds = organizationModuleRepository.findEnabledMenuIds(organizationId);
+        // Only sidebar menus/submenus are assignable — nested workspace resources
+        // (e.g. Fee Heads) inherit from their parent page and must not appear here.
         List<Menu> allMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
-                .filter(menu -> menu.getMenuScope() == MenuScope.PLATFORM || enabledMenuIds.contains(menu.getId()))
+            .filter(menu -> menu.getMenuScope() != MenuScope.PLATFORM)
+            .filter(menu -> !Boolean.FALSE.equals(menu.getShowInSidebar()))
                 .toList();
-        List<RolePermission> assigned = rolePermissionRepository.findByRole_IdAndOrganization_Id(roleId, organizationId);
+        Map<Long, RolePermission> assigned = rolePermissionRepository.findByRole_IdAndOrganization_Id(roleId, organizationId)
+            .stream()
+            .collect(Collectors.toMap(p -> p.getMenu().getId(), Function.identity(), (left, right) -> left));
 
         List<PermissionMatrixResponse.PermissionRow> rows = allMenus.stream().map(menu -> {
-            RolePermission perm = assigned.stream()
-                    .filter(p -> p.getMenu().getId().equals(menu.getId()))
-                    .findFirst()
-                    .orElse(null);
+            RolePermission perm = assigned.get(menu.getId());
             return PermissionMatrixResponse.PermissionRow.builder()
                     .menuId(menu.getId())
                     .menuCode(menu.getMenuCode())
                     .menuName(menu.getMenuName())
-                    .menuType(menu.getMenuType().name())
+                .menuType(menu.getMenuType() != null ? menu.getMenuType().name() : null)
                     .parentMenuId(menu.getParentMenu() != null ? menu.getParentMenu().getId() : null)
                     .parentMenuName(menu.getParentMenu() != null ? menu.getParentMenu().getMenuName() : null)
+                .displayOrder(menu.getDisplayOrder())
                     .canView(perm != null && Boolean.TRUE.equals(perm.getCanView()))
                     .canManage(perm != null && Boolean.TRUE.equals(perm.getCanManage()))
                     .canApprove(perm != null && Boolean.TRUE.equals(perm.getCanApprove()))
@@ -202,32 +206,104 @@ public class RoleServiceImpl implements RoleService {
     @Override
     @Transactional
     public void updatePermissionMatrix(Long roleId, Long organizationId, UpdateRolePermissionsRequest request) {
-        findRoleById(roleId);
+        Role role = findRoleById(roleId);
         Organization org = findOrganization(organizationId);
+
+        Map<Long, Menu> assignableMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
+                .filter(menu -> menu.getMenuScope() != MenuScope.PLATFORM)
+                .filter(menu -> !Boolean.FALSE.equals(menu.getShowInSidebar()))
+                .collect(Collectors.toMap(Menu::getId, Function.identity(), (left, right) -> left));
+
+        Map<Long, PermissionState> normalized = new LinkedHashMap<>();
+        for (UpdateRolePermissionsRequest.PermissionRow row : request.getPermissions()) {
+            Menu menu = assignableMenus.get(row.getMenuId());
+            if (menu == null) {
+                throw new BadRequestException("Menu is not available for role assignment: " + row.getMenuId());
+            }
+            PermissionState state = PermissionState.from(row);
+            if (state.granted()) {
+                normalized.merge(menu.getId(), state, PermissionState::merge);
+                ensureParentVisibility(normalized, assignableMenus, menu);
+            }
+        }
 
         // Delete all existing permissions for this role+org, then re-create
         rolePermissionRepository.deleteAllByRoleAndOrganization(roleId, organizationId);
 
-        Role role = findRoleById(roleId);
-        List<RolePermission> newPerms = request.getPermissions().stream()
-                .filter(row -> Boolean.TRUE.equals(row.getCanView())
-                        || Boolean.TRUE.equals(row.getCanManage())
-                        || Boolean.TRUE.equals(row.getCanApprove()))
-                .map(row -> {
-                    Menu menu = menuRepository.findById(row.getMenuId())
-                            .orElseThrow(() -> new ResourceNotFoundException("Menu not found: " + row.getMenuId()));
+        List<RolePermission> newPerms = normalized.entrySet().stream()
+                .map(entry -> {
+                    Menu menu = assignableMenus.get(entry.getKey());
+                    PermissionState state = entry.getValue();
                     return RolePermission.builder()
                             .organization(org)
                             .role(role)
                             .menu(menu)
-                            .canView(Boolean.TRUE.equals(row.getCanView()))
-                            .canManage(Boolean.TRUE.equals(row.getCanManage()))
-                            .canApprove(Boolean.TRUE.equals(row.getCanApprove()))
+                            .canView(state.canView)
+                            .canManage(state.canManage)
+                            .canApprove(state.canApprove)
                             .build();
                 }).toList();
 
         rolePermissionRepository.saveAll(newPerms);
+        tenantCatalogSyncService.syncRolePermissions(roleId, organizationId);
         log.info("Permission matrix updated for role={} org={} rows={}", roleId, organizationId, newPerms.size());
+    }
+
+    @Override
+    @Transactional
+    public void removeRolePermission(Long roleId, Long organizationId, Long menuId) {
+        findRoleById(roleId);
+        findOrganization(organizationId);
+        rolePermissionRepository.deleteByRoleAndOrganizationAndMenu(roleId, organizationId, menuId);
+        tenantCatalogSyncService.syncRolePermissions(roleId, organizationId);
+        log.info("Role permission removed for role={} org={} menu={}", roleId, organizationId, menuId);
+    }
+
+    private void ensureParentVisibility(Map<Long, PermissionState> normalized, Map<Long, Menu> assignableMenus, Menu child) {
+        Menu cursor = child;
+        while (cursor.getParentMenu() != null) {
+            Menu parent = cursor.getParentMenu();
+            Menu assignableParent = assignableMenus.get(parent.getId());
+            if (assignableParent == null) {
+                throw new BadRequestException("Missing parent menu for assigned submenu: " + parent.getMenuCode());
+            }
+            normalized.merge(assignableParent.getId(), PermissionState.viewOnly(), PermissionState::merge);
+            cursor = assignableParent;
+        }
+    }
+
+    private static final class PermissionState {
+        private final boolean canView;
+        private final boolean canManage;
+        private final boolean canApprove;
+
+        private PermissionState(boolean canView, boolean canManage, boolean canApprove) {
+            this.canManage = canManage;
+            this.canApprove = canApprove;
+            this.canView = canView || canManage || canApprove;
+        }
+
+        private static PermissionState from(UpdateRolePermissionsRequest.PermissionRow row) {
+            return new PermissionState(
+                    Boolean.TRUE.equals(row.getCanView()),
+                    Boolean.TRUE.equals(row.getCanManage()),
+                    Boolean.TRUE.equals(row.getCanApprove()));
+        }
+
+        private static PermissionState viewOnly() {
+            return new PermissionState(true, false, false);
+        }
+
+        private PermissionState merge(PermissionState other) {
+            return new PermissionState(
+                    this.canView || other.canView,
+                    this.canManage || other.canManage,
+                    this.canApprove || other.canApprove);
+        }
+
+        private boolean granted() {
+            return canView || canManage || canApprove;
+        }
     }
 
     private Role findRoleById(Long roleId) {

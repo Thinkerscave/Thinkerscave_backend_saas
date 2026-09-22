@@ -25,8 +25,13 @@ public final class ErrorCodes {
     public static final String CONFLICT = "CONFLICT";
     public static final String ALREADY_EXISTS = "ALREADY_EXISTS";
     public static final String DUPLICATE_RECORD = "DUPLICATE_RECORD";
+    public static final String IDEMPOTENCY_CONFLICT = "IDEMPOTENCY_CONFLICT";
 
     public static final String BUSINESS_RULE_VIOLATION = "BUSINESS_RULE_VIOLATION";
+
+    public static final String ATTENDANCE_NOT_REQUIRED = "ATTENDANCE_NOT_REQUIRED";
+    public static final String ATTENDANCE_ALREADY_COMPLETED = "ATTENDANCE_ALREADY_COMPLETED";
+    public static final String ATTENDANCE_NOT_ACTIVE = "ATTENDANCE_NOT_ACTIVE";
 
     public static final String IMPORT_VALIDATION_ERROR = "IMPORT_VALIDATION_ERROR";
 

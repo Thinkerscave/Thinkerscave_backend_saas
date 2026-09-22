@@ -14,8 +14,8 @@ When the task is done (or abandoned), remove one-off files created only for inve
 
 ## Do keep (commit when the user asks)
 - Real product code under `src/`
-- Migrations/seeds under `src/main/resources/db/migration/`
-- Intentional tracked scripts (`scripts/postgres/`, `scripts/load_test_tenant.sh`)
+- Manual DB reference scripts under `scripts/postgres/` (never wired into Spring startup)
+- Intentional tracked scripts (`scripts/load_test_tenant.sh`)
 - `.gitignore` updates that prevent reintroducing junk
 
 ## Practice

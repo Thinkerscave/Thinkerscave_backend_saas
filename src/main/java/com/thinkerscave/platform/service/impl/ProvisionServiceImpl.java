@@ -10,6 +10,8 @@ import com.thinkerscave.platform.dto.request.ProvisionOrganizationRequest;
 import com.thinkerscave.platform.dto.response.DomainAvailabilityResponse;
 import com.thinkerscave.platform.dto.response.ProvisioningJobResponse;
 import com.thinkerscave.platform.dto.response.ProvisioningResultResponse;
+import com.thinkerscave.platform.dto.response.ProvisioningStepResponse;
+import com.thinkerscave.platform.enums.OperationStatus;
 import com.thinkerscave.platform.entity.Customer;
 import com.thinkerscave.platform.entity.CustomerContact;
 import com.thinkerscave.platform.entity.Organization;
@@ -30,6 +32,7 @@ import com.thinkerscave.platform.enums.ProvisionJobStatus;
 import com.thinkerscave.platform.enums.ProvisionStatus;
 import com.thinkerscave.platform.enums.SubscriptionStatus;
 import com.thinkerscave.platform.repository.CustomerRepository;
+import com.thinkerscave.platform.repository.CustomerContactRepository;
 import com.thinkerscave.platform.repository.FeatureRepository;
 import com.thinkerscave.platform.repository.OrganizationConfigurationRepository;
 import com.thinkerscave.platform.repository.OrganizationDomainRepository;
@@ -43,6 +46,8 @@ import com.thinkerscave.platform.repository.SubscriptionPlanFeatureRepository;
 import com.thinkerscave.platform.repository.SubscriptionPlanRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
 import com.thinkerscave.platform.service.ProvisionService;
+import com.thinkerscave.platform.service.TenantMigrationService;
+import com.thinkerscave.platform.service.TenantScopedFlyway;
 import com.thinkerscave.security.service.OutboundMessageService;
 import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.enums.CodeType;
@@ -83,6 +88,8 @@ public class ProvisionServiceImpl implements ProvisionService {
     private static final String ROLE_ORG_ADMIN_CODE = "ROLE_ADMIN";
     private static final String ROLE_ORG_OWNER_CODE = "ROLE_OWNER";
     private static final String ROLE_PARENT_CODE = "ROLE_PARENT";
+    private static final String CANONICAL_ROLE_FILTER =
+            "role_code IN ('ROLE_SUPER_ADMIN','ROLE_OWNER','ROLE_ADMIN','ROLE_STAFF','ROLE_STUDENT','ROLE_PARENT')";
     private static final List<String> REQUIRED_TENANT_TABLES = List.of(
             "users", "roles", "user_roles", "tenant_registry", "organizations"
     );
@@ -95,6 +102,7 @@ public class ProvisionServiceImpl implements ProvisionService {
     );
 
     private final CustomerRepository customerRepository;
+    private final CustomerContactRepository customerContactRepository;
     private final OrganizationRepository organizationRepository;
     private final TenantRegistryRepository tenantRepository;
     private final OrganizationDomainRepository domainRepository;
@@ -115,6 +123,7 @@ public class ProvisionServiceImpl implements ProvisionService {
     private final DataSource dataSource;
     private final SubscriptionPlanFeatureRepository subscriptionPlanFeatureRepository;
     private final PasswordEncoder passwordEncoder;
+    private final TenantMigrationService tenantMigrationService;
 
     @Value("${app.tenancy.platform-schema:thinkerscave_dev}")
     private String platformSchema;
@@ -147,7 +156,6 @@ public class ProvisionServiceImpl implements ProvisionService {
      * 18. Return ProvisioningResultResponse
      */
     @Override
-    @Transactional
     public ProvisioningResultResponse provision(ProvisionOrganizationRequest request) {
         LocalDateTime start = LocalDateTime.now();
         String provisionedBy = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -238,16 +246,22 @@ public class ProvisionServiceImpl implements ProvisionService {
                 .jobCode(jobCode)
                 .organization(org)
                 .provisioningTemplate(template)
-                .status(ProvisionJobStatus.RUNNING)
-                .currentStep("CREATING_TENANT")
-                .progressPercentage(10)
+                .status(ProvisionJobStatus.PENDING)
+                .currentStep("PENDING")
+                .progressPercentage(0)
                 .startedAt(start)
                 .provisionedBy(provisionedBy)
                 .active(true)
                 .build();
         job = jobRepository.save(job);
+        initializeProvisioningSteps(job.getId());
+        auditProvisioning("PROVISIONING_STARTED", null, org.getId(), job.getId(), "RUNNING", null);
+        job.setStatus(ProvisionJobStatus.RUNNING);
+        updateJobProgress(job, "TENANT_RECORD", 5);
+        startProvisioningStep(job.getId(), "TENANT_RECORD");
 
         String provisionedSchemaName = null;
+        TenantRegistry failedTenant = null;
         try {
             // ── Step 7: Create TenantRegistry ────────────────────────────────
             String subDomainSlug = normalizeSubdomain(
@@ -275,19 +289,34 @@ public class ProvisionServiceImpl implements ProvisionService {
                     .active(false)
                     .build();
             tenant = tenantRepository.save(tenant);
+            failedTenant = tenant;
+            auditProvisioning("TENANT_CREATED", tenant.getTenantIdentifier(), tenant.getId(),
+                    job.getId(), "SUCCESS", null);
+            completeProvisioningStep(job.getId(), "TENANT_RECORD");
             log.info("TenantRegistry created: {} -> schema: {}", tenantId, schemaName);
 
-                // ── Step 8: Schema provisioning + validation ───────────────────────
+                startProvisioningStep(job.getId(), "SCHEMA_AND_MIGRATION");
                 provisionTenantSchema(schemaName);
+                auditProvisioning("TENANT_SCHEMA_CREATED", tenant.getTenantIdentifier(), tenant.getId(),
+                        job.getId(), "SUCCESS", null);
                 verifyTenantSchemaReadiness(schemaName);
+                var migration = tenantMigrationService.executeTenant(
+                        tenant.getId(), TenantScopedFlyway.LATEST_VERSION);
+                if (migration.status() != OperationStatus.SUCCESS) {
+                    throw new BadRequestException("Tenant schema migration failed: " + migration.errorMessage());
+                }
+                tenant = tenantRepository.findById(tenant.getId())
+                        .orElseThrow(() -> new BadRequestException("Tenant disappeared during migration"));
+                failedTenant = tenant;
                 tenant.setProvisionStatus(ProvisionStatus.COMPLETED);
-                tenant.setMigrationVersion(flywayEnabled ? "flyway" : "bootstrap-copy");
                 tenant.setLastMigrationAt(LocalDateTime.now());
-                tenant.setActive(true);
-                tenantRepository.save(tenant);
+                tenant = tenantRepository.saveAndFlush(tenant);
+                failedTenant = tenant;
+            completeProvisioningStep(job.getId(), "SCHEMA_AND_MIGRATION");
             updateJobProgress(job, "SCHEMA_PROVISIONED", 30);
 
             // ── Step 9: Create Domain ─────────────────────────────────────────
+            startProvisioningStep(job.getId(), "DOMAIN");
             OrganizationDomain domain = OrganizationDomain.builder()
                     .organization(org)
                     .subDomain(subDomainSlug)
@@ -300,9 +329,11 @@ public class ProvisionServiceImpl implements ProvisionService {
                     .active(true)
                     .build();
             domainRepository.save(domain);
+            completeProvisioningStep(job.getId(), "DOMAIN");
             updateJobProgress(job, "DOMAIN_CONFIGURED", 45);
 
             // ── Step 10: Create Configuration ─────────────────────────────────
+            startProvisioningStep(job.getId(), "CONFIGURATION");
             OrganizationConfiguration config = OrganizationConfiguration.builder()
                     .organization(org)
                     .currency(request.getCurrency() != null ? request.getCurrency() : "INR")
@@ -317,9 +348,11 @@ public class ProvisionServiceImpl implements ProvisionService {
                     .active(true)
                     .build();
             configRepository.save(config);
+            completeProvisioningStep(job.getId(), "CONFIGURATION");
             updateJobProgress(job, "CONFIGURATION_SEEDED", 55);
 
             // ── Steps 11–13: Create Subscription ─────────────────────────────
+            startProvisioningStep(job.getId(), "SUBSCRIPTION");
             LocalDate subStart = request.getSubscriptionStartDate() != null ? request.getSubscriptionStartDate() : LocalDate.now();
             BillingCycle billingCycle = request.getBillingCycle() != null ? request.getBillingCycle() : BillingCycle.MONTHLY;
             LocalDate subEnd = calculateEndDate(subStart, billingCycle);
@@ -365,9 +398,11 @@ public class ProvisionServiceImpl implements ProvisionService {
                     .active(true)
                     .build();
             subscription = subscriptionRepository.save(subscription);
+            completeProvisioningStep(job.getId(), "SUBSCRIPTION");
             updateJobProgress(job, "SUBSCRIPTION_CREATED", 70);
 
             // ── Step 14: Apply Feature Overrides ──────────────────────────────
+            startProvisioningStep(job.getId(), "ENTITLEMENTS");
             final OrganizationSubscription savedSubscription = subscription;
             if (request.getDisabledFeatureIds() != null && !request.getDisabledFeatureIds().isEmpty()) {
                 for (Long featureId : request.getDisabledFeatureIds()) {
@@ -384,8 +419,10 @@ public class ProvisionServiceImpl implements ProvisionService {
                 }
             }
             updateJobProgress(job, "FEATURES_CONFIGURED", 80);
+            completeProvisioningStep(job.getId(), "ENTITLEMENTS");
 
             // ── Step 15: Create admin user ────────────────────────────────────
+            startProvisioningStep(job.getId(), "ADMIN");
             // Organization Admin is an "internal" tenant user: it must be created
             // directly inside the organization's own schema, never duplicated into
             // the public/platform schema (only SUPER_ADMIN and Customer/Organization
@@ -411,7 +448,7 @@ public class ProvisionServiceImpl implements ProvisionService {
             // resolve ROLE_ADMIN by code against the tenant schema *first*, so copy just
             // that one reference table here (idempotent; bootstrapTenantWorkspace's own
             // copy of it afterwards is a harmless no-op via ON CONFLICT DO NOTHING).
-            copyPlatformRows(schemaName, resolvePlatformSourceSchema(), "roles", null);
+            copyPlatformRows(schemaName, resolvePlatformSourceSchema(), "roles", CANONICAL_ROLE_FILTER);
 
             String adminEmail = request.getAdminEmail().trim().toLowerCase();
             String adminLastName = request.getAdminLastName() != null ? request.getAdminLastName() : "";
@@ -455,18 +492,23 @@ public class ProvisionServiceImpl implements ProvisionService {
                     .firstTimeLogin(true)
                     .build();
             log.info("Admin user created directly in tenant schema {} for org {}: {}", schemaName, orgCode, adminUser.getEmail());
+            completeProvisioningStep(job.getId(), "ADMIN");
             updateJobProgress(job, "ADMIN_USER_CREATED", 90);
 
             // ── Step 16: Map customer owner to this organization ──────────────
+            startProvisioningStep(job.getId(), "OWNER");
             // Organization Owner remains an "external"/platform identity (it can own
             // and switch across multiple organizations), so it stays in public only —
             // it is intentionally NOT duplicated into the tenant schema.
             mapCustomerOwnerToOrganization(customer, org);
+            completeProvisioningStep(job.getId(), "OWNER");
             updateJobProgress(job, "CUSTOMER_OWNER_MAPPED", 94);
 
             // Seed tenant catalog with auth/workspace rows so institution login
             // can resolve tenant_registry + admin/owner users in the tenant DB.
+            startProvisioningStep(job.getId(), "CATALOG_AND_ROLES");
             bootstrapTenantWorkspace(schemaName, tenant, org, customer, adminUser);
+            completeProvisioningStep(job.getId(), "CATALOG_AND_ROLES");
 
             // Grant the organization access to the menus its subscription plan
             // entitles it to, and full permissions on those menus for the Owner
@@ -474,27 +516,33 @@ public class ProvisionServiceImpl implements ProvisionService {
             seedTenantMenuEntitlementsAndPermissions(schemaName, org, plan, request.getDisabledFeatureIds());
 
             // Keep onboarding pending for first-login checklist.
+            startProvisioningStep(job.getId(), "VALIDATE_AND_ACTIVATE");
             org.setOnboardingCompleted(false);
             org.setStatus(OrganizationStatus.ACTIVE);
             organizationRepository.save(org);
+            tenant.setActive(true);
+            tenant = tenantRepository.saveAndFlush(tenant);
+            failedTenant = tenant;
+            completeProvisioningStep(job.getId(), "VALIDATE_AND_ACTIVATE");
+            auditProvisioning("PROVISIONING_COMPLETED", tenant.getTenantIdentifier(), org.getId(),
+                    job.getId(), "SUCCESS", null);
 
             // ── Step 17: Complete Job ─────────────────────────────────────────
             LocalDateTime completedAt = LocalDateTime.now();
-            job.setStatus(ProvisionJobStatus.COMPLETED);
-            job.setCurrentStep("COMPLETED");
-            job.setProgressPercentage(100);
-            job.setCompletedAt(completedAt);
-            job.setDurationSeconds(java.time.Duration.between(start, completedAt).getSeconds());
-            job.setTenantRegistry(tenant);
-            jobRepository.save(job);
+            jdbcTemplate.update("""
+                    UPDATE provisioning_jobs
+                    SET status='COMPLETED', current_step='COMPLETED', progress_percentage=100,
+                        completed_at=?, duration_seconds=?, tenant_registry_id=?, error_message=NULL,
+                        updated_on=now()
+                    WHERE id=?
+                    """, completedAt, java.time.Duration.between(start, completedAt).getSeconds(),
+                    tenant.getId(), job.getId());
 
             sendProvisioningEmails(customer, org, tenantDomain, adminUser, adminTemporaryPassword);
 
             log.info("Provisioning completed: orgCode={}, tenantId={}, jobCode={}", orgCode, tenantId, jobCode);
 
             // ── Step 18: Return result ────────────────────────────────────────
-            log.info("Provisioning credentials: orgCode={} adminUsername={} temporaryPassword={}",
-                    orgCode, adminUser.getUsername(), adminTemporaryPassword);
             return ProvisioningResultResponse.builder()
                     .organizationId(org.getId())
                     .organizationCode(orgCode)
@@ -514,12 +562,25 @@ public class ProvisionServiceImpl implements ProvisionService {
 
         } catch (Exception ex) {
             log.error("Provisioning failed for org: {}, error: {}", orgCode, ex.getMessage(), ex);
-            cleanupTenantSchema(provisionedSchemaName);
-            job.setStatus(ProvisionJobStatus.FAILED);
-            job.setCurrentStep("FAILED");
-            job.setErrorMessage(ex.getMessage());
-            job.setCompletedAt(LocalDateTime.now());
-            jobRepository.save(job);
+            failRunningProvisioningStep(job.getId(), ex.getMessage());
+            if (failedTenant != null) {
+                jdbcTemplate.update("""
+                        UPDATE tenant_registry
+                        SET active=false, provision_status='FAILED', updated_on=now()
+                        WHERE id=?
+                        """, failedTenant.getId());
+            }
+            jdbcTemplate.update("""
+                    UPDATE provisioning_jobs
+                    SET status='FAILED', current_step='FAILED', error_message=?,
+                        completed_at=now(), updated_on=now()
+                    WHERE id=?
+                    """, ex.getMessage() == null ? null
+                            : ex.getMessage().substring(0, Math.min(ex.getMessage().length(), 2000)),
+                    job.getId());
+            auditProvisioning("PROVISIONING_FAILED",
+                    failedTenant == null ? null : failedTenant.getTenantIdentifier(),
+                    org.getId(), job.getId(), "FAILED", ex.getMessage());
             throw ex;
         }
     }
@@ -674,7 +735,14 @@ public class ProvisionServiceImpl implements ProvisionService {
             try (Statement st = connection.createStatement();
                  ResultSet rs = st.executeQuery("SELECT table_name FROM information_schema.tables WHERE table_schema='" + schemaName + "' AND table_type='BASE TABLE'")) {
                 while (rs.next()) {
-                    tables.add(rs.getString(1));
+                    String table = rs.getString(1);
+                    if (!table.startsWith("flyway_")
+                            && !Set.of("platform_releases", "tenant_migration_executions",
+                            "tenant_migration_results", "tenant_operation_locks",
+                            "catalog_versions", "catalog_sync_executions",
+                            "provisioning_steps", "operation_audit_events").contains(table)) {
+                        tables.add(table);
+                    }
                 }
             }
         } catch (Exception ex) {
@@ -720,7 +788,13 @@ public class ProvisionServiceImpl implements ProvisionService {
         String sourceSchema = resolvePlatformSourceSchema();
 
         try {
-            copyPlatformRows(schemaName, sourceSchema, "roles", null);
+            copyPlatformRows(schemaName, sourceSchema, "roles", CANONICAL_ROLE_FILTER);
+            Integer canonicalRoleCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM \"" + schemaName + "\".\"roles\" WHERE " + CANONICAL_ROLE_FILTER,
+                    Integer.class);
+            if (canonicalRoleCount == null || canonicalRoleCount != 6) {
+                throw new BadRequestException("Tenant must contain the exact six canonical role definitions");
+            }
             copyPlatformRows(schemaName, sourceSchema, "customers", "id = " + customer.getId());
             copyPlatformRows(schemaName, sourceSchema, "organizations", "id = " + organization.getId());
             copyPlatformRows(schemaName, sourceSchema, "tenant_registry", "id = " + tenant.getId());
@@ -731,6 +805,7 @@ public class ProvisionServiceImpl implements ProvisionService {
             // organization so Admissions lead assignment/eligibility works from day one
             // (see admissions Lead 360 spec: COUNSELOR is a Staff Responsibility, not a Role).
             copyPlatformRows(schemaName, sourceSchema, "responsibility", "responsibility_code = 'COUNSELOR'");
+            copyPlatformRows(schemaName, sourceSchema, "features", null);
             // PLATFORM-scope menus (Tenant Management) are Super Admin-only and must
             // never be duplicated into a tenant schema; only CORE/SUBSCRIPTION menus
             // are copied here as the full org-facing catalog.
@@ -761,15 +836,12 @@ public class ProvisionServiceImpl implements ProvisionService {
      * Computes the menus this organization is entitled to (CORE menus always,
      * plus SUBSCRIPTION menus matching the plan's enabled features minus any
      * explicitly disabled feature overrides), records them as the organization's
-     * "available modules" cache, and grants full permissions on the entitled
-     * leaf (PAGE) menus to the Owner and Admin roles only. No other role gets
-     * automatic permissions — this matches the approved Workflow 04 architecture.
+     * "available modules" entitlement cache without granting permissions to any
+     * role. Permissions remain an explicit, independently synchronized operation.
      * <p>
      * Uses raw JDBC against fully-qualified "{schema}"."table" identifiers rather
-     * than JPA/TenantContext switching, because the enclosing {@code provision()}
-     * transaction already holds one Hibernate session bound to the schema active
-     * when it began; flipping {@code TenantContext} mid-transaction does not
-     * reliably re-route JPA repository calls to the tenant schema (see
+     * than JPA/TenantContext switching so schema targeting is explicit and cannot
+     * be affected by a request-bound Hibernate session (see
      * {@link #copyPlatformRows} for the same established pattern).
      */
     private void seedTenantMenuEntitlementsAndPermissions(
@@ -827,31 +899,10 @@ public class ProvisionServiceImpl implements ProvisionService {
                         "FROM \"" + schemaName + "\".\"menus\" WHERE id IN (" + menuIdList + ") " +
                         "ON CONFLICT (organization_id, menu_id) DO NOTHING");
 
-        // Full access on entitled leaf (PAGE) menus for Owner and Admin roles only.
-        jdbcTemplate.execute(
-                "INSERT INTO \"" + schemaName + "\".\"role_permissions\" " +
-                        "(organization_id, role_id, menu_id, can_view, can_manage, can_approve, created_on, version) " +
-                        "SELECT " + organization.getId() + ", r.id, m.id, true, true, true, now(), 0 " +
-                        "FROM \"" + schemaName + "\".\"roles\" r " +
-                        "CROSS JOIN \"" + schemaName + "\".\"menus\" m " +
-                        "WHERE r.role_code IN ('" + ROLE_ORG_OWNER_CODE + "', '" + ROLE_ORG_ADMIN_CODE + "') " +
-                        "AND m.id IN (" + menuIdList + ") AND m.menu_type = 'PAGE' " +
-                        "ON CONFLICT (organization_id, role_id, menu_id) DO NOTHING");
-
-                // Parent role gets view-only access for a minimal demo navigation.
-                jdbcTemplate.execute(
-                    "INSERT INTO \"" + schemaName + "\".\"role_permissions\" " +
-                        "(organization_id, role_id, menu_id, can_view, can_manage, can_approve, created_on, version) " +
-                        "SELECT " + organization.getId() + ", r.id, m.id, true, false, false, now(), 0 " +
-                        "FROM \"" + schemaName + "\".\"roles\" r " +
-                        "INNER JOIN \"" + schemaName + "\".\"menus\" m ON m.menu_code IN (" +
-                        "'DASHBOARD','STUDENTS','STUDENTS_DIRECTORY','ATTENDANCE','ATTENDANCE_STUDENTS'," +
-                        "'COMMUNICATION','COMMUNICATION_NOTICES') " +
-                        "WHERE r.role_code = '" + ROLE_PARENT_CODE + "' " +
-                        "AND m.id IN (" + menuIdList + ") AND m.menu_type = 'PAGE' " +
-                        "ON CONFLICT (organization_id, role_id, menu_id) DO NOTHING");
-
-        log.info("Seeded {} entitled menus and default Owner/Admin permissions for organization {} (schema={})",
+        // Catalog existence, entitlement and role permission are independent.
+        // Provisioning records entitlement only; explicit permission assignment
+        // is synchronized later by TenantCatalogSyncService.
+        log.info("Seeded {} entitled menus without implicit role grants for organization {} (schema={})",
                 entitledMenuIds.size(), organization.getOrganizationCode(), schemaName);
     }
 
@@ -863,9 +914,8 @@ public class ProvisionServiceImpl implements ProvisionService {
             String adminTemporaryPassword) {
         String workspaceUrl = "https://" + workspaceDomain + "/auth/login";
 
-        CustomerContact primaryContact = customer.getContacts().stream()
-                .filter(c -> Boolean.TRUE.equals(c.getActive()) && c.getContactType() == ContactType.PRIMARY)
-                .findFirst()
+        CustomerContact primaryContact = customerContactRepository
+                .findByCustomer_IdAndContactTypeAndActiveTrue(customer.getId(), ContactType.PRIMARY)
                 .orElse(null);
 
         if (primaryContact != null && primaryContact.getEmail() != null && !primaryContact.getEmail().isBlank()) {
@@ -938,7 +988,62 @@ public class ProvisionServiceImpl implements ProvisionService {
     private void updateJobProgress(ProvisioningJob job, String step, int percentage) {
         job.setCurrentStep(step);
         job.setProgressPercentage(percentage);
-        jobRepository.save(job);
+        jdbcTemplate.update("""
+                UPDATE provisioning_jobs
+                SET status=?, current_step=?, progress_percentage=?, updated_on=now()
+                WHERE id=?
+                """, job.getStatus().name(), step, percentage, job.getId());
+    }
+
+    private void auditProvisioning(String eventType, String tenantIdentifier, Long entityId,
+                                   Long executionId, String status, String error) {
+        String sanitized = error == null ? null
+                : error.substring(0, Math.min(error.length(), 2000));
+        jdbcTemplate.update("""
+                INSERT INTO operation_audit_events
+                    (event_type, actor, tenant_identifier, entity_type, entity_id,
+                     execution_id, status, error_message)
+                VALUES (?, 'system', ?, 'PROVISIONING', ?, ?, ?, ?)
+                """, eventType, tenantIdentifier, String.valueOf(entityId), executionId, status, sanitized);
+    }
+
+    private static final List<String> PROVISIONING_STEPS = List.of(
+            "TENANT_RECORD", "SCHEMA_AND_MIGRATION", "DOMAIN", "CONFIGURATION",
+            "SUBSCRIPTION", "CATALOG_AND_ROLES", "ENTITLEMENTS", "OWNER", "ADMIN",
+            "VALIDATE_AND_ACTIVATE");
+
+    private void initializeProvisioningSteps(Long jobId) {
+        for (int i = 0; i < PROVISIONING_STEPS.size(); i++) {
+            jdbcTemplate.update("""
+                    INSERT INTO provisioning_steps
+                        (provisioning_job_id, step_key, display_order, status)
+                    VALUES (?, ?, ?, 'PENDING')
+                    ON CONFLICT (provisioning_job_id, step_key) DO NOTHING
+                    """, jobId, PROVISIONING_STEPS.get(i), i + 1);
+        }
+    }
+
+    private void startProvisioningStep(Long jobId, String step) {
+        jdbcTemplate.update("""
+                UPDATE provisioning_steps SET status='RUNNING', started_at=COALESCE(started_at, now()),
+                    error_message=NULL, updated_on=now()
+                WHERE provisioning_job_id=? AND step_key=? AND status IN ('PENDING','FAILED')
+                """, jobId, step);
+    }
+
+    private void completeProvisioningStep(Long jobId, String step) {
+        jdbcTemplate.update("""
+                UPDATE provisioning_steps SET status='SUCCESS', completed_at=now(), updated_on=now()
+                WHERE provisioning_job_id=? AND step_key=?
+                """, jobId, step);
+    }
+
+    private void failRunningProvisioningStep(Long jobId, String error) {
+        jdbcTemplate.update("""
+                UPDATE provisioning_steps SET status='FAILED', completed_at=now(),
+                    error_message=?, updated_on=now()
+                WHERE provisioning_job_id=? AND status='RUNNING'
+                """, error, jobId);
     }
 
     private ProvisioningJob findJobById(Long id) {
@@ -1087,6 +1192,26 @@ public class ProvisionServiceImpl implements ProvisionService {
                 .remarks(j.getRemarks())
                 .createdOn(j.getCreatedOn())
                 .createdBy(j.getCreatedBy())
+                .steps(j.getId() == null ? List.of() : jdbcTemplate.query("""
+                                SELECT step_key, display_order, status, attempt, started_at,
+                                       completed_at, error_message
+                                FROM provisioning_steps
+                                WHERE provisioning_job_id=? ORDER BY display_order
+                                """,
+                        (rs, rowNum) -> new ProvisioningStepResponse(
+                                rs.getString("step_key"), provisioningStepLabel(rs.getString("step_key")),
+                                rs.getInt("display_order"), OperationStatus.valueOf(rs.getString("status")),
+                                rs.getTimestamp("started_at") == null ? null
+                                        : rs.getTimestamp("started_at").toLocalDateTime(),
+                                rs.getTimestamp("completed_at") == null ? null
+                                        : rs.getTimestamp("completed_at").toLocalDateTime(),
+                                rs.getString("error_message")), j.getId()))
                 .build();
+    }
+
+    private String provisioningStepLabel(String code) {
+        return java.util.Arrays.stream(code.toLowerCase(Locale.ROOT).split("_"))
+                .map(word -> Character.toUpperCase(word.charAt(0)) + word.substring(1))
+                .collect(java.util.stream.Collectors.joining(" "));
     }
 }

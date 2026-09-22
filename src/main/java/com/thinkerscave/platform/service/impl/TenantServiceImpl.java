@@ -37,6 +37,8 @@ public class TenantServiceImpl implements TenantService {
     public TenantRegistryResponse setMaintenanceMode(Long id) {
         TenantRegistry tenant = findById(id);
         tenant.setMaintenanceMode(true);
+        tenant.setMaintenanceOperation("MANUAL");
+        tenant.setMaintenanceReason("Maintenance enabled by platform administrator");
         log.info("Tenant set to maintenance mode: {}", tenant.getTenantIdentifier());
         return toResponse(tenantRepository.save(tenant));
     }
@@ -46,6 +48,8 @@ public class TenantServiceImpl implements TenantService {
     public TenantRegistryResponse resumeTenant(Long id) {
         TenantRegistry tenant = findById(id);
         tenant.setMaintenanceMode(false);
+        tenant.setMaintenanceOperation(null);
+        tenant.setMaintenanceReason(null);
         log.info("Tenant resumed from maintenance mode: {}", tenant.getTenantIdentifier());
         return toResponse(tenantRepository.save(tenant));
     }
@@ -84,6 +88,9 @@ public class TenantServiceImpl implements TenantService {
                 .schemaName(t.getSchemaName())
                 .databaseVersion(t.getDatabaseVersion())
                 .migrationVersion(t.getMigrationVersion())
+                .observedDatabaseVersion(t.getObservedDatabaseVersion())
+                .catalogVersion(t.getCatalogVersion())
+                .applicationVersion(t.getApplicationVersion())
                 .templateVersion(t.getTemplateVersion())
                 .provisionStatus(t.getProvisionStatus())
                 .databaseSizeMb(t.getDatabaseSizeMb())
@@ -94,6 +101,10 @@ public class TenantServiceImpl implements TenantService {
                 .tenantDomain(t.getTenantDomain())
                 .customDomain(t.getCustomDomain())
                 .maintenanceMode(t.getMaintenanceMode())
+                .maintenanceReason(t.getMaintenanceReason())
+                .maintenanceOperation(t.getMaintenanceOperation())
+                .healthStatus(t.getHealthStatus())
+                .healthMessage(t.getHealthMessage())
                 .active(t.getActive())
                 .remarks(t.getRemarks())
                 .createdOn(t.getCreatedOn())

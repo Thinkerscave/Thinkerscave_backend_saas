@@ -23,7 +23,7 @@ import java.util.List;
 @RequestMapping("/api/v1/promotions")
 @RequiredArgsConstructor
 @Tag(name = "Student Promotion Batches", description = "Grade promotion batch lifecycle (tenant-schema scoped)")
-@PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','PRINCIPAL')")
+@PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 public class PromotionBatchController {
 
     private final PromotionBatchService promotionBatchService;

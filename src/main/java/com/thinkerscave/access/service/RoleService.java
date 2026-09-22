@@ -37,4 +37,6 @@ public interface RoleService {
     PermissionMatrixResponse getPermissionMatrix(Long roleId, Long organizationId);
 
     void updatePermissionMatrix(Long roleId, Long organizationId, UpdateRolePermissionsRequest request);
+
+    void removeRolePermission(Long roleId, Long organizationId, Long menuId);
 }

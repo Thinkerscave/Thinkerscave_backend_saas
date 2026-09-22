@@ -27,6 +27,7 @@ import java.util.TimeZone;
         "com.thinkerscave.config",
         "com.thinkerscave.dashboard",
         "com.thinkerscave.document",
+        "com.thinkerscave.finance",
         "com.thinkerscave.onboarding",
         "com.thinkerscave.platform",
         "com.thinkerscave.retention",

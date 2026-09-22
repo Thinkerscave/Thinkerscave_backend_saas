@@ -52,6 +52,36 @@ public class LocalFileStorageService {
         return destination.toString();
     }
 
+    /**
+     * Store raw bytes (e.g. generated PDF). Returns absolute path under the upload root.
+     */
+    public String storeBytes(byte[] content, String contentType, String prefix, String fileName) throws IOException {
+        if (content == null || content.length == 0) {
+            throw new BadRequestException("File content is required");
+        }
+        if (content.length > properties.getMaxFileSizeBytes()) {
+            throw new BadRequestException("File exceeds maximum allowed size");
+        }
+        if (StringUtils.hasText(contentType)
+                && properties.getAllowedContentTypes().stream()
+                .noneMatch(allowed -> allowed.equalsIgnoreCase(contentType))) {
+            // Allow generated PDFs even if MIME list is upload-oriented
+            if (!"application/pdf".equalsIgnoreCase(contentType)) {
+                throw new BadRequestException("File type is not allowed");
+            }
+        }
+        String safeName = sanitizeFilename(fileName);
+        String storedName = (prefix != null ? prefix : "doc") + "_"
+                + UUID.randomUUID().toString().replace("-", "") + "_" + safeName;
+        Path destination = rootLocation.resolve(storedName).normalize().toAbsolutePath();
+        if (!destination.startsWith(rootLocation)) {
+            throw new IOException("Cannot store file outside upload directory");
+        }
+        Files.write(destination, content);
+        log.info("Stored bytes under {} as {}", rootLocation, storedName);
+        return destination.toString();
+    }
+
     public Resource loadAsResource(String absolutePath) {
         try {
             if (!StringUtils.hasText(absolutePath) || absolutePath.contains("..")) {

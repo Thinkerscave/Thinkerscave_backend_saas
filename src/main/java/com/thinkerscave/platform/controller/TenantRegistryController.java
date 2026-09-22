@@ -3,6 +3,8 @@ package com.thinkerscave.platform.controller;
 import com.thinkerscave.platform.dto.response.TenantRegistryResponse;
 import com.thinkerscave.platform.enums.ProvisionStatus;
 import com.thinkerscave.platform.service.TenantService;
+import com.thinkerscave.platform.service.TenantMigrationService;
+import com.thinkerscave.platform.service.TenantScopedFlyway;
 import com.thinkerscave.shared.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class TenantRegistryController {
 
     private final TenantService tenantService;
+    private final TenantMigrationService tenantMigrationService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")
@@ -66,7 +69,7 @@ public class TenantRegistryController {
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     @Operation(summary = "Trigger tenant migration")
     public ResponseEntity<ApiResponse<Void>> triggerMigration(@PathVariable Long id) {
-        tenantService.triggerMigration(id);
+        tenantMigrationService.executeTenant(id, TenantScopedFlyway.LATEST_VERSION);
         return ResponseEntity.ok(ApiResponse.noContent("Migration triggered"));
     }
 }

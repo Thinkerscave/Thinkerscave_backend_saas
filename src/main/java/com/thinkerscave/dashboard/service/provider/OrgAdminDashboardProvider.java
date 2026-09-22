@@ -7,6 +7,7 @@ import com.thinkerscave.admission.repository.ApplicationAdmissionRepository;
 import com.thinkerscave.admission.repository.InquiryRepository;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
+import com.thinkerscave.attendance.service.StaffAttendanceService;
 import com.thinkerscave.audit.entity.AuditLog;
 import com.thinkerscave.audit.repository.AuditLogRepository;
 import com.thinkerscave.communication.entity.Notice;
@@ -18,11 +19,13 @@ import com.thinkerscave.dashboard.enums.DataMode;
 import com.thinkerscave.dashboard.enums.WidgetType;
 import com.thinkerscave.dashboard.util.ChartBucketUtil;
 import com.thinkerscave.dashboard.util.RoleLabels;
+import com.thinkerscave.dashboard.util.StaffAttendanceWidgetMapper;
 import com.thinkerscave.onboarding.dto.OnboardingChecklistItemResponse;
 import com.thinkerscave.onboarding.dto.OnboardingChecklistResponse;
 import com.thinkerscave.onboarding.service.OnboardingService;
 import com.thinkerscave.platform.repository.OrganizationRepository;
 import com.thinkerscave.shared.context.OrganizationContext;
+import com.thinkerscave.staff.entity.Staff;
 import com.thinkerscave.staff.repository.StaffRepository;
 import com.thinkerscave.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +34,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -46,6 +50,7 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
     private final StudentRepository studentRepository;
     private final StaffRepository staffRepository;
     private final StudentAttendanceRepository studentAttendanceRepository;
+    private final StaffAttendanceService staffAttendanceService;
     private final InquiryRepository inquiryRepository;
     private final ApplicationAdmissionRepository applicationAdmissionRepository;
     private final NoticeRepository noticeRepository;
@@ -55,18 +60,27 @@ public class OrgAdminDashboardProvider extends AbstractDashboardWidgetProvider i
 
     @Override
     public List<WidgetDTO<?>> getWidgets(User user) {
-        return List.of(
-                welcomeHeader(user),
-                kpiGrid(),
-                quickActions(),
-                attendanceOverviewChart(),
-                admissionTrendChart(),
-                todaysTasks(),
-                recentAdmissions(),
-                upcomingEvents(),
-                recentActivities(),
-                announcements()
-        );
+        Staff staff = user != null ? staffRepository.findByUser_Id(user.getId()).orElse(null) : null;
+        List<WidgetDTO<?>> widgets = new ArrayList<>();
+        widgets.add(welcomeHeader(user));
+        widgets.add(kpiGrid());
+        if (staff != null) {
+            widgets.add(staffAttendanceToggle(staff));
+        }
+        widgets.add(quickActions());
+        widgets.add(attendanceOverviewChart());
+        widgets.add(admissionTrendChart());
+        widgets.add(todaysTasks());
+        widgets.add(recentAdmissions());
+        widgets.add(upcomingEvents());
+        widgets.add(recentActivities());
+        widgets.add(announcements());
+        return widgets;
+    }
+
+    private WidgetDTO<StaffAttendanceToggleData> staffAttendanceToggle(Staff staff) {
+        return safeWidget("staff-attendance-toggle", WidgetType.STAFF_ATTENDANCE_TOGGLE, "Today's Attendance", 2, DataMode.LIVE, () ->
+                StaffAttendanceWidgetMapper.toToggleData(staffAttendanceService.buildTodayStatus(staff)));
     }
 
     private WidgetDTO<WelcomeHeaderData> welcomeHeader(User user) {

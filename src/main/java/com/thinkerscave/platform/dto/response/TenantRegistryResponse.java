@@ -19,6 +19,9 @@ public class TenantRegistryResponse {
     private String schemaName;
     private String databaseVersion;
     private String migrationVersion;
+    private String observedDatabaseVersion;
+    private Long catalogVersion;
+    private String applicationVersion;
     private String templateVersion;
     private ProvisionStatus provisionStatus;
     private Long databaseSizeMb;
@@ -35,6 +38,10 @@ public class TenantRegistryResponse {
     private String tenantDomain;
     private String customDomain;
     private Boolean maintenanceMode;
+    private String maintenanceReason;
+    private String maintenanceOperation;
+    private String healthStatus;
+    private String healthMessage;
     private Boolean active;
     private String remarks;
     private LocalDateTime createdOn;

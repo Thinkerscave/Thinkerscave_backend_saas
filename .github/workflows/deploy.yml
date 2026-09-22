@@ -87,6 +87,7 @@ jobs:
               --restart unless-stopped \
               --network web \
               --env-file /opt/thinkerscave/.env \
+              -e SPRING_PROFILES_ACTIVE=prod \
               -v /var/thinkerscave/uploads:/var/thinkerscave/uploads \
               -v /var/thinkerscave/logs:/app/Logs \
               "$IMAGE:latest"

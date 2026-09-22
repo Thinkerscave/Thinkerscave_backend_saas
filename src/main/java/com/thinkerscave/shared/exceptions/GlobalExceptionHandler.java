@@ -158,12 +158,12 @@ public class GlobalExceptionHandler {
         @ExceptionHandler(BadRequestException.class)
         public ResponseEntity<ApiError> handleBadRequest(BadRequestException ex, HttpServletRequest request) {
                 String correlationId = MDC.get("correlationId");
-                log.info("[{}] Bad request: {}", correlationId, ex.getMessage());
+                log.info("[{}] Bad request ({}): {}", correlationId, ex.getCode(), ex.getMessage());
 
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                                 .body(ApiError.builder()
                                                 .status(400)
-                                                .code("BAD_REQUEST")
+                                                .code(ex.getCode())
                                                 .message(ex.getMessage())
                                                 .path(request.getRequestURI())
                                                 .correlationId(correlationId)
@@ -224,6 +224,20 @@ public class GlobalExceptionHandler {
                             .errors(fieldErrors)
                             .path(request.getRequestURI())
                             .correlationId(correlationId)
+                            .build());
+        }
+
+        @ExceptionHandler(IdempotencyConflictException.class)
+        public ResponseEntity<ApiError> handleIdempotencyConflict(
+                IdempotencyConflictException ex,
+                HttpServletRequest request) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(ApiError.builder()
+                            .status(409)
+                            .code(ErrorCodes.IDEMPOTENCY_CONFLICT)
+                            .message(ex.getMessage())
+                            .path(request.getRequestURI())
+                            .correlationId(MDC.get("correlationId"))
                             .build());
         }
         

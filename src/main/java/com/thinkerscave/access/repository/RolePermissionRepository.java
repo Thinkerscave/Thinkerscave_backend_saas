@@ -29,4 +29,10 @@ public interface RolePermissionRepository extends JpaRepository<RolePermission, 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM RolePermission rp WHERE rp.menu.id = :menuId")
     void deleteByMenu_Id(@Param("menuId") Long menuId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM RolePermission rp WHERE rp.role.id = :roleId AND rp.organization.id = :orgId AND rp.menu.id = :menuId")
+    void deleteByRoleAndOrganizationAndMenu(@Param("roleId") Long roleId,
+                                            @Param("orgId") Long orgId,
+                                            @Param("menuId") Long menuId);
 }

@@ -28,7 +28,7 @@ public class TimetableController {
     // ─── Dashboard ────────────────────────────────────────────────────────
 
     @GetMapping("/years/{yearId}/timetable/dashboard")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Timetable dashboard with readiness checks")
     public ResponseEntity<ApiResponse<TimetableDashboardResponse>> dashboard(@PathVariable Long yearId) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -38,7 +38,7 @@ public class TimetableController {
     // ─── Readiness ────────────────────────────────────────────────────────
 
     @GetMapping("/years/{yearId}/timetable/readiness")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Evaluate timetable generation readiness")
     public ResponseEntity<ApiResponse<TimetableReadinessResponse>> readiness(@PathVariable Long yearId) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -48,7 +48,7 @@ public class TimetableController {
     // ─── Configuration ────────────────────────────────────────────────────
 
     @GetMapping("/years/{yearId}/timetable/configuration")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Get timetable configuration for year")
     public ResponseEntity<ApiResponse<TimetableConfigurationResponse>> getConfiguration(
             @PathVariable Long yearId) {
@@ -69,7 +69,7 @@ public class TimetableController {
     // ─── Resources ────────────────────────────────────────────────────────
 
     @GetMapping("/resources")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+        @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "List active academic resources")
     public ResponseEntity<ApiResponse<List<AcademicResourceResponse>>> listResources() {
         return ResponseEntity.ok(ApiResponse.success(
@@ -117,7 +117,7 @@ public class TimetableController {
     }
 
     @GetMapping("/timetable/generations/{generationId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Get timetable generation progress")
     public ResponseEntity<ApiResponse<TimetableGenerationProgressResponse>> generationProgress(
             @PathVariable Long generationId) {
@@ -145,7 +145,7 @@ public class TimetableController {
     // ─── Grid ─────────────────────────────────────────────────────────────
 
     @GetMapping("/timetable/versions/{versionId}/grid")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Get timetable grid for a version")
     public ResponseEntity<ApiResponse<TimetableGridResponse>> getGrid(
             @PathVariable Long versionId,
@@ -160,7 +160,7 @@ public class TimetableController {
     // ─── Conflicts ────────────────────────────────────────────────────────
 
     @GetMapping("/timetable/versions/{versionId}/conflicts")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "List conflicts for a version")
     public ResponseEntity<ApiResponse<List<TimetableConflictResponse>>> getConflicts(
             @PathVariable Long versionId) {
@@ -189,7 +189,7 @@ public class TimetableController {
     // ─── Versions ─────────────────────────────────────────────────────────
 
     @GetMapping("/years/{yearId}/timetable/versions")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "List timetable versions for year")
     public ResponseEntity<ApiResponse<List<TimetableVersionResponse>>> listVersions(
             @PathVariable Long yearId) {

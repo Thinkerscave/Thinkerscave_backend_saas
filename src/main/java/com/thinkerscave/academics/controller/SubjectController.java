@@ -28,7 +28,7 @@ public class SubjectController {
     private final SubjectService subjectService;
 
     @GetMapping("/years/{yearId}/subjects/dashboard")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Subjects & Mapping dashboard")
     public ResponseEntity<ApiResponse<SubjectsMappingDashboardResponse>> dashboard(
             @PathVariable Long yearId,
@@ -40,7 +40,7 @@ public class SubjectController {
     }
 
     @GetMapping("/years/{yearId}/subjects")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "List subjects for academic year")
     public ResponseEntity<ApiResponse<List<SubjectResponse>>> byYear(@PathVariable Long yearId) {
         return ResponseEntity.ok(ApiResponse.success("Subjects retrieved", subjectService.getByYear(yearId)));
@@ -64,7 +64,7 @@ public class SubjectController {
     }
 
     @GetMapping("/subjects/{subjectId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Get subject by ID")
     public ResponseEntity<ApiResponse<SubjectResponse>> getById(@PathVariable Long subjectId) {
         return ResponseEntity.ok(ApiResponse.success("Subject found", subjectService.getById(subjectId)));
@@ -87,7 +87,7 @@ public class SubjectController {
     }
 
     @GetMapping("/classes/{classId}/subject-mappings")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','TEACHER')")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
     @Operation(summary = "Class subject mapping board")
     public ResponseEntity<ApiResponse<ClassMappingBoardResponse>> classMappingBoard(
             @PathVariable Long classId) {

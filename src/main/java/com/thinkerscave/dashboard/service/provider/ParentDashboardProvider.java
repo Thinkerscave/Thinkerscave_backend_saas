@@ -113,7 +113,6 @@ public class ParentDashboardProvider extends AbstractDashboardWidgetProvider imp
         return safeWidget("quick-actions", WidgetType.QUICK_ACTIONS, "Quick links", 4, DataMode.LIVE, () ->
                 QuickActionsData.builder().items(List.of(
                         QuickActionItem.builder().label("View Attendance").icon("pi-calendar-plus").route("/app/attendance/students").tone("primary").build(),
-                        QuickActionItem.builder().label("Fee Payments").icon("pi-wallet").route("/app/finance/fees").tone("warning").build(),
                         QuickActionItem.builder().label("Notices").icon("pi-megaphone").route("/app/communication/notices").tone("info").build(),
                         QuickActionItem.builder().label("Academic Calendar").icon("pi-calendar").route("/app/academics/academic-calendar").tone("success").build()
                 )).build());

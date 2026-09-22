@@ -110,7 +110,9 @@ For production, use Flyway or Liquibase instead of `ddl-auto=update`:
 # application.properties
 spring.jpa.hibernate.ddl-auto=validate
 spring.flyway.enabled=true
-spring.flyway.locations=classpath:db/migration
+# Flyway is disabled — schema/master data are prepared outside the application.
+# See scripts/postgres/README.md
+# spring.flyway.enabled=false
 ```
 
 #### 3. **SSL/TLS Configuration**

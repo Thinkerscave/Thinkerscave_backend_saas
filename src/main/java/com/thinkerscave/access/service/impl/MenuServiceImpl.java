@@ -163,10 +163,9 @@ public class MenuServiceImpl implements MenuService {
                 .filter(menu -> menu.getMenuScope() != MenuScope.PLATFORM)
                 .toList();
         Set<Long> enabled = new HashSet<>(organizationModuleRepository.findEnabledMenuIds(organizationId));
-        boolean hasPlanMenus = !enabled.isEmpty();
         Set<Long> included = new HashSet<>();
         for (Menu menu : catalog) {
-            if (menu.getMenuScope() == MenuScope.CORE || !hasPlanMenus || enabled.contains(menu.getId())) {
+            if (menu.getMenuScope() == MenuScope.CORE || enabled.contains(menu.getId())) {
                 included.add(menu.getId());
             }
         }
@@ -290,9 +289,7 @@ public class MenuServiceImpl implements MenuService {
         for (GrantedAuthority authority : authentication.getAuthorities()) {
             String value = authority.getAuthority();
             if ("SUPER_ADMIN".equals(value)
-                    || "PLATFORM_ADMIN".equals(value)
-                    || "THINKERSCAVE_INTERNAL".equals(value)
-                    || "INTERNAL_TEAM".equals(value)) {
+                    || "SUPER_ADMIN".equals(value)) {
                 return true;
             }
         }

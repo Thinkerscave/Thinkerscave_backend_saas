@@ -2,7 +2,6 @@ package com.thinkerscave.staff.controller;
 
 import com.thinkerscave.shared.dto.ApiResponse;
 import com.thinkerscave.staff.dto.request.StaffProfileUpdateRequest;
-import com.thinkerscave.staff.dto.response.PayrollResponse;
 import com.thinkerscave.staff.dto.response.ResponsibilityAssignmentResponse;
 import com.thinkerscave.staff.dto.response.StaffDetailResponse;
 import com.thinkerscave.staff.service.StaffProfileService;
@@ -55,12 +54,13 @@ public class StaffProfileController {
     }
 
     @GetMapping("/payroll")
+    @Deprecated
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Get payroll history for logged-in staff")
-    public ResponseEntity<ApiResponse<List<PayrollResponse>>> getMyPayrollHistory() {
-        String username = currentUsername();
-        return ResponseEntity.ok(ApiResponse.success("Payroll history retrieved",
-                staffProfileService.getMyPayrollHistory(username)));
+    @Operation(summary = "Deprecated — use GET /api/v1/payroll/me/history")
+    public ResponseEntity<ApiResponse<Void>> getMyPayrollHistory() {
+        return ResponseEntity.status(org.springframework.http.HttpStatus.GONE)
+                .body(ApiResponse.error(
+                        "Staff self payroll API is retired. Use Finance Payroll at /api/v1/payroll/me/*"));
     }
 
     private String currentUsername() {

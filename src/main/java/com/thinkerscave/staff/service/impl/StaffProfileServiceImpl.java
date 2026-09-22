@@ -3,11 +3,9 @@ package com.thinkerscave.staff.service.impl;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.staff.dto.request.StaffProfileUpdateRequest;
-import com.thinkerscave.staff.dto.response.PayrollResponse;
 import com.thinkerscave.staff.dto.response.ResponsibilityAssignmentResponse;
 import com.thinkerscave.staff.dto.response.StaffDetailResponse;
 import com.thinkerscave.staff.entity.Staff;
-import com.thinkerscave.staff.repository.PayrollRepository;
 import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
 import com.thinkerscave.staff.service.StaffProfileService;
@@ -26,10 +24,8 @@ public class StaffProfileServiceImpl implements StaffProfileService {
 
     private final StaffRepository staffRepository;
     private final UserRepository userRepository;
-    private final PayrollRepository payrollRepository;
     private final ResponsibilityAssignmentRepository assignmentRepository;
     private final StaffServiceImpl staffServiceImpl;
-    private final PayrollServiceImpl payrollServiceImpl;
 
     @Override
     @Transactional(readOnly = true)
@@ -74,12 +70,6 @@ public class StaffProfileServiceImpl implements StaffProfileService {
                         .active(a.getActive())
                         .build())
                 .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<PayrollResponse> getMyPayrollHistory(String username) {
-        return payrollServiceImpl.getMyPayrollHistory(username);
     }
 
     private Staff getStaffByUsername(String username) {

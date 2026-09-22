@@ -24,9 +24,22 @@ public interface UserPermissionRepository extends JpaRepository<UserPermission, 
     @Query("SELECT up FROM UserPermission up JOIN FETCH up.menu WHERE up.user.id = :userId AND up.active = true ORDER BY up.menu.displayOrder ASC")
     List<UserPermission> findActiveWithMenu(@Param("userId") Long userId);
 
+    @Query("""
+            SELECT up FROM UserPermission up JOIN FETCH up.menu
+            WHERE up.user.id = :userId AND up.organization.id = :organizationId
+              AND up.active = true ORDER BY up.menu.displayOrder ASC
+            """)
+    List<UserPermission> findActiveWithMenu(@Param("userId") Long userId,
+                                            @Param("organizationId") Long organizationId);
+
     @Modifying
     @Query("DELETE FROM UserPermission up WHERE up.user.id = :userId")
     void deleteAllByUser(@Param("userId") Long userId);
+
+    @Modifying
+    @Query("DELETE FROM UserPermission up WHERE up.user.id=:userId AND up.organization.id=:organizationId")
+    void deleteAllByUserAndOrganization(@Param("userId") Long userId,
+                                        @Param("organizationId") Long organizationId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM UserPermission up WHERE up.menu.id = :menuId")

@@ -80,22 +80,31 @@ For Gmail, you need to create an App Password:
 
 ---
 
-### 3. Database Setup
+### 3. Database Setup (manual — required)
 
-Create a PostgreSQL database (e.g., `thinkerscave_saas`):
+The application does **not** create schema, run Flyway, or seed data on startup
+(`ddl-auto=none`, Flyway off, no SQL init).
 
-```sql
-CREATE DATABASE thinkerscave_saas;
+1. Create / migrate the PostgreSQL database yourself (tables must already exist).
+2. Apply platform master data manually when needed:
+
+```bash
+psql -h <host> -U <user> -d <database> -v ON_ERROR_STOP=1 \
+  -f scripts/postgres/01_platform_master_seed.sql
 ```
 
-The application will automatically create tables on first run using Hibernate's `ddl-auto=update`.
+See `scripts/postgres/README.md`. Historical schema scripts live under
+`scripts/postgres/archive/` (reference only).
+
+`dev` / `test` / `prod` profiles currently share the same deploy-space defaults;
+override with `SPRING_DATASOURCE_*` when environments split.
 
 ---
 
 ### 4. Run the Application
 
 ```bash
-mvn spring-boot:run
+mvn spring-boot:run -Dspring-boot.run.profiles=test
 ```
 
 ---

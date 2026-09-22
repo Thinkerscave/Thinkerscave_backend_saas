@@ -40,7 +40,11 @@ import java.util.Optional;
         "com.thinkerscave.security.repository",
         "com.thinkerscave.shared.repository",
         "com.thinkerscave.staff.repository",
-        "com.thinkerscave.student.repository"
+        "com.thinkerscave.student.repository",
+        "com.thinkerscave.finance.repository",
+        "com.thinkerscave.finance.payroll.repository",
+        "com.thinkerscave.finance.expense.repository",
+        "com.thinkerscave.shared.document.repository"
 })
 @EntityScan(basePackages = {
         "com.thinkerscave.access.entity",
@@ -54,8 +58,12 @@ import java.util.Optional;
         "com.thinkerscave.retention.entity",
         "com.thinkerscave.security.entity",
         "com.thinkerscave.shared.entity",
+        "com.thinkerscave.shared.document.entity",
         "com.thinkerscave.staff.entity",
-        "com.thinkerscave.student.entity"
+        "com.thinkerscave.student.entity",
+        "com.thinkerscave.finance.entity",
+        "com.thinkerscave.finance.payroll.entity",
+        "com.thinkerscave.finance.expense.entity"
 })
 public class AppJpaConfig {
 
