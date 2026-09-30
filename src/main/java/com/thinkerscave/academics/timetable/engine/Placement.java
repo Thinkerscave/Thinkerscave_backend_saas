@@ -17,6 +17,7 @@ public class Placement {
     private DayOfWeek dayOfWeek;
     private Long periodId;
     private short periodNumber;
+    private int teachingIndex;
     private String subjectNameSnapshot;
 
     public Placement(SchedulingRequirement req, CandidateSlot slot) {
@@ -29,6 +30,14 @@ public class Placement {
         this.dayOfWeek = slot.getDayOfWeek();
         this.periodId = slot.getPeriodId();
         this.periodNumber = slot.getPeriodNumber();
+        this.teachingIndex = slot.getTeachingIndex();
         this.subjectNameSnapshot = req.getSubjectName();
+    }
+
+    public void moveTo(CandidateSlot slot) {
+        this.dayOfWeek = slot.getDayOfWeek();
+        this.periodId = slot.getPeriodId();
+        this.periodNumber = slot.getPeriodNumber();
+        this.teachingIndex = slot.getTeachingIndex();
     }
 }

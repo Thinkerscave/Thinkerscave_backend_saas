@@ -8,6 +8,10 @@ import org.springframework.stereotype.Component;
 
 import java.util.*;
 
+/**
+ * Swaps pairs of lessons within the same section when that improves subject spread and
+ * first/second-half preferences without introducing any hard clash.
+ */
 @Component
 public class SoftConstraintOptimizer {
 
@@ -17,11 +21,27 @@ public class SoftConstraintOptimizer {
     public SchedulingSolution optimize(SchedulingSolution solution,
                                        SchedulingSourceData source,
                                        GenerationProgress progress) {
+        return optimize(solution, source, progress, Map.of());
+    }
+
+    public SchedulingSolution optimize(SchedulingSolution solution,
+                                       SchedulingSourceData source,
+                                       GenerationProgress progress,
+                                       Map<String, SchedulingRequirement> requirementsById) {
         progress.advanceTo(GenerationPhase.OPTIMIZING, 72);
+
+        Map<Long, List<Placement>> bySection = new HashMap<>();
+        for (Placement p : solution.getPlacements()) {
+            bySection.computeIfAbsent(p.getSectionId(), k -> new ArrayList<>()).add(p);
+        }
 
         int improvementCount = 0;
         for (int pass = 0; pass < MAX_OPTIMIZATION_PASSES; pass++) {
-            int passImprovements = runSwapPass(solution, source);
+            if (progress.isCancelRequested()) break;
+            int passImprovements = 0;
+            for (List<Placement> sectionPlacements : bySection.values()) {
+                passImprovements += runSwapPass(sectionPlacements, solution, source, requirementsById);
+            }
             improvementCount += passImprovements;
             if (passImprovements == 0) break;
         }
@@ -31,38 +51,34 @@ public class SoftConstraintOptimizer {
         return solution;
     }
 
-    private int runSwapPass(SchedulingSolution solution, SchedulingSourceData source) {
-        List<Placement> placements = new ArrayList<>(solution.getPlacements());
+    private int runSwapPass(List<Placement> placements, SchedulingSolution solution,
+                            SchedulingSourceData source, Map<String, SchedulingRequirement> requirementsById) {
         int improvements = 0;
-
         for (int a = 0; a < placements.size(); a++) {
             for (int b = a + 1; b < placements.size(); b++) {
                 Placement pA = placements.get(a);
                 Placement pB = placements.get(b);
+                if (Objects.equals(pA.getClassSubjectMappingId(), pB.getClassSubjectMappingId())) continue;
+                if (pA.getDayOfWeek() == pB.getDayOfWeek() && pA.getPeriodId().equals(pB.getPeriodId())) continue;
 
-                if (!pA.getSectionId().equals(pB.getSectionId())) continue;
-                if (pA.getDayOfWeek() == pB.getDayOfWeek()
-                        && pA.getPeriodId().equals(pB.getPeriodId())) continue;
+                double before = evaluate(pA, solution, source, requirementsById)
+                        + evaluate(pB, solution, source, requirementsById);
+                if (!canSwapSlots(pA, pB, solution)) continue;
 
-                double currentScore = evaluatePair(pA, pB, solution, source);
-
-                if (canSwapSlots(pA, pB, solution, source)) {
+                swapSlots(pA, pB, solution);
+                double after = evaluate(pA, solution, source, requirementsById)
+                        + evaluate(pB, solution, source, requirementsById);
+                if (after > before + 0.001) {
+                    improvements++;
+                } else {
                     swapSlots(pA, pB, solution);
-                    double newScore = evaluatePair(pA, pB, solution, source);
-
-                    if (newScore > currentScore) {
-                        improvements++;
-                    } else {
-                        swapSlots(pA, pB, solution);
-                    }
                 }
             }
         }
         return improvements;
     }
 
-    private boolean canSwapSlots(Placement pA, Placement pB,
-                                 SchedulingSolution solution, SchedulingSourceData source) {
+    private boolean canSwapSlots(Placement pA, Placement pB, SchedulingSolution solution) {
         solution.unplace(pA);
         solution.unplace(pB);
 
@@ -87,30 +103,36 @@ public class SoftConstraintOptimizer {
         DayOfWeek dayA = pA.getDayOfWeek();
         Long periodIdA = pA.getPeriodId();
         short periodNumA = pA.getPeriodNumber();
+        int teachingIdxA = pA.getTeachingIndex();
 
         pA.setDayOfWeek(pB.getDayOfWeek());
         pA.setPeriodId(pB.getPeriodId());
         pA.setPeriodNumber(pB.getPeriodNumber());
+        pA.setTeachingIndex(pB.getTeachingIndex());
 
         pB.setDayOfWeek(dayA);
         pB.setPeriodId(periodIdA);
         pB.setPeriodNumber(periodNumA);
+        pB.setTeachingIndex(teachingIdxA);
 
         solution.place(pA);
         solution.place(pB);
     }
 
-    private double evaluatePair(Placement pA, Placement pB,
-                                SchedulingSolution solution, SchedulingSourceData source) {
-        double score = 0;
-        score += evaluateSpread(pA, solution);
-        score += evaluateSpread(pB, solution);
-        return score;
-    }
-
-    private double evaluateSpread(Placement p, SchedulingSolution solution) {
-        int sameSubjectSameDay = solution.countPlacementsForSubjectInDay(
+    private double evaluate(Placement p, SchedulingSolution solution, SchedulingSourceData source,
+                            Map<String, SchedulingRequirement> requirementsById) {
+        SchedulingRequirement req = requirementsById.get(p.getRequirementId());
+        int weekly = req == null ? 1 : req.getWeeklyPeriods();
+        int cap = CandidateScorer.dailyCap(weekly, source.workingDayCount());
+        int sameDay = solution.countPlacementsForSubjectInDay(
                 p.getSectionId(), p.getClassSubjectMappingId(), p.getDayOfWeek());
-        return -sameSubjectSameDay * 10.0;
+        double score = sameDay > cap ? -40.0 * (sameDay - cap) : 0;
+
+        if (req != null && req.getPreference() != null && req.getPreference() != SubjectTimetablePreference.ANY) {
+            boolean firstHalf = p.getTeachingIndex() < source.getHalfIndex();
+            boolean wantsFirst = req.getPreference() == SubjectTimetablePreference.FIRST_HALF;
+            score += firstHalf == wantsFirst ? 10.0 : -10.0;
+        }
+        return score;
     }
 }

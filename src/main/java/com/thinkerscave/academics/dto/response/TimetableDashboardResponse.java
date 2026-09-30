@@ -18,6 +18,8 @@ public class TimetableDashboardResponse {
     private boolean yearReadOnly;
 
     private List<ReadinessItem> readinessChecks;
+    private TimetableReadinessResponse readiness;
+    private TimetableFiltersResponse filters;
     private String overallStatus;
     private boolean canGenerate;
 

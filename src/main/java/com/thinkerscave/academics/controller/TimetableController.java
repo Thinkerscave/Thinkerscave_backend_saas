@@ -56,6 +56,15 @@ public class TimetableController {
                 "Timetable configuration", timetableService.getConfiguration(yearId)));
     }
 
+    @GetMapping("/years/{yearId}/timetable/configuration/template")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @Operation(summary = "Prefilled configuration for a year without one (copied from the latest year or a standard day)")
+    public ResponseEntity<ApiResponse<TimetableConfigurationResponse>> getConfigurationTemplate(
+            @PathVariable Long yearId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Timetable configuration template", timetableService.getConfigurationTemplate(yearId)));
+    }
+
     @PutMapping("/years/{yearId}/timetable/configuration")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Upsert timetable configuration for year")
@@ -150,11 +159,13 @@ public class TimetableController {
     public ResponseEntity<ApiResponse<TimetableGridResponse>> getGrid(
             @PathVariable Long versionId,
             @RequestParam(defaultValue = "CLASS") String view,
+            @RequestParam(required = false) Long classId,
             @RequestParam(required = false) Long sectionId,
             @RequestParam(required = false) Long staffId,
             @RequestParam(required = false) Long resourceId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Timetable grid", timetableService.getGrid(versionId, view, sectionId, staffId, resourceId)));
+                "Timetable grid",
+                timetableService.getGrid(versionId, view, classId, sectionId, staffId, resourceId)));
     }
 
     // ─── Conflicts ────────────────────────────────────────────────────────

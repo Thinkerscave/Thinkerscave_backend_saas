@@ -166,7 +166,7 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
 
         TimetableVersion version = pubVersion.get();
         TimetableGridResponse grid = timetableService.getGrid(
-                version.getTimetableVersionId(), "STAFF", null, staff.getStaffId(), null);
+                version.getTimetableVersionId(), "TEACHER", null, null, staff.getStaffId(), null);
 
         List<TodayEntry> today = extractTodaySchedule(grid);
 
@@ -199,9 +199,18 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
                     .build();
         }
 
+        if (sectionId == null) {
+            return MyTimetableResponse.builder()
+                    .role("STUDENT")
+                    .academicYearId(yearId)
+                    .message("You are not assigned to a section yet, so no timetable can be shown")
+                    .todaySchedule(Collections.emptyList())
+                    .build();
+        }
+
         TimetableVersion version = pubVersion.get();
         TimetableGridResponse grid = timetableService.getGrid(
-                version.getTimetableVersionId(), "CLASS", sectionId, null, null);
+                version.getTimetableVersionId(), "CLASS", null, sectionId, null, null);
 
         List<TodayEntry> today = extractTodaySchedule(grid);
 

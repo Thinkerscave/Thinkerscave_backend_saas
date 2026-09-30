@@ -27,4 +27,8 @@ public class TimetableConfigurationResponse {
     private Boolean active;
     private List<TimetableWorkingDayResponse> workingDays;
     private List<TimetablePeriodResponse> periods;
+    /** Set on unsaved templates: where the prefilled values came from. */
+    private String templateSource;
+    /** Published/approved version numbers that depend on this configuration's structure. */
+    private String lockedReason;
 }

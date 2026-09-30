@@ -20,7 +20,7 @@ import java.util.List;
 public class TenantScopedFlyway {
     public static final String HISTORY_TABLE = "flyway_tenant_schema_history";
     public static final String BASELINE_VERSION = "1";
-    public static final String LATEST_VERSION = "5";
+    public static final String LATEST_VERSION = "7";
     private static final List<String> FINGERPRINT = List.of(
             "users", "roles", "user_roles", "tenant_registry", "organizations");
 

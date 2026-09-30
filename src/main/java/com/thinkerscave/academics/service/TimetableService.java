@@ -15,6 +15,9 @@ public interface TimetableService {
 
     TimetableConfigurationResponse upsertConfiguration(Long yearId, TimetableConfigurationRequest request);
 
+    /** Unsaved configuration prefilled from the most recent other year, or a standard school day. */
+    TimetableConfigurationResponse getConfigurationTemplate(Long yearId);
+
     List<AcademicResourceResponse> listResources();
 
     AcademicResourceResponse createResource(AcademicResourceRequest request);
@@ -35,7 +38,7 @@ public interface TimetableService {
     @Deprecated
     TimetableGenerateResultResponse generate(Long yearId);
 
-    TimetableGridResponse getGrid(Long versionId, String view, Long sectionId, Long staffId, Long resourceId);
+    TimetableGridResponse getGrid(Long versionId, String view, Long classId, Long sectionId, Long staffId, Long resourceId);
 
     List<TimetableConflictResponse> getConflicts(Long versionId);
 

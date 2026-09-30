@@ -35,6 +35,17 @@ public interface ClassSubjectMappingRepository extends JpaRepository<ClassSubjec
     long countBySubject_AcademicYear_AcademicYearIdAndActiveTrue(Long yearId);
 
     @Query("""
+            SELECT m FROM ClassSubjectMapping m
+            JOIN FETCH m.subject sub
+            JOIN FETCH m.academicClass c
+            WHERE c.academicYear.academicYearId = :yearId
+              AND m.active = true
+              AND c.active = true
+              AND sub.active = true
+            """)
+    List<ClassSubjectMapping> findActiveForTimetableByYear(@Param("yearId") Long yearId);
+
+    @Query("""
             SELECT COUNT(DISTINCT s.subjectId) FROM Subject s
             WHERE s.academicYear.academicYearId = :yearId
               AND s.active = true

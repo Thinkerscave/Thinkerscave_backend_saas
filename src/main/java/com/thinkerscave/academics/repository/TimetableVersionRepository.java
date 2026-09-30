@@ -26,4 +26,6 @@ public interface TimetableVersionRepository extends JpaRepository<TimetableVersi
             WHERE v.timetableVersionId = :id
             """)
     Optional<TimetableVersion> findByIdWithConfigAndYear(@Param("id") Long id);
+
+    List<TimetableVersion> findByTimetableConfiguration_TimetableConfigurationId(Long configurationId);
 }
