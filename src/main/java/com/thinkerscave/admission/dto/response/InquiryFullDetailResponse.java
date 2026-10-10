@@ -16,6 +16,8 @@ public class InquiryFullDetailResponse {
     private Long applicationId;
     private String applicationNumber;
     private String applicationStatus;
+    /** Application fee status only. Amounts stay on the finance APIs. */
+    private String applicationFeeStatus;
     private Long studentId;
     private String studentCode;
     private String admissionNumber;

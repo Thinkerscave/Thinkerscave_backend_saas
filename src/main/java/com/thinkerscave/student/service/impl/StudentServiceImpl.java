@@ -47,6 +47,7 @@ import com.thinkerscave.student.repository.StudentMedicalRepository;
 import com.thinkerscave.student.repository.StudentParentRepository;
 import com.thinkerscave.student.repository.StudentRepository;
 import com.thinkerscave.student.repository.StudentTimelineRepository;
+import com.thinkerscave.student.security.StudentProfileAccessGuard;
 import com.thinkerscave.student.service.StudentService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -98,6 +99,7 @@ public class StudentServiceImpl implements StudentService {
     private final AuditWriteService auditWriteService;
     private final ApplicationAdmissionRepository applicationAdmissionRepository;
     private final ObjectMapper objectMapper;
+    private final StudentProfileAccessGuard studentProfileAccessGuard;
 
     @Override
     @Transactional
@@ -276,6 +278,7 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public StudentProfileResponse getProfile360(Long studentId) {
+        studentProfileAccessGuard.requireStudentProfile();
         Student student = getStudent(studentId);
 
         StudentProfileResponse response = new StudentProfileResponse();

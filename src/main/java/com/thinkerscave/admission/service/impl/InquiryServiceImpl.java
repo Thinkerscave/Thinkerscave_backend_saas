@@ -371,55 +371,67 @@ public class InquiryServiceImpl implements InquiryService {
 
     @Override
     public List<FollowUpResponse> getTodayFollowUps() {
-        return resolveFollowUpQueueCounselorFilter()
-                .map(counselorFilter -> {
-                    LocalDate today = LocalDate.now();
-                    LocalDateTime dayStart = today.atStartOfDay();
-                    LocalDateTime dayEnd = today.plusDays(1).atStartOfDay();
-                    List<InquiryFollowUp> rows = counselorFilter.isPresent()
-                            ? followUpRepository.findTodayForCounselor(counselorFilter.get(), dayStart, dayEnd)
-                            : followUpRepository.findTodayOrgWide(dayStart, dayEnd);
-                    return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
-                })
-                .orElseGet(Collections::emptyList);
+        FollowUpQueueMode mode = followUpQueueMode();
+        if (mode == FollowUpQueueMode.NONE) {
+            return List.of();
+        }
+        LocalDate today = LocalDate.now();
+        LocalDateTime dayStart = today.atStartOfDay();
+        LocalDateTime dayEnd = today.plusDays(1).atStartOfDay();
+        List<InquiryFollowUp> rows = switch (mode) {
+            case COUNSELOR -> followUpRepository.findTodayForCounselor(currentStaffId(), dayStart, dayEnd);
+            case ORG -> followUpRepository.findTodayOrgWide(dayStart, dayEnd);
+            case DESK -> followUpRepository.findTodayForDesk(currentUsername(), dayStart, dayEnd);
+            case NONE -> List.of();
+        };
+        return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
     }
 
     @Override
     public List<FollowUpResponse> getOverdueFollowUps() {
-        return resolveFollowUpQueueCounselorFilter()
-                .map(counselorFilter -> {
-                    LocalDateTime dayStart = LocalDate.now().atStartOfDay();
-                    List<InquiryFollowUp> rows = counselorFilter.isPresent()
-                            ? followUpRepository.findOverdueForCounselor(counselorFilter.get(), dayStart)
-                            : followUpRepository.findOverdueOrgWide(dayStart);
-                    return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
-                })
-                .orElseGet(Collections::emptyList);
+        FollowUpQueueMode mode = followUpQueueMode();
+        if (mode == FollowUpQueueMode.NONE) {
+            return List.of();
+        }
+        LocalDateTime dayStart = LocalDate.now().atStartOfDay();
+        List<InquiryFollowUp> rows = switch (mode) {
+            case COUNSELOR -> followUpRepository.findOverdueForCounselor(currentStaffId(), dayStart);
+            case ORG -> followUpRepository.findOverdueOrgWide(dayStart);
+            case DESK -> followUpRepository.findOverdueForDesk(currentUsername(), dayStart);
+            case NONE -> List.of();
+        };
+        return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
     }
 
     @Override
     public List<FollowUpResponse> getUpcomingFollowUps() {
-        return resolveFollowUpQueueCounselorFilter()
-                .map(counselorFilter -> {
-                    LocalDateTime dayEnd = LocalDate.now().plusDays(1).atStartOfDay();
-                    List<InquiryFollowUp> rows = counselorFilter.isPresent()
-                            ? followUpRepository.findUpcomingForCounselor(counselorFilter.get(), dayEnd)
-                            : followUpRepository.findUpcomingOrgWide(dayEnd);
-                    return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
-                })
-                .orElseGet(Collections::emptyList);
+        FollowUpQueueMode mode = followUpQueueMode();
+        if (mode == FollowUpQueueMode.NONE) {
+            return List.of();
+        }
+        LocalDateTime dayEnd = LocalDate.now().plusDays(1).atStartOfDay();
+        List<InquiryFollowUp> rows = switch (mode) {
+            case COUNSELOR -> followUpRepository.findUpcomingForCounselor(currentStaffId(), dayEnd);
+            case ORG -> followUpRepository.findUpcomingOrgWide(dayEnd);
+            case DESK -> followUpRepository.findUpcomingForDesk(currentUsername(), dayEnd);
+            case NONE -> List.of();
+        };
+        return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
     }
 
     @Override
     public List<FollowUpResponse> getCompletedFollowUps() {
-        return resolveFollowUpQueueCounselorFilter()
-                .map(counselorFilter -> {
-                    List<InquiryFollowUp> rows = counselorFilter.isPresent()
-                            ? followUpRepository.findCompletedForCounselor(counselorFilter.get())
-                            : followUpRepository.findCompletedOrgWide();
-                    return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
-                })
-                .orElseGet(Collections::emptyList);
+        FollowUpQueueMode mode = followUpQueueMode();
+        if (mode == FollowUpQueueMode.NONE) {
+            return List.of();
+        }
+        List<InquiryFollowUp> rows = switch (mode) {
+            case COUNSELOR -> followUpRepository.findCompletedForCounselor(currentStaffId());
+            case ORG -> followUpRepository.findCompletedOrgWide();
+            case DESK -> followUpRepository.findCompletedForDesk(currentUsername());
+            case NONE -> List.of();
+        };
+        return rows.stream().map(this::toFollowUpResponse).collect(Collectors.toList());
     }
 
     @Override
@@ -547,6 +559,7 @@ public class InquiryServiceImpl implements InquiryService {
     @Transactional
     public CounselingNoteResponse addCounselingNote(Long inquiryId, CounselingNoteRequest request) {
         Inquiry inquiry = getInquiry(inquiryId);
+        requireCounselingAccess(inquiry);
 
         CounselingNote note = new CounselingNote();
         note.setInquiry(inquiry);
@@ -633,8 +646,17 @@ public class InquiryServiceImpl implements InquiryService {
         return followUp;
     }
 
+    private List<CounselingNoteResponse> counselingNotesOrEmpty(Long inquiryId) {
+        try {
+            return getCounselingNotes(inquiryId);
+        } catch (AccessDeniedException ex) {
+            return List.of();
+        }
+    }
+
     @Override
     public List<CounselingNoteResponse> getCounselingNotes(Long inquiryId) {
+        requireCounselingAccess(getInquiry(inquiryId));
         return counselingNoteRepository
                 .findByInquiryInquiryIdOrderByCreatedOnDesc(inquiryId)
                 .stream().map(this::toCounselingResponse).collect(Collectors.toList());
@@ -799,11 +821,12 @@ public class InquiryServiceImpl implements InquiryService {
             return InquiryFullDetailResponse.builder()
                 .inquiry(inquiry)
                 .followUps(getFollowUps(inquiryId))
-                .counselingNotes(getCounselingNotes(inquiryId))
+                .counselingNotes(counselingNotesOrEmpty(inquiryId))
                 .timeline(getTimeline(inquiryId))
                 .applicationId(application != null ? application.getApplicationId() : null)
                 .applicationNumber(application != null ? application.getApplicationNumber() : null)
                 .applicationStatus(application != null && application.getStatus() != null ? application.getStatus().name() : null)
+                .applicationFeeStatus(application != null && application.getFeeStatus() != null ? application.getFeeStatus().name() : null)
                 .studentId(studentId)
                 .studentCode(student != null ? student.getStudentCode() : null)
                 .admissionNumber(student != null ? student.getAdmissionNumber() : null)
@@ -1353,17 +1376,43 @@ public class InquiryServiceImpl implements InquiryService {
      * </ul>
      * Counselors never receive another counselor's items.
      */
-    private Optional<Optional<Long>> resolveFollowUpQueueCounselorFilter() {
+    private enum FollowUpQueueMode { NONE, COUNSELOR, ORG, DESK }
+
+    /**
+     * Counselors see their own queue. FOLLOW_UPS:MANAGE sees the school.
+     * A receptionist with leads access and no counselor responsibility sees
+     * follow-ups on leads they created, plus leads that have no counselor yet.
+     */
+    private FollowUpQueueMode followUpQueueMode() {
         requireFollowUpsAccess();
         Long staffId = currentStaffId();
         if (staffId != null && hasActiveCounselorResponsibility(staffId)) {
-            return Optional.of(Optional.of(staffId));
+            return FollowUpQueueMode.COUNSELOR;
         }
-        // Explicit architecture: elevated roles or FOLLOW_UPS:MANAGE may see the org queue.
         if (hasElevatedRole() || canManageFollowUps()) {
-            return Optional.of(Optional.empty());
+            return FollowUpQueueMode.ORG;
         }
-        return Optional.empty();
+        User user = currentUser();
+        Long orgId = OrganizationContext.getOrganizationId();
+        if (user != null && orgId != null
+                && permissionService.hasPermission(user.getId(), orgId, RESOURCE_ADMISSIONS_LEADS, "VIEW")) {
+            return FollowUpQueueMode.DESK;
+        }
+        return FollowUpQueueMode.NONE;
+    }
+
+    private void requireCounselingAccess(Inquiry inquiry) {
+        if (hasElevatedRole() || canManageFollowUps()) {
+            return;
+        }
+        Long staffId = currentStaffId();
+        if (staffId != null
+                && hasActiveCounselorResponsibility(staffId)
+                && inquiry != null
+                && staffId.equals(inquiry.getAssignedCounselorId())) {
+            return;
+        }
+        throw new AccessDeniedException("Counseling notes are limited to the assigned counselor");
     }
 
     private boolean hasActiveCounselorResponsibility(Long staffId) {

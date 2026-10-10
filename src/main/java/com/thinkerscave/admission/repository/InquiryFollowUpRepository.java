@@ -177,4 +177,58 @@ public interface InquiryFollowUpRepository extends JpaRepository<InquiryFollowUp
             @Param("counselorId") Long counselorId,
             @Param("dayStart") LocalDateTime dayStart,
             @Param("dayEnd") LocalDateTime dayEnd);
+
+    @Query("""
+        SELECT f FROM InquiryFollowUp f
+        JOIN FETCH f.inquiry i
+        WHERE i.deleted = false
+          AND (i.createdBy = :createdBy OR i.assignedCounselorId IS NULL)
+          AND (f.lifecycleStatus IS NULL
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.SCHEDULED
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.RESCHEDULED)
+          AND f.followUpDate >= :dayStart AND f.followUpDate < :dayEnd
+        ORDER BY f.followUpDate ASC
+        """)
+    java.util.List<InquiryFollowUp> findTodayForDesk(@org.springframework.data.repository.query.Param("createdBy") String createdBy,
+            @org.springframework.data.repository.query.Param("dayStart") java.time.LocalDateTime dayStart,
+            @org.springframework.data.repository.query.Param("dayEnd") java.time.LocalDateTime dayEnd);
+
+    @Query("""
+        SELECT f FROM InquiryFollowUp f
+        JOIN FETCH f.inquiry i
+        WHERE i.deleted = false
+          AND (i.createdBy = :createdBy OR i.assignedCounselorId IS NULL)
+          AND (f.lifecycleStatus IS NULL
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.SCHEDULED
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.RESCHEDULED)
+          AND f.followUpDate < :dayStart
+        ORDER BY f.followUpDate ASC
+        """)
+    java.util.List<InquiryFollowUp> findOverdueForDesk(@org.springframework.data.repository.query.Param("createdBy") String createdBy,
+            @org.springframework.data.repository.query.Param("dayStart") java.time.LocalDateTime dayStart);
+
+    @Query("""
+        SELECT f FROM InquiryFollowUp f
+        JOIN FETCH f.inquiry i
+        WHERE i.deleted = false
+          AND (i.createdBy = :createdBy OR i.assignedCounselorId IS NULL)
+          AND (f.lifecycleStatus IS NULL
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.SCHEDULED
+               OR f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.RESCHEDULED)
+          AND f.followUpDate >= :dayEnd
+        ORDER BY f.followUpDate ASC
+        """)
+    java.util.List<InquiryFollowUp> findUpcomingForDesk(@org.springframework.data.repository.query.Param("createdBy") String createdBy,
+            @org.springframework.data.repository.query.Param("dayEnd") java.time.LocalDateTime dayEnd);
+
+    @Query("""
+        SELECT f FROM InquiryFollowUp f
+        JOIN FETCH f.inquiry i
+        WHERE i.deleted = false
+          AND (i.createdBy = :createdBy OR i.assignedCounselorId IS NULL)
+          AND f.lifecycleStatus = com.thinkerscave.admission.enums.FollowUpLifecycleStatus.COMPLETED
+        ORDER BY f.completedOn DESC
+        """)
+    java.util.List<InquiryFollowUp> findCompletedForDesk(@org.springframework.data.repository.query.Param("createdBy") String createdBy);
+
 }

@@ -13,6 +13,8 @@ public enum FeatureModule {
     LIBRARY,
     HOSTEL,
     COMMUNICATION,
-    SETTINGS
+    SETTINGS,
+    FRONT_DESK,
+    DOCUMENTATION
 
 }

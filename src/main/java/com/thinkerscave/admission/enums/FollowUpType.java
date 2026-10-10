@@ -6,5 +6,7 @@ public enum FollowUpType {
     EMAIL,
     WALK_IN,
     SMS,
+    BROCHURE,
+    ENTRANCE_TEST,
     OTHER
 }
