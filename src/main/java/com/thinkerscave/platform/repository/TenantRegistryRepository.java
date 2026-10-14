@@ -4,6 +4,7 @@ import com.thinkerscave.platform.entity.TenantRegistry;
 import com.thinkerscave.platform.enums.ProvisionStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -33,6 +34,11 @@ public interface TenantRegistryRepository extends JpaRepository<TenantRegistry, 
     Optional<TenantRegistry> findByOrganization_Id(Long organizationId);
 
     List<TenantRegistry> findByActiveTrueAndProvisionStatus(ProvisionStatus provisionStatus);
+
+    @EntityGraph(attributePaths = "organization")
+    @Query("SELECT t FROM TenantRegistry t WHERE t.active = true AND t.provisionStatus = :status")
+    List<TenantRegistry> findByActiveTrueAndProvisionStatusWithOrganization(
+            @Param("status") ProvisionStatus provisionStatus);
 
     boolean existsByTenantIdentifier(String tenantIdentifier);
 

@@ -34,9 +34,17 @@ public interface RoleService {
 
     List<UserSummaryResponse> getRoleUsers(Long roleId, Long organizationId);
 
-    PermissionMatrixResponse getPermissionMatrix(Long roleId, Long organizationId);
+    /**
+     * Returns the role's single global (organization-independent) permission
+     * matrix. The matrix is the authoritative source applied to every tenant.
+     */
+    PermissionMatrixResponse getPermissionMatrix(Long roleId);
 
-    void updatePermissionMatrix(Long roleId, Long organizationId, UpdateRolePermissionsRequest request);
+    /**
+     * Replaces the role's global permission matrix and propagates it to every
+     * applicable active, provisioned tenant schema.
+     */
+    void updatePermissionMatrix(Long roleId, UpdateRolePermissionsRequest request);
 
-    void removeRolePermission(Long roleId, Long organizationId, Long menuId);
+    void removeRolePermission(Long roleId, Long menuId);
 }
