@@ -32,6 +32,23 @@ public class StaffAttendanceDayContextService {
     private final TimetableConfigurationRepository timetableConfigurationRepository;
     private final TimetableWorkingDayRepository timetableWorkingDayRepository;
 
+    /**
+     * Resolves whether a date is an instructional day for student attendance
+     * using Holiday → Weekend (no leave concept for students).
+     */
+    public DayContext resolveStudentDay(Long organizationId, LocalDate date) {
+        Optional<AcademicCalendarEvent> holiday = findHoliday(date);
+        if (holiday.isPresent()) {
+            return DayContext.forHoliday(holiday.get().getTitle());
+        }
+
+        if (isWeekend(date)) {
+            return DayContext.forWeekend();
+        }
+
+        return DayContext.workingDay();
+    }
+
     public DayContext resolve(Long organizationId, Long staffId, LocalDate date) {
         Optional<StaffLeaveAttendancePort.ApprovedLeaveInfo> leave =
                 leaveAttendancePort.findApprovedLeave(organizationId, staffId, date);

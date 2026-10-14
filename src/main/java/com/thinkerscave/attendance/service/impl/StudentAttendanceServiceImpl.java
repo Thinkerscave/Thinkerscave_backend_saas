@@ -6,18 +6,29 @@ import com.thinkerscave.attendance.dto.request.StudentAttendanceEntry;
 import com.thinkerscave.attendance.dto.request.UpdateStudentAttendanceRequest;
 import com.thinkerscave.attendance.dto.response.ClassAttendanceSummaryResponse;
 import com.thinkerscave.attendance.dto.response.StudentAttendanceResponse;
+import com.thinkerscave.attendance.dto.response.StudentAttendanceSessionResponse;
 import com.thinkerscave.attendance.dto.response.StudentHistoryResponse;
+import com.thinkerscave.attendance.dto.response.StudentRosterResponse;
 import com.thinkerscave.attendance.entity.StudentAttendance;
 import com.thinkerscave.attendance.entity.StudentPeriodAttendance;
+import com.thinkerscave.attendance.enums.AttendanceMode;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
 import com.thinkerscave.attendance.repository.AttendanceSettingRepository;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
 import com.thinkerscave.attendance.repository.StudentPeriodAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceFreezeService;
+import com.thinkerscave.attendance.service.StaffAttendanceDayContextService;
 import com.thinkerscave.attendance.service.StudentAttendanceService;
+import com.thinkerscave.academics.entity.AcademicClass;
+import com.thinkerscave.academics.entity.AcademicSection;
+import com.thinkerscave.academics.repository.ClassRepository;
+import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.student.entity.Student;
+import com.thinkerscave.student.entity.StudentEnrollment;
+import com.thinkerscave.student.repository.StudentEnrollmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -27,7 +38,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,20 +56,153 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
     private final StudentPeriodAttendanceRepository studentPeriodAttendanceRepository;
     private final AttendanceFreezeService attendanceFreezeService;
     private final AttendanceSettingRepository attendanceSettingRepository;
+    private final StudentEnrollmentRepository studentEnrollmentRepository;
+    private final StaffAttendanceDayContextService dayContextService;
+    private final ClassRepository classRepository;
+    private final SectionRepository sectionRepository;
+
+    @Override
+    public StudentRosterResponse getRoster(Long classId, Long sectionId, LocalDate date) {
+        Long orgId = OrganizationContext.getOrganizationId();
+
+        List<StudentEnrollment> enrollments = sectionId != null
+                ? studentEnrollmentRepository.findActiveRosterByClassSection(classId, sectionId)
+                : studentEnrollmentRepository.findActiveRosterByClass(classId);
+
+        List<StudentAttendance> saved = studentAttendanceRepository
+                .findByOrganizationIdAndClassIdAndSectionIdAndAttendanceDateOrderByRollNumber(
+                        orgId, classId, sectionId, date);
+        Map<Long, StudentAttendance> savedByStudent = saved.stream()
+                .collect(Collectors.toMap(StudentAttendance::getStudentId, Function.identity()));
+
+        List<StudentRosterResponse.StudentRosterEntryResponse> students = enrollments.stream()
+                .map(e -> toRosterEntry(e, savedByStudent.get(e.getStudent().getStudentId())))
+                .collect(Collectors.toList());
+
+        AcademicClass cls = classRepository.findByIdWithYear(classId).orElse(null);
+        AcademicSection sec = sectionId != null
+                ? sectionRepository.findById(sectionId).orElse(null)
+                : null;
+
+        String className = cls != null ? cls.getName() : (saved.isEmpty() ? null : saved.get(0).getClassName());
+        String sectionName = sec != null
+                ? sec.getName()
+                : (saved.isEmpty() ? null : saved.get(0).getSectionName());
+
+        Long academicYearId = cls != null && cls.getAcademicYear() != null
+                ? cls.getAcademicYear().getAcademicYearId()
+                : null;
+
+        StaffAttendanceDayContextService.DayContext day = dayContextService.resolveStudentDay(orgId, date);
+        AttendanceMode mode = attendanceSettingRepository.findByOrganizationId(orgId)
+                .map(s -> s.getAttendanceMode() != null ? s.getAttendanceMode() : AttendanceMode.DAILY)
+                .orElse(AttendanceMode.DAILY);
+        boolean frozen = attendanceFreezeService.isDateFrozen(orgId, date);
+
+        return StudentRosterResponse.builder()
+                .attendanceDate(date)
+                .classId(classId)
+                .className(className)
+                .sectionId(sectionId)
+                .sectionName(sectionName)
+                .academicYearId(academicYearId)
+                .attendanceMode(mode)
+                .attendanceRequired(day.attendanceRequired())
+                .holiday(day.holiday())
+                .weekend(day.weekend())
+                .holidayName(day.holidayName())
+                .dayReason(day.reason())
+                .frozen(frozen)
+                .students(students)
+                .build();
+    }
+
+    private StudentRosterResponse.StudentRosterEntryResponse toRosterEntry(
+            StudentEnrollment e, StudentAttendance saved) {
+        Student student = e.getStudent();
+        String roll = e.getRollNumber() != null ? e.getRollNumber()
+                : (student.getRollNumber() != null ? student.getRollNumber() : null);
+        String name = studentName(student);
+        return StudentRosterResponse.StudentRosterEntryResponse.builder()
+                .studentId(student.getStudentId())
+                .studentName(name)
+                .rollNumber(roll)
+                .admissionNumber(student.getAdmissionNumber())
+                .status(saved != null ? saved.getStatus() : null)
+                .remarks(saved != null ? saved.getRemarks() : null)
+                .build();
+    }
+
+    @Override
+    public List<StudentAttendanceSessionResponse> getSessions(
+            LocalDate from, LocalDate to, Long classId, Long sectionId) {
+        Long orgId = OrganizationContext.getOrganizationId();
+
+        List<Object[]> rows = studentAttendanceRepository.getSessionList(orgId, from, to, classId, sectionId);
+        List<StudentAttendanceSessionResponse> sessions = new ArrayList<>();
+
+        for (Object[] row : rows) {
+            LocalDate date = (LocalDate) row[0];
+            Long cid = ((Number) row[1]).longValue();
+            String cname = (String) row[2];
+            Long sid = row[3] != null ? ((Number) row[3]).longValue() : null;
+            String sname = (String) row[4];
+            int totalMarked = ((Number) row[5]).intValue();
+            int present = ((Number) row[6]).intValue();
+            int absent = ((Number) row[7]).intValue();
+            int late = ((Number) row[8]).intValue();
+            int excused = ((Number) row[9]).intValue();
+
+            long expected = sid != null
+                    ? studentEnrollmentRepository.countByClassEntityClassIdAndSectionSectionIdAndActiveTrue(cid, sid)
+                    : studentEnrollmentRepository.countByClassEntityClassIdAndActiveTrue(cid);
+
+            StaffAttendanceDayContextService.DayContext day = dayContextService.resolveStudentDay(orgId, date);
+            boolean complete = expected > 0 && totalMarked >= expected;
+            double pct = totalMarked > 0
+                    ? Math.round(((present + late) * 100.0 / totalMarked) * 100.0) / 100.0
+                    : 0.0;
+
+            sessions.add(StudentAttendanceSessionResponse.builder()
+                    .date(date)
+                    .classId(cid)
+                    .className(cname)
+                    .sectionId(sid)
+                    .sectionName(sname)
+                    .expectedStudents((int) expected)
+                    .totalMarked(totalMarked)
+                    .present(present)
+                    .absent(absent)
+                    .late(late)
+                    .excused(excused)
+                    .attendancePercent(pct)
+                    .holiday(day.holiday())
+                    .weekend(day.weekend())
+                    .dayReason(day.reason())
+                    .status(complete ? "COMPLETED" : "PARTIAL")
+                    .build());
+        }
+        return sessions;
+    }
 
     @Override
     @Transactional
     public ClassAttendanceSummaryResponse markDailyAttendance(MarkStudentAttendanceRequest request) {
         Long orgId = OrganizationContext.getOrganizationId();
         validateNotFrozen(orgId, request.getAttendanceDate());
+        validateInstructionalDay(orgId, request.getAttendanceDate());
+
+        ResolvedClassInfo resolved = resolveClassInfo(orgId, request.getClassId(), request.getSectionId());
+        Set<Long> roster = activeRosterStudentIds(resolved.classId, resolved.sectionId);
+        validateEntriesAgainstRoster(request.getEntries(), roster);
 
         String markedBy = currentUser();
         List<StudentAttendance> saved = request.getEntries().stream()
-                .map(entry -> upsertDailyAttendance(orgId, request, entry, markedBy))
+                .map(entry -> upsertDailyAttendance(orgId, request, entry, markedBy, resolved))
                 .collect(Collectors.toList());
 
         return buildClassSummary(saved, request.getAttendanceDate(),
-                request.getClassId(), request.getSectionId());
+                resolved.classId, resolved.sectionId);
     }
 
     @Override
@@ -61,17 +210,22 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
     public ClassAttendanceSummaryResponse markPeriodAttendance(MarkPeriodAttendanceRequest request) {
         Long orgId = OrganizationContext.getOrganizationId();
         validateNotFrozen(orgId, request.getAttendanceDate());
+        validateInstructionalDay(orgId, request.getAttendanceDate());
+
+        ResolvedClassInfo resolved = resolveClassInfo(orgId, request.getClassId(), request.getSectionId());
+        Set<Long> roster = activeRosterStudentIds(resolved.classId, resolved.sectionId);
+        validateEntriesAgainstRoster(request.getEntries(), roster);
 
         String markedBy = currentUser();
         request.getEntries().forEach(entry ->
-                upsertPeriodAttendance(orgId, request, entry, markedBy));
+                upsertPeriodAttendance(orgId, request, entry, markedBy, resolved));
 
         List<StudentAttendance> classDayList = studentAttendanceRepository
                 .findByOrganizationIdAndClassIdAndSectionIdAndAttendanceDateOrderByRollNumber(
-                        orgId, request.getClassId(), request.getSectionId(), request.getAttendanceDate());
+                        orgId, resolved.classId, resolved.sectionId, request.getAttendanceDate());
 
         return buildClassSummary(classDayList, request.getAttendanceDate(),
-                request.getClassId(), request.getSectionId());
+                resolved.classId, resolved.sectionId);
     }
 
     @Override
@@ -79,6 +233,7 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
     public ClassAttendanceSummaryResponse copyFromPreviousDay(Long classId, Long sectionId, LocalDate targetDate) {
         Long orgId = OrganizationContext.getOrganizationId();
         validateNotFrozen(orgId, targetDate);
+        validateInstructionalDay(orgId, targetDate);
 
         LocalDate previousDay = targetDate.minusDays(1);
         List<StudentAttendance> previous = sectionId != null
@@ -213,7 +368,7 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
     // ─── Private helpers ─────────────────────────────────────────────────────────
 
     private StudentAttendance upsertDailyAttendance(Long orgId, MarkStudentAttendanceRequest request,
-            StudentAttendanceEntry entry, String markedBy) {
+            StudentAttendanceEntry entry, String markedBy, ResolvedClassInfo resolved) {
 
         StudentAttendance attendance = studentAttendanceRepository
                 .findByOrganizationIdAndStudentIdAndAttendanceDate(orgId, entry.getStudentId(),
@@ -225,9 +380,11 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
         attendance.setStudentName(entry.getStudentName());
         attendance.setRollNumber(entry.getRollNumber());
         attendance.setAdmissionNumber(entry.getAdmissionNumber());
-        attendance.setAcademicYearId(request.getAcademicYearId());
-        attendance.setClassId(request.getClassId());
-        attendance.setSectionId(request.getSectionId());
+        attendance.setAcademicYearId(resolved.academicYearId);
+        attendance.setClassId(resolved.classId);
+        attendance.setClassName(resolved.className);
+        attendance.setSectionId(resolved.sectionId);
+        attendance.setSectionName(resolved.sectionName);
         attendance.setAttendanceDate(request.getAttendanceDate());
         attendance.setStatus(entry.getStatus());
         attendance.setRemarks(entry.getRemarks());
@@ -237,7 +394,7 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
     }
 
     private void upsertPeriodAttendance(Long orgId, MarkPeriodAttendanceRequest request,
-            StudentAttendanceEntry entry, String markedBy) {
+            StudentAttendanceEntry entry, String markedBy, ResolvedClassInfo resolved) {
 
         StudentPeriodAttendance attendance = studentPeriodAttendanceRepository
                 .findByOrganizationIdAndStudentIdAndAttendanceDateAndPeriodId(
@@ -248,9 +405,11 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
         attendance.setStudentId(entry.getStudentId());
         attendance.setStudentName(entry.getStudentName());
         attendance.setRollNumber(entry.getRollNumber());
-        attendance.setAcademicYearId(request.getAcademicYearId());
-        attendance.setClassId(request.getClassId());
-        attendance.setSectionId(request.getSectionId());
+        attendance.setAcademicYearId(resolved.academicYearId);
+        attendance.setClassId(resolved.classId);
+        attendance.setClassName(resolved.className);
+        attendance.setSectionId(resolved.sectionId);
+        attendance.setSectionName(resolved.sectionName);
         attendance.setPeriodId(request.getPeriodId());
         attendance.setPeriodNumber(request.getPeriodNumber());
         attendance.setPeriodName(request.getPeriodName());
@@ -319,6 +478,75 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
         if (attendanceFreezeService.isDateFrozen(orgId, date)) {
             throw new BadRequestException("Attendance is frozen for date: " + date);
         }
+    }
+
+    private void validateInstructionalDay(Long orgId, LocalDate date) {
+        StaffAttendanceDayContextService.DayContext day = dayContextService.resolveStudentDay(orgId, date);
+        if (!day.attendanceRequired()) {
+            String reason = day.holiday() ? "holiday" : "weekend";
+            String detail = day.holiday() && day.holidayName() != null ? " (" + day.holidayName() + ")" : "";
+            throw new BadRequestException(
+                    "Attendance cannot be marked on a " + reason + detail + ": " + date);
+        }
+    }
+
+    private ResolvedClassInfo resolveClassInfo(Long orgId, Long classId, Long sectionId) {
+        AcademicClass cls = classRepository.findByIdWithYear(classId)
+                .filter(c -> Boolean.TRUE.equals(c.getActive()))
+                .orElseThrow(() -> new BadRequestException("Class not found or inactive: " + classId));
+        String className = cls.getName();
+
+        Long resolvedSectionId = sectionId;
+        String resolvedSectionName = null;
+        if (sectionId != null) {
+            AcademicSection sec = sectionRepository.findById(sectionId)
+                    .filter(s -> Boolean.TRUE.equals(s.getActive()))
+                    .orElseThrow(() -> new BadRequestException("Section not found or inactive: " + sectionId));
+            resolvedSectionName = sec.getName();
+        }
+
+        Long academicYearId = cls.getAcademicYear() != null ? cls.getAcademicYear().getAcademicYearId() : null;
+
+        return new ResolvedClassInfo(classId, className, resolvedSectionId, resolvedSectionName, academicYearId);
+    }
+
+    private Set<Long> activeRosterStudentIds(Long classId, Long sectionId) {
+        List<StudentEnrollment> enrollments = sectionId != null
+                ? studentEnrollmentRepository.findActiveRosterByClassSection(classId, sectionId)
+                : studentEnrollmentRepository.findActiveRosterByClass(classId);
+        return enrollments.stream()
+                .map(e -> e.getStudent().getStudentId())
+                .collect(Collectors.toSet());
+    }
+
+    private void validateEntriesAgainstRoster(List<StudentAttendanceEntry> entries, Set<Long> roster) {
+        if (entries.isEmpty()) {
+            throw new BadRequestException("At least one student entry is required");
+        }
+        Set<Long> seen = new HashSet<>();
+        for (StudentAttendanceEntry entry : entries) {
+            if (entry.getStudentId() == null) {
+                throw new BadRequestException("Student ID is required for every entry");
+            }
+            if (!seen.add(entry.getStudentId())) {
+                throw new BadRequestException("Duplicate entry for student: " + entry.getStudentId());
+            }
+            if (!roster.contains(entry.getStudentId())) {
+                throw new BadRequestException(
+                        "Student is not enrolled in this class/section: " + entry.getStudentId());
+            }
+        }
+    }
+
+    private String studentName(Student student) {
+        return java.util.stream.Stream.of(student.getFirstName(), student.getMiddleName(), student.getLastName())
+                .filter(s -> s != null && !s.isBlank())
+                .collect(Collectors.joining(" "))
+                .trim();
+    }
+
+    private record ResolvedClassInfo(Long classId, String className, Long sectionId,
+            String sectionName, Long academicYearId) {
     }
 
     private String currentUser() {

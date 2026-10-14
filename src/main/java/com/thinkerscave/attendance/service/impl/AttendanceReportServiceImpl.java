@@ -42,8 +42,9 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
 
         // Class-wise summary across the selected date range (not a single day)
         // row: [0]=classId, [1]=className, [2]=sectionId, [3]=sectionName, [4]=total, [5]=presentCount
-        List<Object[]> classRows = studentAttendanceRepository.getClassWiseSummaryForRange(
-                orgId, request.getFromDate(), request.getToDate());
+        List<Object[]> classRows = studentAttendanceRepository.getClassWiseSummaryForRangeFiltered(
+                orgId, request.getFromDate(), request.getToDate(),
+                request.getClassId(), request.getSectionId());
 
         List<ClassSummaryRow> classWiseSummary = classRows.stream()
                 .map(row -> ClassSummaryRow.builder()
@@ -66,8 +67,9 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
                         .map(s -> s.getMinStudentAttendancePercent() != null
                                 ? s.getMinStudentAttendancePercent().doubleValue() : 75.0)
                         .orElse(75.0);
-        List<Object[]> defaulterRows = studentAttendanceRepository.getDefaulterList(
-                orgId, request.getFromDate(), request.getToDate(), threshold);
+        List<Object[]> defaulterRows = studentAttendanceRepository.getDefaulterListFiltered(
+                orgId, request.getFromDate(), request.getToDate(),
+                request.getClassId(), request.getSectionId(), threshold);
 
         List<DefaulterRow> defaulters = defaulterRows.stream()
                 .map(row -> DefaulterRow.builder()

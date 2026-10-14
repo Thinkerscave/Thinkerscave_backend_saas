@@ -100,7 +100,61 @@ public interface StudentAttendanceRepository extends JpaRepository<StudentAttend
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
-    // ─── Dashboard ────────────────────────────────────────────────────────
+    @Query("""
+            SELECT sa.classId, sa.className, sa.sectionId, sa.sectionName,
+                   COUNT(sa) as total,
+                   SUM(CASE WHEN sa.status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) as presentCount
+            FROM StudentAttendance sa
+            WHERE sa.organizationId = :orgId
+              AND sa.attendanceDate BETWEEN :from AND :to
+              AND (:classId IS NULL OR sa.classId = :classId)
+              AND (:sectionId IS NULL OR sa.sectionId = :sectionId)
+            GROUP BY sa.classId, sa.className, sa.sectionId, sa.sectionName
+            ORDER BY sa.className, sa.sectionName
+            """)
+    List<Object[]> getClassWiseSummaryForRangeFiltered(@Param("orgId") Long orgId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("classId") Long classId,
+            @Param("sectionId") Long sectionId);
+
+    @Query("""
+            SELECT sa.attendanceDate, COUNT(DISTINCT sa.studentId) as totalStudents,
+                   SUM(CASE WHEN sa.status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) as presentCount
+            FROM StudentAttendance sa
+            WHERE sa.organizationId = :orgId
+              AND sa.attendanceDate BETWEEN :from AND :to
+              AND (:classId IS NULL OR sa.classId = :classId)
+              AND (:sectionId IS NULL OR sa.sectionId = :sectionId)
+            GROUP BY sa.attendanceDate
+            ORDER BY sa.attendanceDate
+            """)
+    List<Object[]> getDailyAttendanceSummaryFiltered(@Param("orgId") Long orgId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("classId") Long classId,
+            @Param("sectionId") Long sectionId);
+
+    @Query("""
+            SELECT sa.attendanceDate, sa.classId, sa.className, sa.sectionId, sa.sectionName,
+                   COUNT(sa) as totalMarked,
+                   SUM(CASE WHEN sa.status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) as presentCount,
+                   SUM(CASE WHEN sa.status = 'ABSENT' THEN 1 ELSE 0 END) as absentCount,
+                   SUM(CASE WHEN sa.status = 'LATE' THEN 1 ELSE 0 END) as lateCount,
+                   SUM(CASE WHEN sa.status = 'EXCUSED' THEN 1 ELSE 0 END) as excusedCount
+            FROM StudentAttendance sa
+            WHERE sa.organizationId = :orgId
+              AND sa.attendanceDate BETWEEN :from AND :to
+              AND (:classId IS NULL OR sa.classId = :classId)
+              AND (:sectionId IS NULL OR sa.sectionId = :sectionId)
+            GROUP BY sa.attendanceDate, sa.classId, sa.className, sa.sectionId, sa.sectionName
+            ORDER BY sa.attendanceDate DESC, sa.className ASC, sa.sectionName ASC
+            """)
+    List<Object[]> getSessionList(@Param("orgId") Long orgId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("classId") Long classId,
+            @Param("sectionId") Long sectionId);
 
     @Query("""
             SELECT COUNT(DISTINCT ac.classId)
@@ -164,6 +218,42 @@ public interface StudentAttendanceRepository extends JpaRepository<StudentAttend
             @Param("from") LocalDate from,
             @Param("to") LocalDate to,
             @Param("threshold") double threshold);
+
+    @Query("""
+            SELECT sa.studentId, sa.studentName, sa.className, sa.sectionName,
+                   COUNT(sa) as totalDays,
+                   SUM(CASE WHEN sa.status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) as presentDays
+            FROM StudentAttendance sa
+            WHERE sa.organizationId = :orgId
+              AND sa.attendanceDate BETWEEN :from AND :to
+              AND (:classId IS NULL OR sa.classId = :classId)
+              AND (:sectionId IS NULL OR sa.sectionId = :sectionId)
+            GROUP BY sa.studentId, sa.studentName, sa.className, sa.sectionName
+            HAVING (CAST(SUM(CASE WHEN sa.status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) AS double) / COUNT(sa)) * 100 < :threshold
+            ORDER BY (CAST(SUM(CASE WHEN sa.status IN ('PRESENT', 'LATE') THEN 1 ELSE 0 END) AS double) / COUNT(sa)) ASC
+            """)
+    List<Object[]> getDefaulterListFiltered(@Param("orgId") Long orgId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("classId") Long classId,
+            @Param("sectionId") Long sectionId,
+            @Param("threshold") double threshold);
+
+    @Query("""
+            SELECT sa.attendanceDate, sa.status, COUNT(sa)
+            FROM StudentAttendance sa
+            WHERE sa.organizationId = :orgId
+              AND sa.attendanceDate BETWEEN :from AND :to
+              AND (:classId IS NULL OR sa.classId = :classId)
+              AND (:sectionId IS NULL OR sa.sectionId = :sectionId)
+            GROUP BY sa.attendanceDate, sa.status
+            ORDER BY sa.attendanceDate
+            """)
+    List<Object[]> getStatusBreakdownFiltered(@Param("orgId") Long orgId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("classId") Long classId,
+            @Param("sectionId") Long sectionId);
 
     @Modifying
     @Query("DELETE FROM StudentAttendance sa WHERE sa.organizationId = :orgId AND sa.classId = :classId AND sa.sectionId = :sectionId AND sa.attendanceDate = :date")

@@ -4,6 +4,7 @@ import com.thinkerscave.attendance.dto.request.AttendanceReportRequest;
 import com.thinkerscave.attendance.dto.response.AttendanceSummaryReportResponse;
 import com.thinkerscave.attendance.dto.response.StaffAttendanceSummaryResponse;
 import com.thinkerscave.attendance.dto.response.StudentHistoryResponse;
+import com.thinkerscave.attendance.security.AttendanceAccessGuard;
 import com.thinkerscave.attendance.service.AttendanceReportService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,12 +26,14 @@ import java.util.List;
 public class AttendanceReportController {
 
     private final AttendanceReportService attendanceReportService;
+    private final AttendanceAccessGuard accessGuard;
 
     @PostMapping("/summary")
     @Operation(summary = "Get class-wise attendance summary for a date range")
     @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER', 'STAFF')")
     public ResponseEntity<ApiResponse<AttendanceSummaryReportResponse>> getSummaryReport(
             @Valid @RequestBody AttendanceReportRequest request) {
+        accessGuard.requireView(AttendanceAccessGuard.ATTENDANCE);
         return ResponseEntity.ok(ApiResponse.success(
                 "Summary report generated",
                 attendanceReportService.getSummaryReport(request)));
@@ -41,6 +44,7 @@ public class AttendanceReportController {
     @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
     public ResponseEntity<ApiResponse<List<StaffAttendanceSummaryResponse>>> getStaffReport(
             @Valid @RequestBody AttendanceReportRequest request) {
+        accessGuard.requireView(AttendanceAccessGuard.ATTENDANCE);
         return ResponseEntity.ok(ApiResponse.success(
                 "Staff report generated",
                 attendanceReportService.getStaffReport(request)));
@@ -52,6 +56,7 @@ public class AttendanceReportController {
     public ResponseEntity<ApiResponse<StudentHistoryResponse>> getStudentReport(
             @PathVariable Long studentId,
             @Valid @RequestBody AttendanceReportRequest request) {
+        accessGuard.requireView(AttendanceAccessGuard.ATTENDANCE);
         return ResponseEntity.ok(ApiResponse.success(
                 "Student report generated",
                 attendanceReportService.getStudentReport(studentId, request)));

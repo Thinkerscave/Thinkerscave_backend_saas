@@ -25,7 +25,11 @@ public class AttendanceCalendarResponse {
     public static class CalendarDayResponse {
         private LocalDate date;
         private Double attendancePercent;
-        @Schema(description = "GOOD=>=85%, AVERAGE=>=70%, LOW=<70%, NO_DATA=not marked, HOLIDAY")
+        @Schema(description = "GOOD=>=85%, AVERAGE=>=70%, LOW=<70%, NO_DATA=not marked, HOLIDAY, WEEKEND")
         private String status;
+        @Schema(description = "Calendar classification of the day: WORKING, HOLIDAY, WEEKEND")
+        private String dayType;
+        @Schema(description = "Holiday title when dayType is HOLIDAY")
+        private String holidayName;
     }
 }

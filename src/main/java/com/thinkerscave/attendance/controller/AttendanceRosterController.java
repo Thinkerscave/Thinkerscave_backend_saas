@@ -6,6 +6,7 @@ import com.thinkerscave.attendance.dto.AttendanceRosterRecord;
 import com.thinkerscave.attendance.entity.StudentAttendance;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
+import com.thinkerscave.attendance.security.AttendanceAccessGuard;
 import com.thinkerscave.attendance.service.AttendanceFreezeService;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.BadRequestException;
@@ -47,6 +48,7 @@ public class AttendanceRosterController {
     private final SectionRepository sectionRepository;
     private final StudentEnrollmentRepository studentEnrollmentRepository;
     private final AttendanceFreezeService attendanceFreezeService;
+    private final AttendanceAccessGuard accessGuard;
 
     // ─────────────────────────────────────────────────────────────────────────
     // GET  /api/v1/attendance?date=&type=
@@ -67,6 +69,7 @@ public class AttendanceRosterController {
             return ResponseEntity.ok(List.of());
         }
 
+        accessGuard.requireView(AttendanceAccessGuard.ATTENDANCE);
         List<StudentAttendance> records =
                 studentAttendanceRepository.findByOrganizationIdAndAttendanceDateOrderByClassNameAscRollNumberAsc(orgId, date);
 
@@ -87,6 +90,7 @@ public class AttendanceRosterController {
         Long orgId = OrganizationContext.getOrganizationId();
         log.debug("Fetching class attendance for orgId={} classId={} date={}", orgId, classId, date);
 
+        accessGuard.requireView(AttendanceAccessGuard.ATTENDANCE);
         List<StudentAttendance> records =
                 studentAttendanceRepository.findByOrganizationIdAndClassIdAndAttendanceDateOrderByRollNumber(orgId, classId, date);
 
@@ -105,6 +109,7 @@ public class AttendanceRosterController {
 
         Long orgId = OrganizationContext.getOrganizationId();
         LocalDate date = LocalDate.parse(payload.getAttendanceDate());
+        accessGuard.requireManage(AttendanceAccessGuard.ATTENDANCE);
         validateNotFrozen(orgId, date);
 
         try {
@@ -146,6 +151,7 @@ public class AttendanceRosterController {
             @RequestBody AttendanceRosterRecord payload) {
 
         Long orgId = OrganizationContext.getOrganizationId();
+        accessGuard.requireManage(AttendanceAccessGuard.ATTENDANCE);
 
         StudentAttendance attendance = studentAttendanceRepository
                 .findByOrganizationIdAndAttendanceId(orgId, id)

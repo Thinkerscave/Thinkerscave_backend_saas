@@ -1,6 +1,7 @@
 package com.thinkerscave.attendance.controller;
 
 import com.thinkerscave.attendance.dto.response.AttendanceCalendarResponse;
+import com.thinkerscave.attendance.security.AttendanceAccessGuard;
 import com.thinkerscave.attendance.service.AttendanceCalendarService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AttendanceCalendarController {
 
     private final AttendanceCalendarService attendanceCalendarService;
+    private final AttendanceAccessGuard accessGuard;
 
     @GetMapping
     @Operation(summary = "Get monthly calendar attendance data for a class/section")
@@ -31,6 +33,7 @@ public class AttendanceCalendarController {
             @RequestParam(required = false) Long sectionId,
             @RequestParam int year,
             @RequestParam int month) {
+        accessGuard.requireView(AttendanceAccessGuard.ATTENDANCE);
         return ResponseEntity.ok(ApiResponse.success(
                 "Calendar data retrieved",
                 attendanceCalendarService.getCalendarData(classId, sectionId, year, month)));
