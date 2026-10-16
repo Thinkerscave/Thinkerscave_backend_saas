@@ -3,7 +3,10 @@ package com.thinkerscave.academics.controller;
 import com.thinkerscave.academics.dto.request.AcademicResourceRequest;
 import com.thinkerscave.academics.dto.request.TimetableConfigurationRequest;
 import com.thinkerscave.academics.dto.request.TimetableGenerationStartRequest;
+import com.thinkerscave.academics.dto.request.TeacherArrangementRequest;
+import com.thinkerscave.academics.dto.request.TeacherArrangementReviewRequest;
 import com.thinkerscave.academics.dto.response.*;
+import com.thinkerscave.academics.service.TeacherArrangementService;
 import com.thinkerscave.academics.service.TimetableService;
 import com.thinkerscave.shared.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -24,6 +28,73 @@ import java.util.List;
 public class TimetableController {
 
     private final TimetableService timetableService;
+    private final TeacherArrangementService teacherArrangementService;
+
+    @GetMapping("/arrangements")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @Operation(summary = "List teacher absence arrangements for an academic year")
+    public ResponseEntity<ApiResponse<List<TeacherArrangementResponse>>> arrangements(
+            @RequestParam Long academicYearId) {
+        return ResponseEntity.ok(ApiResponse.success("Teacher arrangements",
+                teacherArrangementService.list(academicYearId)));
+    }
+
+    @GetMapping("/arrangements/by-date")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @Operation(summary = "List approved substitute arrangements for a date")
+    public ResponseEntity<ApiResponse<List<TeacherArrangementResponse>>> arrangementsByDate(
+            @RequestParam Long academicYearId,
+            @RequestParam LocalDate date) {
+        return ResponseEntity.ok(ApiResponse.success("Approved teacher arrangements",
+                teacherArrangementService.listByDate(academicYearId, date)));
+    }
+
+    @GetMapping("/arrangements/teachers")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @Operation(summary = "List active teachers assigned in an academic year")
+    public ResponseEntity<ApiResponse<List<TeacherArrangementEligibleSlotResponse.StaffOption>>> arrangementTeachers(
+            @RequestParam Long academicYearId) {
+        return ResponseEntity.ok(ApiResponse.success("Assigned teachers",
+                teacherArrangementService.teachers(academicYearId)));
+    }
+
+    @GetMapping("/arrangements/eligible-slots")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @Operation(summary = "List scheduled periods and available substitutes for a teacher absence")
+    public ResponseEntity<ApiResponse<List<TeacherArrangementEligibleSlotResponse>>> eligibleArrangementSlots(
+            @RequestParam Long academicYearId,
+            @RequestParam LocalDate date,
+            @RequestParam Long absentTeacherId) {
+        return ResponseEntity.ok(ApiResponse.success("Eligible substitute periods",
+                teacherArrangementService.eligibleSlots(academicYearId, date, absentTeacherId)));
+    }
+
+    @PostMapping("/arrangements")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @Operation(summary = "Submit a teacher absence and substitute arrangement")
+    public ResponseEntity<ApiResponse<TeacherArrangementResponse>> createArrangement(
+            @Valid @RequestBody TeacherArrangementRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created("Arrangement submitted",
+                teacherArrangementService.create(request)));
+    }
+
+    @PostMapping("/arrangements/{id}/approve")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @Operation(summary = "Approve a teacher substitute arrangement")
+    public ResponseEntity<ApiResponse<TeacherArrangementResponse>> approveArrangement(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Arrangement approved",
+                teacherArrangementService.approve(id)));
+    }
+
+    @PostMapping("/arrangements/{id}/reject")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @Operation(summary = "Reject a teacher substitute arrangement")
+    public ResponseEntity<ApiResponse<TeacherArrangementResponse>> rejectArrangement(
+            @PathVariable Long id,
+            @Valid @RequestBody TeacherArrangementReviewRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Arrangement rejected",
+                teacherArrangementService.reject(id, request == null ? null : request.note())));
+    }
 
     // ─── Dashboard ────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 package com.thinkerscave.admission.scheduling;
 
-import com.thinkerscave.attendance.entity.AttendanceSetting;
-import com.thinkerscave.attendance.repository.AttendanceSettingRepository;
+import com.thinkerscave.settings.ModuleSettingCatalog;
+import com.thinkerscave.settings.ModuleSettingsService;
 import com.thinkerscave.shared.context.OrganizationContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -37,7 +37,7 @@ public class FollowUpSlotPlanner {
     private static final LocalTime DEFAULT_END = LocalTime.of(17, 0);
     private static final int MAX_BUSINESS_DAY_OFFSET = 2;
 
-    private final AttendanceSettingRepository attendanceSettingRepository;
+    private final ModuleSettingsService moduleSettingsService;
 
     /**
      * @param loadForDate returns how many scheduled follow-ups the counselor already has on that date
@@ -140,10 +140,11 @@ public class FollowUpSlotPlanner {
     private Window resolveWindow() {
         Long orgId = OrganizationContext.getOrganizationId();
         if (orgId != null) {
-            AttendanceSetting setting = attendanceSettingRepository.findByOrganizationId(orgId).orElse(null);
-            if (setting != null && setting.getWindowStartTime() != null && setting.getWindowEndTime() != null) {
-                return new Window(setting.getWindowStartTime(), setting.getWindowEndTime());
-            }
+                LocalTime start = moduleSettingsService.getTime(orgId, ModuleSettingCatalog.ATTENDANCE,
+                    ModuleSettingCatalog.ATTENDANCE_WINDOW_START);
+                LocalTime end = moduleSettingsService.getTime(orgId, ModuleSettingCatalog.ATTENDANCE,
+                    ModuleSettingCatalog.ATTENDANCE_WINDOW_END);
+                if (start != null && end != null) return new Window(start, end);
         }
         return new Window(DEFAULT_START, DEFAULT_END);
     }

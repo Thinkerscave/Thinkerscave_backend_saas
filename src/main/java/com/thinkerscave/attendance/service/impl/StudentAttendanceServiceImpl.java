@@ -13,12 +13,13 @@ import com.thinkerscave.attendance.entity.StudentAttendance;
 import com.thinkerscave.attendance.entity.StudentPeriodAttendance;
 import com.thinkerscave.attendance.enums.AttendanceMode;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
-import com.thinkerscave.attendance.repository.AttendanceSettingRepository;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
 import com.thinkerscave.attendance.repository.StudentPeriodAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceFreezeService;
 import com.thinkerscave.attendance.service.StaffAttendanceDayContextService;
 import com.thinkerscave.attendance.service.StudentAttendanceService;
+import com.thinkerscave.settings.ModuleSettingCatalog;
+import com.thinkerscave.settings.ModuleSettingsService;
 import com.thinkerscave.academics.entity.AcademicClass;
 import com.thinkerscave.academics.entity.AcademicSection;
 import com.thinkerscave.academics.repository.ClassRepository;
@@ -55,7 +56,7 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
     private final StudentAttendanceRepository studentAttendanceRepository;
     private final StudentPeriodAttendanceRepository studentPeriodAttendanceRepository;
     private final AttendanceFreezeService attendanceFreezeService;
-    private final AttendanceSettingRepository attendanceSettingRepository;
+        private final ModuleSettingsService moduleSettingsService;
     private final StudentEnrollmentRepository studentEnrollmentRepository;
     private final StaffAttendanceDayContextService dayContextService;
     private final ClassRepository classRepository;
@@ -94,9 +95,8 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
                 : null;
 
         StaffAttendanceDayContextService.DayContext day = dayContextService.resolveStudentDay(orgId, date);
-        AttendanceMode mode = attendanceSettingRepository.findByOrganizationId(orgId)
-                .map(s -> s.getAttendanceMode() != null ? s.getAttendanceMode() : AttendanceMode.DAILY)
-                .orElse(AttendanceMode.DAILY);
+        AttendanceMode mode = AttendanceMode.valueOf(moduleSettingsService.getString(
+                orgId, ModuleSettingCatalog.ATTENDANCE, ModuleSettingCatalog.ATTENDANCE_MODE));
         boolean frozen = attendanceFreezeService.isDateFrozen(orgId, date);
 
         return StudentRosterResponse.builder()
@@ -249,9 +249,8 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
         }
 
         // Honor org setting — copy is a no-op when disabled
-        boolean allowCopy = attendanceSettingRepository.findByOrganizationId(orgId)
-                .map(s -> Boolean.TRUE.equals(s.getAllowCopyPrevious()))
-                .orElse(true);
+        boolean allowCopy = Boolean.TRUE.equals(moduleSettingsService.getBoolean(
+                orgId, ModuleSettingCatalog.ATTENDANCE, ModuleSettingCatalog.ALLOW_COPY_PREVIOUS));
         if (!allowCopy) {
             throw new BadRequestException("Copy from previous day is disabled in attendance settings");
         }

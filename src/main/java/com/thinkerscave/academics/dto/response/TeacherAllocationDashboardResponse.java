@@ -23,7 +23,14 @@ public class TeacherAllocationDashboardResponse {
     private long assignedSlots;
     private long missingSlots;
     private long conflictSlots;
+    private int page;
+    private int size;
+    private int totalPages;
+    private long totalRows;
 
     private List<TeacherAllocationRowResponse> rows;
+    private List<FilterOption> subjectOptions;
     private List<TeacherWorkloadResponse> workloads;
+
+    public record FilterOption(Long id, String name) {}
 }
