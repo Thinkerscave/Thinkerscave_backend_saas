@@ -2,12 +2,11 @@ package com.thinkerscave.dashboard.service;
 
 import com.thinkerscave.academics.entity.TimetableEntry;
 import com.thinkerscave.academics.entity.TimetableVersion;
-import com.thinkerscave.academics.enums.TeacherAllocationTeacherRole;
 import com.thinkerscave.academics.enums.TimetableStatus;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
-import com.thinkerscave.academics.repository.TeacherAllocationTeacherRepository;
 import com.thinkerscave.academics.repository.TimetableEntryRepository;
 import com.thinkerscave.academics.repository.TimetableVersionRepository;
+import com.thinkerscave.attendance.service.TeacherAttendanceAuthorizationService;
 import com.thinkerscave.dashboard.dto.response.widgetdata.TimetableSlotItem;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -15,9 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -35,34 +32,15 @@ public class DashboardTimetableHelper {
     private final AcademicYearRepository academicYearRepository;
     private final TimetableVersionRepository timetableVersionRepository;
     private final TimetableEntryRepository timetableEntryRepository;
-    private final TeacherAllocationTeacherRepository teacherAllocationTeacherRepository;
+    private final TeacherAttendanceAuthorizationService teacherAttendanceAuthorizationService;
 
     @Transactional(readOnly = true)
     public List<TimetableSlotItem> todaySlotsForTeacher(Long staffId) {
         if (staffId == null) {
             return List.of();
         }
-        Long versionId = currentPublishedVersionId();
-        if (versionId == null) {
-            return List.of();
-        }
-
-        Set<Long> ownAllocationIds = teacherAllocationTeacherRepository
-                .findByStaff_StaffIdAndEffectiveToIsNull(staffId).stream()
-                .filter(t -> Boolean.TRUE.equals(t.getActive()) && t.getRole() == TeacherAllocationTeacherRole.PRIMARY)
-                .map(t -> t.getTeacherAllocation().getTeacherAllocationId())
-                .collect(Collectors.toCollection(HashSet::new));
-
-        if (ownAllocationIds.isEmpty()) {
-            return List.of();
-        }
-
-        return timetableEntryRepository
-                .findByTimetableVersion_TimetableVersionIdAndDayOfWeek(versionId, today()).stream()
-                .filter(e -> e.getTeacherAllocation() != null
-                        && ownAllocationIds.contains(e.getTeacherAllocation().getTeacherAllocationId()))
-                .sorted(Comparator.comparing(e -> e.getTimetablePeriod().getPeriodNumber()))
-                .map(this::toSlot)
+        return teacherAttendanceAuthorizationService.slotsForTeacher(staffId, LocalDate.now()).stream()
+                .map(slot -> toSlot(slot.entry(), slot))
                 .collect(Collectors.toList());
     }
 
@@ -80,7 +58,7 @@ public class DashboardTimetableHelper {
                 .findByTimetableVersion_TimetableVersionIdAndSection_SectionId(versionId, sectionId).stream()
                 .filter(e -> e.getDayOfWeek() == today())
                 .sorted(Comparator.comparing(e -> e.getTimetablePeriod().getPeriodNumber()))
-                .map(this::toSlot)
+                .map(entry -> toSlot(entry, null))
                 .collect(Collectors.toList());
     }
 
@@ -96,10 +74,19 @@ public class DashboardTimetableHelper {
                 .orElse(null);
     }
 
-    private TimetableSlotItem toSlot(TimetableEntry entry) {
+        private TimetableSlotItem toSlot(
+            TimetableEntry entry, TeacherAttendanceAuthorizationService.TeacherTeachingSlot assignment) {
         var period = entry.getTimetablePeriod();
         var section = entry.getSection();
+        var academicClass = section != null ? section.getAcademicClass() : null;
+        var academicYear = entry.getTimetableVersion() != null
+            ? entry.getTimetableVersion().getAcademicYear() : null;
         return TimetableSlotItem.builder()
+            .timetableEntryId(entry.getTimetableEntryId())
+            .academicYearId(academicYear != null ? academicYear.getAcademicYearId() : null)
+            .classId(academicClass != null ? academicClass.getClassId() : null)
+            .sectionId(section != null ? section.getSectionId() : null)
+            .periodId(period != null ? period.getTimetablePeriodId() : null)
                 .periodNumber(period != null && period.getPeriodNumber() != null ? period.getPeriodNumber().intValue() : null)
                 .periodName(period != null ? period.getName() : null)
                 .startTime(period != null ? period.getStartTime() : null)
@@ -108,6 +95,9 @@ public class DashboardTimetableHelper {
                 .className(section != null && section.getAcademicClass() != null
                         ? section.getAcademicClass().getName() + " " + section.getName() : null)
                 .roomLabel(entry.getResource() != null ? entry.getResource().getName() : null)
+                .attendanceMode(assignment != null ? assignment.attendanceMode().name() : null)
+                .attendanceAllowed(assignment != null && assignment.attendanceAllowed())
+                .substitute(assignment != null && assignment.substitute())
                 .build();
     }
 }

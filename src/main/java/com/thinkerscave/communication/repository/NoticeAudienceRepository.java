@@ -5,11 +5,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Collection;
 
 @Repository
 public interface NoticeAudienceRepository extends JpaRepository<NoticeAudience, Long> {
 
     List<NoticeAudience> findByNoticeId(Long noticeId);
+
+    List<NoticeAudience> findByNoticeIdIn(Collection<Long> noticeIds);
 
     void deleteByNoticeId(Long noticeId);
 }

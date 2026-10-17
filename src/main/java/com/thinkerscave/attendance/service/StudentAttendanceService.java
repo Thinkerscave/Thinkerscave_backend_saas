@@ -20,13 +20,13 @@ public interface StudentAttendanceService {
      * Build the daily marking roster for a class/section on a date. The student
      * list is authoritative (active enrollments) and merged with saved statuses.
      */
-    StudentRosterResponse getRoster(Long classId, Long sectionId, LocalDate date);
+    StudentRosterResponse getRoster(Long classId, Long sectionId, LocalDate date, Long periodId);
 
     /**
      * List recorded attendance sessions within a range, optionally filtered by
      * class/section. Each session is one class/section on one date.
      */
-    List<StudentAttendanceSessionResponse> getSessions(LocalDate from, LocalDate to, Long classId, Long sectionId);
+    List<StudentAttendanceSessionResponse> getSessions(LocalDate from, LocalDate to, Long classId, Long sectionId, Integer limit);
 
     /**
      * Mark daily attendance for all students in a class/section.

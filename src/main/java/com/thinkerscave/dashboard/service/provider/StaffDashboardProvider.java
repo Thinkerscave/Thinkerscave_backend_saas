@@ -1,34 +1,35 @@
 package com.thinkerscave.dashboard.service.provider;
 
 import com.thinkerscave.access.entity.User;
-import com.thinkerscave.academics.entity.TeacherAllocation;
-import com.thinkerscave.academics.entity.TeacherAllocationTeacher;
-import com.thinkerscave.academics.repository.AcademicYearRepository;
-import com.thinkerscave.academics.repository.TeacherAllocationTeacherRepository;
-import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
+import com.thinkerscave.access.dto.response.EffectivePermissionResponse;
+import com.thinkerscave.access.service.PermissionService;
+import com.thinkerscave.academics.dto.response.AcademicCalendarEventResponse;
+import com.thinkerscave.academics.service.AcademicCalendarService;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
+import com.thinkerscave.attendance.repository.StudentPeriodAttendanceRepository;
 import com.thinkerscave.attendance.service.StaffAttendanceService;
-import com.thinkerscave.communication.entity.Notice;
-import com.thinkerscave.communication.enums.NoticeStatus;
-import com.thinkerscave.communication.repository.NoticeRepository;
+import com.thinkerscave.communication.dto.response.NoticeResponse;
+import com.thinkerscave.communication.service.NoticeService;
 import com.thinkerscave.dashboard.dto.response.WidgetDTO;
 import com.thinkerscave.dashboard.dto.response.widgetdata.*;
 import com.thinkerscave.dashboard.enums.DataMode;
 import com.thinkerscave.dashboard.enums.WidgetType;
 import com.thinkerscave.dashboard.service.DashboardTimetableHelper;
 import com.thinkerscave.dashboard.util.RoleLabels;
+import com.thinkerscave.dashboard.util.StaffAttendanceWeekMapper;
 import com.thinkerscave.dashboard.util.StaffAttendanceWidgetMapper;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.staff.entity.Staff;
-import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
+import com.thinkerscave.student.repository.StudentEnrollmentRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
-import java.util.Collections;
-import java.util.LinkedHashMap;
+import java.time.LocalTime;
+import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -41,39 +42,89 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class StaffDashboardProvider extends AbstractDashboardWidgetProvider implements DashboardWidgetProvider {
 
+    private static final String ATTENDANCE_MENU = "ATTENDANCE";
+    private static final String STUDENT_ATTENDANCE_MENU = "ATTENDANCE_STUDENTS";
+    private static final String STAFF_ATTENDANCE_MENU = "ATTENDANCE_STAFF";
+    private static final String ATTENDANCE_REPORTS_MENU = "ATTENDANCE_REPORTS";
+        private static final String TIMETABLE_MENU = "ACADEMICS_MY_TIMETABLE";
+    private static final String CALENDAR_MENU = "ACADEMICS_CALENDAR";
+    private static final String NOTICES_MENU = "COMMUNICATION_NOTICES";
+
     private final StaffRepository staffRepository;
     private final StaffAttendanceService staffAttendanceService;
     private final StudentAttendanceRepository studentAttendanceRepository;
-    private final NoticeRepository noticeRepository;
+    private final StudentPeriodAttendanceRepository studentPeriodAttendanceRepository;
+    private final StudentEnrollmentRepository studentEnrollmentRepository;
+    private final NoticeService noticeService;
+    private final AcademicCalendarService calendarService;
     private final DashboardTimetableHelper timetableHelper;
-    private final TeacherAllocationTeacherRepository teacherAllocationTeacherRepository;
-    private final AcademicYearRepository academicYearRepository;
-    private final ResponsibilityAssignmentRepository responsibilityAssignmentRepository;
+    private final PermissionService permissionService;
 
     @Override
     public List<WidgetDTO<?>> getWidgets(User user) {
         Staff staff = user != null ? staffRepository.findByUser_Id(user.getId()).orElse(null) : null;
+        Map<String, EffectivePermissionResponse> permissions = permissionSnapshot(user);
+        var todayAttendance = staff != null ? staffAttendanceService.buildTodayStatus(staff) : null;
         List<TimetableSlotItem> todaySlots = staff != null
-                ? timetableHelper.todaySlotsForTeacher(staff.getStaffId()) : List.of();
+                ? enrichAttendanceSlots(timetableHelper.todaySlotsForTeacher(staff.getStaffId()), permissions)
+                : List.of();
 
-        return List.of(
-                welcomeHeader(user, staff),
-                kpiGrid(staff, todaySlots),
-                staffAttendanceToggle(staff),
-                quickActions(),
-                todaysTimetable(todaySlots),
-                studentAttendanceToday(),
-                myClassesOverview(staff),
-                myResponsibilities(staff),
-                announcements(),
-                upcomingEvents()
-        );
+        List<WidgetDTO<?>> widgets = new ArrayList<>();
+        widgets.add(welcomeHeader(user, staff, todayAttendance));
+        widgets.add(staffAttendanceToggle(todayAttendance));
+        widgets.add(weeklyAttendanceSummary(staff));
+        widgets.add(quickActions(permissions));
+        widgets.add(todaysTimetable(permissions, todaySlots));
+        widgets.add(announcements(user, staff, permissions));
+                widgets.add(upcomingEvents(permissions));
+        return widgets;
     }
 
-    private WidgetDTO<WelcomeHeaderData> welcomeHeader(User user, Staff staff) {
+    private List<TimetableSlotItem> enrichAttendanceSlots(
+            List<TimetableSlotItem> slots, Map<String, EffectivePermissionResponse> permissions) {
+        Long organizationId = OrganizationContext.getOrganizationId();
+        boolean canView = canViewAttendancePage(permissions, STUDENT_ATTENDANCE_MENU);
+        boolean canManage = hasPermission(permissions, ATTENDANCE_MENU, "MANAGE")
+                && hasPermission(permissions, STUDENT_ATTENDANCE_MENU, "MANAGE");
+        LocalDate date = LocalDate.now();
+        LocalTime now = LocalTime.now();
+        Map<SectionKey, Long> expectedBySection = new HashMap<>();
+        Map<SessionKey, Long> markedBySession = new HashMap<>();
+
+        for (TimetableSlotItem slot : slots) {
+            if (slot.getClassId() == null || slot.getSectionId() == null) continue;
+            SectionKey section = new SectionKey(slot.getClassId(), slot.getSectionId());
+            long expected = expectedBySection.computeIfAbsent(section, key ->
+                    studentEnrollmentRepository.countByClassEntityClassIdAndSectionSectionIdAndActiveTrue(
+                            key.classId(), key.sectionId()));
+            Long periodId = "PERIOD_WISE".equals(slot.getAttendanceMode()) ? slot.getPeriodId() : null;
+            SessionKey session = new SessionKey(section, periodId);
+            long marked = markedBySession.computeIfAbsent(session, key -> key.periodId() != null
+                    ? studentPeriodAttendanceRepository.countByOrganizationIdAndClassIdAndSectionIdAndAttendanceDateAndPeriodId(
+                            organizationId, key.section().classId(), key.section().sectionId(), date, key.periodId())
+                    : studentAttendanceRepository.countByOrganizationIdAndClassIdAndSectionIdAndAttendanceDate(
+                            organizationId, key.section().classId(), key.section().sectionId(), date));
+
+            String status = expected == 0 ? "NO_STUDENTS"
+                    : marked >= expected ? "COMPLETED"
+                    : marked > 0 ? "IN_PROGRESS"
+                    : slot.getStartTime() != null && slot.getStartTime().isAfter(now) ? "UPCOMING" : "PENDING";
+            boolean sessionAuthorized = slot.isAttendanceAllowed();
+            slot.setAttendanceStatus(status);
+            slot.setExpectedStudents((int) expected);
+            slot.setMarkedStudents((int) marked);
+            slot.setCanViewAttendance(canView && sessionAuthorized);
+            slot.setCanMarkAttendance(canManage && sessionAuthorized && expected > 0 && !"COMPLETED".equals(status));
+        }
+        return slots;
+    }
+
+    private WidgetDTO<WelcomeHeaderData> welcomeHeader(
+            User user, Staff staff, com.thinkerscave.attendance.dto.response.StaffAttendanceTodayResponse today) {
         return safeWidget("welcome-header", WidgetType.WELCOME_HEADER, "Welcome", 4, DataMode.LIVE, () ->
                 WelcomeHeaderData.builder()
                         .displayName(staff != null ? staff.getFirstName() + " " + staff.getLastName() : displayName(user))
+                        .organizationName(today != null ? today.getOrganizationName() : null)
                         .roleLabel(RoleLabels.of(com.thinkerscave.access.enums.RoleType.STAFF))
                         .greeting(RoleLabels.greeting())
                         .avatarUrl(staff != null ? staff.getPhotoUrl() : null)
@@ -81,130 +132,140 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
                         .build());
     }
 
-    private WidgetDTO<KpiGridData> kpiGrid(Staff staff, List<TimetableSlotItem> todaySlots) {
-        return safeWidget("kpi-grid", WidgetType.KPI_GRID, "Your day at a glance", 4, DataMode.LIVE, () -> {
-            long classesCompleted = todaySlots.stream()
-                    .filter(s -> s.getEndTime() != null && s.getEndTime().isBefore(java.time.LocalTime.now()))
-                    .count();
+        private WidgetDTO<StaffAttendanceToggleData> staffAttendanceToggle(
+                        com.thinkerscave.attendance.dto.response.StaffAttendanceTodayResponse today) {
+                return safeWidget("staff-attendance-toggle", WidgetType.STAFF_ATTENDANCE_TOGGLE,
+                                "My Staff Attendance", "Mark your daily attendance", 1, DataMode.LIVE,
+                                () -> StaffAttendanceWidgetMapper.toToggleData(today));
+        }
 
-            long attendancePending = todaySlots.stream()
-                    .map(TimetableSlotItem::getClassName)
-                    .filter(java.util.Objects::nonNull)
-                    .distinct()
-                    .count();
+        private WidgetDTO<StaffAttendanceWeekData> weeklyAttendanceSummary(Staff staff) {
+                LocalDate today = LocalDate.now();
+                LocalDate start = today.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+                LocalDate end = start.plusDays(6);
+                return safeWidget("staff-attendance-week", WidgetType.STAFF_ATTENDANCE_WEEK,
+                                "Attendance Summary (This Week)", 1, DataMode.LIVE,
+                                () -> staff == null ? null
+                                                : StaffAttendanceWeekMapper.map(today, staffAttendanceService.getMyHistory(start, end)));
+        }
 
-            return KpiGridData.builder().items(List.of(
-                    KpiItem.builder().label("Today's Classes").value(String.valueOf(todaySlots.size())).icon("pi-book").tone("primary").build(),
-                    KpiItem.builder().label("Classes Completed").value(String.valueOf(classesCompleted)).icon("pi-check-circle").tone("success").build(),
-                    KpiItem.builder().label("Distinct Classes Today").value(String.valueOf(attendancePending)).icon("pi-exclamation-circle").tone("warning").build()
-            )).build();
-        });
+        private WidgetDTO<QuickActionsData> quickActions(Map<String, EffectivePermissionResponse> permissions) {
+                List<QuickActionItem> items = new ArrayList<>();
+                if (canViewAttendancePage(permissions, STUDENT_ATTENDANCE_MENU)
+                                && hasPermission(permissions, ATTENDANCE_MENU, "MANAGE")
+                                && hasPermission(permissions, STUDENT_ATTENDANCE_MENU, "MANAGE")) {
+                        items.add(action("Mark Attendance", "pi-calendar-plus", "/app/attendance/students", "success"));
+                }
+                if (hasPermission(permissions, TIMETABLE_MENU, "VIEW")) {
+                            items.add(action("My Timetable", "pi-clock", "/app/academics/my-timetable", "info"));
+                }
+                if (canViewAttendancePage(permissions, STAFF_ATTENDANCE_MENU)) {
+                        items.add(action("Attendance Records", "pi-file", "/app/attendance/staff", "primary"));
+                }
+                if (canViewAttendancePage(permissions, ATTENDANCE_REPORTS_MENU)) {
+                        items.add(action("Attendance Reports", "pi-chart-bar", "/app/attendance/reports", "danger"));
+                }
+                return safeWidget("quick-actions", WidgetType.QUICK_ACTIONS, "Quick Actions", 4, DataMode.LIVE,
+                                () -> QuickActionsData.builder().items(items).build());
+        }
+
+            private WidgetDTO<TimetableData> todaysTimetable(
+                    Map<String, EffectivePermissionResponse> permissions, List<TimetableSlotItem> todaySlots) {
+                WidgetDTO<TimetableData> widget = safeWidget("todays-timetable", WidgetType.TIMETABLE,
+                                "Today's Classes", 2, DataMode.LIVE, () -> TimetableData.builder()
+                                                .dayLabel(LocalDate.now().getDayOfWeek().toString())
+                                                .date(LocalDate.now())
+                                                .slots(todaySlots)
+                                                .build());
+                if (hasPermission(permissions, TIMETABLE_MENU, "VIEW")) {
+                        widget.setActionLabel("View Full Timetable");
+                            widget.setActionRoute("/app/academics/my-timetable");
+                }
+                return widget;
+        }
+
+    private WidgetDTO<AnnouncementsData> announcements(
+            User user, Staff staff, Map<String, EffectivePermissionResponse> permissions) {
+        WidgetDTO<AnnouncementsData> widget = safeWidget("announcements", WidgetType.ANNOUNCEMENTS,
+                "Recent Announcements", 2, DataMode.LIVE, () -> {
+                    List<NoticeResponse> notices = user == null || staff == null ? List.of()
+                            : noticeService.getRecentPublishedForStaff(user.getId(), staff.getStaffId(), 4);
+                    return AnnouncementsData.builder()
+                            .items(notices.stream().map(notice -> AnnouncementItem.builder()
+                                    .title(notice.getTitle())
+                                    .summary(trim(notice.getContent()))
+                                    .category(notice.getCategory())
+                                    .publishedAt(notice.getPublishDate())
+                                    .pinned(notice.isPinned())
+                                    .build()).toList())
+                            .viewAllRoute(hasPermission(permissions, NOTICES_MENU, "VIEW")
+                                    ? "/app/communication/notices" : null)
+                            .build();
+                });
+        if (hasPermission(permissions, NOTICES_MENU, "VIEW")) {
+            widget.setActionLabel("View All");
+            widget.setActionRoute("/app/communication/notices");
+        }
+        return widget;
     }
 
-    private WidgetDTO<StaffAttendanceToggleData> staffAttendanceToggle(Staff staff) {
-        return safeWidget("staff-attendance-toggle", WidgetType.STAFF_ATTENDANCE_TOGGLE, "Today's Attendance", 2, DataMode.LIVE, () ->
-                StaffAttendanceWidgetMapper.toToggleData(staffAttendanceService.buildTodayStatus(staff)));
-    }
-
-    private WidgetDTO<QuickActionsData> quickActions() {
-        return safeWidget("quick-actions", WidgetType.QUICK_ACTIONS, "Quick actions", 4, DataMode.LIVE, () ->
-                QuickActionsData.builder().items(List.of(
-                        QuickActionItem.builder().label("Mark Student Attendance").icon("pi-calendar-plus").route("/app/attendance/students").tone("primary").build(),
-                        QuickActionItem.builder().label("View Timetable").icon("pi-clock").route("/app/academics/timetable").tone("info").build(),
-                        QuickActionItem.builder().label("Notices").icon("pi-megaphone").route("/app/communication/notices").tone("warning").build()
-                )).build());
-    }
-
-    private WidgetDTO<TimetableData> todaysTimetable(List<TimetableSlotItem> todaySlots) {
-        return safeWidget("todays-timetable", WidgetType.TIMETABLE, "Today's timetable", 4, DataMode.LIVE, () ->
-                TimetableData.builder()
-                        .dayLabel(LocalDate.now().getDayOfWeek().toString())
-                        .slots(todaySlots)
+    private WidgetDTO<CalendarData> upcomingEvents(Map<String, EffectivePermissionResponse> permissions) {
+        boolean canView = hasPermission(permissions, CALENDAR_MENU, "VIEW");
+        WidgetDTO<CalendarData> widget = safeWidget("upcoming-events", WidgetType.EVENTS,
+                "Upcoming Events", 4, DataMode.LIVE, () -> CalendarData.builder()
+                        .items(canView ? calendarService.upcoming(null, 4).stream()
+                                .map(this::toCalendarEvent)
+                                .toList() : List.of())
+                        .viewAllRoute(canView ? "/app/academics/academic-calendar" : null)
                         .build());
+        if (canView) {
+            widget.setActionLabel("View All");
+            widget.setActionRoute("/app/academics/academic-calendar");
+        }
+        return widget;
     }
 
-    private WidgetDTO<AttendanceSummaryData> studentAttendanceToday() {
-        return safeWidget("student-attendance-today", WidgetType.ATTENDANCE_SUMMARY, "Student attendance (today)", 2, DataMode.LIVE, () -> {
-            Long orgId = OrganizationContext.getOrganizationId();
-            LocalDate today = LocalDate.now();
-            long present = studentAttendanceRepository.countByOrganizationIdAndAttendanceDateAndStatus(orgId, today, StudentAttendanceStatus.PRESENT);
-            long absent = studentAttendanceRepository.countByOrganizationIdAndAttendanceDateAndStatus(orgId, today, StudentAttendanceStatus.ABSENT);
-            long late = studentAttendanceRepository.countByOrganizationIdAndAttendanceDateAndStatus(orgId, today, StudentAttendanceStatus.LATE);
-            long total = present + absent + late;
-            return AttendanceSummaryData.builder()
-                    .presentCount(present).absentCount(absent).lateCount(late).totalCount(total)
-                    .percentage(total == 0 ? 0 : (present * 100.0) / total)
-                    .date(today)
-                    .build();
-        });
+    private CalendarEventItem toCalendarEvent(AcademicCalendarEventResponse event) {
+        return CalendarEventItem.builder()
+                .eventId(event.getEventId())
+                .title(event.getTitle())
+                .startDate(event.getStartDate())
+                .endDate(event.getEndDate())
+                .startTime(event.getStartTime() != null ? event.getStartTime().toString() : null)
+                .endTime(event.getEndTime() != null ? event.getEndTime().toString() : null)
+                .location(event.getLocation())
+                .eventType(event.getEventType() != null ? event.getEventType().name() : null)
+                .allDay(event.isAllDay())
+                .build();
     }
 
-    private WidgetDTO<StatListData> myClassesOverview(Staff staff) {
-        return safeWidget("my-classes-overview", WidgetType.STAT_LIST, "My classes overview", 2, DataMode.LIVE, () -> {
-            if (staff == null) {
-                return StatListData.builder().items(Collections.emptyList()).build();
-            }
-            Long yearId = academicYearRepository.findByCurrentYearTrue()
-                    .map(y -> y.getAcademicYearId()).orElse(null);
-            if (yearId == null) {
-                return StatListData.builder().items(Collections.emptyList()).build();
-            }
-            List<TeacherAllocationTeacher> allocations = teacherAllocationTeacherRepository
-                    .findActiveByStaffAndYear(staff.getStaffId(), yearId);
-
-            Map<String, Integer> subjectCountBySection = new LinkedHashMap<>();
-            for (TeacherAllocationTeacher tat : allocations) {
-                TeacherAllocation ta = tat.getTeacherAllocation();
-                String key = ta.getSection().getAcademicClass().getName() + " " + ta.getSection().getName();
-                subjectCountBySection.merge(key, 1, Integer::sum);
-            }
-
-            return StatListData.builder().items(subjectCountBySection.entrySet().stream()
-                    .map(e -> StatListItem.builder()
-                            .label(e.getKey())
-                            .value(e.getValue() + (e.getValue() == 1 ? " subject" : " subjects"))
-                            .icon("pi-book")
-                            .tone("primary")
-                            .build())
-                    .collect(Collectors.toList())).build();
-        });
+        private boolean canViewAttendancePage(Map<String, EffectivePermissionResponse> permissions, String pageMenu) {
+                return hasPermission(permissions, ATTENDANCE_MENU, "VIEW")
+                                && hasPermission(permissions, pageMenu, "VIEW");
     }
 
-    private WidgetDTO<StatListData> myResponsibilities(Staff staff) {
-        return safeWidget("my-responsibilities", WidgetType.STAT_LIST, "My responsibilities", 2, DataMode.LIVE, () -> {
-            if (staff == null) {
-                return StatListData.builder().items(Collections.emptyList()).build();
-            }
-            var assignments = responsibilityAssignmentRepository
-                    .findByStaff_StaffIdAndActiveTrueOrderByEffectiveFromDesc(staff.getStaffId());
-            return StatListData.builder().items(assignments.stream()
-                    .map(a -> StatListItem.builder()
-                            .label(a.getResponsibility().getResponsibilityName())
-                            .value(a.getScope() != null ? a.getScope() : "—")
-                            .icon("pi-sitemap")
-                            .tone("info")
-                            .build())
-                    .collect(Collectors.toList())).build();
-        });
+        private Map<String, EffectivePermissionResponse> permissionSnapshot(User user) {
+        Long organizationId = OrganizationContext.getOrganizationId();
+                if (user == null || organizationId == null) return Map.of();
+                return permissionService.getEffectivePermissions(user.getId(), organizationId).stream()
+                                .filter(permission -> permission.getMenuCode() != null)
+                                .collect(Collectors.toMap(EffectivePermissionResponse::getMenuCode, permission -> permission, (first, ignored) -> first));
+        }
+
+        private boolean hasPermission(Map<String, EffectivePermissionResponse> permissions, String menuCode, String privilege) {
+                EffectivePermissionResponse permission = permissions.get(menuCode);
+                if (permission == null) return false;
+                return switch (privilege) {
+                        case "VIEW" -> Boolean.TRUE.equals(permission.getCanView());
+                        case "MANAGE" -> Boolean.TRUE.equals(permission.getCanManage());
+                        case "APPROVE" -> Boolean.TRUE.equals(permission.getCanApprove());
+                        default -> false;
+                };
     }
 
-    private WidgetDTO<AnnouncementsData> announcements() {
-        return safeWidget("announcements", WidgetType.ANNOUNCEMENTS, "Recent announcements", 2, DataMode.LIVE, () -> {
-            Long orgId = OrganizationContext.getOrganizationId();
-            List<Notice> notices = noticeRepository.findByOrganizationIdAndStatusOrderByPublishDateDesc(
-                    orgId, NoticeStatus.PUBLISHED, PageRequest.of(0, 5)).getContent();
-            return AnnouncementsData.builder()
-                    .items(notices.stream().map(n -> AnnouncementItem.builder()
-                            .title(n.getTitle()).summary(trim(n.getContent())).category(n.getCategory())
-                            .publishedAt(n.getPublishDate()).pinned(n.isPinned()).build()).collect(Collectors.toList()))
-                    .build();
-        });
-    }
-
-    private WidgetDTO<CalendarData> upcomingEvents() {
-        return safeWidget("upcoming-events", WidgetType.EVENTS, "Upcoming events", 2, DataMode.LIVE, () ->
-                CalendarData.builder().items(Collections.emptyList()).build());
-    }
+        private QuickActionItem action(String label, String icon, String route, String tone) {
+                return QuickActionItem.builder().label(label).icon(icon).route(route).tone(tone).build();
+        }
 
     private String displayName(User user) {
         if (user == null) return "Staff";
@@ -217,4 +278,8 @@ public class StaffDashboardProvider extends AbstractDashboardWidgetProvider impl
         if (content == null) return null;
         return content.length() > 140 ? content.substring(0, 140) + "…" : content;
     }
+
+        private record SectionKey(Long classId, Long sectionId) {}
+
+        private record SessionKey(SectionKey section, Long periodId) {}
 }

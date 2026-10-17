@@ -95,7 +95,7 @@ public class AcademicYearServiceImpl implements AcademicYearService {
     @Override
     @Transactional(readOnly = true)
     public Page<AcademicYearResponse> search(String query, AcademicYearStatus status, Pageable pageable) {
-        accessGuard.requireView(AcademicsAccessGuard.RESOURCE_ACADEMIC_YEAR);
+        accessGuard.requireAcademicYearListView();
 
         Page<AcademicYear> page;
         boolean hasQuery = StringUtils.hasText(query);

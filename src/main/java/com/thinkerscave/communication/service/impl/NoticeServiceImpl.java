@@ -4,16 +4,24 @@ import com.thinkerscave.communication.dto.request.NoticeRequest;
 import com.thinkerscave.communication.dto.response.NoticeResponse;
 import com.thinkerscave.communication.entity.Notice;
 import com.thinkerscave.communication.entity.NoticeAudience;
+import com.thinkerscave.communication.enums.NoticeAudienceType;
 import com.thinkerscave.communication.enums.NoticeStatus;
 import com.thinkerscave.communication.repository.NoticeAudienceRepository;
 import com.thinkerscave.communication.repository.NoticeRepository;
 import com.thinkerscave.communication.service.NoticeService;
 import com.thinkerscave.access.repository.UserRepository;
+import com.thinkerscave.access.repository.UserRoleRepository;
+import com.thinkerscave.academics.entity.AcademicYear;
+import com.thinkerscave.academics.entity.TeacherAllocationTeacher;
+import com.thinkerscave.academics.enums.TeacherAllocationTeacherRole;
+import com.thinkerscave.academics.repository.AcademicYearRepository;
+import com.thinkerscave.academics.repository.TeacherAllocationTeacherRepository;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -21,7 +29,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,6 +44,9 @@ public class NoticeServiceImpl implements NoticeService {
     private final NoticeRepository noticeRepository;
     private final NoticeAudienceRepository audienceRepository;
     private final UserRepository userRepository;
+    private final UserRoleRepository userRoleRepository;
+    private final AcademicYearRepository academicYearRepository;
+    private final TeacherAllocationTeacherRepository allocationTeacherRepository;
 
     @Override
     @Transactional
@@ -83,6 +97,61 @@ public class NoticeServiceImpl implements NoticeService {
                 .findByOrganizationIdAndStatusAndPinnedTrueOrderByPublishDateDesc(
                         OrganizationContext.getOrganizationId(), NoticeStatus.PUBLISHED)
                 .stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<NoticeResponse> getRecentPublishedForStaff(Long userId, Long staffId, int limit) {
+        Long organizationId = OrganizationContext.getOrganizationId();
+        LocalDate today = LocalDate.now();
+        int resultLimit = Math.max(1, Math.min(limit, 10));
+        List<Notice> candidates = noticeRepository
+                .findByOrganizationIdAndStatusOrderByPublishDateDesc(
+                        organizationId, NoticeStatus.PUBLISHED, PageRequest.of(0, Math.max(resultLimit * 10, 50)))
+                .getContent().stream()
+                .filter(notice -> notice.getPublishDate() == null || !notice.getPublishDate().isAfter(today))
+                .filter(notice -> notice.getExpiryDate() == null || !notice.getExpiryDate().isBefore(today))
+                .toList();
+        if (candidates.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, List<NoticeAudience>> audiencesByNotice = audienceRepository
+                .findByNoticeIdIn(candidates.stream().map(Notice::getNoticeId).toList()).stream()
+                .collect(Collectors.groupingBy(NoticeAudience::getNoticeId));
+        Set<Long> roleIds = userRoleRepository.findActiveRolesWithDetails(userId).stream()
+                .filter(role -> role.getRole() != null)
+                .map(role -> role.getRole().getId())
+                .collect(Collectors.toSet());
+        Set<Long> classIds = new HashSet<>();
+        Set<Long> sectionIds = new HashSet<>();
+        AcademicYear year = academicYearRepository.findByCurrentYearTrue().orElse(null);
+        if (year != null && staffId != null) {
+            for (TeacherAllocationTeacher assignment : allocationTeacherRepository
+                    .findActiveByStaffAndYear(staffId, year.getAcademicYearId())) {
+                if (assignment.getRole() == TeacherAllocationTeacherRole.PRIMARY
+                        || assignment.getRole() == TeacherAllocationTeacherRole.SECONDARY) {
+                    var section = assignment.getTeacherAllocation().getSection();
+                    if (section != null) {
+                        sectionIds.add(section.getSectionId());
+                        if (section.getAcademicClass() != null) {
+                            classIds.add(section.getAcademicClass().getClassId());
+                        }
+                    }
+                }
+            }
+        }
+
+        List<NoticeResponse> result = new java.util.ArrayList<>();
+        for (Notice notice : candidates) {
+            List<NoticeAudience> audiences = audiencesByNotice.getOrDefault(notice.getNoticeId(), List.of());
+            if (visibleToStaff(audiences, userId, roleIds, classIds, sectionIds)) {
+                result.add(toResponse(notice, audiences));
+                if (result.size() == resultLimit) {
+                    break;
+                }
+            }
+        }
+        return result;
     }
 
     @Override
@@ -137,9 +206,29 @@ public class NoticeServiceImpl implements NoticeService {
         });
     }
 
+    private boolean visibleToStaff(
+            List<NoticeAudience> audiences,
+            Long userId,
+            Set<Long> roleIds,
+            Set<Long> classIds,
+            Set<Long> sectionIds) {
+        if (audiences.isEmpty()) return true;
+        return audiences.stream().anyMatch(audience -> switch (audience.getAudienceType()) {
+            case ALL, STAFF -> true;
+            case ROLE -> roleIds.contains(audience.getRefId());
+            case CLASS -> classIds.contains(audience.getRefId());
+            case SECTION -> sectionIds.contains(audience.getRefId());
+            case INDIVIDUAL -> userId != null && userId.equals(audience.getRefId());
+            case STUDENTS, PARENTS -> false;
+        });
+    }
+
     private NoticeResponse toResponse(Notice n) {
-        List<NoticeResponse.AudienceEntryResponse> audiences = audienceRepository
-                .findByNoticeId(n.getNoticeId()).stream()
+        return toResponse(n, audienceRepository.findByNoticeId(n.getNoticeId()));
+    }
+
+    private NoticeResponse toResponse(Notice n, List<NoticeAudience> audienceRows) {
+        List<NoticeResponse.AudienceEntryResponse> audiences = audienceRows.stream()
                 .map(a -> NoticeResponse.AudienceEntryResponse.builder()
                         .audienceId(a.getAudienceId())
                         .audienceType(a.getAudienceType().name())

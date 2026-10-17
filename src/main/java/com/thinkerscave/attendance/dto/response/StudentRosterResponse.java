@@ -36,6 +36,12 @@ public class StudentRosterResponse {
     /** True when attendance is frozen for this date and cannot be modified. */
     private final boolean frozen;
 
+    /** True when the current org policy and day state allow saving attendance for this date. */
+    private final boolean editable;
+
+    /** Why attendance cannot be saved for this date; null when editable. */
+    private final String editabilityReason;
+
     private final List<StudentRosterEntryResponse> students;
 
     @Getter
@@ -45,6 +51,8 @@ public class StudentRosterResponse {
         private final String studentName;
         private final String rollNumber;
         private final String admissionNumber;
+        /** Document id of the student's PHOTO document; the client loads it via the authenticated download endpoint. */
+        private final Long photoDocumentId;
         private final com.thinkerscave.attendance.enums.StudentAttendanceStatus status;
         private final String remarks;
     }

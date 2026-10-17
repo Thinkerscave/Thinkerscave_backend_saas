@@ -14,6 +14,8 @@ import com.thinkerscave.shared.dto.ApiResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -44,11 +46,12 @@ public class StudentAttendanceController {
     public ResponseEntity<ApiResponse<StudentRosterResponse>> getRoster(
             @RequestParam Long classId,
             @RequestParam(required = false) Long sectionId,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+                        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                        @RequestParam(required = false) Long periodId) {
         accessGuard.requireView(AttendanceAccessGuard.ATTENDANCE);
         return ResponseEntity.ok(ApiResponse.success(
                 "Roster retrieved",
-                studentAttendanceService.getRoster(classId, sectionId, date)));
+                                studentAttendanceService.getRoster(classId, sectionId, date, periodId)));
     }
 
     @GetMapping("/sessions")
@@ -58,11 +61,12 @@ public class StudentAttendanceController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) Long classId,
-            @RequestParam(required = false) Long sectionId) {
+            @RequestParam(required = false) Long sectionId,
+            @RequestParam(required = false) @Min(1) @Max(50) Integer limit) {
         accessGuard.requireView(AttendanceAccessGuard.ATTENDANCE);
         return ResponseEntity.ok(ApiResponse.success(
                 "Sessions retrieved",
-                studentAttendanceService.getSessions(from, to, classId, sectionId)));
+                studentAttendanceService.getSessions(from, to, classId, sectionId, limit)));
     }
 
     @PostMapping("/daily")

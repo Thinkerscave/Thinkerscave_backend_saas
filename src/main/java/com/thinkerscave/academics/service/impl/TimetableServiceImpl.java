@@ -24,6 +24,8 @@ import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.exceptions.BusinessException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.staff.entity.Staff;
+import com.thinkerscave.staff.repository.StaffRepository;
+import org.springframework.security.access.AccessDeniedException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,6 +61,7 @@ public class TimetableServiceImpl implements TimetableService {
     private final TimetableEntryRepository entryRepository;
     private final TimetableConflictRepository conflictRepository;
     private final AcademicResourceRepository resourceRepository;
+    private final StaffRepository staffRepository;
     private final AcademicsAccessGuard accessGuard;
     private final TimetableReadinessEvaluator readinessEvaluator;
     private final TimetablePlanningDataLoader planningDataLoader;
@@ -549,7 +552,18 @@ public class TimetableServiceImpl implements TimetableService {
     @Transactional(readOnly = true)
     public TimetableGridResponse getGrid(Long versionId, String view, Long classId,
                                          Long sectionId, Long staffId, Long resourceId) {
-        accessGuard.requireView(AcademicsAccessGuard.RESOURCE_TIMETABLE);
+        if ("TEACHER".equalsIgnoreCase(view) && !accessGuard.hasElevatedRole()) {
+            accessGuard.requireView(AcademicsAccessGuard.RESOURCE_MY_TIMETABLE);
+            Long currentUserId = accessGuard.currentUserIdOrNull();
+            Staff currentStaff = currentUserId == null ? null
+                    : staffRepository.findByUser_Id(currentUserId).orElse(null);
+            if (currentStaff == null || staffId == null
+                    || !Objects.equals(currentStaff.getStaffId(), staffId)) {
+                throw new AccessDeniedException("Teachers may only view their own timetable.");
+            }
+        } else {
+            accessGuard.requireView(AcademicsAccessGuard.RESOURCE_TIMETABLE);
+        }
         TimetableVersion version = versionRepository.findByIdWithConfigAndYear(versionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Timetable version not found: " + versionId));
         Long configId = version.getTimetableConfiguration().getTimetableConfigurationId();

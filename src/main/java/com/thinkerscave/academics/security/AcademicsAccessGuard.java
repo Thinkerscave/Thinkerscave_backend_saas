@@ -46,6 +46,24 @@ public class AcademicsAccessGuard {
         require(resource, "APPROVE");
     }
 
+    public void requireAcademicYearListView() {
+        if (hasElevatedRole()) {
+            return;
+        }
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("STAFF"::equals)) {
+            Long orgId = OrganizationContext.getOrganizationId();
+            User user = auth.getName() == null ? null : userRepository.findByUsername(auth.getName()).orElse(null);
+            if (user != null && orgId != null
+                    && permissionService.hasPermission(user.getId(), orgId, RESOURCE_MY_TIMETABLE, "VIEW")) {
+                return;
+            }
+        }
+        requireView(RESOURCE_ACADEMIC_YEAR);
+    }
+
     /** True when caller has MANAGE on the resource (or elevated org role). */
     public boolean canManage(String resource) {
         if (hasElevatedRole()) {
