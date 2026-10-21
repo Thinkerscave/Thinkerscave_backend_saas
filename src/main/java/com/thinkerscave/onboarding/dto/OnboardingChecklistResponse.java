@@ -15,12 +15,10 @@ import java.util.List;
 @AllArgsConstructor
 public class OnboardingChecklistResponse {
 
-    private List<OnboardingChecklistItemResponse> items;
-    private int completedRequiredCount;
-    private int requiredCount;
+    private List<SetupCategoryResponse> categories;
+    private int completedCount;
+    private int totalCount;
     private int progressPercent;
-    private String recommendedNextKey;
-    private String recommendedNextLabel;
-    private String recommendedNextRoute;
+    /** True when every mandatory category is completed. Optional categories do not block this. */
     private boolean setupComplete;
 }

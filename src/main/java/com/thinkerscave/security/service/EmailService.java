@@ -1,9 +1,12 @@
 package com.thinkerscave.security.service;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -20,6 +23,11 @@ import org.springframework.util.StringUtils;
 public class EmailService {
 
     private final JavaMailSender mailSender;
+    private final Environment environment;
+
+    /** Non-empty in dev/test: all mail goes here. Must stay empty in prod. */
+    @Value("${app.mail.redirect-to:}")
+    private String redirectTo;
 
     @Value("${spring.mail.username:}")
     private String mailUsername;
@@ -55,15 +63,26 @@ public class EmailService {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
             helper.setFrom(from);
-            helper.setTo(to.trim());
-            helper.setSubject(subject);
+            boolean redirected = StringUtils.hasText(redirectTo);
+            String deliveredTo = redirected ? redirectTo.trim() : to.trim();
+            String deliveredSubject = redirected ? "[To: " + to.trim() + "] " + subject : subject;
+            helper.setTo(deliveredTo);
+            helper.setSubject(deliveredSubject);
             helper.setText(htmlBody, true);
             mailSender.send(mimeMessage);
-            log.info("Email sent to={} from={} subject={}", to, from, subject);
+            log.info("Email sent intendedTo={} deliveredTo={} from={} redirected={} subject={}",
+                    to, deliveredTo, from, redirected, deliveredSubject);
             return true;
         } catch (Exception e) {
             log.error("Failed to send email to={} subject={} reason={}", to, subject, e.getMessage());
             return false;
+        }
+    }
+
+    @PostConstruct
+    void validateRedirectPolicy() {
+        if (StringUtils.hasText(redirectTo) && environment.acceptsProfiles(Profiles.of("prod"))) {
+            throw new IllegalStateException("app.mail.redirect-to must be empty under the prod profile");
         }
     }
 

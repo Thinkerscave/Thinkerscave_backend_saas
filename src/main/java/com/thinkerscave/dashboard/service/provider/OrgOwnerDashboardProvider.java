@@ -21,7 +21,6 @@ import com.thinkerscave.dashboard.enums.WidgetType;
 import com.thinkerscave.dashboard.util.ChartBucketUtil;
 import com.thinkerscave.dashboard.util.RoleLabels;
 import com.thinkerscave.dashboard.util.StaffAttendanceWidgetMapper;
-import com.thinkerscave.onboarding.dto.OnboardingChecklistItemResponse;
 import com.thinkerscave.onboarding.dto.OnboardingChecklistResponse;
 import com.thinkerscave.onboarding.service.OnboardingService;
 import com.thinkerscave.platform.repository.OrganizationRepository;
@@ -104,25 +103,14 @@ public class OrgOwnerDashboardProvider extends AbstractDashboardWidgetProvider i
     private void applySetupGuide(WelcomeHeaderData.WelcomeHeaderDataBuilder builder) {
         try {
             OnboardingChecklistResponse checklist = onboardingService.getChecklist();
-            boolean showGuide = !checklist.isSetupComplete();
             builder.setupComplete(checklist.isSetupComplete())
-                    .showSetupGuide(showGuide)
-                    .setupProgressPercent(checklist.getProgressPercent())
-                    .recommendedNextLabel(showGuide ? checklist.getRecommendedNextLabel() : null)
-                    .recommendedNextRoute(showGuide ? checklist.getRecommendedNextRoute() : null)
-                    .setupChecklist(showGuide ? checklist.getItems().stream()
-                            .filter(OnboardingChecklistItemResponse::isAvailable)
-                            .map(i -> WelcomeHeaderData.SetupChecklistItem.builder()
-                                    .key(i.getKey())
-                                    .label(i.getLabel())
-                                    .completed(i.isCompleted())
-                                    .requiredForCompletion(i.isRequiredForCompletion())
-                                    .available(i.isAvailable())
-                                    .route(i.getRoute())
-                                    .build())
-                            .collect(Collectors.toList()) : null);
+                    .showSetupGuide(!checklist.isSetupComplete())
+                    .setupCompletedCount(checklist.getCompletedCount())
+                    .setupTotalCount(checklist.getTotalCount())
+                    .setupProgressPercent(checklist.getProgressPercent());
         } catch (Exception ex) {
-            builder.showSetupGuide(false).setupComplete(false);
+            // Status unknown: keep the card visible in an error state rather than hiding it.
+            builder.showSetupGuide(true).setupComplete(false).setupError(true);
         }
     }
 
