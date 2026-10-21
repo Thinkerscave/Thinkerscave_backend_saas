@@ -1,8 +1,10 @@
 package com.thinkerscave.staff.dto.request;
 
+import com.thinkerscave.shared.dto.AddressDto;
 import com.thinkerscave.staff.enums.EmploymentCategory;
 import com.thinkerscave.staff.enums.EmploymentStatus;
 import com.thinkerscave.staff.enums.StaffType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -29,6 +31,7 @@ public class StaffUpdateRequest {
     private String gender;
 
     @NotNull(message = "Date of birth is required")
+    @Past(message = "Date of birth must be in the past")
     private LocalDate dateOfBirth;
 
     @Size(max = 10)
@@ -41,7 +44,7 @@ public class StaffUpdateRequest {
     private String nationality;
 
     @NotBlank(message = "Mobile number is required")
-    @Size(max = 15)
+    @Pattern(regexp = "^[0-9+\\- ]{7,15}$", message = "Mobile number is invalid")
     private String mobileNumber;
 
     @NotNull(message = "Staff type is required")
@@ -60,6 +63,10 @@ public class StaffUpdateRequest {
     @NotNull(message = "Joining date is required")
     private LocalDate joiningDate;
 
+    private LocalDate contractStartDate;
+
+    private LocalDate contractEndDate;
+
     @Size(max = 255)
     private String highestQualification;
 
@@ -72,10 +79,16 @@ public class StaffUpdateRequest {
     @Size(max = 100)
     private String emergencyContactRelation;
 
-    @Size(max = 15)
+    @Pattern(regexp = "^$|^[0-9+\\- ]{7,15}$", message = "Emergency contact number is invalid")
     private String emergencyContactNumber;
 
-    private String photoUrl;
-
     private String remarks;
+
+    @Valid
+    private AddressDto presentAddress;
+
+    @Valid
+    private AddressDto permanentAddress;
+
+    private Boolean sameAsPresentAddress;
 }

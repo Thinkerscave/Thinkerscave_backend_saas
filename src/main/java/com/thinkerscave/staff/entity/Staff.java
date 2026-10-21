@@ -1,6 +1,7 @@
 package com.thinkerscave.staff.entity;
 
 import com.thinkerscave.access.entity.User;
+import com.thinkerscave.shared.entity.Address;
 import com.thinkerscave.shared.entity.Auditable;
 import com.thinkerscave.staff.enums.EmploymentCategory;
 import com.thinkerscave.staff.enums.EmploymentStatus;
@@ -138,6 +139,17 @@ public class Staff extends Auditable {
     @Size(max = 150)
     @Column(name = "emergency_contact_name")
     private String emergencyContactName;
+
+    @OneToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "present_address_id")
+    private Address presentAddress;
+
+    @OneToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "permanent_address_id")
+    private Address permanentAddress;
+
+    @Column(name = "same_as_present_address", nullable = false)
+    private Boolean sameAsPresentAddress = false;
 
     @Size(max = 100)
     @Column(name = "emergency_contact_relation")

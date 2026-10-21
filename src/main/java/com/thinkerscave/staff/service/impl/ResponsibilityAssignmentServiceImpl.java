@@ -7,10 +7,12 @@ import com.thinkerscave.staff.dto.response.ResponsibilityAssignmentResponse;
 import com.thinkerscave.staff.entity.Responsibility;
 import com.thinkerscave.staff.entity.ResponsibilityAssignment;
 import com.thinkerscave.staff.entity.Staff;
+import com.thinkerscave.staff.enums.StaffActivityType;
 import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
 import com.thinkerscave.staff.repository.ResponsibilityRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
 import com.thinkerscave.staff.service.ResponsibilityAssignmentService;
+import com.thinkerscave.staff.service.StaffActivityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ public class ResponsibilityAssignmentServiceImpl implements ResponsibilityAssign
     private final ResponsibilityAssignmentRepository assignmentRepository;
     private final StaffRepository staffRepository;
     private final ResponsibilityRepository responsibilityRepository;
+    private final StaffActivityService activityService;
 
     @Override
     @Transactional
@@ -52,6 +55,8 @@ public class ResponsibilityAssignmentServiceImpl implements ResponsibilityAssign
         ResponsibilityAssignment assignment = getEntity(assignmentId);
         assignment.setActive(false);
         assignmentRepository.save(assignment);
+        activityService.record(assignment.getStaff(), StaffActivityType.RESPONSIBILITY_REMOVED,
+                "Responsibilities", "Removed responsibility: " + assignment.getResponsibility().getResponsibilityName());
     }
 
     @Override
@@ -91,8 +96,13 @@ public class ResponsibilityAssignmentServiceImpl implements ResponsibilityAssign
         assignment.setEffectiveFrom(effectiveFrom != null ? effectiveFrom : LocalDate.now());
         assignment.setEffectiveTo(effectiveTo);
         assignment.setRemarks(remarks);
+        boolean isNew = assignment.getAssignmentId() == null;
         assignment.setActive(true);
         ResponsibilityAssignment saved = assignmentRepository.save(assignment);
+        activityService.record(staff,
+                isNew ? StaffActivityType.RESPONSIBILITY_ADDED : StaffActivityType.RESPONSIBILITY_UPDATED,
+                "Responsibilities",
+                (isNew ? "Added responsibility: " : "Updated responsibility: ") + responsibility.getResponsibilityName());
         log.info("Responsibility assigned: {} to staff: {}", responsibility.getResponsibilityCode(), staff.getStaffCode());
         return saved.getAssignmentId();
     }

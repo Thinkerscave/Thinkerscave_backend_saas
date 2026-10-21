@@ -1,5 +1,6 @@
 package com.thinkerscave.staff.dto.response;
 
+import com.thinkerscave.shared.dto.AddressDto;
 import com.thinkerscave.staff.enums.EmploymentCategory;
 import com.thinkerscave.staff.enums.EmploymentStatus;
 import com.thinkerscave.staff.enums.StaffType;
@@ -39,6 +40,8 @@ public class StaffDetailResponse {
     private EmploymentCategory employmentCategory;
     private EmploymentStatus employmentStatus;
     private LocalDate joiningDate;
+    private LocalDate contractStartDate;
+    private LocalDate contractEndDate;
     private String highestQualification;
     private Integer experienceYears;
 
@@ -66,6 +69,14 @@ public class StaffDetailResponse {
 
     // Documents
     private List<DocumentResponse> documents;
+
+    // Address
+    private AddressDto presentAddress;
+    private AddressDto permanentAddress;
+    private Boolean sameAsPresentAddress;
+
+    // Bank (masked; account number never returned)
+    private StaffBankDetailsResponse bankDetails;
 
     @Getter
     @Setter

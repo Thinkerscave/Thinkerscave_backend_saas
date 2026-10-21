@@ -45,7 +45,6 @@ public class StaffProfileServiceImpl implements StaffProfileService {
         if (request.getReligion() != null) staff.setReligion(request.getReligion());
         if (request.getNationality() != null) staff.setNationality(request.getNationality());
         if (request.getBloodGroup() != null) staff.setBloodGroup(request.getBloodGroup());
-        if (request.getPhotoUrl() != null) staff.setPhotoUrl(request.getPhotoUrl());
         staffRepository.save(staff);
     }
 
