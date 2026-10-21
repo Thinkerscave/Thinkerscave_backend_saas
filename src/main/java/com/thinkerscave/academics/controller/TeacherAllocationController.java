@@ -36,10 +36,12 @@ public class TeacherAllocationController {
             @RequestParam(required = false) Long classId,
             @RequestParam(required = false) Long sectionId,
             @RequestParam(required = false) Long subjectId,
-            @RequestParam(required = false) TeacherAllocationStatus status) {
+            @RequestParam(required = false) TeacherAllocationStatus status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Teacher allocation dashboard",
-                allocationService.getDashboard(yearId, classId, sectionId, subjectId, status)));
+                allocationService.getDashboard(yearId, classId, sectionId, subjectId, status, page, size)));
     }
 
     @PostMapping("/teacher-allocations/assign")

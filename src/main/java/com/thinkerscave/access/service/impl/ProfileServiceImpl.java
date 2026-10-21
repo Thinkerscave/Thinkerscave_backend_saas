@@ -7,7 +7,10 @@ import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.repository.UserRepository;
 import com.thinkerscave.access.service.ProfileService;
 import com.thinkerscave.access.service.UserManagementService;
+import com.thinkerscave.security.service.impl.PublicSchemaUserLookupService;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.shared.context.OrganizationContext;
+import com.thinkerscave.shared.context.TenantContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -19,6 +22,7 @@ public class ProfileServiceImpl implements ProfileService {
 
     private final UserRepository userRepository;
     private final UserManagementService userManagementService;
+    private final PublicSchemaUserLookupService publicSchemaUserLookupService;
 
     @Override
     @Transactional(readOnly = true)
@@ -37,8 +41,26 @@ public class ProfileServiceImpl implements ProfileService {
     @Override
     @Transactional
     public void changeCurrentUserPassword(ChangePasswordRequest request) {
-        User user = resolveCurrentUser();
-        userManagementService.changePassword(user.getOrganizationId(), user.getId(), request);
+        String principal = SecurityContextHolder.getContext().getAuthentication().getName();
+        User tenantUser = userRepository.findByUsername(principal)
+                .or(() -> userRepository.findByEmail(principal))
+                .orElse(null);
+        if (tenantUser != null) {
+            userManagementService.changePassword(tenantUser.getOrganizationId(), tenantUser.getId(), request);
+            return;
+        }
+
+        String previousTenant = TenantContext.getTenant();
+        try {
+            TenantContext.setTenant("public");
+            publicSchemaUserLookupService.changeInstitutionUserPassword(principal, previousTenant, request);
+        } finally {
+            if (previousTenant == null) {
+                TenantContext.clear();
+            } else {
+                TenantContext.setTenant(previousTenant);
+            }
+        }
     }
 
     private User resolveCurrentUser() {

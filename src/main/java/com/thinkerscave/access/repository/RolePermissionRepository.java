@@ -26,6 +26,15 @@ public interface RolePermissionRepository extends JpaRepository<RolePermission, 
     @Query("DELETE FROM RolePermission rp WHERE rp.role.id = :roleId AND rp.organization.id = :orgId")
     void deleteAllByRoleAndOrganization(@Param("roleId") Long roleId, @Param("orgId") Long orgId);
 
+    /**
+     * Removes every explicit permission row for a role regardless of organization.
+     * Used by the global role-permission model, where a role carries one
+     * authoritative matrix rather than per-organization copies.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("DELETE FROM RolePermission rp WHERE rp.role.id = :roleId")
+    void deleteAllByRoleId(@Param("roleId") Long roleId);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("DELETE FROM RolePermission rp WHERE rp.menu.id = :menuId")
     void deleteByMenu_Id(@Param("menuId") Long menuId);

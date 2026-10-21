@@ -6,6 +6,7 @@ import com.thinkerscave.access.enums.LoginStatus;
 import com.thinkerscave.access.enums.RoleType;
 import com.thinkerscave.access.repository.LoginHistoryRepository;
 import com.thinkerscave.access.repository.UserRepository;
+import com.thinkerscave.access.dto.request.ChangePasswordRequest;
 import com.thinkerscave.platform.entity.Organization;
 import com.thinkerscave.platform.entity.TenantRegistry;
 import com.thinkerscave.platform.repository.OrganizationRepository;
@@ -15,12 +16,16 @@ import com.thinkerscave.security.entity.UserSession;
 import com.thinkerscave.security.enums.SessionStatus;
 import com.thinkerscave.security.repository.UserSessionRepository;
 import com.thinkerscave.shared.context.TenantContext;
+import com.thinkerscave.shared.exceptions.BadRequestException;
+import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -46,6 +51,7 @@ public class PublicSchemaUserLookupService {
     private final TenantRegistryRepository tenantRegistryRepository;
     private final UserSessionRepository sessionRepository;
     private final LoginHistoryRepository loginHistoryRepository;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Institution catalog lives in public. Login requests arrive with X-Tenant-ID already
@@ -81,6 +87,46 @@ public class PublicSchemaUserLookupService {
                 .or(() -> userRepository.findByEmail(usernameOrEmail))
                 .filter(candidate -> belongsToInstitution(candidate, organizationId))
                 .map(this::initializeRoles);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
+    public List<Organization> findActiveOrganizationsByOwnerUserId(Long ownerUserId) {
+        return organizationRepository.findActiveByOwnerUserId(ownerUserId);
+    }
+
+    /** Must be called with TenantContext already set to "public". */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void changeInstitutionUserPassword(
+            String usernameOrEmail, String tenantKey, ChangePasswordRequest request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new BadRequestException("New password and confirm password do not match");
+        }
+        Long organizationId = organizationIdForTenant(tenantKey);
+        User user = userRepository.findByUsername(usernameOrEmail)
+                .or(() -> userRepository.findByEmail(usernameOrEmail))
+                .filter(candidate -> belongsToInstitution(candidate, organizationId))
+                .orElseThrow(() -> new ResourceNotFoundException("Signed-in user not found"));
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new BadRequestException("Current password is incorrect");
+        }
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setFirstTimeLogin(false);
+        user.setPasswordChangedAt(LocalDateTime.now());
+        userRepository.save(user);
+    }
+
+    private Long organizationIdForTenant(String tenantKey) {
+        if (tenantKey == null || tenantKey.isBlank()) {
+            throw new ResourceNotFoundException("Selected tenant not found");
+        }
+        TenantRegistry tenant = tenantRegistryRepository.findBySchemaName(tenantKey)
+                .or(() -> tenantRegistryRepository.findActiveByTenantIdentifierNormalized(tenantKey))
+                .filter(candidate -> Boolean.TRUE.equals(candidate.getActive()))
+                .orElseThrow(() -> new ResourceNotFoundException("Selected tenant not found"));
+        if (tenant.getOrganization() == null) {
+            throw new ResourceNotFoundException("Selected tenant has no organization");
+        }
+        return tenant.getOrganization().getId();
     }
 
     private boolean belongsToInstitution(User user, Long organizationId) {

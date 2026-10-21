@@ -4,6 +4,7 @@ import com.thinkerscave.attendance.dto.response.AttendanceCalendarResponse;
 import com.thinkerscave.attendance.dto.response.AttendanceCalendarResponse.CalendarDayResponse;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceCalendarService;
+import com.thinkerscave.attendance.service.StaffAttendanceDayContextService;
 import com.thinkerscave.shared.context.OrganizationContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
 public class AttendanceCalendarServiceImpl implements AttendanceCalendarService {
 
     private final StudentAttendanceRepository studentAttendanceRepository;
+    private final StaffAttendanceDayContextService dayContextService;
 
     @Override
     public AttendanceCalendarResponse getCalendarData(Long classId, Long sectionId, int year, int month) {
@@ -33,8 +35,9 @@ public class AttendanceCalendarServiceImpl implements AttendanceCalendarService 
         LocalDate from = yearMonth.atDay(1);
         LocalDate to = yearMonth.atEndOfMonth();
 
-        // Fetch daily summary for the org within the month
-        List<Object[]> dailySummary = studentAttendanceRepository.getDailyAttendanceSummary(orgId, from, to);
+        // Fetch daily summary for the org within the month (LATE counts as present)
+        List<Object[]> dailySummary = studentAttendanceRepository.getDailyAttendanceSummaryFiltered(
+                orgId, from, to, classId, sectionId);
 
         // row: [0]=attendanceDate, [1]=totalStudents, [2]=presentCount
         Map<LocalDate, double[]> dateMap = dailySummary.stream()
@@ -46,13 +49,26 @@ public class AttendanceCalendarServiceImpl implements AttendanceCalendarService 
         List<CalendarDayResponse> days = new ArrayList<>();
         for (int d = 1; d <= yearMonth.lengthOfMonth(); d++) {
             LocalDate current = yearMonth.atDay(d);
+            StaffAttendanceDayContextService.DayContext day = dayContextService.resolveStudentDay(orgId, current);
+
             double[] counts = dateMap.get(current);
             if (counts == null) {
-                days.add(CalendarDayResponse.builder()
-                        .date(current)
-                        .attendancePercent(null)
-                        .status("NO_DATA")
-                        .build());
+                if (!day.attendanceRequired()) {
+                    days.add(CalendarDayResponse.builder()
+                            .date(current)
+                            .attendancePercent(null)
+                            .status(day.holiday() ? "HOLIDAY" : "WEEKEND")
+                            .dayType(day.holiday() ? "HOLIDAY" : "WEEKEND")
+                            .holidayName(day.holidayName())
+                            .build());
+                } else {
+                    days.add(CalendarDayResponse.builder()
+                            .date(current)
+                            .attendancePercent(null)
+                            .status("NO_DATA")
+                            .dayType("WORKING")
+                            .build());
+                }
             } else {
                 double total = counts[0];
                 double present = counts[1];
@@ -66,6 +82,7 @@ public class AttendanceCalendarServiceImpl implements AttendanceCalendarService 
                         .date(current)
                         .attendancePercent(pct)
                         .status(status)
+                        .dayType("WORKING")
                         .build());
             }
         }

@@ -18,8 +18,9 @@ import java.util.function.Consumer;
 
 /**
  * Runs a unit of work once per completed tenant schema.
- * Each tenant runs in {@code REQUIRES_NEW} so Hibernate opens a session after
- * {@link TenantContext} is set (schema multi-tenancy cannot flip mid-transaction).
+ * {@link TenantContext} must be set before the {@code REQUIRES_NEW} transaction starts,
+ * because Hibernate resolves the tenant schema when the session opens and cannot
+ * switch it mid-transaction.
  */
 @Component
 @RequiredArgsConstructor
@@ -59,7 +60,6 @@ public class FinanceTenantJobRunner {
         }
     }
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void runInTenant(String schemaName, Long organizationId, Runnable work) {
         String previousTenant = TenantContext.getTenant();
         Long previousOrg = OrganizationContext.getOrganizationId();
@@ -70,7 +70,7 @@ public class FinanceTenantJobRunner {
             } else {
                 OrganizationContext.clear();
             }
-            work.run();
+            selfProvider.getObject().runInNewTransaction(work);
         } finally {
             if (previousTenant != null) {
                 TenantContext.setTenant(previousTenant);
@@ -83,5 +83,10 @@ public class FinanceTenantJobRunner {
                 OrganizationContext.clear();
             }
         }
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void runInNewTransaction(Runnable work) {
+        work.run();
     }
 }

@@ -4,13 +4,19 @@ import com.thinkerscave.academics.dto.response.TimetableGenerateResultResponse;
 import com.thinkerscave.academics.entity.*;
 import com.thinkerscave.academics.enums.*;
 import com.thinkerscave.academics.repository.*;
+import com.thinkerscave.academics.timetable.engine.TimetablePlanningData.MissingTeacher;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Session;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.sql.PreparedStatement;
+import java.sql.Types;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -19,8 +25,11 @@ import java.util.*;
 public class TimetableGenerationEngine {
 
     private static final Logger log = LoggerFactory.getLogger(TimetableGenerationEngine.class);
-    public static final String ALGORITHM_VERSION = "v1";
+    public static final String ALGORITHM_VERSION = "v2";
+    private static final String SYSTEM_USER = "system";
+    private static final int INSERT_BATCH_SIZE = 250;
 
+    private final TimetablePlanningDataLoader planningDataLoader;
     private final RequirementExpander expander;
     private final CandidateCalculator candidateCalculator;
     private final ConstraintScheduler scheduler;
@@ -29,93 +38,88 @@ public class TimetableGenerationEngine {
     private final TimetableVersionRepository versionRepository;
     private final TimetableEntryRepository entryRepository;
     private final TimetableConflictRepository conflictRepository;
-    private final TimetableConfigurationRepository configurationRepository;
-    private final TimetableWorkingDayRepository workingDayRepository;
     private final TimetablePeriodRepository periodRepository;
     private final TeacherAllocationRepository allocationRepository;
-    private final TeacherAllocationTeacherRepository allocationTeacherRepository;
     private final AcademicResourceRepository resourceRepository;
-    private final ClassRepository classRepository;
     private final SectionRepository sectionRepository;
     private final TransactionTemplate transactionTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    private record Prepared(SchedulingSourceData source,
+                            List<SchedulingRequirement> requirements,
+                            List<SolutionValidator.ValidationConflict> unscheduled,
+                            int sectionCount) {}
 
     public TimetableGenerateResultResponse execute(Long versionId, long seed,
                                                    GenerationProgress progress) {
         log.info("Engine start: versionId={}, seed={}, algorithm={}", versionId, seed, ALGORITHM_VERSION);
+        long startedAt = System.nanoTime();
 
         try {
-            // Phase 2: Load version
             progress.advanceTo(GenerationPhase.PREPARING_WORKSPACE, 5);
             TimetableVersion version = versionRepository.findById(versionId)
                     .orElseThrow(() -> new IllegalStateException("Version not found: " + versionId));
 
             if (progress.isCancelRequested()) return cancelled(version, progress);
 
-            // Phase 3–4: Load source data + expand requirements inside one read transaction
-            // (async worker otherwise hits LazyInitializationException on associations).
             progress.advanceTo(GenerationPhase.LOADING_DATA, 10);
-            record Prepared(SchedulingSourceData source, List<SchedulingRequirement> requirements) {}
-            Prepared prepared = transactionTemplate.execute(status -> {
-                SchedulingSourceData loaded = loadSourceData(versionId);
-                progress.advanceTo(GenerationPhase.BUILDING_REQUIREMENTS, 20);
-                List<SchedulingRequirement> reqs = expander.expand(loaded);
-                return new Prepared(loaded, reqs);
-            });
+            Prepared prepared = transactionTemplate.execute(status -> prepare(versionId, progress));
             if (prepared == null) {
                 throw new IllegalStateException("Failed to prepare scheduling data for version " + versionId);
             }
             SchedulingSourceData source = prepared.source();
             List<SchedulingRequirement> requirements = prepared.requirements();
-            log.info("Expanded {} scheduling requirements", requirements.size());
+            log.info("Expanded {} scheduling requirements, {} unscheduled lesson(s) without teacher",
+                    requirements.size(), prepared.unscheduled().size());
 
             if (progress.isCancelRequested()) return cancelled(version, progress);
 
+            if (source.getWorkingDays().isEmpty() || source.getTeachingPeriods().isEmpty()) {
+                throw new IllegalStateException("The configuration has no working days or teaching periods");
+            }
+
+            SolutionValidator.ValidationResult validation;
+            SchedulingSolution solution;
             if (requirements.isEmpty()) {
-                return completeEmpty(version, progress);
-            }
+                solution = new SchedulingSolution();
+                validation = new SolutionValidator.ValidationResult();
+            } else {
+                progress.advanceTo(GenerationPhase.CALCULATING_CANDIDATES, 30);
+                candidateCalculator.calculateCandidates(requirements, source);
 
-            if (progress.isCancelRequested()) return cancelled(version, progress);
+                if (progress.isCancelRequested()) return cancelled(version, progress);
 
-            // Phase 5: Calculate candidates
-            progress.advanceTo(GenerationPhase.CALCULATING_CANDIDATES, 30);
-            candidateCalculator.calculateCandidates(requirements, source);
+                progress.advanceTo(GenerationPhase.SCHEDULING, 40);
+                solution = scheduler.solve(requirements, source, seed, progress);
 
-            List<SchedulingRequirement> zeroCandidates = requirements.stream()
-                    .filter(r -> r.getCandidates().isEmpty())
-                    .toList();
-            if (!zeroCandidates.isEmpty()) {
-                return completeBlocked(version, zeroCandidates, progress);
-            }
+                if (progress.isCancelRequested()) return cancelled(version, progress);
 
-            if (progress.isCancelRequested()) return cancelled(version, progress);
-
-            // Phase 6: Schedule (CPU-bound, outside long DB transaction)
-            progress.advanceTo(GenerationPhase.SCHEDULING, 40);
-            SchedulingSolution solution = scheduler.solve(requirements, source, seed, progress);
-
-            if (progress.isCancelRequested()) return cancelled(version, progress);
-
-            // Phase 7: Optimize
-            if (solution.isComplete()) {
+                Map<String, SchedulingRequirement> byId = new HashMap<>();
+                for (SchedulingRequirement r : requirements) byId.put(r.getRequirementId(), r);
                 progress.advanceTo(GenerationPhase.OPTIMIZING, 72);
-                solution = optimizer.optimize(solution, source, progress);
+                solution = optimizer.optimize(solution, source, progress, byId);
+
+                if (progress.isCancelRequested()) return cancelled(version, progress);
+
+                progress.advanceTo(GenerationPhase.VALIDATING, 82);
+                validation = validator.validate(solution, requirements, source);
             }
+            prepared.unscheduled().forEach(validation::addWarning);
 
-            if (progress.isCancelRequested()) return cancelled(version, progress);
-
-            // Phase 8: Validate
-            progress.advanceTo(GenerationPhase.VALIDATING, 82);
-            SolutionValidator.ValidationResult validation =
-                    validator.validate(solution, requirements, source);
-
-            // Phase 9: Generate conflicts
             progress.advanceTo(GenerationPhase.GENERATING_CONFLICTS, 90);
-
-            // Phase 10: Persist in a short transaction
             progress.advanceTo(GenerationPhase.FINALIZING, 95);
             SchedulingSolution finalSolution = solution;
-            return transactionTemplate.execute(status ->
-                    persist(version, finalSolution, validation, progress));
+            SolutionValidator.ValidationResult finalValidation = validation;
+            long elapsedMs = Duration.ofNanos(System.nanoTime() - startedAt).toMillis();
+            TimetableGenerateResultResponse result = transactionTemplate.execute(status ->
+                    persist(versionId, finalSolution, finalValidation, prepared, elapsedMs));
+            if (result == null) {
+                throw new IllegalStateException("Failed to save the generated timetable");
+            }
+            progress.complete(result.getGenerationStatus(), result.getMessage());
+            return result;
 
         } catch (Exception e) {
             log.error("Engine failed for versionId={}", versionId, e);
@@ -123,73 +127,76 @@ public class TimetableGenerationEngine {
         }
     }
 
-    private SchedulingSourceData loadSourceData(Long versionId) {
+    private Prepared prepare(Long versionId, GenerationProgress progress) {
         TimetableVersion version = versionRepository.findByIdWithConfigAndYear(versionId)
                 .orElseThrow(() -> new IllegalStateException("Version not found: " + versionId));
         TimetableConfiguration config = version.getTimetableConfiguration();
-        Long configId = config.getTimetableConfigurationId();
-        Long yearId = version.getAcademicYear().getAcademicYearId();
+        TimetablePlanningData data = planningDataLoader.load(
+                version.getAcademicYear().getAcademicYearId(), config);
 
-        List<TimetableWorkingDay> workingDays = workingDayRepository
-                .findByTimetableConfiguration_TimetableConfigurationId(configId)
-                .stream()
-                .filter(w -> Boolean.TRUE.equals(w.getWorking()))
-                .toList();
-        List<DayOfWeek> days = workingDays.stream()
-                .map(TimetableWorkingDay::getDayOfWeek).toList();
-
-        List<TimetablePeriod> allPeriods = periodRepository
-                .findByTimetableConfiguration_TimetableConfigurationIdOrderByPeriodNumberAsc(configId);
-        List<TimetablePeriod> teachingPeriods = allPeriods.stream()
-                .filter(p -> p.getSlotKind() == TimetableSlotKind.TEACHING).toList();
-
-        int halfIndex = teachingPeriods.size() / 2;
-
-        List<AcademicClass> classes = classRepository
-                .findByAcademicYear_AcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(yearId);
-        List<AcademicSection> sections = new ArrayList<>();
-        for (AcademicClass c : classes) {
-            sections.addAll(sectionRepository
-                    .findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(c.getClassId()));
-        }
-
-        List<TeacherAllocationTeacher> primaries = allocationTeacherRepository.findActiveByYear(yearId)
-                .stream()
-                .filter(t -> t.getRole() == TeacherAllocationTeacherRole.PRIMARY
-                        && t.getTeacherAllocation().getStatus() == TeacherAllocationStatus.ASSIGNED)
-                .toList();
-
-        return SchedulingSourceData.builder()
+        SchedulingSourceData source = SchedulingSourceData.builder()
                 .configuration(config)
-                .workingDays(days)
-                .teachingPeriods(teachingPeriods)
-                .allPeriods(allPeriods)
-                .activeSections(sections)
-                .activePrimaries(primaries)
-                .maxTeacherWeeklyPeriods(config.getMaxTeacherWeeklyPeriods())
-                .halfIndex(halfIndex)
+                .workingDays(data.getWorkingDays())
+                .teachingPeriods(data.getTeachingPeriods())
+                .allPeriods(data.getAllPeriods())
+                .maxTeacherWeeklyPeriods(config.getMaxTeacherWeeklyPeriods() == null
+                        ? Integer.MAX_VALUE : config.getMaxTeacherWeeklyPeriods())
+                .halfIndex(firstHalfTeachingCount(data.getAllPeriods(), data.getTeachingPeriods().size()))
                 .build();
+
+        progress.advanceTo(GenerationPhase.BUILDING_REQUIREMENTS, 20);
+        List<SchedulingRequirement> requirements = expander.expand(data.getLessons());
+
+        List<SolutionValidator.ValidationConflict> unscheduled = new ArrayList<>();
+        for (MissingTeacher m : data.getMissingTeachers()) {
+            unscheduled.add(new SolutionValidator.ValidationConflict(
+                    TimetableConflictType.SUBJECT_ALLOCATION_CONFLICT,
+                    m.mapping().getSubject().getName() + " for " + TimetablePlanningData.sectionLabel(m.section())
+                            + " was not scheduled: " + m.reason().getLabel()
+                            + (m.teacherName() != null ? " (" + m.teacherName() + ")" : "")
+                            + ". Assign a teacher in Teacher Allocation and regenerate to fill its "
+                            + m.weeklyPeriods() + " period(s).",
+                    m.section().getSectionId(), null, null, null, null));
+        }
+        return new Prepared(source, requirements, unscheduled, data.getSections().size());
     }
 
-    private TimetableGenerateResultResponse persist(TimetableVersion version,
-                                                      SchedulingSolution solution,
-                                                      SolutionValidator.ValidationResult validation,
-                                                      GenerationProgress progress) {
-        List<TimetableEntry> entries = new ArrayList<>();
-        for (Placement p : solution.getPlacements()) {
-            TimetableEntry entry = new TimetableEntry();
-            entry.setTimetableVersion(version);
-            entry.setDayOfWeek(p.getDayOfWeek());
-            entry.setTimetablePeriod(periodRepository.getReferenceById(p.getPeriodId()));
-            entry.setSection(sectionRepository.getReferenceById(p.getSectionId()));
-            entry.setTeacherAllocation(allocationRepository.getReferenceById(p.getTeacherAllocationId()));
-            entry.setEntryType(TimetableEntryType.SUBJECT);
-            entry.setSubjectNameSnapshot(p.getSubjectNameSnapshot());
-            if (p.getResourceId() != null) {
-                entry.setResource(resourceRepository.getReferenceById(p.getResourceId()));
+    /**
+     * Teaching periods before the longest break (usually lunch); falls back to half the day
+     * when there is no break splitting the teaching periods.
+     */
+    static int firstHalfTeachingCount(List<TimetablePeriod> allPeriods, int teachingCount) {
+        TimetablePeriod longestBreak = null;
+        long longest = -1;
+        for (TimetablePeriod p : allPeriods) {
+            if (p.getSlotKind() != TimetableSlotKind.BREAK || p.getStartTime() == null || p.getEndTime() == null) continue;
+            long minutes = Duration.between(p.getStartTime(), p.getEndTime()).toMinutes();
+            if (minutes > longest) {
+                longest = minutes;
+                longestBreak = p;
             }
-            entries.add(entry);
         }
+        if (longestBreak != null) {
+            int before = 0;
+            for (TimetablePeriod p : allPeriods) {
+                if (p == longestBreak) break;
+                if (p.getSlotKind() == TimetableSlotKind.TEACHING) before++;
+            }
+            if (before > 0 && before < teachingCount) return before;
+        }
+        return Math.max(1, teachingCount / 2);
+    }
+
+    private TimetableGenerateResultResponse persist(Long versionId,
+                                                    SchedulingSolution solution,
+                                                    SolutionValidator.ValidationResult validation,
+                                                    Prepared prepared,
+                                                    long elapsedMs) {
+        TimetableVersion version = versionRepository.findById(versionId)
+                .orElseThrow(() -> new IllegalStateException("Version not found: " + versionId));
+
+        List<Placement> entries = new ArrayList<>(solution.getPlacements());
+        insertEntries(versionId, entries);
 
         List<TimetableConflict> conflicts = new ArrayList<>();
         for (SolutionValidator.ValidationConflict vc : validation.getBlockingConflicts()) {
@@ -199,18 +206,12 @@ public class TimetableGenerationEngine {
             conflicts.add(toConflictEntity(version, vc, false));
         }
 
-        entryRepository.saveAll(entries);
         conflictRepository.saveAll(conflicts);
 
-        long openBlocking = conflicts.stream()
-                .filter(c -> Boolean.TRUE.equals(c.getBlocking())
-                        && c.getStatus() == TimetableConflictStatus.OPEN)
-                .count();
+        long openBlocking = validation.getBlockingConflicts().size();
+        long warnings = validation.getWarnings().size();
 
-        boolean hasBlockingConflicts = openBlocking > 0;
-        boolean hasWarnings = !validation.getWarnings().isEmpty();
-
-        version.setGenerationStatus(hasBlockingConflicts
+        version.setGenerationStatus(openBlocking > 0
                 ? TimetableGenerationStatus.GENERATED_WITH_CONFLICTS
                 : TimetableGenerationStatus.GENERATED);
         version.setStatus(TimetableStatus.READY_FOR_REVIEW);
@@ -218,19 +219,27 @@ public class TimetableGenerationEngine {
         versionRepository.save(version);
 
         TimetableGenerateResultResponse.ResultKind resultKind;
-        if (hasBlockingConflicts) {
+        if (openBlocking > 0) {
             resultKind = TimetableGenerateResultResponse.ResultKind.BLOCKED;
-        } else if (hasWarnings) {
+        } else if (warnings > 0) {
             resultKind = TimetableGenerateResultResponse.ResultKind.SUCCESS_WITH_WARNINGS;
         } else {
             resultKind = TimetableGenerateResultResponse.ResultKind.SUCCESS;
         }
 
-        String msg = hasBlockingConflicts
-                ? "Timetable generated with " + openBlocking + " blocking conflict(s)"
-                : "Timetable generated successfully";
-
-        progress.complete(version.getGenerationStatus(), msg);
+        StringBuilder msg = new StringBuilder();
+        if (openBlocking > 0) {
+            msg.append("Timetable generated with ").append(openBlocking)
+                    .append(" unresolved issue(s): ").append(entries.size()).append(" periods placed");
+        } else {
+            msg.append("Timetable generated: ").append(entries.size()).append(" periods placed across ")
+                    .append(prepared.sectionCount()).append(" section(s) with no clashes");
+        }
+        if (!prepared.unscheduled().isEmpty()) {
+            msg.append("; ").append(prepared.unscheduled().size())
+                    .append(" subject(s) skipped because no teacher is assigned");
+        }
+        msg.append(" (").append(Math.max(1, elapsedMs / 1000)).append("s)");
 
         return TimetableGenerateResultResponse.builder()
                 .timetableVersionId(version.getTimetableVersionId())
@@ -239,10 +248,52 @@ public class TimetableGenerationEngine {
                 .totalEntries(entries.size())
                 .totalConflicts(conflicts.size())
                 .openBlockingConflicts(openBlocking)
-                .message(msg)
+                .message(msg.toString())
                 .algorithmVersion(ALGORITHM_VERSION)
                 .resultKind(resultKind)
                 .build();
+    }
+
+    /**
+     * Entries use IDENTITY keys, which disables Hibernate insert batching; a school timetable has
+     * hundreds of rows, so they are written as one JDBC batch on the session's tenant connection.
+     */
+    private void insertEntries(Long versionId, List<Placement> placements) {
+        if (placements.isEmpty()) return;
+        String sql = "INSERT INTO timetable_entry (created_by, created_on, updated_by, updated_on, version, "
+                + "day_of_week, entry_type, resource_id, section_id, subject_name_snapshot, "
+                + "teacher_allocation_id, timetable_period_id, timetable_version_id) "
+                + "VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)";
+        LocalDateTime now = LocalDateTime.now();
+        entityManager.unwrap(Session.class).doWork(connection -> {
+            try (PreparedStatement ps = connection.prepareStatement(sql)) {
+                int pending = 0;
+                for (Placement p : placements) {
+                    ps.setString(1, SYSTEM_USER);
+                    ps.setObject(2, now);
+                    ps.setString(3, SYSTEM_USER);
+                    ps.setObject(4, now);
+                    ps.setString(5, p.getDayOfWeek().name());
+                    ps.setString(6, TimetableEntryType.SUBJECT.name());
+                    if (p.getResourceId() == null) {
+                        ps.setNull(7, Types.BIGINT);
+                    } else {
+                        ps.setLong(7, p.getResourceId());
+                    }
+                    ps.setLong(8, p.getSectionId());
+                    ps.setString(9, p.getSubjectNameSnapshot());
+                    ps.setLong(10, p.getTeacherAllocationId());
+                    ps.setLong(11, p.getPeriodId());
+                    ps.setLong(12, versionId);
+                    ps.addBatch();
+                    if (++pending == INSERT_BATCH_SIZE) {
+                        ps.executeBatch();
+                        pending = 0;
+                    }
+                }
+                if (pending > 0) ps.executeBatch();
+            }
+        });
     }
 
     private TimetableConflict toConflictEntity(TimetableVersion version,
@@ -253,73 +304,22 @@ public class TimetableGenerationEngine {
         c.setConflictType(vc.getConflictType());
         c.setBlocking(blocking);
         c.setStatus(TimetableConflictStatus.OPEN);
-        c.setMessage(vc.getMessage());
+        String message = vc.getMessage();
+        c.setMessage(message.length() > 1000 ? message.substring(0, 997) + "..." : message);
         if (vc.getSectionId() != null) {
             c.setSection(sectionRepository.getReferenceById(vc.getSectionId()));
+        }
+        if (vc.getTeacherAllocationId() != null) {
+            c.setTeacherAllocation(allocationRepository.getReferenceById(vc.getTeacherAllocationId()));
+        }
+        if (vc.getResourceId() != null) {
+            c.setResource(resourceRepository.getReferenceById(vc.getResourceId()));
         }
         c.setDayOfWeek(vc.getDayOfWeek());
         if (vc.getPeriodId() != null) {
             c.setTimetablePeriod(periodRepository.getReferenceById(vc.getPeriodId()));
         }
         return c;
-    }
-
-    private TimetableGenerateResultResponse completeEmpty(TimetableVersion version,
-                                                          GenerationProgress progress) {
-        version.setGenerationStatus(TimetableGenerationStatus.GENERATED);
-        version.setStatus(TimetableStatus.READY_FOR_REVIEW);
-        version.setGeneratedAt(LocalDateTime.now());
-        versionRepository.save(version);
-
-        progress.complete(TimetableGenerationStatus.GENERATED, "No requirements to schedule");
-        return TimetableGenerateResultResponse.builder()
-                .timetableVersionId(version.getTimetableVersionId())
-                .versionNumber(version.getVersionNumber())
-                .generationStatus(TimetableGenerationStatus.GENERATED)
-                .totalEntries(0).totalConflicts(0).openBlockingConflicts(0)
-                .message("No requirements to schedule")
-                .algorithmVersion(ALGORITHM_VERSION)
-                .resultKind(TimetableGenerateResultResponse.ResultKind.SUCCESS)
-                .build();
-    }
-
-    private TimetableGenerateResultResponse completeBlocked(TimetableVersion version,
-                                                            List<SchedulingRequirement> zeroReqs,
-                                                            GenerationProgress progress) {
-        List<TimetableConflict> conflicts = new ArrayList<>();
-        for (SchedulingRequirement r : zeroReqs) {
-            TimetableConflict c = new TimetableConflict();
-            c.setTimetableVersion(version);
-            c.setConflictType(TimetableConflictType.SUBJECT_ALLOCATION_CONFLICT);
-            c.setBlocking(true);
-            c.setStatus(TimetableConflictStatus.OPEN);
-            c.setMessage("No candidate slots for " + r.getSubjectName()
-                    + " in " + r.getSectionName());
-            if (r.getSectionId() != null) {
-                c.setSection(sectionRepository.getReferenceById(r.getSectionId()));
-            }
-            conflicts.add(c);
-        }
-        conflictRepository.saveAll(conflicts);
-
-        version.setGenerationStatus(TimetableGenerationStatus.GENERATED_WITH_CONFLICTS);
-        version.setStatus(TimetableStatus.READY_FOR_REVIEW);
-        version.setGeneratedAt(LocalDateTime.now());
-        versionRepository.save(version);
-
-        progress.complete(TimetableGenerationStatus.GENERATED_WITH_CONFLICTS,
-                zeroReqs.size() + " requirement(s) have no viable candidates");
-
-        return TimetableGenerateResultResponse.builder()
-                .timetableVersionId(version.getTimetableVersionId())
-                .versionNumber(version.getVersionNumber())
-                .generationStatus(TimetableGenerationStatus.GENERATED_WITH_CONFLICTS)
-                .totalEntries(0).totalConflicts(conflicts.size())
-                .openBlockingConflicts(conflicts.size())
-                .message(zeroReqs.size() + " requirement(s) have no viable candidates")
-                .algorithmVersion(ALGORITHM_VERSION)
-                .resultKind(TimetableGenerateResultResponse.ResultKind.BLOCKED)
-                .build();
     }
 
     private TimetableGenerateResultResponse cancelled(TimetableVersion version,

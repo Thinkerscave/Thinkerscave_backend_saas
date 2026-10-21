@@ -300,7 +300,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
-            List<Organization> ownedOrganizations = organizationRepository.findActiveByOwnerUserId(user.getId());
+            List<Organization> ownedOrganizations = findActiveOrganizationsByOwnerUserId(user.getId());
             List<String> switchableTenants = new ArrayList<>();
             List<Long> switchableOrgIds = new ArrayList<>();
             for (Organization org : ownedOrganizations) {
@@ -322,7 +322,7 @@ public class AuthServiceImpl implements AuthService {
             return LoginContext.PLATFORM_TENANT;
         }
         if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
-            return organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+            return findActiveOrganizationsByOwnerUserId(user.getId()).stream()
                     .map(Organization::getTenantRegistry)
                     .filter(tr -> tr != null && tr.getTenantIdentifier() != null)
                     .map(TenantRegistry::getTenantIdentifier)
@@ -419,7 +419,7 @@ public class AuthServiceImpl implements AuthService {
             return normalizedPreferred;
         }
         if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
-            boolean switchable = organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+            boolean switchable = findActiveOrganizationsByOwnerUserId(user.getId()).stream()
                     .map(Organization::getTenantRegistry)
                     .filter(tr -> tr != null && tr.getTenantIdentifier() != null)
                     .map(tr -> tr.getTenantIdentifier().trim().toLowerCase().replace('-', '_'))
@@ -447,18 +447,32 @@ public class AuthServiceImpl implements AuthService {
             }
         }
         if (hasActiveRole(user, RoleType.ORGANIZATION_OWNER)) {
-            return organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+            return findActiveOrganizationsByOwnerUserId(user.getId()).stream()
                     .filter(org -> org.getTenantRegistry() != null
                             && tenantId != null
                             && tenantId.equalsIgnoreCase(org.getTenantRegistry().getTenantIdentifier()))
                     .map(Organization::getId)
                     .findFirst()
-                    .orElseGet(() -> organizationRepository.findActiveByOwnerUserId(user.getId()).stream()
+                    .orElseGet(() -> findActiveOrganizationsByOwnerUserId(user.getId()).stream()
                             .map(Organization::getId)
                             .findFirst()
                             .orElse(user.getOrganizationId()));
         }
         return user.getOrganizationId();
+    }
+
+    private List<Organization> findActiveOrganizationsByOwnerUserId(Long ownerUserId) {
+        String previousTenant = TenantContext.getTenant();
+        try {
+            TenantContext.setTenant("public");
+            return publicSchemaUserLookupService.findActiveOrganizationsByOwnerUserId(ownerUserId);
+        } finally {
+            if (previousTenant == null) {
+                TenantContext.clear();
+            } else {
+                TenantContext.setTenant(previousTenant);
+            }
+        }
     }
 
     private record ResolvedRefreshSession(UserSession session, User user, boolean publicSchemaSession) {}

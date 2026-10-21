@@ -7,6 +7,7 @@ import com.thinkerscave.shared.context.OrganizationContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
@@ -14,7 +15,9 @@ import java.util.Map;
 
 /**
  * Privilege checks for Staff Attendance APIs.
- * Uses menu privileges VIEW / MANAGE / APPROVE — never hard-coded admin roles.
+ * Uses menu privileges VIEW / MANAGE / APPROVE and falls back to elevated
+ * org roles (SUPER_ADMIN / ORGANIZATION_OWNER / ORGANIZATION_ADMIN) so the
+ * attendance module keeps working while menu permissions are provisioned.
  */
 @Component
 @RequiredArgsConstructor
@@ -68,7 +71,22 @@ public class AttendanceAccessGuard {
                 .orElseThrow(() -> new AccessDeniedException("User not found"));
     }
 
+    public boolean hasElevatedRole() {
+        Authentication a = SecurityContextHolder.getContext().getAuthentication();
+        if (a == null) {
+            return false;
+        }
+        return a.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(r -> "SUPER_ADMIN".equals(r)
+                        || "ORGANIZATION_OWNER".equals(r)
+                        || "ORGANIZATION_ADMIN".equals(r));
+    }
+
     private boolean has(String resource, String privilege) {
+        if (hasElevatedRole()) {
+            return true;
+        }
         Authentication a = SecurityContextHolder.getContext().getAuthentication();
         if (a == null || a.getName() == null || OrganizationContext.getOrganizationId() == null) {
             return false;

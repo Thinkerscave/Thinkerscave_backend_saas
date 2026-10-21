@@ -19,15 +19,16 @@ public class CandidateCalculator {
             List<CandidateSlot> candidates = new ArrayList<>();
 
             for (DayOfWeek day : workingDays) {
-                for (TimetablePeriod period : teachingPeriods) {
-                    CandidateSlot slot = new CandidateSlot(
+                for (int idx = 0; idx < teachingPeriods.size(); idx++) {
+                    TimetablePeriod period = teachingPeriods.get(idx);
+                    candidates.add(new CandidateSlot(
                             day,
                             period.getTimetablePeriodId(),
                             period.getPeriodNumber(),
+                            idx,
                             req.getPrimaryStaffId(),
                             req.getDefaultResourceId()
-                    );
-                    candidates.add(slot);
+                    ));
                 }
             }
 

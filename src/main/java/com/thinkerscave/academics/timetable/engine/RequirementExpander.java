@@ -1,10 +1,10 @@
 package com.thinkerscave.academics.timetable.engine;
 
-import com.thinkerscave.academics.entity.*;
+import com.thinkerscave.academics.entity.AcademicSection;
+import com.thinkerscave.academics.entity.ClassSubjectMapping;
 import com.thinkerscave.academics.enums.SubjectTimetablePreference;
-import com.thinkerscave.academics.enums.TeacherAllocationTeacherRole;
+import com.thinkerscave.academics.timetable.engine.TimetablePlanningData.Lesson;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -12,18 +12,16 @@ import java.util.List;
 @Component
 public class RequirementExpander {
 
-    public List<SchedulingRequirement> expand(SchedulingSourceData source) {
+    /** One requirement per weekly period of every section subject that has an active teacher. */
+    public List<SchedulingRequirement> expand(List<Lesson> lessons) {
         List<SchedulingRequirement> requirements = new ArrayList<>();
         int seq = 1;
 
-        for (TeacherAllocationTeacher primary : source.getActivePrimaries()) {
-            if (primary.getRole() != TeacherAllocationTeacherRole.PRIMARY) continue;
+        for (Lesson lesson : lessons) {
+            ClassSubjectMapping mapping = lesson.mapping();
+            AcademicSection section = lesson.section();
 
-            TeacherAllocation allocation = primary.getTeacherAllocation();
-            ClassSubjectMapping mapping = allocation.getClassSubjectMapping();
-            AcademicSection section = allocation.getSection();
-
-            int weeklyPeriods = mapping.getWeeklyPeriods() == null ? 0 : mapping.getWeeklyPeriods();
+            int weeklyPeriods = lesson.weeklyPeriods();
             if (weeklyPeriods <= 0) continue;
 
             SubjectTimetablePreference pref = mapping.getTimetablePreference() == null
@@ -32,13 +30,13 @@ public class RequirementExpander {
             Long defaultResourceId = section.getDefaultResource() == null
                     ? null : section.getDefaultResource().getAcademicResourceId();
 
-            String staffName = buildStaffName(primary.getStaff());
+            String staffName = TimetablePlanningData.staffName(lesson.teacher());
 
             for (int i = 0; i < weeklyPeriods; i++) {
                 SchedulingRequirement req = new SchedulingRequirement();
                 req.setRequirementId(String.format("REQ-%04d", seq++));
                 req.setSectionId(section.getSectionId());
-                req.setSectionName(section.getName());
+                req.setSectionName(TimetablePlanningData.sectionLabel(section));
                 req.setClassId(section.getAcademicClass().getClassId());
                 req.setClassName(section.getAcademicClass().getName());
                 req.setClassSubjectMappingId(mapping.getClassSubjectMappingId());
@@ -46,8 +44,8 @@ public class RequirementExpander {
                 req.setSubjectName(mapping.getSubject().getName());
                 req.setWeeklyPeriods(weeklyPeriods);
                 req.setPeriodIndex(i);
-                req.setTeacherAllocationId(allocation.getTeacherAllocationId());
-                req.setPrimaryStaffId(primary.getStaff().getStaffId());
+                req.setTeacherAllocationId(lesson.allocation().getTeacherAllocationId());
+                req.setPrimaryStaffId(lesson.teacher().getStaffId());
                 req.setPrimaryStaffName(staffName);
                 req.setDefaultResourceId(defaultResourceId);
                 req.setPreference(pref);
@@ -55,10 +53,5 @@ public class RequirementExpander {
             }
         }
         return requirements;
-    }
-
-    private String buildStaffName(com.thinkerscave.staff.entity.Staff staff) {
-        String middle = StringUtils.hasText(staff.getMiddleName()) ? " " + staff.getMiddleName() : "";
-        return (staff.getFirstName() + middle + " " + staff.getLastName()).trim();
     }
 }

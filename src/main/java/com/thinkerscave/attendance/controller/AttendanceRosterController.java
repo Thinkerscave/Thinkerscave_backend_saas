@@ -6,7 +6,10 @@ import com.thinkerscave.attendance.dto.AttendanceRosterRecord;
 import com.thinkerscave.attendance.entity.StudentAttendance;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
+import com.thinkerscave.attendance.security.AttendanceAccessGuard;
+import com.thinkerscave.attendance.service.AttendanceEditWindowService;
 import com.thinkerscave.attendance.service.AttendanceFreezeService;
+import com.thinkerscave.attendance.service.TeacherAttendanceAuthorizationService;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
@@ -47,6 +50,9 @@ public class AttendanceRosterController {
     private final SectionRepository sectionRepository;
     private final StudentEnrollmentRepository studentEnrollmentRepository;
     private final AttendanceFreezeService attendanceFreezeService;
+    private final AttendanceEditWindowService attendanceEditWindowService;
+    private final AttendanceAccessGuard accessGuard;
+    private final TeacherAttendanceAuthorizationService teacherAttendanceAuthorizationService;
 
     // ─────────────────────────────────────────────────────────────────────────
     // GET  /api/v1/attendance?date=&type=
@@ -67,6 +73,7 @@ public class AttendanceRosterController {
             return ResponseEntity.ok(List.of());
         }
 
+        accessGuard.requireView(AttendanceAccessGuard.ATTENDANCE);
         List<StudentAttendance> records =
                 studentAttendanceRepository.findByOrganizationIdAndAttendanceDateOrderByClassNameAscRollNumberAsc(orgId, date);
 
@@ -87,6 +94,7 @@ public class AttendanceRosterController {
         Long orgId = OrganizationContext.getOrganizationId();
         log.debug("Fetching class attendance for orgId={} classId={} date={}", orgId, classId, date);
 
+        accessGuard.requireView(AttendanceAccessGuard.ATTENDANCE);
         List<StudentAttendance> records =
                 studentAttendanceRepository.findByOrganizationIdAndClassIdAndAttendanceDateOrderByRollNumber(orgId, classId, date);
 
@@ -105,6 +113,8 @@ public class AttendanceRosterController {
 
         Long orgId = OrganizationContext.getOrganizationId();
         LocalDate date = LocalDate.parse(payload.getAttendanceDate());
+        accessGuard.requireManage(AttendanceAccessGuard.ATTENDANCE);
+        requireDailyAuthorization(payload, date);
         validateNotFrozen(orgId, date);
 
         try {
@@ -146,6 +156,7 @@ public class AttendanceRosterController {
             @RequestBody AttendanceRosterRecord payload) {
 
         Long orgId = OrganizationContext.getOrganizationId();
+        accessGuard.requireManage(AttendanceAccessGuard.ATTENDANCE);
 
         StudentAttendance attendance = studentAttendanceRepository
                 .findByOrganizationIdAndAttendanceId(orgId, id)
@@ -154,6 +165,8 @@ public class AttendanceRosterController {
         LocalDate date = payload.getAttendanceDate() != null
                 ? LocalDate.parse(payload.getAttendanceDate())
                 : attendance.getAttendanceDate();
+        teacherAttendanceAuthorizationService.requireDailyAttendanceAccess(
+            attendance.getClassId(), attendance.getSectionId(), date);
         validateNotFrozen(orgId, date);
 
         populateAttendance(attendance, payload, orgId, date);
@@ -165,6 +178,25 @@ public class AttendanceRosterController {
     // ─────────────────────────────────────────────────────────────────────────
     // Helpers
     // ─────────────────────────────────────────────────────────────────────────
+
+    private void requireDailyAuthorization(AttendanceRosterRecord payload, LocalDate date) {
+        Long classId = payload.getClassId();
+        Long sectionId = null;
+        if (payload.getReferenceId() != null) {
+            var enrollment = studentEnrollmentRepository.findActiveWithClassByStudentId(payload.getReferenceId());
+            if (enrollment.isPresent()) {
+                classId = enrollment.get().getClassEntity() != null
+                        ? enrollment.get().getClassEntity().getClassId() : classId;
+                sectionId = enrollment.get().getSection() != null
+                        ? enrollment.get().getSection().getSectionId() : null;
+            }
+        }
+        if (sectionId == null && classId != null && payload.getSectionName() != null) {
+            sectionId = sectionRepository.findByAcademicClass_ClassIdAndNameIgnoreCase(
+                    classId, payload.getSectionName()).map(section -> section.getSectionId()).orElse(null);
+        }
+        teacherAttendanceAuthorizationService.requireDailyAttendanceAccess(classId, sectionId, date);
+    }
 
     private void populateAttendance(StudentAttendance a, AttendanceRosterRecord p, Long orgId, LocalDate date) {
         a.setOrganizationId(orgId);
@@ -259,6 +291,10 @@ public class AttendanceRosterController {
     private void validateNotFrozen(Long orgId, LocalDate date) {
         if (attendanceFreezeService.isDateFrozen(orgId, date)) {
             throw new BadRequestException("Attendance is frozen for date: " + date);
+        }
+        var window = attendanceEditWindowService.evaluate(orgId, date);
+        if (!window.editable()) {
+            throw new BadRequestException(window.reason());
         }
     }
 

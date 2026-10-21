@@ -10,4 +10,5 @@ import java.util.List;
 @Builder
 public class CalendarData {
     private List<CalendarEventItem> items;
+    private String viewAllRoute;
 }

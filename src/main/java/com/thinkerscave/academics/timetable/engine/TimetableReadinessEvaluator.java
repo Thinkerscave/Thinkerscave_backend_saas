@@ -7,7 +7,9 @@ import com.thinkerscave.academics.dto.response.TimetableReadinessResponse.Readin
 import com.thinkerscave.academics.dto.response.TimetableReadinessResponse.ReadinessSummary;
 import com.thinkerscave.academics.entity.*;
 import com.thinkerscave.academics.enums.*;
-import com.thinkerscave.academics.repository.*;
+import com.thinkerscave.academics.timetable.engine.TimetablePlanningData.Lesson;
+import com.thinkerscave.academics.timetable.engine.TimetablePlanningData.MissingTeacher;
+import com.thinkerscave.staff.entity.Staff;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -18,330 +20,412 @@ import java.util.*;
 @RequiredArgsConstructor
 public class TimetableReadinessEvaluator {
 
-    private final AcademicYearRepository academicYearRepository;
-    private final ClassRepository classRepository;
-    private final SectionRepository sectionRepository;
-    private final ClassSubjectMappingRepository mappingRepository;
-    private final TeacherAllocationRepository allocationRepository;
-    private final TeacherAllocationTeacherRepository allocationTeacherRepository;
-    private final TimetableConfigurationRepository configurationRepository;
-    private final TimetableWorkingDayRepository workingDayRepository;
-    private final TimetablePeriodRepository periodRepository;
-    private final TimetableVersionRepository versionRepository;
-    private final AcademicResourceRepository resourceRepository;
+    static final String ROUTE_ACADEMIC_YEAR = "/app/academics/academic-year";
+    static final String ROUTE_CLASSES = "/app/academics/classes-sections";
+    static final String ROUTE_SUBJECTS = "/app/academics/subjects-mapping";
+    static final String ROUTE_TEACHER_ALLOCATION = "/app/academics/teacher-allocation";
+    static final String TAB_CONFIGURATION = "tab:configuration";
+
+    private static final int MAX_DETAILS = 60;
 
     private static final Set<AcademicYearStatus> ELIGIBLE_STATUSES = EnumSet.of(
             AcademicYearStatus.APPROVED,
             AcademicYearStatus.CURRENT
     );
 
+    private final TimetablePlanningDataLoader loader;
+    private final GenerationProgressTracker progressTracker;
+
     public TimetableReadinessResponse evaluate(Long yearId) {
+        return evaluate(loader.load(yearId));
+    }
+
+    public TimetableReadinessResponse evaluate(TimetablePlanningData data) {
         List<ReadinessCheck> checks = new ArrayList<>();
-        int sectionCount = 0;
-        int subjectCount = 0;
-        int requirementCount = 0;
-        int teacherCount = 0;
-        int resourceCount = 0;
+        AcademicYear year = data.getYear();
 
-        AcademicYear year = academicYearRepository.findById(yearId).orElse(null);
-
-        // 1. ACADEMIC_YEAR_ELIGIBLE
         if (year == null) {
-            checks.add(check("ACADEMIC_YEAR_ELIGIBLE", ReadinessStatus.FAILED, ReadinessSeverity.BLOCKING,
-                    "Academic year not found"));
-            return buildResponse(false, checks, new ReadinessSummary(0, 0, 0, 0, 0));
-        }
-        boolean yearEligible = ELIGIBLE_STATUSES.contains(year.getStatus()) && year.isActive();
-        checks.add(check("ACADEMIC_YEAR_ELIGIBLE",
-                yearEligible ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                yearEligible ? "Academic year is eligible for timetable generation"
-                        : "Academic year status must be APPROVED or CURRENT"));
-
-        // 2. TIMETABLE_CONFIGURATION_READY
-        TimetableConfiguration config = findActiveConfig(yearId);
-        boolean configReady = config != null
-                && config.getStatus() == TimetableConfigurationStatus.READY
-                && config.getSchoolStartTime() != null
-                && config.getSchoolEndTime() != null
-                && config.getSchoolStartTime().isBefore(config.getSchoolEndTime())
-                && config.getMaxTeacherWeeklyPeriods() != null
-                && config.getMaxTeacherWeeklyPeriods() > 0;
-        checks.add(check("TIMETABLE_CONFIGURATION_READY",
-                configReady ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                configReady ? "Timetable configuration is ready"
-                        : "Timetable configuration is missing or incomplete"));
-
-        if (config == null) {
-            return buildResponse(false, checks, new ReadinessSummary(0, 0, 0, 0, 0));
+            checks.add(fail("ACADEMIC_YEAR_ELIGIBLE", "Academic year", "Academic year not found", null, null, null));
+            return buildResponse(checks, data, new ReadinessSummary(0, 0, 0, 0, 0, 0, 0));
         }
 
-        Long configId = config.getTimetableConfigurationId();
-
-        // 3. WORKING_DAYS_CONFIGURED
-        List<TimetableWorkingDay> workingDays = workingDayRepository
-                .findByTimetableConfiguration_TimetableConfigurationId(configId);
-        long activeWorkingDays = workingDays.stream()
-                .filter(w -> Boolean.TRUE.equals(w.getWorking())).count();
-        boolean hasWorkingDays = activeWorkingDays > 0;
-        checks.add(check("WORKING_DAYS_CONFIGURED",
-                hasWorkingDays ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                hasWorkingDays ? activeWorkingDays + " working day(s) configured"
-                        : "No working days configured"));
-
-        // 4. TEACHING_PERIODS_VALID
-        List<TimetablePeriod> periods = periodRepository
-                .findByTimetableConfiguration_TimetableConfigurationIdOrderByPeriodNumberAsc(configId);
-        long teachingPeriodCount = periods.stream()
-                .filter(p -> p.getSlotKind() == TimetableSlotKind.TEACHING).count();
-        boolean hasTeachingPeriods = teachingPeriodCount > 0;
-        checks.add(check("TEACHING_PERIODS_VALID",
-                hasTeachingPeriods ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                hasTeachingPeriods ? teachingPeriodCount + " teaching period(s) configured"
-                        : "No teaching periods configured"));
-
-        // 5. PERIODS_NO_OVERLAP
-        boolean noOverlap = validateNoOverlap(periods);
-        checks.add(check("PERIODS_NO_OVERLAP",
-                noOverlap ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                noOverlap ? "Period times do not overlap"
-                        : "Period time overlap detected"));
-
-        // 6. PERIODS_WITHIN_SCHOOL_BOUNDS
-        boolean withinBounds = validateWithinBounds(periods, config);
-        checks.add(check("PERIODS_WITHIN_SCHOOL_BOUNDS",
-                withinBounds ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                withinBounds ? "All periods are within school hours"
-                        : "Some periods are outside school start/end time"));
-
-        // 7. ACTIVE_SECTIONS_PRESENT
-        List<AcademicClass> classes = classRepository
-                .findByAcademicYear_AcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(yearId);
-        List<AcademicSection> allSections = new ArrayList<>();
-        for (AcademicClass cls : classes) {
-            allSections.addAll(sectionRepository
-                    .findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(cls.getClassId()));
+        checkYear(year, checks);
+        boolean configUsable = checkConfiguration(data, checks);
+        checkSectionsAndSubjects(data, checks);
+        if (configUsable) {
+            checkSectionCapacity(data, checks);
         }
-        sectionCount = allSections.size();
-        boolean hasSections = sectionCount > 0;
-        checks.add(check("ACTIVE_SECTIONS_PRESENT",
-                hasSections ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                hasSections ? sectionCount + " active section(s) found"
-                        : "No active sections found for this year"));
+        checkTeacherAllocations(data, checks);
+        checkTeacherWorkload(data, checks, configUsable);
+        checkResources(data, checks);
+        checkRunningGeneration(data, checks);
 
-        // 8. SUBJECT_MAPPINGS_PRESENT
-        long mappingCount = mappingRepository.countBySubject_AcademicYear_AcademicYearIdAndActiveTrue(yearId);
-        subjectCount = (int) mappingCount;
-        boolean hasMappings = mappingCount > 0;
-        checks.add(check("SUBJECT_MAPPINGS_PRESENT",
-                hasMappings ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                hasMappings ? mappingCount + " active subject mapping(s)"
-                        : "No active subject mappings found"));
-
-        // 9. WEEKLY_PERIODS_POSITIVE
-        List<ClassSubjectMapping> allMappings = new ArrayList<>();
-        for (AcademicClass cls : classes) {
-            allMappings.addAll(mappingRepository.findByAcademicClass_ClassIdAndActiveTrue(cls.getClassId()));
+        Set<Long> teacherIds = new HashSet<>();
+        int requirementCount = 0;
+        for (Lesson lesson : data.getLessons()) {
+            teacherIds.add(lesson.teacher().getStaffId());
+            requirementCount += lesson.weeklyPeriods();
         }
-        boolean allPositive = allMappings.stream()
-                .allMatch(m -> m.getWeeklyPeriods() != null && m.getWeeklyPeriods() > 0);
-        checks.add(check("WEEKLY_PERIODS_POSITIVE",
-                allPositive ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                allPositive ? "All subject mappings have positive weekly periods"
-                        : "Some subject mappings have zero or null weekly periods"));
-
-        // 10. TEACHER_ALLOCATION_COMPLETE
-        long missingAllocations = countMissingAllocations(yearId, classes);
-        boolean allocComplete = missingAllocations == 0;
-        checks.add(check("TEACHER_ALLOCATION_COMPLETE",
-                allocComplete ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                allocComplete ? "All required teaching slots are allocated"
-                        : missingAllocations + " allocation(s) missing"));
-
-        // 11. TEACHER_ASSIGNMENT_PRIMARY_PRESENT
-        long missingPrimary = countMissingPrimary(yearId, classes);
-        boolean primaryPresent = missingPrimary == 0;
-        checks.add(check("TEACHER_ASSIGNMENT_PRIMARY_PRESENT",
-                primaryPresent ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                primaryPresent ? "All allocations have active primary teachers"
-                        : missingPrimary + " allocation(s) missing primary teacher"));
-
-        // 12. TEACHER_WORKLOAD_WITHIN_LIMIT
-        List<TeacherAllocationTeacher> primaries = allocationTeacherRepository.findActiveByYear(yearId)
-                .stream()
-                .filter(t -> t.getRole() == TeacherAllocationTeacherRole.PRIMARY)
-                .toList();
-        teacherCount = (int) primaries.stream()
-                .map(t -> t.getStaff().getStaffId()).distinct().count();
-        requirementCount = primaries.stream()
-                .mapToInt(t -> {
-                    Short wp = t.getTeacherAllocation().getClassSubjectMapping().getWeeklyPeriods();
-                    return wp == null ? 0 : wp;
-                }).sum();
-
-        Map<Long, Integer> teacherLoad = new HashMap<>();
-        for (TeacherAllocationTeacher p : primaries) {
-            Short wp = p.getTeacherAllocation().getClassSubjectMapping().getWeeklyPeriods();
-            teacherLoad.merge(p.getStaff().getStaffId(), wp == null ? 0 : wp.intValue(), Integer::sum);
-        }
-        int maxAllowed = config.getMaxTeacherWeeklyPeriods();
-        long overloaded = teacherLoad.values().stream().filter(v -> v > maxAllowed).count();
-        boolean workloadOk = overloaded == 0;
-        checks.add(check("TEACHER_WORKLOAD_WITHIN_LIMIT",
-                workloadOk ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                workloadOk ? "All teachers within workload limit (" + maxAllowed + " periods/week)"
-                        : overloaded + " teacher(s) exceed max weekly periods of " + maxAllowed));
-
-        // 13. RESOURCES_AVAILABLE
-        long resCount = resourceRepository.findByActiveTrueOrderByNameAsc().size();
-        resourceCount = (int) resCount;
-        ReadinessStatus resStatus = resCount > 0 ? ReadinessStatus.PASSED : ReadinessStatus.WARNING;
-        checks.add(check("RESOURCES_AVAILABLE", resStatus, ReadinessSeverity.WARNING,
-                resCount > 0 ? resCount + " active resource(s) available"
-                        : "No rooms/resources configured (optional)"));
-
-        // 14. NO_ACTIVE_GENERATION_RUNNING
-        boolean noRunning = !hasActiveGeneration(yearId);
-        checks.add(check("NO_ACTIVE_GENERATION_RUNNING",
-                noRunning ? ReadinessStatus.PASSED : ReadinessStatus.FAILED,
-                ReadinessSeverity.BLOCKING,
-                noRunning ? "No active generation in progress"
-                        : "A timetable generation is already running for this year"));
-
-        // 15. DATA_INTEGRITY_OK
-        checks.add(check("DATA_INTEGRITY_OK", ReadinessStatus.PASSED, ReadinessSeverity.BLOCKING,
-                "Data integrity checks passed"));
-
-        boolean ready = checks.stream()
-                .noneMatch(c -> c.getSeverity() == ReadinessSeverity.BLOCKING
-                        && c.getStatus() == ReadinessStatus.FAILED);
-
+        int schedulableMappings = data.getMappings().size() - data.getZeroPeriodMappings().size();
         ReadinessSummary summary = new ReadinessSummary(
-                sectionCount, subjectCount, requirementCount, teacherCount, resourceCount);
+                data.getSections().size(),
+                schedulableMappings,
+                requirementCount,
+                teacherIds.size(),
+                data.getResourceCount(),
+                data.weeklySlotCount(),
+                data.getMissingTeachers().size());
 
-        return buildResponse(ready, checks, summary);
+        return buildResponse(checks, data, summary);
     }
 
-    private TimetableReadinessResponse buildResponse(boolean ready, List<ReadinessCheck> checks,
-                                                     ReadinessSummary summary) {
-        List<ReadinessCheck> blocking = checks.stream()
-                .filter(c -> c.getSeverity() == ReadinessSeverity.BLOCKING
-                        && c.getStatus() == ReadinessStatus.FAILED)
+    // ─── Checks ──────────────────────────────────────────────────────────
+
+    private void checkYear(AcademicYear year, List<ReadinessCheck> checks) {
+        boolean eligible = ELIGIBLE_STATUSES.contains(year.getStatus()) && year.isActive();
+        if (eligible) {
+            checks.add(pass("ACADEMIC_YEAR_ELIGIBLE", "Academic year",
+                    "Academic year " + year.getName() + " is " + year.getStatus()));
+        } else {
+            String reason = !year.isActive()
+                    ? "Academic year " + year.getName() + " is inactive."
+                    : "Academic year " + year.getName() + " is " + year.getStatus()
+                    + ". Timetables can be generated once the year is Approved or Current.";
+            checks.add(fail("ACADEMIC_YEAR_ELIGIBLE", "Academic year", reason, null,
+                    "Open Academic Year", ROUTE_ACADEMIC_YEAR));
+        }
+    }
+
+    private boolean checkConfiguration(TimetablePlanningData data, List<ReadinessCheck> checks) {
+        TimetableConfiguration config = data.getConfiguration();
+        if (config == null) {
+            checks.add(fail("TIMETABLE_CONFIGURATION_READY", "School day setup",
+                    "No school day (periods and working days) is configured for this academic year.",
+                    null, "Set up school day", TAB_CONFIGURATION));
+            return false;
+        }
+
+        List<String> problems = new ArrayList<>();
+        if (config.getSchoolStartTime() == null || config.getSchoolEndTime() == null
+                || !config.getSchoolStartTime().isBefore(config.getSchoolEndTime())) {
+            problems.add("School start time must be before school end time");
+        }
+        if (config.getMaxTeacherWeeklyPeriods() == null || config.getMaxTeacherWeeklyPeriods() <= 0) {
+            problems.add("Max teacher weekly periods must be greater than 0");
+        }
+        if (problems.isEmpty()) {
+            checks.add(pass("TIMETABLE_CONFIGURATION_READY", "School day setup",
+                    "Using configuration '" + config.getName() + "' (" + config.getShiftType() + ")"));
+        } else {
+            checks.add(fail("TIMETABLE_CONFIGURATION_READY", "School day setup",
+                    "Configuration '" + config.getName() + "' is incomplete.", problems,
+                    "Fix school day", TAB_CONFIGURATION));
+        }
+
+        if (data.getActiveConfigurations().size() > 1) {
+            List<String> others = data.getActiveConfigurations().stream()
+                    .filter(c -> !Objects.equals(c.getTimetableConfigurationId(), config.getTimetableConfigurationId()))
+                    .map(c -> "'" + c.getName() + "' (" + c.getShiftType() + ") is also active and will be ignored")
+                    .toList();
+            checks.add(warn("SINGLE_ACTIVE_CONFIGURATION", "Duplicate school day setups",
+                    data.getActiveConfigurations().size() + " active configurations found. Generation uses '"
+                            + config.getName() + "'. Saving the school day setup deactivates the others.",
+                    others, "Review school day", TAB_CONFIGURATION));
+        }
+
+        boolean hasDays = !data.getWorkingDays().isEmpty();
+        checks.add(hasDays
+                ? pass("WORKING_DAYS_CONFIGURED", "Working days",
+                data.getWorkingDays().size() + " working day(s): " + joinDays(data.getWorkingDays()))
+                : fail("WORKING_DAYS_CONFIGURED", "Working days", "No working days are selected.", null,
+                "Select working days", TAB_CONFIGURATION));
+
+        List<String> invalidPeriods = new ArrayList<>();
+        for (TimetablePeriod p : data.getAllPeriods()) {
+            if (p.getStartTime() == null || p.getEndTime() == null || !p.getStartTime().isBefore(p.getEndTime())) {
+                invalidPeriods.add(periodLabel(p) + " must end after it starts");
+            }
+        }
+        boolean hasTeaching = !data.getTeachingPeriods().isEmpty();
+        if (!hasTeaching) {
+            checks.add(fail("TEACHING_PERIODS_VALID", "Teaching periods",
+                    "No teaching periods are configured.", invalidPeriods, "Add periods", TAB_CONFIGURATION));
+        } else if (!invalidPeriods.isEmpty()) {
+            checks.add(fail("TEACHING_PERIODS_VALID", "Teaching periods",
+                    invalidPeriods.size() + " period(s) have invalid times.", invalidPeriods,
+                    "Fix periods", TAB_CONFIGURATION));
+        } else {
+            checks.add(pass("TEACHING_PERIODS_VALID", "Teaching periods",
+                    data.getTeachingPeriods().size() + " teaching period(s) per day"));
+        }
+
+        List<String> overlaps = new ArrayList<>();
+        List<TimetablePeriod> periods = data.getAllPeriods().stream()
+                .filter(p -> p.getStartTime() != null && p.getEndTime() != null)
                 .toList();
-        List<ReadinessCheck> warnings = checks.stream()
-                .filter(c -> c.getStatus() == ReadinessStatus.WARNING)
-                .toList();
-
-        return TimetableReadinessResponse.builder()
-                .ready(ready)
-                .summary(summary)
-                .checks(checks)
-                .blockingIssues(blocking)
-                .warnings(warnings)
-                .build();
-    }
-
-    private ReadinessCheck check(String code, ReadinessStatus status,
-                                 ReadinessSeverity severity, String message) {
-        return ReadinessCheck.builder()
-                .code(code)
-                .status(status)
-                .severity(severity)
-                .message(message)
-                .build();
-    }
-
-    private boolean validateNoOverlap(List<TimetablePeriod> periods) {
         for (int i = 0; i < periods.size(); i++) {
             for (int j = i + 1; j < periods.size(); j++) {
                 TimetablePeriod a = periods.get(i);
                 TimetablePeriod b = periods.get(j);
-                if (a.getStartTime().isBefore(b.getEndTime())
-                        && b.getStartTime().isBefore(a.getEndTime())) {
-                    return false;
+                if (a.getStartTime().isBefore(b.getEndTime()) && b.getStartTime().isBefore(a.getEndTime())) {
+                    overlaps.add(periodLabel(a) + " overlaps " + periodLabel(b));
                 }
             }
         }
-        return true;
-    }
+        checks.add(overlaps.isEmpty()
+                ? pass("PERIODS_NO_OVERLAP", "Period timings", "Period times do not overlap")
+                : fail("PERIODS_NO_OVERLAP", "Period timings", overlaps.size() + " period overlap(s) found.",
+                overlaps, "Fix periods", TAB_CONFIGURATION));
 
-    private boolean validateWithinBounds(List<TimetablePeriod> periods, TimetableConfiguration config) {
+        List<String> outOfBounds = new ArrayList<>();
         LocalTime start = config.getSchoolStartTime();
         LocalTime end = config.getSchoolEndTime();
-        if (start == null || end == null) return false;
-        return periods.stream().allMatch(p ->
-                !p.getStartTime().isBefore(start) && !p.getEndTime().isAfter(end));
-    }
-
-    private long countMissingAllocations(Long yearId, List<AcademicClass> classes) {
-        long missing = 0;
-        for (AcademicClass ac : classes) {
-            List<AcademicSection> sections = sectionRepository
-                    .findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(ac.getClassId());
-            List<ClassSubjectMapping> mappings = mappingRepository
-                    .findByAcademicClass_ClassIdAndActiveTrue(ac.getClassId());
-            for (AcademicSection section : sections) {
-                for (ClassSubjectMapping mapping : mappings) {
-                    Optional<TeacherAllocation> alloc = allocationRepository
-                            .findBySection_SectionIdAndClassSubjectMapping_ClassSubjectMappingId(
-                                    section.getSectionId(), mapping.getClassSubjectMappingId());
-                    if (alloc.isEmpty() || alloc.get().getStatus() != TeacherAllocationStatus.ASSIGNED) {
-                        missing++;
-                    }
+        if (start != null && end != null) {
+            for (TimetablePeriod p : periods) {
+                if (p.getStartTime().isBefore(start) || p.getEndTime().isAfter(end)) {
+                    outOfBounds.add(periodLabel(p) + " is outside school hours " + start + "–" + end);
                 }
             }
         }
-        return missing;
+        checks.add(outOfBounds.isEmpty()
+                ? pass("PERIODS_WITHIN_SCHOOL_BOUNDS", "School hours", "All periods are within school hours")
+                : fail("PERIODS_WITHIN_SCHOOL_BOUNDS", "School hours",
+                outOfBounds.size() + " period(s) fall outside school hours.", outOfBounds,
+                "Fix periods", TAB_CONFIGURATION));
+
+        return problems.isEmpty() && hasDays && hasTeaching && invalidPeriods.isEmpty()
+                && overlaps.isEmpty() && outOfBounds.isEmpty();
     }
 
-    private long countMissingPrimary(Long yearId, List<AcademicClass> classes) {
-        long missing = 0;
-        for (AcademicClass ac : classes) {
-            List<AcademicSection> sections = sectionRepository
-                    .findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(ac.getClassId());
-            List<ClassSubjectMapping> mappings = mappingRepository
-                    .findByAcademicClass_ClassIdAndActiveTrue(ac.getClassId());
-            for (AcademicSection section : sections) {
-                for (ClassSubjectMapping mapping : mappings) {
-                    Optional<TeacherAllocation> alloc = allocationRepository
-                            .findBySection_SectionIdAndClassSubjectMapping_ClassSubjectMappingId(
-                                    section.getSectionId(), mapping.getClassSubjectMappingId());
-                    if (alloc.isPresent() && alloc.get().getStatus() == TeacherAllocationStatus.ASSIGNED) {
-                        Optional<TeacherAllocationTeacher> primary = allocationTeacherRepository
-                                .findFirstByTeacherAllocation_TeacherAllocationIdAndActiveTrueAndEffectiveToIsNullAndRoleOrderByEffectiveFromDesc(
-                                        alloc.get().getTeacherAllocationId(),
-                                        TeacherAllocationTeacherRole.PRIMARY);
-                        if (primary.isEmpty()) {
-                            missing++;
-                        }
-                    }
+    private void checkSectionsAndSubjects(TimetablePlanningData data, List<ReadinessCheck> checks) {
+        int sectionCount = data.getSections().size();
+        checks.add(sectionCount > 0
+                ? pass("ACTIVE_SECTIONS_PRESENT", "Classes & sections", sectionCount + " active section(s)")
+                : fail("ACTIVE_SECTIONS_PRESENT", "Classes & sections",
+                "No active classes with sections exist for this academic year.", null,
+                "Open Classes & Sections", ROUTE_CLASSES));
+
+        int schedulable = data.getMappings().size() - data.getZeroPeriodMappings().size();
+        if (schedulable == 0) {
+            checks.add(fail("SUBJECT_MAPPINGS_PRESENT", "Class subjects",
+                    "No subjects with weekly periods are mapped to classes.", null,
+                    "Map subjects", ROUTE_SUBJECTS));
+        } else {
+            Set<Long> classesWithSubjects = new HashSet<>();
+            for (ClassSubjectMapping m : data.getMappings()) {
+                if (m.getWeeklyPeriods() != null && m.getWeeklyPeriods() > 0) {
+                    classesWithSubjects.add(m.getAcademicClass().getClassId());
                 }
             }
+            List<String> sectionsWithoutSubjects = data.getSections().stream()
+                    .filter(s -> !classesWithSubjects.contains(s.getAcademicClass().getClassId()))
+                    .map(s -> TimetablePlanningData.sectionLabel(s) + " has no subjects mapped (it will have an empty timetable)")
+                    .toList();
+            if (sectionsWithoutSubjects.isEmpty()) {
+                checks.add(pass("SUBJECT_MAPPINGS_PRESENT", "Class subjects",
+                        schedulable + " class-subject mapping(s) with weekly periods"));
+            } else {
+                checks.add(warn("SUBJECT_MAPPINGS_PRESENT", "Class subjects",
+                        sectionsWithoutSubjects.size() + " section(s) have no subjects mapped.",
+                        sectionsWithoutSubjects, "Map subjects", ROUTE_SUBJECTS));
+            }
         }
-        return missing;
+
+        if (!data.getZeroPeriodMappings().isEmpty()) {
+            List<String> details = data.getZeroPeriodMappings().stream()
+                    .map(m -> m.getAcademicClass().getName() + " · " + m.getSubject().getName()
+                            + " has 0 weekly periods (skipped)")
+                    .toList();
+            checks.add(warn("WEEKLY_PERIODS_POSITIVE", "Weekly periods",
+                    details.size() + " class subject(s) have no weekly periods and will be skipped.",
+                    details, "Set weekly periods", ROUTE_SUBJECTS));
+        } else {
+            checks.add(pass("WEEKLY_PERIODS_POSITIVE", "Weekly periods",
+                    "All mapped subjects have weekly periods"));
+        }
     }
 
-    private boolean hasActiveGeneration(Long yearId) {
-        return versionRepository.findByAcademicYear_AcademicYearIdOrderByVersionNumberDesc(yearId)
-                .stream()
-                .anyMatch(v -> v.getGenerationStatus() == TimetableGenerationStatus.GENERATING);
+    private void checkSectionCapacity(TimetablePlanningData data, List<ReadinessCheck> checks) {
+        int slots = data.weeklySlotCount();
+        Map<Long, Integer> requiredByClass = new HashMap<>();
+        for (ClassSubjectMapping m : data.getMappings()) {
+            if (m.getWeeklyPeriods() != null && m.getWeeklyPeriods() > 0) {
+                requiredByClass.merge(m.getAcademicClass().getClassId(), (int) m.getWeeklyPeriods(), Integer::sum);
+            }
+        }
+        List<String> over = new ArrayList<>();
+        for (AcademicSection s : data.getSections()) {
+            int required = requiredByClass.getOrDefault(s.getAcademicClass().getClassId(), 0);
+            if (required > slots) {
+                over.add(TimetablePlanningData.sectionLabel(s) + " needs " + required
+                        + " periods/week but only " + slots + " teaching slots exist");
+            }
+        }
+        checks.add(over.isEmpty()
+                ? pass("SECTION_CAPACITY", "Weekly capacity",
+                "Every section fits within " + slots + " teaching slots per week")
+                : fail("SECTION_CAPACITY", "Weekly capacity",
+                over.size() + " section(s) need more periods than the school week has. "
+                        + "Add teaching periods/working days or reduce weekly periods.",
+                over, "Adjust school day", TAB_CONFIGURATION));
     }
 
-    private TimetableConfiguration findActiveConfig(Long yearId) {
-        return configurationRepository.findByAcademicYear_AcademicYearId(yearId).stream()
-                .filter(TimetableConfiguration::isActive)
-                .findFirst()
-                .orElse(null);
+    private void checkTeacherAllocations(TimetablePlanningData data, List<ReadinessCheck> checks) {
+        List<MissingTeacher> missing = data.getMissingTeachers();
+        if (missing.isEmpty()) {
+            if (!data.getLessons().isEmpty()) {
+                checks.add(pass("TEACHER_ALLOCATION_COMPLETE", "Teacher allocation",
+                        "Every mapped subject in every section has an active teacher"));
+            }
+            return;
+        }
+        List<String> details = missing.stream()
+                .map(m -> TimetablePlanningData.sectionLabel(m.section()) + " · " + m.mapping().getSubject().getName()
+                        + " — " + m.reason().getLabel()
+                        + (m.teacherName() != null ? " (" + m.teacherName() + ")" : "")
+                        + ", " + m.weeklyPeriods() + " period(s) will stay free")
+                .toList();
+        if (data.getLessons().isEmpty()) {
+            checks.add(fail("TEACHER_ALLOCATION_COMPLETE", "Teacher allocation",
+                    "No subject has an active teacher assigned yet.", details,
+                    "Assign teachers", ROUTE_TEACHER_ALLOCATION));
+        } else {
+            int periods = missing.stream().mapToInt(MissingTeacher::weeklyPeriods).sum();
+            checks.add(warn("TEACHER_ALLOCATION_COMPLETE", "Teacher allocation",
+                    missing.size() + " class subject(s) have no active teacher. Their " + periods
+                            + " weekly period(s) will be left free until a teacher is assigned.",
+                    details, "Assign teachers", ROUTE_TEACHER_ALLOCATION));
+        }
+    }
+
+    private void checkTeacherWorkload(TimetablePlanningData data, List<ReadinessCheck> checks, boolean configUsable) {
+        TimetableConfiguration config = data.getConfiguration();
+        if (config == null || config.getMaxTeacherWeeklyPeriods() == null || data.getLessons().isEmpty()) {
+            return;
+        }
+        int maxAllowed = config.getMaxTeacherWeeklyPeriods();
+        int slots = data.weeklySlotCount();
+
+        Map<Long, Integer> load = new LinkedHashMap<>();
+        Map<Long, Staff> staffById = new HashMap<>();
+        for (Lesson lesson : data.getLessons()) {
+            load.merge(lesson.teacher().getStaffId(), lesson.weeklyPeriods(), Integer::sum);
+            staffById.put(lesson.teacher().getStaffId(), lesson.teacher());
+        }
+
+        List<String> over = new ArrayList<>();
+        load.entrySet().stream()
+                .sorted(Map.Entry.<Long, Integer>comparingByValue().reversed())
+                .forEach(e -> {
+                    String name = TimetablePlanningData.staffName(staffById.get(e.getKey()));
+                    if (e.getValue() > maxAllowed) {
+                        over.add(name + " — " + e.getValue() + " periods/week (limit " + maxAllowed + ")");
+                    } else if (configUsable && e.getValue() > slots) {
+                        over.add(name + " — " + e.getValue() + " periods/week but the week only has " + slots + " slots");
+                    }
+                });
+
+        checks.add(over.isEmpty()
+                ? pass("TEACHER_WORKLOAD_WITHIN_LIMIT", "Teacher workload",
+                load.size() + " teacher(s), all within " + maxAllowed + " periods/week")
+                : fail("TEACHER_WORKLOAD_WITHIN_LIMIT", "Teacher workload",
+                over.size() + " teacher(s) are over their weekly limit. Reassign some subjects or raise "
+                        + "'Max teacher weekly periods'.",
+                over, "Rebalance allocation", ROUTE_TEACHER_ALLOCATION));
+    }
+
+    private void checkResources(TimetablePlanningData data, List<ReadinessCheck> checks) {
+        checks.add(pass("RESOURCES_AVAILABLE", "Rooms",
+                data.getResourceCount() > 0
+                        ? data.getResourceCount() + " active room(s); sections with a default room are checked for room clashes"
+                        : "No rooms configured (optional) — room clashes are not checked"));
+    }
+
+    private void checkRunningGeneration(TimetablePlanningData data, List<ReadinessCheck> checks) {
+        boolean running = data.getVersions().stream()
+                .anyMatch(v -> v.getGenerationStatus() == TimetableGenerationStatus.GENERATING
+                        && progressTracker.hasActive(v.getTimetableVersionId()));
+        checks.add(running
+                ? fail("NO_ACTIVE_GENERATION_RUNNING", "Generation in progress",
+                "A timetable generation is already running for this year. Wait for it to finish.",
+                null, null, null)
+                : pass("NO_ACTIVE_GENERATION_RUNNING", "Generation in progress", "No generation is running"));
+    }
+
+    // ─── Builders ─────────────────────────────────────────────────────────
+
+    private TimetableReadinessResponse buildResponse(List<ReadinessCheck> checks,
+                                                     TimetablePlanningData data,
+                                                     ReadinessSummary summary) {
+        List<ReadinessCheck> blocking = checks.stream()
+                .filter(c -> c.getSeverity() == ReadinessSeverity.BLOCKING && c.getStatus() == ReadinessStatus.FAILED)
+                .toList();
+        List<ReadinessCheck> warnings = checks.stream()
+                .filter(c -> c.getStatus() == ReadinessStatus.WARNING)
+                .toList();
+        TimetableConfiguration config = data.getConfiguration();
+        return TimetableReadinessResponse.builder()
+                .ready(blocking.isEmpty())
+                .summary(summary)
+                .checks(checks)
+                .blockingIssues(blocking)
+                .warnings(warnings)
+                .configurationId(config == null ? null : config.getTimetableConfigurationId())
+                .configurationName(config == null ? null : config.getName())
+                .build();
+    }
+
+    private static ReadinessCheck pass(String code, String title, String message) {
+        return ReadinessCheck.builder()
+                .code(code).title(title)
+                .status(ReadinessStatus.PASSED)
+                .severity(ReadinessSeverity.BLOCKING)
+                .message(message)
+                .details(List.of())
+                .build();
+    }
+
+    private static ReadinessCheck fail(String code, String title, String message, List<String> details,
+                                       String actionLabel, String actionRoute) {
+        return ReadinessCheck.builder()
+                .code(code).title(title)
+                .status(ReadinessStatus.FAILED)
+                .severity(ReadinessSeverity.BLOCKING)
+                .message(message)
+                .details(cap(details))
+                .actionLabel(actionLabel)
+                .actionRoute(actionRoute)
+                .build();
+    }
+
+    private static ReadinessCheck warn(String code, String title, String message, List<String> details,
+                                       String actionLabel, String actionRoute) {
+        return ReadinessCheck.builder()
+                .code(code).title(title)
+                .status(ReadinessStatus.WARNING)
+                .severity(ReadinessSeverity.WARNING)
+                .message(message)
+                .details(cap(details))
+                .actionLabel(actionLabel)
+                .actionRoute(actionRoute)
+                .build();
+    }
+
+    private static List<String> cap(List<String> details) {
+        if (details == null || details.isEmpty()) return List.of();
+        if (details.size() <= MAX_DETAILS) return details;
+        List<String> capped = new ArrayList<>(details.subList(0, MAX_DETAILS));
+        capped.add("…and " + (details.size() - MAX_DETAILS) + " more");
+        return capped;
+    }
+
+    private static String periodLabel(TimetablePeriod p) {
+        return p.getName() + " (" + p.getStartTime() + "–" + p.getEndTime() + ")";
+    }
+
+    private static String joinDays(List<DayOfWeek> days) {
+        return String.join(", ", days.stream()
+                .map(d -> d.name().charAt(0) + d.name().substring(1, 3).toLowerCase())
+                .toList());
     }
 }

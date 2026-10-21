@@ -22,6 +22,8 @@ public interface NoticeService {
 
     List<NoticeResponse> getPinnedPublished();
 
+    List<NoticeResponse> getRecentPublishedForStaff(Long userId, Long staffId, int limit);
+
     NoticeResponse publish(Long noticeId);
 
     void delete(Long noticeId);

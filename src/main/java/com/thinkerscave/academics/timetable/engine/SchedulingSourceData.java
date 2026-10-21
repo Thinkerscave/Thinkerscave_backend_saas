@@ -15,9 +15,11 @@ public class SchedulingSourceData {
     private final List<DayOfWeek> workingDays;
     private final List<TimetablePeriod> teachingPeriods;
     private final List<TimetablePeriod> allPeriods;
-    private final List<AcademicSection> activeSections;
-    private final List<ClassSubjectMapping> activeMappings;
-    private final List<TeacherAllocationTeacher> activePrimaries;
     private final int maxTeacherWeeklyPeriods;
+    /** Number of teaching periods that belong to the first half of the day. */
     private final int halfIndex;
+
+    public int workingDayCount() {
+        return Math.max(workingDays.size(), 1);
+    }
 }

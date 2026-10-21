@@ -8,12 +8,16 @@ import com.thinkerscave.access.enums.RoleType;
 import com.thinkerscave.access.repository.*;
 import com.thinkerscave.access.service.PermissionService;
 import com.thinkerscave.platform.entity.Organization;
+import com.thinkerscave.security.service.impl.PublicSchemaUserLookupService;
+import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.staff.entity.ResponsibilityAssignment;
 import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,11 +37,12 @@ public class PermissionServiceImpl implements PermissionService {
     private final StaffRepository staffRepository;
     private final ResponsibilityAssignmentRepository responsibilityAssignmentRepository;
     private final ResponsibilityPermissionRepository responsibilityPermissionRepository;
+    private final PublicSchemaUserLookupService publicSchemaUserLookupService;
 
     @Override
     @Transactional(readOnly = true)
     public List<EffectivePermissionResponse> getEffectivePermissions(Long userId, Long organizationId) {
-        List<UserRole> activeRoles = userRoleRepository.findActiveRolesWithDetails(userId);
+        List<UserRole> activeRoles = activeRolesForUser(userId, organizationId);
         boolean isSuperAdmin = activeRoles.stream()
                 .map(UserRole::getRole)
                 .filter(Objects::nonNull)
@@ -65,6 +70,11 @@ public class PermissionServiceImpl implements PermissionService {
         // 2. Responsibilities add to role baseline (primarily used by staff users).
         mergeResponsibilityPermissions(merged, userId, organizationId, entitledMenuIds);
 
+        // Elevated organization roles need a usable initial workspace even when a new
+        // tenant has no role matrix yet. The baseline remains constrained to entitlements;
+        // explicit user overrides below remain authoritative.
+        applyElevatedTenantAdministratorBaseline(merged, entitledMenus, isElevatedTenantAdministrator());
+
         // 3. User-level overrides are authoritative and applied last, but still
         // constrained by organization feature entitlement.
         List<UserPermission> overrides = userPermissionRepository.findActiveWithMenu(userId, organizationId);
@@ -79,6 +89,63 @@ public class PermissionServiceImpl implements PermissionService {
         ensureParentVisibility(merged, entitledMenus);
 
         return new ArrayList<>(merged.values());
+    }
+
+    private boolean isElevatedTenantAdministrator() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> RoleType.ORGANIZATION_ADMIN.name().equals(authority)
+                        || RoleType.ORGANIZATION_OWNER.name().equals(authority));
+    }
+
+    void applyElevatedTenantAdministratorBaseline(
+            Map<Long, EffectivePermissionResponse> merged, Map<Long, Menu> entitledMenus, boolean elevated) {
+        if (!elevated) {
+            return;
+        }
+        entitledMenus.values().forEach(menu -> mergeOr(merged, menu, true, true, true));
+    }
+
+    List<UserRole> activeRolesForUser(Long userId, Long organizationId) {
+        List<UserRole> activeRoles = new ArrayList<>(userRoleRepository.findActiveRolesWithDetails(userId));
+        Set<RoleType> activeRoleTypes = activeRoles.stream()
+                .map(UserRole::getRole)
+                .filter(Objects::nonNull)
+                .map(Role::getRoleType)
+                .collect(java.util.stream.Collectors.toSet());
+        for (UserRole publicRole : publicOwnerRolesForCurrentUser(userId, organizationId)) {
+            if (publicRole.getRole() != null && activeRoleTypes.add(publicRole.getRole().getRoleType())) {
+                activeRoles.add(publicRole);
+            }
+        }
+        return activeRoles;
+    }
+
+    private List<UserRole> publicOwnerRolesForCurrentUser(Long requestedUserId, Long organizationId) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities().stream()
+                .noneMatch(authority -> RoleType.ORGANIZATION_OWNER.name().equals(authority.getAuthority()))) {
+            return List.of();
+        }
+
+        String previousTenant = TenantContext.getTenant();
+        try {
+            TenantContext.setTenant("public");
+            return publicSchemaUserLookupService
+                    .findInstitutionUserInPublicSchema(authentication.getName(), organizationId)
+                    .filter(user -> Objects.equals(user.getId(), requestedUserId))
+                    .map(user -> user.getUserRoles().stream()
+                            .filter(UserRole::getActive)
+                            .toList())
+                    .orElseGet(List::of);
+        } finally {
+            if (previousTenant == null) {
+                TenantContext.clear();
+            } else {
+                TenantContext.setTenant(previousTenant);
+            }
+        }
     }
 
     private void mergeRolePermissions(Map<Long, EffectivePermissionResponse> merged,

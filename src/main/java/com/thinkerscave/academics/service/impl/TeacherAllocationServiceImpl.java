@@ -78,23 +78,38 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
             Long classId,
             Long sectionId,
             Long subjectId,
-            TeacherAllocationStatus status) {
+            TeacherAllocationStatus status,
+            int page,
+            int size) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_TEACHER_ALLOCATION);
         AcademicYear year = requireYear(academicYearId);
         int maxPeriods = resolveMaxWeeklyPeriods(academicYearId);
         boolean fromConfig = hasConfiguredMax(academicYearId);
 
         Map<Long, Integer> workloadByStaff = computeWorkloadMap(academicYearId);
-        List<TeacherAllocationRowResponse> rows = buildRows(year, maxPeriods, workloadByStaff).stream()
+        List<TeacherAllocationRowResponse> filteredRows = buildRows(year, maxPeriods, workloadByStaff).stream()
                 .filter(r -> classId == null || Objects.equals(r.getClassId(), classId))
                 .filter(r -> sectionId == null || Objects.equals(r.getSectionId(), sectionId))
                 .filter(r -> subjectId == null || Objects.equals(r.getSubjectId(), subjectId))
                 .filter(r -> status == null || r.getStatus() == status)
+            .sorted(Comparator.comparing(TeacherAllocationRowResponse::getClassName,
+                    Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER))
+                .thenComparing(TeacherAllocationRowResponse::getSectionName,
+                    Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER))
+                .thenComparing(TeacherAllocationRowResponse::getSubjectName,
+                    Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
 
-        long assigned = rows.stream().filter(r -> r.getStatus() == TeacherAllocationStatus.ASSIGNED).count();
-        long missing = rows.stream().filter(r -> r.getStatus() == TeacherAllocationStatus.UNASSIGNED).count();
-        long conflict = rows.stream().filter(r -> r.getStatus() == TeacherAllocationStatus.CONFLICT).count();
+        long assigned = filteredRows.stream().filter(r -> r.getStatus() == TeacherAllocationStatus.ASSIGNED).count();
+        long missing = filteredRows.stream().filter(r -> r.getStatus() == TeacherAllocationStatus.UNASSIGNED).count();
+        long conflict = filteredRows.stream().filter(r -> r.getStatus() == TeacherAllocationStatus.CONFLICT).count();
+        AllocationPage allocationPage = paginateRows(filteredRows, page, size);
+        List<TeacherAllocationDashboardResponse.FilterOption> subjectOptions = filteredRows.stream()
+            .map(row -> new TeacherAllocationDashboardResponse.FilterOption(row.getSubjectId(), row.getSubjectName()))
+            .distinct()
+            .sorted(Comparator.comparing(TeacherAllocationDashboardResponse.FilterOption::name,
+                Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)))
+            .toList();
 
         return TeacherAllocationDashboardResponse.builder()
                 .academicYearId(year.getAcademicYearId())
@@ -103,14 +118,34 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
                 .yearReadOnly(isYearReadOnly(year))
                 .maxWeeklyPeriods(maxPeriods)
                 .maxWeeklyPeriodsFromConfig(fromConfig)
-                .totalSlots(rows.size())
+                .totalSlots(filteredRows.size())
                 .assignedSlots(assigned)
                 .missingSlots(missing)
                 .conflictSlots(conflict)
-                .rows(rows)
+                .page(allocationPage.page())
+                .size(allocationPage.size())
+                .totalPages(allocationPage.totalPages())
+                .totalRows(allocationPage.totalRows())
+                .rows(allocationPage.rows())
+                .subjectOptions(subjectOptions)
                 .workloads(listWorkloadsInternal(academicYearId, maxPeriods, workloadByStaff))
                 .build();
     }
+
+    static AllocationPage paginateRows(List<TeacherAllocationRowResponse> rows, int page, int size) {
+        int safeSize = Math.min(100, Math.max(1, size));
+        int totalPages = (int) Math.ceil(rows.size() / (double) safeSize);
+        int safePage = totalPages == 0 ? 0 : Math.min(Math.max(0, page), totalPages - 1);
+        int start = Math.min(rows.size(), safePage * safeSize);
+        List<TeacherAllocationRowResponse> pageRows = rows.stream()
+                .skip(start)
+                .limit(safeSize)
+                .toList();
+        return new AllocationPage(safePage, safeSize, totalPages, rows.size(), pageRows);
+    }
+
+    record AllocationPage(int page, int size, int totalPages, long totalRows,
+                          List<TeacherAllocationRowResponse> rows) {}
 
     @Override
     public TeacherAllocationRowResponse assign(TeacherAllocationAssignRequest request) {

@@ -9,4 +9,5 @@ import java.util.List;
 @Builder
 public class AnnouncementsData {
     private List<AnnouncementItem> items;
+    private String viewAllRoute;
 }

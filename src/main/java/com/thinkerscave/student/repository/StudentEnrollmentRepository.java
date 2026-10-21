@@ -46,6 +46,36 @@ public interface StudentEnrollmentRepository extends JpaRepository<StudentEnroll
 	@Query("""
 			SELECT e FROM StudentEnrollment e
 			LEFT JOIN FETCH e.student
+			LEFT JOIN FETCH e.academicYear
+			LEFT JOIN FETCH e.classEntity c
+			LEFT JOIN FETCH c.academicYear
+			LEFT JOIN FETCH e.section
+			WHERE e.classEntity.classId = :classId
+			  AND e.section.sectionId = :sectionId
+			  AND e.active = true
+			ORDER BY e.rollNumber ASC
+			""")
+	List<StudentEnrollment> findActiveRosterByClassSection(@Param("classId") Long classId,
+			@Param("sectionId") Long sectionId);
+
+	@Query("""
+			SELECT e FROM StudentEnrollment e
+			LEFT JOIN FETCH e.student
+			LEFT JOIN FETCH e.academicYear
+			LEFT JOIN FETCH e.classEntity c
+			LEFT JOIN FETCH c.academicYear
+			LEFT JOIN FETCH e.section
+			WHERE e.classEntity.classId = :classId
+			  AND e.active = true
+			ORDER BY e.rollNumber ASC
+			""")
+	List<StudentEnrollment> findActiveRosterByClass(@Param("classId") Long classId);
+
+	long countByClassEntityClassIdAndSectionSectionIdAndActiveTrue(Long classId, Long sectionId);
+
+	@Query("""
+			SELECT e FROM StudentEnrollment e
+			LEFT JOIN FETCH e.student
 			LEFT JOIN FETCH e.classEntity
 			LEFT JOIN FETCH e.section
 			LEFT JOIN FETCH e.academicYear
