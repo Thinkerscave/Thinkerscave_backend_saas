@@ -58,6 +58,12 @@ public class StaffDetailResponse {
     private LocalDateTime createdOn;
     private LocalDateTime updatedOn;
 
+    // Subject slots (teaching staff; primary is always set for teaching staff)
+    private SubjectRef primarySubject;
+    private SubjectRef secondarySubject;
+
+    public record SubjectRef(Long subjectId, String name) {}
+
     // Salary Summary
     private SalarySummary salarySummary;
 

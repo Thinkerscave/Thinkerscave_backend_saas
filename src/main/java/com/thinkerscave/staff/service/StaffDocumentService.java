@@ -15,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -48,6 +50,7 @@ public class StaffDocumentService {
         fileStorage.validate(file);
         Document doc = new Document();
         fillFile(doc, staffId, type, documentName, file);
+        deleteStoredFileIfRolledBack(doc.getFilePath());
         DocumentResponse response = toResponse(documentRepository.save(doc));
         activityService.record(requireStaff(staffId), StaffActivityType.DOCUMENT_UPLOADED, "Documents",
                 "Uploaded " + type + " document");
@@ -120,6 +123,7 @@ public class StaffDocumentService {
         Document doc = new Document();
         fillFile(doc, staffId, old.getDocumentType(),
                 StringUtils.hasText(documentName) ? documentName : old.getDocumentName(), file);
+        deleteStoredFileIfRolledBack(doc.getFilePath());
         old.setActive(false);
         documentRepository.save(old);
         DocumentResponse response = toResponse(documentRepository.save(doc));
@@ -162,6 +166,18 @@ public class StaffDocumentService {
     }
 
     public record DownloadedDocument(Resource resource, String fileName, String contentType) {}
+
+    /** Removes the stored file if the surrounding transaction rolls back, so no orphan file remains. */
+    private void deleteStoredFileIfRolledBack(String storedPath) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    fileStorage.deleteQuietly(storedPath);
+                }
+            }
+        });
+    }
 
     private void fillFile(Document doc, Long staffId, String type, String name, MultipartFile file) {
         try {

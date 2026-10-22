@@ -2,6 +2,7 @@ package com.thinkerscave.student.service.impl;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thinkerscave.access.dto.UserCreationContext;
+import com.thinkerscave.access.dto.UserProvisioningResult;
 import com.thinkerscave.access.entity.Role;
 import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.repository.RoleRepository;
@@ -14,6 +15,7 @@ import com.thinkerscave.admission.repository.ApplicationAdmissionRepository;
 import com.thinkerscave.audit.enums.AuditEventType;
 import com.thinkerscave.audit.service.AuditWriteService;
 import com.thinkerscave.admission.enums.DocumentCheckStatus;
+import com.thinkerscave.security.service.UserCredentialNotificationService;
 import com.thinkerscave.shared.entity.Address;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
@@ -98,6 +100,7 @@ public class StudentServiceImpl implements StudentService {
     private final AuditWriteService auditWriteService;
     private final ApplicationAdmissionRepository applicationAdmissionRepository;
     private final ObjectMapper objectMapper;
+    private final UserCredentialNotificationService credentialNotificationService;
 
     @Override
     @Transactional
@@ -118,7 +121,8 @@ public class StudentServiceImpl implements StudentService {
         UserCreationContext studentContext = new UserCreationContext(
                 dto.getFirstName(), dto.getMiddleName(), dto.getLastName(),
                 dto.getEmail(), dto.getMobileNumber(), null, null, null, TYPE_STUDENT);
-        User studentUser = userService.createUser(studentContext, studentRole);
+        UserProvisioningResult studentProvisioning = userService.createUserWithTemporaryPassword(studentContext, studentRole);
+        User studentUser = studentProvisioning.getUser();
 
         String studentCode = "STU" + System.currentTimeMillis();
         String admissionNumber = hasText(dto.getAdmissionNumber())
@@ -225,6 +229,9 @@ public class StudentServiceImpl implements StudentService {
                 "Student",
                 String.valueOf(student.getStudentId()),
                 "Student created: " + studentCode);
+
+        credentialNotificationService.sendInstitutionUserCredentials(
+                studentProvisioning, dto.getEmail(), dto.getMobileNumber(), "Student");
 
         return mapToResponseDTO(student);
     }

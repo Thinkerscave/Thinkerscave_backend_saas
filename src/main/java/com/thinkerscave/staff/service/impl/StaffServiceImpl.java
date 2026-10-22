@@ -1,6 +1,7 @@
 package com.thinkerscave.staff.service.impl;
 
 import com.thinkerscave.access.dto.UserCreationContext;
+import com.thinkerscave.access.dto.UserProvisioningResult;
 import com.thinkerscave.access.entity.Role;
 import com.thinkerscave.access.entity.User;
 import com.thinkerscave.access.repository.RoleRepository;
@@ -14,6 +15,7 @@ import com.thinkerscave.shared.entity.Address;
 import com.thinkerscave.shared.exceptions.AlreadyExistsException;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.security.service.UserCredentialNotificationService;
 import com.thinkerscave.shared.service.AddressFactory;
 import com.thinkerscave.staff.dto.request.StaffCreateRequest;
 import com.thinkerscave.staff.dto.request.StaffUpdateRequest;
@@ -31,6 +33,7 @@ import com.thinkerscave.staff.enums.StaffActivityType;
 import com.thinkerscave.staff.service.StaffActivityService;
 import com.thinkerscave.staff.service.StaffDocumentService;
 import com.thinkerscave.staff.service.StaffService;
+import com.thinkerscave.staff.service.StaffSpecializationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -61,6 +64,8 @@ public class StaffServiceImpl implements StaffService {
     private final StaffBankAccountCipher bankCipher;
     private final AddressFactory addressFactory;
     private final StaffActivityService activityService;
+    private final StaffSpecializationService specializationService;
+    private final UserCredentialNotificationService credentialNotificationService;
 
     private static final String SECTION_PERSONAL = "Personal details";
     private static final String SECTION_PROFESSIONAL = "Professional details";
@@ -98,7 +103,8 @@ public class StaffServiceImpl implements StaffService {
                 request.getEmail(), request.getMobileNumber(),
                 null, null, null, null
         );
-        User user = userService.createUser(context, staffRole);
+        UserProvisioningResult provisioning = userService.createUserWithTemporaryPassword(context, staffRole);
+        User user = provisioning.getUser();
 
         Staff staff = new Staff();
         staff.setUser(user);
@@ -106,12 +112,15 @@ public class StaffServiceImpl implements StaffService {
         staff.setStaffCode(staffCodeGenerator.nextStaffCode(organizationId));
         staff.setActive(true);
         applyAddresses(request, staff);
+        specializationService.assign(staff, request.getStaffType(),
+                request.getPrimarySubjectId(), request.getSecondarySubjectId());
 
         Staff saved = staffRepository.save(staff);
         if (request.getBankDetails() != null) {
             bankDetailsService.apply(saved, request.getBankDetails());
         }
         activityService.record(saved, StaffActivityType.CREATED, null, "Staff profile created");
+        credentialNotificationService.sendInstitutionUserCredentials(provisioning, request.getEmail(), request.getMobileNumber(), "Staff");
         log.info("Staff created with ID: {}, code: {}", saved.getStaffId(), saved.getStaffCode());
 
         return StaffCreateResponse.builder()
@@ -127,6 +136,8 @@ public class StaffServiceImpl implements StaffService {
         Staff staff = getStaffEntity(staffId);
         Map<String, List<Object>> before = profileSections(staff);
         mapUpdateRequestToStaff(request, staff);
+        specializationService.assign(staff, request.getStaffType(),
+                request.getPrimarySubjectId(), request.getSecondarySubjectId());
         applyAddressesOnUpdate(request, staff);
         Staff saved = staffRepository.save(staff);
         profileSections(saved).forEach((section, value) -> {
@@ -246,7 +257,6 @@ public class StaffServiceImpl implements StaffService {
         staff.setGender(req.getGender());
         staff.setDateOfBirth(req.getDateOfBirth());
         staff.setBloodGroup(req.getBloodGroup());
-        staff.setReligion(req.getReligion());
         staff.setNationality(req.getNationality());
         staff.setMobileNumber(req.getMobileNumber());
         staff.setEmail(req.getEmail());
@@ -432,7 +442,13 @@ public class StaffServiceImpl implements StaffService {
                 .permanentAddress(addressFactory.toDto(staff.getPermanentAddress()))
                 .sameAsPresentAddress(Boolean.TRUE.equals(staff.getSameAsPresentAddress()))
                 .bankDetails(bankDetailsService.findMasked(staff.getStaffId()).orElse(null))
+                .primarySubject(subjectRef(staff.getPrimarySubject()))
+                .secondarySubject(subjectRef(staff.getSecondarySubject()))
                 .build();
+    }
+
+    private static StaffDetailResponse.SubjectRef subjectRef(com.thinkerscave.academics.entity.Subject subject) {
+        return subject == null ? null : new StaffDetailResponse.SubjectRef(subject.getSubjectId(), subject.getName());
     }
 
     private StaffSummaryResponse toSummary(Staff staff) {

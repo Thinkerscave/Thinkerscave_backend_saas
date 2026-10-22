@@ -38,9 +38,6 @@ public class StaffCreateRequest {
     private String bloodGroup;
 
     @Size(max = 50)
-    private String religion;
-
-    @Size(max = 50)
     private String nationality;
 
     @NotBlank(message = "Mobile number is required")
@@ -77,6 +74,11 @@ public class StaffCreateRequest {
 
     @Min(0)
     private Integer experienceYears;
+
+    /** Required for teaching staff; must be empty for non-teaching staff. */
+    private Long primarySubjectId;
+
+    private Long secondarySubjectId;
 
     @Size(max = 150)
     private String emergencyContactName;

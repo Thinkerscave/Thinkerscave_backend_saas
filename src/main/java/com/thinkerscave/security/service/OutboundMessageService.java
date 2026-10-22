@@ -108,6 +108,28 @@ public class OutboundMessageService {
         log.info("Admin password reset dispatched emailOk={} smsOk={} email={}", mailOk, smsOk, email);
     }
 
+    public void sendInstitutionUserCredentials(
+            String email,
+            String mobile,
+            String recipientName,
+            String roleLabel,
+            String organizationName,
+            String loginUrl,
+            String username,
+            String temporaryPassword) {
+        String subject = "Your " + safe(organizationName) + " account is ready";
+        String html = emailService.buildInstitutionUserCredentialsEmailBody(
+                recipientName, roleLabel, organizationName, loginUrl, username, temporaryPassword);
+        boolean mailOk = emailService.sendHtmlEmailSync(email, subject, html);
+
+        String sms = "ThinkersCave: your " + safe(roleLabel) + " account at " + safe(organizationName) + " is ready. "
+                + "Username: " + safe(username)
+                + " Temp password: " + safe(temporaryPassword)
+                + " Login: " + safe(loginUrl);
+        boolean smsOk = trySms(mobile, sms);
+        log.info("Institution user credentials dispatched emailOk={} smsOk={} email={}", mailOk, smsOk, email);
+    }
+
     private boolean trySms(String mobile, String message) {
         if (!smsService.isEnabled() || !StringUtils.hasText(mobile)) {
             return false;

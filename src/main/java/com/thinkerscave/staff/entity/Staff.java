@@ -1,6 +1,7 @@
 package com.thinkerscave.staff.entity;
 
 import com.thinkerscave.access.entity.User;
+import com.thinkerscave.academics.entity.Subject;
 import com.thinkerscave.shared.entity.Address;
 import com.thinkerscave.shared.entity.Auditable;
 import com.thinkerscave.staff.enums.EmploymentCategory;
@@ -167,4 +168,12 @@ public class Staff extends Auditable {
 
     @Column(name = "remarks", columnDefinition = "TEXT")
     private String remarks;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "primary_subject_id")
+    private Subject primarySubject;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "secondary_subject_id")
+    private Subject secondarySubject;
 }

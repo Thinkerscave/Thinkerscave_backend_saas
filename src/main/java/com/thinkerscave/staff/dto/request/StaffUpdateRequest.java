@@ -73,6 +73,11 @@ public class StaffUpdateRequest {
     @Min(0)
     private Integer experienceYears;
 
+    /** Same rules as create; the three slots replace the stored subjects. */
+    private Long primarySubjectId;
+
+    private Long secondarySubjectId;
+
     @Size(max = 150)
     private String emergencyContactName;
 

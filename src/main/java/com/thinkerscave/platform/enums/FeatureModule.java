@@ -10,7 +10,6 @@ public enum FeatureModule {
     EXAMINATION,
     FINANCE,
     TRANSPORT,
-    LIBRARY,
     HOSTEL,
     COMMUNICATION,
     SETTINGS
