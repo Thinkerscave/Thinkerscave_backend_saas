@@ -1,11 +1,13 @@
 package com.thinkerscave.academics.repository;
 
 import com.thinkerscave.academics.entity.Subject;
+import com.thinkerscave.academics.enums.AcademicYearStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,4 +39,8 @@ public interface SubjectRepository extends JpaRepository<Subject, Long> {
     long countByAcademicYear_AcademicYearIdAndActiveTrue(Long yearId);
 
     List<Subject> findByNameContainingIgnoreCaseOrCodeContainingIgnoreCase(String name, String code);
+
+    @Query("SELECT s FROM Subject s JOIN FETCH s.academicYear y WHERE s.active = true AND y.active = true "
+            + "AND y.status NOT IN :excluded ORDER BY y.startDate DESC, s.name ASC")
+    List<Subject> findSelectableWithYear(@Param("excluded") Collection<AcademicYearStatus> excluded);
 }

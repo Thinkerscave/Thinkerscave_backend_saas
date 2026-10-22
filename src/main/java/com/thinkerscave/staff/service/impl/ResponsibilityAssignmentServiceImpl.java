@@ -61,19 +61,6 @@ public class ResponsibilityAssignmentServiceImpl implements ResponsibilityAssign
 
     @Override
     @Transactional(readOnly = true)
-    public List<ResponsibilityAssignmentResponse> getStaffResponsibilities(Long staffId) {
-        if (!staffRepository.existsById(staffId)) {
-            throw new ResourceNotFoundException("Staff not found: " + staffId);
-        }
-        return assignmentRepository
-                .findByStaff_StaffIdAndActiveTrueOrderByEffectiveFromDesc(staffId)
-                .stream()
-                .map(this::toResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public List<ResponsibilityAssignmentResponse> getResponsibilityStaff(Long responsibilityId) {
         findResponsibility(responsibilityId);
         return assignmentRepository.findActiveByResponsibilityId(responsibilityId).stream()

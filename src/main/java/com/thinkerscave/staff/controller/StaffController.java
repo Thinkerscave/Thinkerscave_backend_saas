@@ -14,6 +14,7 @@ import com.thinkerscave.staff.dto.response.StaffSummaryResponse;
 import com.thinkerscave.staff.enums.EmploymentCategory;
 import com.thinkerscave.staff.enums.EmploymentStatus;
 import com.thinkerscave.staff.enums.StaffType;
+import com.thinkerscave.staff.security.StaffAccessGuard;
 import com.thinkerscave.staff.service.StaffBankDetailsService;
 import com.thinkerscave.staff.service.StaffActivityService;
 import com.thinkerscave.staff.service.StaffDocumentService;
@@ -49,42 +50,47 @@ public class StaffController {
     private final StaffDocumentService documentService;
     private final StaffExportService exportService;
     private final StaffActivityService activityService;
+    private final StaffAccessGuard accessGuard;
 
     @PostMapping
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Create a new staff member")
     public ResponseEntity<ApiResponse<StaffCreateResponse>> createStaff(
             @Valid @RequestBody StaffCreateRequest request) {
+        accessGuard.requireWrite();
         StaffCreateResponse response = staffService.createStaff(request);
         return ResponseEntity.status(201).body(ApiResponse.created("Staff created successfully", response));
     }
 
     @PutMapping("/{staffId}")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Update staff details")
     public ResponseEntity<ApiResponse<Void>> updateStaff(
             @PathVariable Long staffId,
             @Valid @RequestBody StaffUpdateRequest request) {
+        accessGuard.requireWrite();
         staffService.updateStaff(staffId, request);
         return ResponseEntity.ok(ApiResponse.noContent("Staff updated successfully"));
     }
 
     @GetMapping("/{staffId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get staff 360 profile details")
     public ResponseEntity<ApiResponse<StaffDetailResponse>> getStaffDetail(@PathVariable Long staffId) {
+        accessGuard.requireView();
         return ResponseEntity.ok(ApiResponse.success("Staff details retrieved", staffService.getStaffDetail(staffId)));
     }
 
     @GetMapping("/{staffId}/activity")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get staff activity log (latest first)")
     public ResponseEntity<ApiResponse<List<StaffActivityResponse>>> getStaffActivity(@PathVariable Long staffId) {
+        accessGuard.requireView();
         return ResponseEntity.ok(ApiResponse.success("Staff activity retrieved", activityService.list(staffId)));
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get paginated staff list with filters")
     public ResponseEntity<ApiResponse<Page<StaffSummaryResponse>>> getStaffList(
             @RequestParam(required = false) StaffType staffType,
@@ -93,13 +99,14 @@ public class StaffController {
             @RequestParam(required = false) String designation,
             @RequestParam(required = false) String keyword,
             @PageableDefault(size = 10, sort = "createdOn") Pageable pageable) {
+        accessGuard.requireView();
         Page<StaffSummaryResponse> page = staffService.getStaffList(
                 staffType, employmentCategory, employmentStatus, designation, keyword, pageable);
         return ResponseEntity.ok(ApiResponse.success("Staff list retrieved", page));
     }
 
     @GetMapping("/export")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Export the filtered staff list as an Excel workbook")
     public ResponseEntity<byte[]> exportStaff(
             @RequestParam(required = false) StaffType staffType,
@@ -107,6 +114,7 @@ public class StaffController {
             @RequestParam(required = false) EmploymentStatus employmentStatus,
             @RequestParam(required = false) String designation,
             @RequestParam(required = false) String keyword) {
+        accessGuard.requireView();
         byte[] workbook = exportService.exportExcel(
                 staffType, employmentCategory, employmentStatus, designation, keyword);
         String fileName = "staff-" + LocalDate.now() + ".xlsx";
@@ -119,89 +127,99 @@ public class StaffController {
     }
 
     @GetMapping("/dashboard")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get staff dashboard KPI metrics")
     public ResponseEntity<ApiResponse<StaffDashboardResponse>> getDashboard() {
+        accessGuard.requireView();
         return ResponseEntity.ok(ApiResponse.success("Dashboard metrics retrieved", staffService.getDashboard()));
     }
 
     @PatchMapping("/{staffId}/activate")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Activate a staff member")
     public ResponseEntity<ApiResponse<Void>> activateStaff(@PathVariable Long staffId) {
+        accessGuard.requireWrite();
         staffService.activateStaff(staffId);
         return ResponseEntity.ok(ApiResponse.noContent("Staff activated successfully"));
     }
 
     @PatchMapping("/{staffId}/deactivate")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Deactivate a staff member")
     public ResponseEntity<ApiResponse<Void>> deactivateStaff(@PathVariable Long staffId) {
+        accessGuard.requireWrite();
         staffService.deactivateStaff(staffId);
         return ResponseEntity.ok(ApiResponse.noContent("Staff deactivated successfully"));
     }
 
     @DeleteMapping("/{staffId}")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Soft delete a staff member")
     public ResponseEntity<ApiResponse<Void>> deleteStaff(@PathVariable Long staffId) {
+        accessGuard.requireWrite();
         staffService.deleteStaff(staffId);
         return ResponseEntity.ok(ApiResponse.noContent("Staff deleted successfully"));
     }
 
     @GetMapping("/{staffId}/bank-details")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get masked bank details for a staff member")
     public ResponseEntity<ApiResponse<StaffBankDetailsResponse>> getBankDetails(@PathVariable Long staffId) {
+        accessGuard.requireView();
         StaffBankDetailsResponse response = bankDetailsService.findMasked(staffId).orElse(null);
         return ResponseEntity.ok(ApiResponse.success("Bank details retrieved", response));
     }
 
     @PutMapping("/{staffId}/bank-details")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Create or replace bank details (account number stored encrypted)")
     public ResponseEntity<ApiResponse<StaffBankDetailsResponse>> upsertBankDetails(
             @PathVariable Long staffId,
             @Valid @RequestBody StaffBankDetailsRequest request) {
+        accessGuard.requireWrite();
         StaffBankDetailsResponse response = bankDetailsService.upsert(staffId, request);
         return ResponseEntity.ok(ApiResponse.success("Bank details saved", response));
     }
 
     @GetMapping("/{staffId}/documents")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "List active documents for a staff member")
     public ResponseEntity<ApiResponse<List<DocumentResponse>>> listDocuments(@PathVariable Long staffId) {
+        accessGuard.requireView();
         return ResponseEntity.ok(ApiResponse.success("Documents retrieved", documentService.list(staffId)));
     }
 
     @PostMapping(value = "/{staffId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Upload a document for a staff member")
     public ResponseEntity<ApiResponse<DocumentResponse>> uploadDocument(
             @PathVariable Long staffId,
             @RequestParam("file") MultipartFile file,
             @RequestParam("documentType") String documentType,
             @RequestParam(value = "documentName", required = false) String documentName) {
+        accessGuard.requireWrite();
         DocumentResponse response = documentService.upload(staffId, file, documentType, documentName);
         return ResponseEntity.status(201).body(ApiResponse.created("Document uploaded", response));
     }
 
     @PutMapping(value = "/{staffId}/documents/{documentId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Replace a staff document (previous version is kept inactive)")
     public ResponseEntity<ApiResponse<DocumentResponse>> replaceDocument(
             @PathVariable Long staffId,
             @PathVariable Long documentId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "documentName", required = false) String documentName) {
+        accessGuard.requireWrite();
         DocumentResponse response = documentService.replace(staffId, documentId, file, documentName);
         return ResponseEntity.ok(ApiResponse.success("Document replaced", response));
     }
 
     @GetMapping("/{staffId}/documents/{documentId}/download")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Download a staff document")
     public ResponseEntity<Resource> downloadDocument(@PathVariable Long staffId, @PathVariable Long documentId) {
+        accessGuard.requireView();
         StaffDocumentService.DownloadedDocument doc = documentService.download(staffId, documentId);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -211,26 +229,29 @@ public class StaffController {
     }
 
     @DeleteMapping("/{staffId}/documents/{documentId}")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Deactivate a staff document")
     public ResponseEntity<ApiResponse<Void>> deactivateDocument(@PathVariable Long staffId, @PathVariable Long documentId) {
+        accessGuard.requireWrite();
         documentService.deactivate(staffId, documentId);
         return ResponseEntity.ok(ApiResponse.noContent("Document removed"));
     }
 
     @PostMapping(value = "/{staffId}/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Upload or replace a staff profile photo (JPG, PNG or WEBP, max 2 MB)")
     public ResponseEntity<ApiResponse<DocumentResponse>> uploadPhoto(
             @PathVariable Long staffId,
             @RequestParam("file") MultipartFile file) {
+        accessGuard.requireWrite();
         return ResponseEntity.ok(ApiResponse.success("Photo saved", documentService.uploadPhoto(staffId, file)));
     }
 
     @GetMapping("/{staffId}/photo")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Get a staff profile photo")
     public ResponseEntity<Resource> getPhoto(@PathVariable Long staffId) {
+        accessGuard.requireView();
         StaffDocumentService.DownloadedDocument photo = documentService.loadPhoto(staffId);
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(photo.contentType()))
@@ -238,9 +259,10 @@ public class StaffController {
     }
 
     @DeleteMapping("/{staffId}/photo")
-    @PreAuthorize("hasAnyAuthority('ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Remove a staff profile photo")
     public ResponseEntity<ApiResponse<Void>> removePhoto(@PathVariable Long staffId) {
+        accessGuard.requireWrite();
         documentService.removePhoto(staffId);
         return ResponseEntity.ok(ApiResponse.noContent("Photo removed"));
     }

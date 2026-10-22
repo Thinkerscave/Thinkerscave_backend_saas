@@ -382,10 +382,6 @@ public class StaffServiceImpl implements StaffService {
                         .build())
                 .collect(Collectors.toList());
 
-        // Salary/payroll summaries live under Finance Payroll — omit legacy Staff payroll reads.
-        StaffDetailResponse.SalarySummary salarySummary = null;
-        StaffDetailResponse.PayrollSummary payrollSummary = null;
-
         List<DocumentResponse> docResponses = docs.stream()
                 .map(d -> DocumentResponse.builder()
                         .documentId(d.getDocumentId())
@@ -434,9 +430,7 @@ public class StaffServiceImpl implements StaffService {
                 .remarks(staff.getRemarks())
                 .createdOn(staff.getCreatedOn())
                 .updatedOn(staff.getUpdatedOn())
-                .salarySummary(salarySummary)
                 .responsibilities(responsibilities)
-                .payrollSummary(payrollSummary)
                 .documents(docResponses)
                 .presentAddress(addressFactory.toDto(staff.getPresentAddress()))
                 .permanentAddress(addressFactory.toDto(staff.getPermanentAddress()))

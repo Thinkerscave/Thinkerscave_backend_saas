@@ -2,7 +2,6 @@ package com.thinkerscave.staff.controller;
 
 import com.thinkerscave.shared.dto.ApiResponse;
 import com.thinkerscave.staff.dto.request.ResponsibilityAssignmentRequest;
-import com.thinkerscave.staff.dto.response.ResponsibilityAssignmentResponse;
 import com.thinkerscave.staff.service.ResponsibilityAssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -12,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -41,14 +39,5 @@ public class ResponsibilityAssignmentController {
     public ResponseEntity<ApiResponse<Void>> removeAssignment(@PathVariable Long id) {
         assignmentService.removeAssignment(id);
         return ResponseEntity.ok(ApiResponse.noContent("Assignment removed successfully"));
-    }
-
-    @GetMapping("/api/v1/staff/{staffId}/responsibilities")
-    @PreAuthorize(RESP_ROLES)
-    @Operation(summary = "Get all responsibilities for a staff member")
-    public ResponseEntity<ApiResponse<List<ResponsibilityAssignmentResponse>>> getStaffResponsibilities(
-            @PathVariable Long staffId) {
-        return ResponseEntity.ok(ApiResponse.success("Responsibilities retrieved",
-                assignmentService.getStaffResponsibilities(staffId)));
     }
 }

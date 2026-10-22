@@ -64,14 +64,8 @@ public class StaffDetailResponse {
 
     public record SubjectRef(Long subjectId, String name) {}
 
-    // Salary Summary
-    private SalarySummary salarySummary;
-
     // Responsibility Summary
     private List<ResponsibilityAssignmentResponse> responsibilities;
-
-    // Payroll Summary
-    private PayrollSummary payrollSummary;
 
     // Documents
     private List<DocumentResponse> documents;
@@ -83,23 +77,4 @@ public class StaffDetailResponse {
 
     // Bank (masked; account number never returned)
     private StaffBankDetailsResponse bankDetails;
-
-    @Getter
-    @Setter
-    @Builder
-    public static class SalarySummary {
-        private Long salaryStructureId;
-        private String salaryType;
-        private java.math.BigDecimal grossSalary;
-        private java.time.LocalDate effectiveFrom;
-    }
-
-    @Getter
-    @Setter
-    @Builder
-    public static class PayrollSummary {
-        private String lastPayrollMonth;
-        private java.math.BigDecimal lastNetSalary;
-        private String lastPayrollStatus;
-    }
 }

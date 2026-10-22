@@ -8,7 +8,6 @@ import com.thinkerscave.finance.payroll.dto.request.SalaryComponentRequest;
 import com.thinkerscave.finance.payroll.dto.request.SalaryStructureRequest;
 import com.thinkerscave.finance.payroll.dto.request.StatusUpdateRequest;
 import com.thinkerscave.finance.payroll.dto.response.EmployeeSalaryResponse;
-import com.thinkerscave.finance.payroll.dto.response.LegacyMigrationInventoryResponse;
 import com.thinkerscave.finance.payroll.dto.response.MyPayrollSummaryResponse;
 import com.thinkerscave.finance.payroll.dto.response.PayrollEmployeeRowResponse;
 import com.thinkerscave.finance.payroll.dto.response.PayrollGenerateResult;
@@ -23,7 +22,6 @@ import com.thinkerscave.finance.payroll.enums.ComponentStatus;
 import com.thinkerscave.finance.payroll.enums.ComponentType;
 import com.thinkerscave.finance.payroll.enums.EmployeePayrollStatus;
 import com.thinkerscave.finance.payroll.enums.PaymentType;
-import com.thinkerscave.finance.payroll.migration.LegacyPayrollMigrationService;
 import com.thinkerscave.finance.payroll.service.EmployeeSalaryService;
 import com.thinkerscave.finance.payroll.service.PayrollApprovalService;
 import com.thinkerscave.finance.payroll.service.PayrollGenerationService;
@@ -64,7 +62,6 @@ public class PayrollController {
     private final PayslipService payslipService;
     private final PayrollSettingsService settingsService;
     private final PayrollMeService meService;
-    private final LegacyPayrollMigrationService legacyMigrationService;
 
     // --- Overview ---
     @GetMapping("/overview")
@@ -312,16 +309,5 @@ public class PayrollController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"payslip-" + id + ".pdf\"")
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
-    }
-
-    // --- Admin migrate (optional) ---
-    @GetMapping("/admin/legacy-migration/inventory")
-    public ResponseEntity<ApiResponse<LegacyMigrationInventoryResponse>> migrationInventory() {
-        return ResponseEntity.ok(ApiResponse.success("Legacy payroll inventory", legacyMigrationService.inventory()));
-    }
-
-    @PostMapping("/admin/legacy-migration/migrate")
-    public ResponseEntity<ApiResponse<LegacyMigrationInventoryResponse>> migrateLegacy() {
-        return ResponseEntity.ok(ApiResponse.success("Legacy payroll migrated", legacyMigrationService.migrate()));
     }
 }

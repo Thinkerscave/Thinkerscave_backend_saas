@@ -14,7 +14,5 @@ public interface ResponsibilityAssignmentService {
 
     void removeAssignment(Long assignmentId);
 
-    List<ResponsibilityAssignmentResponse> getStaffResponsibilities(Long staffId);
-
     List<ResponsibilityAssignmentResponse> getResponsibilityStaff(Long responsibilityId);
 }
