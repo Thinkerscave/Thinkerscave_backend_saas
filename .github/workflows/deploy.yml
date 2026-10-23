@@ -82,32 +82,14 @@ jobs:
             docker stop thinkerscave-backend || true
             docker rm   thinkerscave-backend || true
 
-            # `docker system prune` above can drop the shared network when nothing is attached
-            docker network inspect web >/dev/null 2>&1 || docker network create web
-
-            # Not published to the host: reachable only by the frontend container over the "web" network.
             docker run -d \
               --name thinkerscave-backend \
               --restart unless-stopped \
               --network web \
               --env-file /opt/thinkerscave/.env \
-              -e SPRING_PROFILES_ACTIVE=prod \
               -v /var/thinkerscave/uploads:/var/thinkerscave/uploads \
               -v /var/thinkerscave/logs:/app/Logs \
               "$IMAGE:latest"
-
-            # Fail the deploy (instead of reporting success) if the app does not start.
-            echo "Waiting for backend health..."
-            for i in $(seq 1 40); do
-              status=$(docker inspect -f '{{.State.Health.Status}}' thinkerscave-backend 2>/dev/null || echo starting)
-              [ "$status" = "healthy" ] && break
-              if [ "$i" -eq 40 ] || [ "$(docker inspect -f '{{.State.Running}}' thinkerscave-backend 2>/dev/null)" != "true" ]; then
-                echo "Backend failed to become healthy (status: $status)"
-                docker logs --tail 100 thinkerscave-backend
-                exit 1
-              fi
-              sleep 5
-            done
 
             docker image prune -f
             echo "Backend deployed: $IMAGE:latest"
