@@ -72,7 +72,6 @@ public class StaffServiceImpl implements StaffService {
     private static final String SECTION_PROFESSIONAL = "Professional details";
     private static final String SECTION_EMERGENCY = "Emergency contact";
     private static final String SECTION_ADDRESS = "Address";
-    private static final String SECTION_REMARKS = "Remarks";
 
     @Override
     @Transactional
@@ -232,7 +231,6 @@ public class StaffServiceImpl implements StaffService {
                 s.getEmergencyContactRelation(), s.getEmergencyContactNumber()));
         sections.put(SECTION_ADDRESS, Arrays.<Object>asList(addressKey(s.getPresentAddress()),
                 addressKey(s.getPermanentAddress()), Boolean.TRUE.equals(s.getSameAsPresentAddress())));
-        sections.put(SECTION_REMARKS, Arrays.<Object>asList(s.getRemarks()));
         return sections;
     }
 
@@ -273,7 +271,6 @@ public class StaffServiceImpl implements StaffService {
         staff.setEmergencyContactNumber(req.getEmergencyContactNumber());
         staff.setContractStartDate(req.getContractStartDate());
         staff.setContractEndDate(req.getContractEndDate());
-        staff.setRemarks(req.getRemarks());
     }
 
     private void mapUpdateRequestToStaff(StaffUpdateRequest req, Staff staff) {
@@ -298,7 +295,6 @@ public class StaffServiceImpl implements StaffService {
         staff.setEmergencyContactNumber(req.getEmergencyContactNumber());
         staff.setContractStartDate(req.getContractStartDate());
         staff.setContractEndDate(req.getContractEndDate());
-        staff.setRemarks(req.getRemarks());
     }
 
     /** Contract end date must not be before the start date (both optional). */
@@ -428,7 +424,6 @@ public class StaffServiceImpl implements StaffService {
                 .contractStartDate(staff.getContractStartDate())
                 .contractEndDate(staff.getContractEndDate())
                 .active(staff.getActive())
-                .remarks(staff.getRemarks())
                 .createdOn(staff.getCreatedOn())
                 .updatedOn(staff.getUpdatedOn())
                 .responsibilities(responsibilities)

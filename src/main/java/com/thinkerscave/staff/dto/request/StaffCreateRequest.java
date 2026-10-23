@@ -89,8 +89,6 @@ public class StaffCreateRequest {
     @Pattern(regexp = "^$|^[0-9+\\- ]{7,15}$", message = "Emergency contact number is invalid")
     private String emergencyContactNumber;
 
-    private String remarks;
-
     @Valid
     private AddressDto presentAddress;
 

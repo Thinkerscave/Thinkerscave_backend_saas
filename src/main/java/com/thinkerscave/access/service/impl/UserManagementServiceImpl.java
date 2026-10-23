@@ -83,7 +83,6 @@ public class UserManagementServiceImpl implements UserManagementService {
                 .build();
 
         user = userRepository.save(user);
-        ensureCreatedOn(user);
 
         UserRole userRole = UserRole.builder()
                 .user(user)
@@ -135,7 +134,6 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Override
     @Transactional
     public Page<UserSummaryResponse> searchUsers(Long organizationId, UserStatus status, RoleType roleType, String search, Pageable pageable) {
-        userRepository.backfillMissingCreatedOn();
         var spec = com.thinkerscave.access.specification.UserSpecification.filter(organizationId, status, roleType, search);
         return userRepository.findAll(spec, pageable).map(this::toSummary);
     }
@@ -370,24 +368,12 @@ public class UserManagementServiceImpl implements UserManagementService {
     }
 
     private UserSummaryResponse toSummary(User user) {
-        ensureCreatedOn(user);
         UserSummaryResponse response = userMapper.toSummary(user);
         if (Boolean.TRUE.equals(user.getAccountLocked()) || user.getStatus() == UserStatus.LOCKED) {
             response.setStatus(UserStatus.LOCKED);
             response.setAccountLocked(true);
         }
         return response;
-    }
-
-    private void ensureCreatedOn(User user) {
-        if (user.getCreatedOn() != null) {
-            return;
-        }
-        LocalDateTime fallback = user.getUpdatedOn() != null ? user.getUpdatedOn() : LocalDateTime.now();
-        user.setCreatedOn(fallback);
-        if (user.getId() != null) {
-            userRepository.backfillCreatedOnIfMissing(user.getId(), fallback);
-        }
     }
 
     private String resolveResetPassword() {

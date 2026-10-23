@@ -9,6 +9,7 @@ import com.thinkerscave.access.repository.*;
 import com.thinkerscave.access.service.PermissionService;
 import com.thinkerscave.platform.entity.Organization;
 import com.thinkerscave.security.service.impl.PublicSchemaUserLookupService;
+import com.thinkerscave.security.dto.LoginContext;
 import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.access.entity.ResponsibilityAssignment;
@@ -166,6 +167,10 @@ public class PermissionServiceImpl implements PermissionService {
                                                 Long userId,
                                                 Long organizationId,
                                                 Set<Long> entitledMenuIds) {
+        // Platform (public schema) users have no tenant staff profile, so skip the tenant-scoped staff lookup.
+        if (LoginContext.PLATFORM_TENANT.equals(TenantContext.getTenant())) {
+            return;
+        }
         staffRepository.findByUser_Id(userId).ifPresent(staff -> {
             LocalDate today = LocalDate.now();
             List<ResponsibilityAssignment> assignments = responsibilityAssignmentRepository

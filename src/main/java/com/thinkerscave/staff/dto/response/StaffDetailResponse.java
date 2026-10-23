@@ -53,7 +53,6 @@ public class StaffDetailResponse {
 
     // Status
     private Boolean active;
-    private String remarks;
 
     // Audit
     private LocalDateTime createdOn;

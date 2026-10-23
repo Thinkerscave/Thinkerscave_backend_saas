@@ -165,9 +165,6 @@ public class Staff extends Auditable {
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
-    @Column(name = "remarks", columnDefinition = "TEXT")
-    private String remarks;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "primary_subject_id")
     private Subject primarySubject;
