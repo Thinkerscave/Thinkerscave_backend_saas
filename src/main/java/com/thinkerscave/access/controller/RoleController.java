@@ -121,15 +121,4 @@ public class RoleController {
         roleService.removeRolePermission(roleId, menuId);
         return ResponseEntity.ok(ApiResponse.noContent("Role permission removed"));
     }
-
-    @DeleteMapping("/{roleId}/permissions/{menuId}")
-    @Operation(summary = "Remove a role permission row for a menu")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
-    public ResponseEntity<ApiResponse<Void>> removePermission(
-            @PathVariable Long roleId,
-            @PathVariable Long menuId,
-            @RequestParam Long organizationId) {
-        roleService.removeRolePermission(roleId, organizationId, menuId);
-        return ResponseEntity.ok(ApiResponse.noContent("Role permission removed"));
-    }
 }
