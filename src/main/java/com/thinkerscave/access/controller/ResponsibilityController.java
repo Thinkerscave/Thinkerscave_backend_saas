@@ -1,12 +1,12 @@
-package com.thinkerscave.staff.controller;
+package com.thinkerscave.access.controller;
 
 import com.thinkerscave.shared.dto.ApiResponse;
-import com.thinkerscave.staff.dto.request.BulkResponsibilityAssignmentRequest;
-import com.thinkerscave.staff.dto.request.ResponsibilityRequest;
-import com.thinkerscave.staff.dto.response.ResponsibilityAssignmentResponse;
-import com.thinkerscave.staff.dto.response.ResponsibilityResponse;
-import com.thinkerscave.staff.service.ResponsibilityAssignmentService;
-import com.thinkerscave.staff.service.ResponsibilityService;
+import com.thinkerscave.access.dto.request.BulkResponsibilityAssignmentRequest;
+import com.thinkerscave.access.dto.request.ResponsibilityRequest;
+import com.thinkerscave.access.dto.response.ResponsibilityAssignmentResponse;
+import com.thinkerscave.access.dto.response.ResponsibilityResponse;
+import com.thinkerscave.access.service.ResponsibilityAssignmentService;
+import com.thinkerscave.access.service.ResponsibilityService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

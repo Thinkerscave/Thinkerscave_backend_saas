@@ -1,11 +1,11 @@
 package com.thinkerscave.finance.security;
 
-import com.thinkerscave.staff.entity.ResponsibilityAssignment;
-import com.thinkerscave.staff.entity.ResponsibilityAssignmentScope;
+import com.thinkerscave.access.entity.ResponsibilityAssignment;
+import com.thinkerscave.access.entity.ResponsibilityAssignmentScope;
 import com.thinkerscave.staff.entity.Staff;
 import com.thinkerscave.staff.enums.DataScopeType;
-import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
-import com.thinkerscave.staff.repository.ResponsibilityAssignmentScopeRepository;
+import com.thinkerscave.access.repository.ResponsibilityAssignmentRepository;
+import com.thinkerscave.access.repository.ResponsibilityAssignmentScopeRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
 import com.thinkerscave.student.entity.StudentEnrollment;
 import com.thinkerscave.student.entity.StudentParent;

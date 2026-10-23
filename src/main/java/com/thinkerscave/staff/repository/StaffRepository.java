@@ -17,13 +17,9 @@ import java.util.Optional;
 @Repository
 public interface StaffRepository extends JpaRepository<Staff, Long> {
 
-    Optional<Staff> findByStaffCode(String staffCode);
-
     Optional<Staff> findByEmail(String email);
 
     boolean existsByEmail(String email);
-
-    boolean existsByStaffCode(String staffCode);
 
     @Query("""
             SELECT s FROM Staff s

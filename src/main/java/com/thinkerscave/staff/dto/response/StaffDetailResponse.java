@@ -1,5 +1,6 @@
 package com.thinkerscave.staff.dto.response;
 
+import com.thinkerscave.access.dto.response.ResponsibilityAssignmentResponse;
 import com.thinkerscave.shared.dto.AddressDto;
 import com.thinkerscave.staff.enums.EmploymentCategory;
 import com.thinkerscave.staff.enums.EmploymentStatus;

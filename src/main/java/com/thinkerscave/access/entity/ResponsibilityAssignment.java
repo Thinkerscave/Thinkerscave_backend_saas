@@ -1,6 +1,7 @@
-package com.thinkerscave.staff.entity;
+package com.thinkerscave.access.entity;
 
 import com.thinkerscave.shared.entity.Auditable;
+import com.thinkerscave.staff.entity.Staff;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

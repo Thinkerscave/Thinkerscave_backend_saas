@@ -1,6 +1,6 @@
-package com.thinkerscave.staff.repository;
+package com.thinkerscave.access.repository;
 
-import com.thinkerscave.staff.entity.Responsibility;
+import com.thinkerscave.access.entity.Responsibility;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

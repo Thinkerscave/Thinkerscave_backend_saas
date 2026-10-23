@@ -20,11 +20,12 @@ import com.thinkerscave.shared.service.AddressFactory;
 import com.thinkerscave.staff.dto.request.StaffCreateRequest;
 import com.thinkerscave.staff.dto.request.StaffUpdateRequest;
 import com.thinkerscave.staff.dto.response.*;
+import com.thinkerscave.access.dto.response.ResponsibilityAssignmentResponse;
 import com.thinkerscave.staff.entity.Staff;
 import com.thinkerscave.staff.enums.EmploymentCategory;
 import com.thinkerscave.staff.enums.EmploymentStatus;
 import com.thinkerscave.staff.enums.StaffType;
-import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
+import com.thinkerscave.access.repository.ResponsibilityAssignmentRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
 import com.thinkerscave.staff.security.StaffBankAccountCipher;
 import com.thinkerscave.staff.service.StaffBankDetailsService;
@@ -109,13 +110,13 @@ public class StaffServiceImpl implements StaffService {
         Staff staff = new Staff();
         staff.setUser(user);
         mapCreateRequestToStaff(request, staff);
-        staff.setStaffCode(staffCodeGenerator.nextStaffCode(organizationId));
         staff.setActive(true);
         applyAddresses(request, staff);
         specializationService.assign(staff, request.getStaffType(),
                 request.getPrimarySubjectId(), request.getSecondarySubjectId());
 
         Staff saved = staffRepository.save(staff);
+        saved.setStaffCode(staffCodeGenerator.staffCodeFor(organizationId, saved.getStaffId()));
         if (request.getBankDetails() != null) {
             bankDetailsService.apply(saved, request.getBankDetails());
         }

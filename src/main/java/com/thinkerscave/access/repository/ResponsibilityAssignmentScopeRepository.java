@@ -1,6 +1,6 @@
-package com.thinkerscave.staff.repository;
+package com.thinkerscave.access.repository;
 
-import com.thinkerscave.staff.entity.ResponsibilityAssignmentScope;
+import com.thinkerscave.access.entity.ResponsibilityAssignmentScope;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;

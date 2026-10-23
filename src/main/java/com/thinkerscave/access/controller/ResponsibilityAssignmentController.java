@@ -1,8 +1,8 @@
-package com.thinkerscave.staff.controller;
+package com.thinkerscave.access.controller;
 
 import com.thinkerscave.shared.dto.ApiResponse;
-import com.thinkerscave.staff.dto.request.ResponsibilityAssignmentRequest;
-import com.thinkerscave.staff.service.ResponsibilityAssignmentService;
+import com.thinkerscave.access.dto.request.ResponsibilityAssignmentRequest;
+import com.thinkerscave.access.service.ResponsibilityAssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;

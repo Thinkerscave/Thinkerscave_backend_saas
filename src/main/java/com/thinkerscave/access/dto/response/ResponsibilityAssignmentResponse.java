@@ -1,4 +1,4 @@
-package com.thinkerscave.staff.dto.response;
+package com.thinkerscave.access.dto.response;
 
 import lombok.Builder;
 import lombok.Getter;

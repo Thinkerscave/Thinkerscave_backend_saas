@@ -1,13 +1,13 @@
-package com.thinkerscave.staff.service.impl;
+package com.thinkerscave.access.service.impl;
 
 import com.thinkerscave.shared.exceptions.AlreadyExistsException;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
-import com.thinkerscave.staff.dto.request.ResponsibilityRequest;
-import com.thinkerscave.staff.dto.response.ResponsibilityResponse;
-import com.thinkerscave.staff.entity.Responsibility;
-import com.thinkerscave.staff.repository.ResponsibilityRepository;
-import com.thinkerscave.staff.service.ResponsibilityService;
+import com.thinkerscave.access.dto.request.ResponsibilityRequest;
+import com.thinkerscave.access.dto.response.ResponsibilityResponse;
+import com.thinkerscave.access.entity.Responsibility;
+import com.thinkerscave.access.repository.ResponsibilityRepository;
+import com.thinkerscave.access.service.ResponsibilityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

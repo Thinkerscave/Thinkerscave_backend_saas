@@ -1,8 +1,8 @@
-package com.thinkerscave.staff.service;
+package com.thinkerscave.access.service;
 
-import com.thinkerscave.staff.dto.request.BulkResponsibilityAssignmentRequest;
-import com.thinkerscave.staff.dto.request.ResponsibilityAssignmentRequest;
-import com.thinkerscave.staff.dto.response.ResponsibilityAssignmentResponse;
+import com.thinkerscave.access.dto.request.BulkResponsibilityAssignmentRequest;
+import com.thinkerscave.access.dto.request.ResponsibilityAssignmentRequest;
+import com.thinkerscave.access.dto.response.ResponsibilityAssignmentResponse;
 
 import java.util.List;
 

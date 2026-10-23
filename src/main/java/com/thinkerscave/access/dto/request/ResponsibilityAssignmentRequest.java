@@ -1,4 +1,4 @@
-package com.thinkerscave.staff.dto.request;
+package com.thinkerscave.access.dto.request;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

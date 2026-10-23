@@ -50,9 +50,8 @@ public class Staff extends Auditable {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @NotBlank
     @Size(max = 30)
-    @Column(name = "staff_code", nullable = false, length = 30)
+    @Column(name = "staff_code", length = 30)
     private String staffCode;
 
     @NotBlank

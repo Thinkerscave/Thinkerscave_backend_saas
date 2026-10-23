@@ -1,17 +1,17 @@
-package com.thinkerscave.staff.service.impl;
+package com.thinkerscave.access.service.impl;
 
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
-import com.thinkerscave.staff.dto.request.BulkResponsibilityAssignmentRequest;
-import com.thinkerscave.staff.dto.request.ResponsibilityAssignmentRequest;
-import com.thinkerscave.staff.dto.response.ResponsibilityAssignmentResponse;
-import com.thinkerscave.staff.entity.Responsibility;
-import com.thinkerscave.staff.entity.ResponsibilityAssignment;
+import com.thinkerscave.access.dto.request.BulkResponsibilityAssignmentRequest;
+import com.thinkerscave.access.dto.request.ResponsibilityAssignmentRequest;
+import com.thinkerscave.access.dto.response.ResponsibilityAssignmentResponse;
+import com.thinkerscave.access.entity.Responsibility;
+import com.thinkerscave.access.entity.ResponsibilityAssignment;
 import com.thinkerscave.staff.entity.Staff;
 import com.thinkerscave.staff.enums.StaffActivityType;
-import com.thinkerscave.staff.repository.ResponsibilityAssignmentRepository;
-import com.thinkerscave.staff.repository.ResponsibilityRepository;
+import com.thinkerscave.access.repository.ResponsibilityAssignmentRepository;
+import com.thinkerscave.access.repository.ResponsibilityRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
-import com.thinkerscave.staff.service.ResponsibilityAssignmentService;
+import com.thinkerscave.access.service.ResponsibilityAssignmentService;
 import com.thinkerscave.staff.service.StaffActivityService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

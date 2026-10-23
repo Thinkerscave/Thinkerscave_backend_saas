@@ -1,4 +1,4 @@
-package com.thinkerscave.staff.entity;
+package com.thinkerscave.access.entity;
 
 import com.thinkerscave.staff.enums.DataScopeType;
 import com.thinkerscave.shared.entity.Auditable;

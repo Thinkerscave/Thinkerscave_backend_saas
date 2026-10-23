@@ -1,7 +1,7 @@
-package com.thinkerscave.staff.service;
+package com.thinkerscave.access.service;
 
-import com.thinkerscave.staff.dto.request.ResponsibilityRequest;
-import com.thinkerscave.staff.dto.response.ResponsibilityResponse;
+import com.thinkerscave.access.dto.request.ResponsibilityRequest;
+import com.thinkerscave.access.dto.response.ResponsibilityResponse;
 
 import java.util.List;
 
