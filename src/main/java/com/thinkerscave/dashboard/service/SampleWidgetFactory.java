@@ -12,7 +12,7 @@ import java.util.Locale;
 
 /**
  * Builds realistic, clearly-{@code SAMPLE}-tagged payloads for domains that
- * have no backend module yet (Leave, Examination, Library, Transport,
+ * have no backend module yet (Leave, Examination, Transport,
  * Support Tickets). These are consumed through the exact same
  * {@code WidgetDTO} contract as live widgets so swapping to real data later
  * is a provider-level change only — no frontend rewrite.
@@ -36,14 +36,6 @@ public class SampleWidgetFactory {
                         StatListItem.builder().label("Mid-Term — Science").value(dateLabel(9)).icon("pi-pencil").tone("info").build(),
                         StatListItem.builder().label("Unit Test — English").value(dateLabel(14)).icon("pi-pencil").tone("warning").build()
                 ))
-                .build();
-    }
-
-    public LibrarySummaryData librarySummary() {
-        return LibrarySummaryData.builder()
-                .booksIssued(3)
-                .booksOverdue(1)
-                .fineDue(15.0)
                 .build();
     }
 

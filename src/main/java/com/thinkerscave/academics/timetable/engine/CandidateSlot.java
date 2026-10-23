@@ -11,15 +11,18 @@ public class CandidateSlot {
     private DayOfWeek dayOfWeek;
     private Long periodId;
     private short periodNumber;
+    /** Zero-based position among the day's teaching periods (breaks excluded). */
+    private int teachingIndex;
     private Long staffId;
     private Long resourceId;
     private double score;
 
-    public CandidateSlot(DayOfWeek dayOfWeek, Long periodId, short periodNumber,
+    public CandidateSlot(DayOfWeek dayOfWeek, Long periodId, short periodNumber, int teachingIndex,
                          Long staffId, Long resourceId) {
         this.dayOfWeek = dayOfWeek;
         this.periodId = periodId;
         this.periodNumber = periodNumber;
+        this.teachingIndex = teachingIndex;
         this.staffId = staffId;
         this.resourceId = resourceId;
     }

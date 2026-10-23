@@ -9,10 +9,11 @@ import com.thinkerscave.attendance.dto.response.StaffAttendanceSummaryResponse;
 import com.thinkerscave.attendance.dto.response.StudentHistoryResponse;
 import com.thinkerscave.attendance.entity.StudentAttendance;
 import com.thinkerscave.attendance.enums.StudentAttendanceStatus;
-import com.thinkerscave.attendance.repository.AttendanceSettingRepository;
 import com.thinkerscave.attendance.repository.StaffAttendanceRepository;
 import com.thinkerscave.attendance.repository.StudentAttendanceRepository;
 import com.thinkerscave.attendance.service.AttendanceReportService;
+import com.thinkerscave.settings.ModuleSettingCatalog;
+import com.thinkerscave.settings.ModuleSettingsService;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -34,7 +35,7 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
 
     private final StudentAttendanceRepository studentAttendanceRepository;
     private final StaffAttendanceRepository staffAttendanceRepository;
-    private final AttendanceSettingRepository attendanceSettingRepository;
+        private final ModuleSettingsService moduleSettingsService;
 
     @Override
     public AttendanceSummaryReportResponse getSummaryReport(AttendanceReportRequest request) {
@@ -42,8 +43,9 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
 
         // Class-wise summary across the selected date range (not a single day)
         // row: [0]=classId, [1]=className, [2]=sectionId, [3]=sectionName, [4]=total, [5]=presentCount
-        List<Object[]> classRows = studentAttendanceRepository.getClassWiseSummaryForRange(
-                orgId, request.getFromDate(), request.getToDate());
+        List<Object[]> classRows = studentAttendanceRepository.getClassWiseSummaryForRangeFiltered(
+                orgId, request.getFromDate(), request.getToDate(),
+                request.getClassId(), request.getSectionId());
 
         List<ClassSummaryRow> classWiseSummary = classRows.stream()
                 .map(row -> ClassSummaryRow.builder()
@@ -62,12 +64,11 @@ public class AttendanceReportServiceImpl implements AttendanceReportService {
         // Defaulter list — prefer request threshold, else org minStudentAttendancePercent, else 75
         double threshold = request.getDefaulterThreshold() != null
                 ? request.getDefaulterThreshold()
-                : attendanceSettingRepository.findByOrganizationId(orgId)
-                        .map(s -> s.getMinStudentAttendancePercent() != null
-                                ? s.getMinStudentAttendancePercent().doubleValue() : 75.0)
-                        .orElse(75.0);
-        List<Object[]> defaulterRows = studentAttendanceRepository.getDefaulterList(
-                orgId, request.getFromDate(), request.getToDate(), threshold);
+                : moduleSettingsService.getInteger(orgId, ModuleSettingCatalog.ATTENDANCE,
+                        ModuleSettingCatalog.LOW_ATTENDANCE_THRESHOLD).doubleValue();
+        List<Object[]> defaulterRows = studentAttendanceRepository.getDefaulterListFiltered(
+                orgId, request.getFromDate(), request.getToDate(),
+                request.getClassId(), request.getSectionId(), threshold);
 
         List<DefaulterRow> defaulters = defaulterRows.stream()
                 .map(row -> DefaulterRow.builder()

@@ -38,5 +38,9 @@ public class WidgetDTO<T> {
     /** Populated only when {@link #state} is {@code ERROR}. */
     private String errorMessage;
 
+    private String actionLabel;
+
+    private String actionRoute;
+
     private T data;
 }

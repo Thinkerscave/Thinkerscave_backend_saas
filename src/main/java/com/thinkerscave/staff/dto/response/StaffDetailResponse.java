@@ -1,5 +1,7 @@
 package com.thinkerscave.staff.dto.response;
 
+import com.thinkerscave.access.dto.response.ResponsibilityAssignmentResponse;
+import com.thinkerscave.shared.dto.AddressDto;
 import com.thinkerscave.staff.enums.EmploymentCategory;
 import com.thinkerscave.staff.enums.EmploymentStatus;
 import com.thinkerscave.staff.enums.StaffType;
@@ -39,6 +41,8 @@ public class StaffDetailResponse {
     private EmploymentCategory employmentCategory;
     private EmploymentStatus employmentStatus;
     private LocalDate joiningDate;
+    private LocalDate contractStartDate;
+    private LocalDate contractEndDate;
     private String highestQualification;
     private Integer experienceYears;
 
@@ -49,40 +53,28 @@ public class StaffDetailResponse {
 
     // Status
     private Boolean active;
-    private String remarks;
 
     // Audit
     private LocalDateTime createdOn;
     private LocalDateTime updatedOn;
 
-    // Salary Summary
-    private SalarySummary salarySummary;
+    // Subject slots (teaching staff; primary is always set for teaching staff)
+    private SubjectRef primarySubject;
+    private SubjectRef secondarySubject;
+
+    public record SubjectRef(Long subjectId, String name) {}
 
     // Responsibility Summary
     private List<ResponsibilityAssignmentResponse> responsibilities;
 
-    // Payroll Summary
-    private PayrollSummary payrollSummary;
-
     // Documents
     private List<DocumentResponse> documents;
 
-    @Getter
-    @Setter
-    @Builder
-    public static class SalarySummary {
-        private Long salaryStructureId;
-        private String salaryType;
-        private java.math.BigDecimal grossSalary;
-        private java.time.LocalDate effectiveFrom;
-    }
+    // Address
+    private AddressDto presentAddress;
+    private AddressDto permanentAddress;
+    private Boolean sameAsPresentAddress;
 
-    @Getter
-    @Setter
-    @Builder
-    public static class PayrollSummary {
-        private String lastPayrollMonth;
-        private java.math.BigDecimal lastNetSalary;
-        private String lastPayrollStatus;
-    }
+    // Bank (masked; account number never returned)
+    private StaffBankDetailsResponse bankDetails;
 }

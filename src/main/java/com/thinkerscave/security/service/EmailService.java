@@ -1,14 +1,18 @@
 package com.thinkerscave.security.service;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.util.HtmlUtils;
 
 /**
  * Transactional HTML email sender (OTP, welcome, provisioning).
@@ -20,6 +24,11 @@ import org.springframework.util.StringUtils;
 public class EmailService {
 
     private final JavaMailSender mailSender;
+    private final Environment environment;
+
+    /** Non-empty in dev/test: all mail goes here. Must stay empty in prod. */
+    @Value("${app.mail.redirect-to:}")
+    private String redirectTo;
 
     @Value("${spring.mail.username:}")
     private String mailUsername;
@@ -55,15 +64,26 @@ public class EmailService {
             MimeMessage mimeMessage = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
             helper.setFrom(from);
-            helper.setTo(to.trim());
-            helper.setSubject(subject);
+            boolean redirected = StringUtils.hasText(redirectTo);
+            String deliveredTo = redirected ? redirectTo.trim() : to.trim();
+            String deliveredSubject = redirected ? "[To: " + to.trim() + "] " + subject : subject;
+            helper.setTo(deliveredTo);
+            helper.setSubject(deliveredSubject);
             helper.setText(htmlBody, true);
             mailSender.send(mimeMessage);
-            log.info("Email sent to={} from={} subject={}", to, from, subject);
+            log.info("Email sent intendedTo={} deliveredTo={} from={} redirected={} subject={}",
+                    to, deliveredTo, from, redirected, deliveredSubject);
             return true;
         } catch (Exception e) {
             log.error("Failed to send email to={} subject={} reason={}", to, subject, e.getMessage());
             return false;
+        }
+    }
+
+    @PostConstruct
+    void validateRedirectPolicy() {
+        if (StringUtils.hasText(redirectTo) && environment.acceptsProfiles(Profiles.of("prod"))) {
+            throw new IllegalStateException("app.mail.redirect-to must be empty under the prod profile");
         }
     }
 
@@ -219,5 +239,47 @@ public class EmailService {
                 username,
                 temporaryPassword
         );
+    }
+
+    public String buildInstitutionUserCredentialsEmailBody(
+            String recipientName,
+            String roleLabel,
+            String organizationName,
+            String loginUrl,
+            String username,
+            String temporaryPassword) {
+        String org = HtmlUtils.htmlEscape(organizationName != null ? organizationName : "your organization");
+        String name = HtmlUtils.htmlEscape(recipientName != null ? recipientName : "there");
+        String role = HtmlUtils.htmlEscape(roleLabel != null ? roleLabel : "user");
+        String user = HtmlUtils.htmlEscape(username != null ? username : "");
+        String pwd = HtmlUtils.htmlEscape(temporaryPassword != null ? temporaryPassword : "");
+        String url = HtmlUtils.htmlEscape(loginUrl != null ? loginUrl : "");
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head><meta charset="utf-8"></head>
+                <body style="margin: 0; padding: 24px; font-family: Arial, sans-serif; background-color: #f4f6fb;">
+                  <div style="max-width: 640px; margin: auto; background: #ffffff; border-radius: 14px; overflow: hidden; border: 1px solid #e5e7eb;">
+                    <div style="background: linear-gradient(135deg, #4f46e5, #2563eb); padding: 28px 32px; color: #ffffff;">
+                      <p style="margin: 0 0 6px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; opacity: 0.85;">ThinkersCave</p>
+                      <h2 style="margin: 0; font-size: 22px;">Welcome to %1$s</h2>
+                    </div>
+                    <div style="padding: 28px 32px;">
+                      <p style="margin: 0 0 18px; color: #334155;">Hello %2$s, your %3$s account is ready. Sign in with the details below.</p>
+                      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+                        <p style="margin: 0 0 10px;"><strong>Username:</strong> %4$s</p>
+                        <p style="margin: 0;"><strong>Temporary password:</strong> <span style="font-family: Consolas, monospace; background: #eef2ff; color: #3730a3; padding: 2px 8px; border-radius: 6px;">%5$s</span></p>
+                      </div>
+                      <div style="text-align: center; margin: 24px 0;">
+                        <a href="%6$s" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: bold;">Sign in to your account</a>
+                      </div>
+                      <p style="margin: 0 0 8px; color: #334155;">You will be asked to set a new password on your first sign-in.</p>
+                      <p style="margin: 0; color: #64748b; font-size: 12px;">Login link: <a href="%6$s" style="color: #2563eb;">%6$s</a></p>
+                    </div>
+                    <div style="padding: 16px 32px; background: #f8fafc; color: #94a3b8; font-size: 12px;">If you did not expect this email, contact your organization administrator.</div>
+                  </div>
+                </body>
+                </html>
+                """.formatted(org, name, role, user, pwd, url);
     }
 }

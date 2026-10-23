@@ -17,8 +17,6 @@ import java.util.Optional;
 @Repository
 public interface StaffRepository extends JpaRepository<Staff, Long> {
 
-    Optional<Staff> findByStaffCode(String staffCode);
-
     Optional<Staff> findByEmail(String email);
 
     boolean existsByEmail(String email);
@@ -45,16 +43,14 @@ public interface StaffRepository extends JpaRepository<Staff, Long> {
             Pageable pageable
     );
 
-    long countByStaffType(StaffType staffType);
-
-    long countByEmploymentStatus(EmploymentStatus employmentStatus);
-
-    long countByEmploymentCategory(EmploymentCategory employmentCategory);
-
     long countByActive(Boolean active);
 
-    @Query("SELECT COUNT(s) FROM Staff s WHERE s.active = true")
-    long countActiveStaff();
+    /* Dashboard KPIs: every count is scoped to active (non-deleted) staff, the same rule the list uses. */
+    long countByActiveTrueAndStaffType(StaffType staffType);
+
+    long countByActiveTrueAndEmploymentCategory(EmploymentCategory employmentCategory);
+
+    long countByActiveTrueAndEmploymentStatus(EmploymentStatus employmentStatus);
 
     Optional<Staff> findByUser_Id(Long userId);
 

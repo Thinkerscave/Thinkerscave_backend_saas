@@ -164,17 +164,15 @@ public class RoleServiceImpl implements RoleService {
 
     @Override
     @Transactional(readOnly = true)
-    public PermissionMatrixResponse getPermissionMatrix(Long roleId, Long organizationId) {
+    public PermissionMatrixResponse getPermissionMatrix(Long roleId) {
         Role role = findRoleById(roleId);
-        findOrganization(organizationId);
+        Long globalOrganizationId = tenantCatalogSyncService.platformOrganizationId();
 
         // Only sidebar menus/submenus are assignable — nested workspace resources
         // (e.g. Fee Heads) inherit from their parent page and must not appear here.
-        List<Menu> allMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
-            .filter(menu -> menu.getMenuScope() != MenuScope.PLATFORM)
-            .filter(menu -> !Boolean.FALSE.equals(menu.getShowInSidebar()))
-                .toList();
-        Map<Long, RolePermission> assigned = rolePermissionRepository.findByRole_IdAndOrganization_Id(roleId, organizationId)
+        List<Menu> allMenus = assignableMenus();
+        Map<Long, RolePermission> assigned = rolePermissionRepository
+            .findByRole_IdAndOrganization_Id(roleId, globalOrganizationId)
             .stream()
             .collect(Collectors.toMap(p -> p.getMenu().getId(), Function.identity(), (left, right) -> left));
 
@@ -198,20 +196,18 @@ public class RoleServiceImpl implements RoleService {
                 .roleId(roleId)
                 .roleCode(role.getRoleCode())
                 .roleName(role.getRoleName())
-                .organizationId(organizationId)
                 .rows(rows)
                 .build();
     }
 
     @Override
     @Transactional
-    public void updatePermissionMatrix(Long roleId, Long organizationId, UpdateRolePermissionsRequest request) {
+    public void updatePermissionMatrix(Long roleId, UpdateRolePermissionsRequest request) {
         Role role = findRoleById(roleId);
-        Organization org = findOrganization(organizationId);
+        Long globalOrganizationId = tenantCatalogSyncService.platformOrganizationId();
+        Organization globalOrg = findOrganization(globalOrganizationId);
 
-        Map<Long, Menu> assignableMenus = menuRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
-                .filter(menu -> menu.getMenuScope() != MenuScope.PLATFORM)
-                .filter(menu -> !Boolean.FALSE.equals(menu.getShowInSidebar()))
+        Map<Long, Menu> assignableMenus = assignableMenus().stream()
                 .collect(Collectors.toMap(Menu::getId, Function.identity(), (left, right) -> left));
 
         Map<Long, PermissionState> normalized = new LinkedHashMap<>();
@@ -227,15 +223,16 @@ public class RoleServiceImpl implements RoleService {
             }
         }
 
-        // Delete all existing permissions for this role+org, then re-create
-        rolePermissionRepository.deleteAllByRoleAndOrganization(roleId, organizationId);
+        // Global replace: the role carries a single authoritative matrix, so any
+        // legacy per-organization rows for this role are discarded first.
+        rolePermissionRepository.deleteAllByRoleId(roleId);
 
         List<RolePermission> newPerms = normalized.entrySet().stream()
                 .map(entry -> {
                     Menu menu = assignableMenus.get(entry.getKey());
                     PermissionState state = entry.getValue();
                     return RolePermission.builder()
-                            .organization(org)
+                            .organization(globalOrg)
                             .role(role)
                             .menu(menu)
                             .canView(state.canView)
@@ -245,18 +242,25 @@ public class RoleServiceImpl implements RoleService {
                 }).toList();
 
         rolePermissionRepository.saveAll(newPerms);
-        tenantCatalogSyncService.syncRolePermissions(roleId, organizationId);
-        log.info("Permission matrix updated for role={} org={} rows={}", roleId, organizationId, newPerms.size());
+        tenantCatalogSyncService.syncGlobalRolePermissions(roleId);
+        log.info("Global permission matrix updated for role={} rows={}", roleId, newPerms.size());
     }
 
     @Override
     @Transactional
-    public void removeRolePermission(Long roleId, Long organizationId, Long menuId) {
+    public void removeRolePermission(Long roleId, Long menuId) {
         findRoleById(roleId);
-        findOrganization(organizationId);
-        rolePermissionRepository.deleteByRoleAndOrganizationAndMenu(roleId, organizationId, menuId);
-        tenantCatalogSyncService.syncRolePermissions(roleId, organizationId);
-        log.info("Role permission removed for role={} org={} menu={}", roleId, organizationId, menuId);
+        rolePermissionRepository.deleteByRoleAndOrganizationAndMenu(
+                roleId, tenantCatalogSyncService.platformOrganizationId(), menuId);
+        tenantCatalogSyncService.syncGlobalRolePermissions(roleId);
+        log.info("Global role permission removed for role={} menu={}", roleId, menuId);
+    }
+
+    private List<Menu> assignableMenus() {
+        return menuRepository.findByActiveTrueOrderByDisplayOrderAsc().stream()
+                .filter(menu -> menu.getMenuScope() != MenuScope.PLATFORM)
+                .filter(menu -> !Boolean.FALSE.equals(menu.getShowInSidebar()))
+                .toList();
     }
 
     private void ensureParentVisibility(Map<Long, PermissionState> normalized, Map<Long, Menu> assignableMenus, Menu child) {

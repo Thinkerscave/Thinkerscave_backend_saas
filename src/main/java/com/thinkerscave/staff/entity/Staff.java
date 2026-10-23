@@ -1,6 +1,8 @@
 package com.thinkerscave.staff.entity;
 
 import com.thinkerscave.access.entity.User;
+import com.thinkerscave.academics.entity.Subject;
+import com.thinkerscave.shared.entity.Address;
 import com.thinkerscave.shared.entity.Auditable;
 import com.thinkerscave.staff.enums.EmploymentCategory;
 import com.thinkerscave.staff.enums.EmploymentStatus;
@@ -48,9 +50,8 @@ public class Staff extends Auditable {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @NotBlank
     @Size(max = 30)
-    @Column(name = "staff_code", nullable = false, length = 30)
+    @Column(name = "staff_code", length = 30)
     private String staffCode;
 
     @NotBlank
@@ -139,6 +140,17 @@ public class Staff extends Auditable {
     @Column(name = "emergency_contact_name")
     private String emergencyContactName;
 
+    @OneToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "present_address_id")
+    private Address presentAddress;
+
+    @OneToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "permanent_address_id")
+    private Address permanentAddress;
+
+    @Column(name = "same_as_present_address", nullable = false)
+    private Boolean sameAsPresentAddress = false;
+
     @Size(max = 100)
     @Column(name = "emergency_contact_relation")
     private String emergencyContactRelation;
@@ -153,6 +165,11 @@ public class Staff extends Auditable {
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 
-    @Column(name = "remarks", columnDefinition = "TEXT")
-    private String remarks;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "primary_subject_id")
+    private Subject primarySubject;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "secondary_subject_id")
+    private Subject secondarySubject;
 }

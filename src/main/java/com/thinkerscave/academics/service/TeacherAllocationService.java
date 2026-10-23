@@ -18,7 +18,9 @@ public interface TeacherAllocationService {
             Long classId,
             Long sectionId,
             Long subjectId,
-            TeacherAllocationStatus status);
+            TeacherAllocationStatus status,
+            int page,
+            int size);
 
     TeacherAllocationRowResponse assign(TeacherAllocationAssignRequest request);
 

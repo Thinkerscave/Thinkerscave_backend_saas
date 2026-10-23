@@ -1,5 +1,6 @@
 package com.thinkerscave.academics.timetable.engine;
 
+import com.thinkerscave.academics.enums.DayOfWeek;
 import com.thinkerscave.academics.enums.SubjectTimetablePreference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -7,11 +8,19 @@ import org.springframework.stereotype.Component;
 
 import java.util.*;
 
+/**
+ * Places every requirement without section, teacher, room or weekly-load clashes.
+ *
+ * <p>Each attempt repeatedly schedules the most constrained remaining requirement into its
+ * best-scoring free slot. When no free slot exists it tries a one-step repair: move the
+ * lessons blocking a slot to another free slot. Attempts restart with a different seed until
+ * a complete schedule is found or {@link #MAX_ATTEMPTS} is reached; the best attempt wins.
+ */
 @Component
 public class ConstraintScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(ConstraintScheduler.class);
-    public static final int MAX_BACKTRACKS = 100_000;
+    public static final int MAX_ATTEMPTS = 12;
 
     private final CandidateScorer scorer;
 
@@ -23,138 +32,206 @@ public class ConstraintScheduler {
                                     SchedulingSourceData source,
                                     long seed,
                                     GenerationProgress progress) {
-        Random random = new Random(seed);
-        SchedulingSolution solution = new SchedulingSolution();
-
-        List<SchedulingRequirement> ordered = sortByConstraintTightness(requirements);
-
-        int totalBacktracks = 0;
-        List<PlacementRecord> placementStack = new ArrayList<>();
-
-        int i = 0;
-        while (i < ordered.size()) {
-            if (progress.isCancelRequested()) {
-                log.info("Generation cancelled at requirement {}/{}", i, ordered.size());
-                for (int j = i; j < ordered.size(); j++) {
-                    solution.getUnplacedRequirements().add(ordered.get(j));
-                }
-                break;
-            }
-
-            SchedulingRequirement req = ordered.get(i);
-
-            scorer.scoreCandidates(req, solution, source, random);
-            List<CandidateSlot> feasible = filterAndSort(req, solution, source);
-
-            int startIdx = 0;
-            if (placementStack.size() > i) {
-                PlacementRecord existing = placementStack.get(i);
-                startIdx = existing.nextCandidateIdx;
-                if (existing.placement != null) {
-                    solution.unplace(existing.placement);
-                    existing.placement = null;
-                }
-            }
-
-            boolean placed = false;
-            for (int ci = startIdx; ci < feasible.size(); ci++) {
-                CandidateSlot slot = feasible.get(ci);
-                if (isHardViolation(slot, req, solution, source)) continue;
-
-                Placement p = new Placement(req, slot);
-                solution.place(p);
-
-                if (placementStack.size() > i) {
-                    PlacementRecord rec = placementStack.get(i);
-                    rec.placement = p;
-                    rec.nextCandidateIdx = ci + 1;
-                } else {
-                    placementStack.add(new PlacementRecord(p, ci + 1));
-                }
-                placed = true;
-                break;
-            }
-
-            if (placed) {
-                i++;
-                int pct = 40 + (int) ((i / (double) ordered.size()) * 30);
-                progress.advanceTo(GenerationPhase.SCHEDULING, Math.min(pct, 70));
-            } else {
-                if (placementStack.size() > i) {
-                    placementStack.remove(i);
-                }
-
-                if (i == 0 || totalBacktracks >= MAX_BACKTRACKS) {
-                    for (int j = i; j < ordered.size(); j++) {
-                        solution.getUnplacedRequirements().add(ordered.get(j));
-                    }
-                    log.warn("Scheduling incomplete: {} unplaced after {} backtracks",
-                            ordered.size() - i, totalBacktracks);
-                    break;
-                }
-
-                totalBacktracks++;
-                i--;
-            }
+        Map<String, SchedulingRequirement> byId = new HashMap<>();
+        Map<Long, Integer> teacherDemand = new HashMap<>();
+        for (SchedulingRequirement r : requirements) {
+            byId.put(r.getRequirementId(), r);
+            teacherDemand.merge(r.getPrimaryStaffId(), 1, Integer::sum);
         }
 
-        log.info("Scheduling done: {} placed, {} unplaced, {} backtracks",
-                solution.getPlacements().size(),
-                solution.getUnplacedRequirements().size(),
-                totalBacktracks);
+        SchedulingSolution best = null;
+        int attempts = 0;
+        for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+            if (progress.isCancelRequested()) break;
+            attempts++;
+            Random random = new Random(seed + attempt * 7919L);
+            SchedulingSolution candidate = runAttempt(requirements, byId, teacherDemand, source, random,
+                    progress, attempt == 0);
+            if (best == null
+                    || candidate.getUnplacedRequirements().size() < best.getUnplacedRequirements().size()) {
+                best = candidate;
+            }
+            log.info("Scheduling attempt {}: {} placed, {} unplaced", attempt + 1,
+                    candidate.getPlacements().size(), candidate.getUnplacedRequirements().size());
+            if (best.isComplete()) break;
+            progress.advanceTo(GenerationPhase.SCHEDULING, Math.min(70, 55 + attempt));
+        }
 
+        if (best == null) {
+            best = new SchedulingSolution();
+            best.getUnplacedRequirements().addAll(requirements);
+        }
+        log.info("Scheduling done after {} attempt(s): {} placed, {} unplaced",
+                attempts, best.getPlacements().size(), best.getUnplacedRequirements().size());
+        return best;
+    }
+
+    private SchedulingSolution runAttempt(List<SchedulingRequirement> requirements,
+                                          Map<String, SchedulingRequirement> byId,
+                                          Map<Long, Integer> teacherDemand,
+                                          SchedulingSourceData source,
+                                          Random random,
+                                          GenerationProgress progress,
+                                          boolean reportProgress) {
+        SchedulingSolution solution = new SchedulingSolution();
+        List<SchedulingRequirement> remaining = new ArrayList<>(requirements);
+        Collections.shuffle(remaining, random);
+        int total = requirements.size();
+
+        while (!remaining.isEmpty()) {
+            if (progress.isCancelRequested()) {
+                solution.getUnplacedRequirements().addAll(remaining);
+                break;
+            }
+
+            int pick = pickMostConstrained(remaining, solution, source, teacherDemand);
+            SchedulingRequirement req = remaining.remove(pick);
+
+            CandidateSlot slot = bestSlot(req, solution, source, random);
+            if (slot != null) {
+                solution.place(new Placement(req, slot));
+            } else if (!repair(req, solution, source, random, byId)) {
+                solution.getUnplacedRequirements().add(req);
+            }
+
+            if (reportProgress && (total - remaining.size()) % 25 == 0) {
+                int pct = 40 + (int) (((total - remaining.size()) / (double) total) * 15);
+                progress.advanceTo(GenerationPhase.SCHEDULING, Math.min(pct, 55));
+            }
+        }
         return solution;
     }
 
-    List<SchedulingRequirement> sortByConstraintTightness(List<SchedulingRequirement> requirements) {
-        List<SchedulingRequirement> sorted = new ArrayList<>(requirements);
-        sorted.sort(Comparator
-                .<SchedulingRequirement, Integer>comparing(SchedulingRequirement::getStaticCandidateCount)
-                .thenComparing(r -> r.getPreference() != SubjectTimetablePreference.ANY ? 0 : 1)
-                .thenComparing(Comparator.<SchedulingRequirement, Integer>comparing(
-                        SchedulingRequirement::getWeeklyPeriods).reversed())
-                .thenComparing(SchedulingRequirement::getRequirementId));
-        return sorted;
-    }
-
-    private List<CandidateSlot> filterAndSort(SchedulingRequirement req,
-                                              SchedulingSolution solution,
-                                              SchedulingSourceData source) {
-        List<CandidateSlot> feasible = new ArrayList<>();
-        for (CandidateSlot slot : req.getCandidates()) {
-            if (!isHardViolation(slot, req, solution, source)) {
-                feasible.add(slot);
+    /** Index of the remaining requirement with the fewest free slots (ties: busiest teacher, preference set). */
+    private int pickMostConstrained(List<SchedulingRequirement> remaining,
+                                    SchedulingSolution solution,
+                                    SchedulingSourceData source,
+                                    Map<Long, Integer> teacherDemand) {
+        Map<String, Integer> feasibleByOwner = new HashMap<>();
+        int bestIdx = 0;
+        int bestCount = Integer.MAX_VALUE;
+        for (int i = 0; i < remaining.size(); i++) {
+            SchedulingRequirement r = remaining.get(i);
+            String owner = r.getSectionId() + "|" + r.getPrimaryStaffId() + "|" + r.getDefaultResourceId();
+            int count = feasibleByOwner.computeIfAbsent(owner, k -> countFeasible(r, solution, source));
+            if (count < bestCount || (count == bestCount && isTighter(r, remaining.get(bestIdx), teacherDemand))) {
+                bestCount = count;
+                bestIdx = i;
             }
         }
-        feasible.sort(Comparator.comparingDouble(CandidateSlot::getScore).reversed());
-        return feasible;
+        return bestIdx;
     }
 
-    private boolean isHardViolation(CandidateSlot slot, SchedulingRequirement req,
-                                    SchedulingSolution solution, SchedulingSourceData source) {
-        if (solution.isSectionOccupied(req.getSectionId(), slot.getDayOfWeek(), slot.getPeriodId())) {
-            return true;
+    private boolean isTighter(SchedulingRequirement a, SchedulingRequirement b, Map<Long, Integer> teacherDemand) {
+        int demandA = teacherDemand.getOrDefault(a.getPrimaryStaffId(), 0);
+        int demandB = teacherDemand.getOrDefault(b.getPrimaryStaffId(), 0);
+        if (demandA != demandB) return demandA > demandB;
+        boolean prefA = a.getPreference() != null && a.getPreference() != SubjectTimetablePreference.ANY;
+        boolean prefB = b.getPreference() != null && b.getPreference() != SubjectTimetablePreference.ANY;
+        return prefA && !prefB;
+    }
+
+    private int countFeasible(SchedulingRequirement req, SchedulingSolution solution, SchedulingSourceData source) {
+        if (solution.getTeacherWeeklyLoad(req.getPrimaryStaffId()) >= source.getMaxTeacherWeeklyPeriods()) {
+            return 0;
         }
-        if (solution.isTeacherOccupied(slot.getStaffId(), slot.getDayOfWeek(), slot.getPeriodId())) {
-            return true;
+        int count = 0;
+        for (CandidateSlot slot : req.getCandidates()) {
+            if (!isHardViolation(slot, req, solution, source)) count++;
         }
-        if (slot.getResourceId() != null
-                && solution.isResourceOccupied(slot.getResourceId(), slot.getDayOfWeek(), slot.getPeriodId())) {
-            return true;
+        return count;
+    }
+
+    private CandidateSlot bestSlot(SchedulingRequirement req, SchedulingSolution solution,
+                                   SchedulingSourceData source, Random random) {
+        CandidateSlot best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (CandidateSlot slot : req.getCandidates()) {
+            if (isHardViolation(slot, req, solution, source)) continue;
+            double score = scorer.score(req, slot, solution, source, random);
+            if (score > bestScore) {
+                bestScore = score;
+                best = slot;
+            }
         }
-        if (solution.getTeacherWeeklyLoad(slot.getStaffId()) >= source.getMaxTeacherWeeklyPeriods()) {
-            return true;
+        return best;
+    }
+
+    private record Position(DayOfWeek day, Long periodId, short periodNumber, int teachingIndex) {
+        static Position of(Placement p) {
+            return new Position(p.getDayOfWeek(), p.getPeriodId(), p.getPeriodNumber(), p.getTeachingIndex());
+        }
+
+        CandidateSlot asSlot(Placement p) {
+            return new CandidateSlot(day, periodId, periodNumber, teachingIndex, p.getStaffId(), p.getResourceId());
+        }
+    }
+
+    /**
+     * Frees a slot for {@code req} by moving the (at most two) lessons occupying it to other
+     * free slots. Leaves the solution unchanged when no such move exists.
+     */
+    private boolean repair(SchedulingRequirement req, SchedulingSolution solution,
+                           SchedulingSourceData source, Random random,
+                           Map<String, SchedulingRequirement> byId) {
+        if (solution.getTeacherWeeklyLoad(req.getPrimaryStaffId()) >= source.getMaxTeacherWeeklyPeriods()) {
+            return false;
+        }
+        List<CandidateSlot> slots = new ArrayList<>(req.getCandidates());
+        Collections.shuffle(slots, random);
+
+        for (CandidateSlot slot : slots) {
+            Set<Placement> blockers = Collections.newSetFromMap(new IdentityHashMap<>());
+            addIfPresent(blockers, solution.placementAtSection(req.getSectionId(), slot.getDayOfWeek(), slot.getPeriodId()));
+            addIfPresent(blockers, solution.placementAtTeacher(slot.getStaffId(), slot.getDayOfWeek(), slot.getPeriodId()));
+            addIfPresent(blockers, solution.placementAtResource(slot.getResourceId(), slot.getDayOfWeek(), slot.getPeriodId()));
+            if (blockers.isEmpty() || blockers.size() > 2) continue;
+
+            Map<Placement, Position> original = new IdentityHashMap<>();
+            for (Placement b : blockers) {
+                original.put(b, Position.of(b));
+                solution.unplace(b);
+            }
+            Placement placed = new Placement(req, slot);
+            solution.place(placed);
+
+            List<Placement> moved = new ArrayList<>();
+            boolean ok = true;
+            for (Placement b : blockers) {
+                SchedulingRequirement blockerReq = byId.get(b.getRequirementId());
+                CandidateSlot target = blockerReq == null ? null : bestSlot(blockerReq, solution, source, random);
+                if (target == null) {
+                    ok = false;
+                    break;
+                }
+                b.moveTo(target);
+                solution.place(b);
+                moved.add(b);
+            }
+            if (ok) return true;
+
+            for (Placement m : moved) solution.unplace(m);
+            solution.unplace(placed);
+            for (Placement b : blockers) {
+                b.moveTo(original.get(b).asSlot(b));
+                solution.place(b);
+            }
         }
         return false;
     }
 
-    private static class PlacementRecord {
-        Placement placement;
-        int nextCandidateIdx;
+    private static void addIfPresent(Set<Placement> set, Placement p) {
+        if (p != null) set.add(p);
+    }
 
-        PlacementRecord(Placement placement, int nextCandidateIdx) {
-            this.placement = placement;
-            this.nextCandidateIdx = nextCandidateIdx;
+    static boolean isHardViolation(CandidateSlot slot, SchedulingRequirement req,
+                                   SchedulingSolution solution, SchedulingSourceData source) {
+        if (solution.isSectionOccupied(req.getSectionId(), slot.getDayOfWeek(), slot.getPeriodId())) return true;
+        if (solution.isTeacherOccupied(slot.getStaffId(), slot.getDayOfWeek(), slot.getPeriodId())) return true;
+        if (slot.getResourceId() != null
+                && solution.isResourceOccupied(slot.getResourceId(), slot.getDayOfWeek(), slot.getPeriodId())) {
+            return true;
         }
+        return solution.getTeacherWeeklyLoad(slot.getStaffId()) >= source.getMaxTeacherWeeklyPeriods();
     }
 }

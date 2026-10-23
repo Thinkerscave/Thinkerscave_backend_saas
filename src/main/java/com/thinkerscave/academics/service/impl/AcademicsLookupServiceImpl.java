@@ -55,13 +55,17 @@ public class AcademicsLookupServiceImpl implements AcademicsLookupService {
 
     @Override
     public List<LookupDTO> getActiveSubjects() {
-        return academicYearRepository.findByStatus(AcademicYearStatus.CURRENT)
-                .map(current -> subjectRepository.findByAcademicYear_AcademicYearIdAndActiveTrueOrderByNameAsc(
-                                current.getAcademicYearId())
-                        .stream()
-                        .map(s -> new LookupDTO(s.getSubjectId(), s.getName()))
-                        .toList())
-                .orElse(Collections.emptyList());
+        var rows = subjectRepository.findSelectableWithYear(
+                List.of(AcademicYearStatus.COMPLETED, AcademicYearStatus.ARCHIVED));
+        if (rows.isEmpty()) {
+            return Collections.emptyList();
+        }
+        // Rows are ordered newest year first, so the first row identifies the latest year that has subjects.
+        Long latestYearId = rows.get(0).getAcademicYear().getAcademicYearId();
+        return rows.stream()
+                .filter(s -> s.getAcademicYear().getAcademicYearId().equals(latestYearId))
+                .map(s -> new LookupDTO(s.getSubjectId(), s.getName()))
+                .toList();
     }
 
     @Override

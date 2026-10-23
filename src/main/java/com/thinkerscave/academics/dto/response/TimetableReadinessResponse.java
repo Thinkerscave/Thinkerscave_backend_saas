@@ -17,16 +17,24 @@ public class TimetableReadinessResponse {
     private List<ReadinessCheck> checks;
     private List<ReadinessCheck> blockingIssues;
     private List<ReadinessCheck> warnings;
+    private Long configurationId;
+    private String configurationName;
 
     @Getter
     @Setter
     @Builder
     public static class ReadinessCheck {
         private String code;
+        private String title;
         private ReadinessStatus status;
         private ReadinessSeverity severity;
         private String message;
         private String reference;
+        /** Specific items (class/section/subject, teacher, period) that need attention. */
+        private List<String> details;
+        private String actionLabel;
+        /** Frontend route or in-page tab key ({@code tab:configuration}) that fixes the issue. */
+        private String actionRoute;
     }
 
     @Getter
@@ -37,6 +45,8 @@ public class TimetableReadinessResponse {
         private int requirements;
         private int teachers;
         private int resources;
+        private int weeklySlots;
+        private int unscheduledSubjects;
     }
 
     public enum ReadinessStatus {

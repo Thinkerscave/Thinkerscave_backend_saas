@@ -66,6 +66,18 @@ public class TenantCatalogSyncService {
     @Value("${app.tenancy.platform-schema:thinkerscave_dev}")
     private String platformSchema;
 
+    /**
+     * Organization that owns the single authoritative global role-permission
+     * matrix in the platform schema. Tenants receive a materialized copy under
+     * their own organization id.
+     */
+    @Value("${app.tenancy.platform-organization-id:249}")
+    private Long platformOrganizationId;
+
+    public Long platformOrganizationId() {
+        return platformOrganizationId;
+    }
+
     public void syncFeature(Feature feature) {
         if (feature == null || feature.getId() == null) {
             return;
@@ -281,63 +293,80 @@ public class TenantCatalogSyncService {
     }
 
     /**
-     * Reconciles only explicit role permissions. Catalog definitions and
-     * subscription entitlements are intentionally untouched.
+     * Propagates a role's single global permission matrix to every active,
+     * provisioned tenant schema. Catalog definitions and subscription
+     * entitlements are intentionally untouched — only explicit role permissions
+     * and the associated sync bookkeeping are written. Each tenant is reconciled
+     * in its own transaction, so one failure never blocks the others and every
+     * outcome (success or failure) is recorded for the Migration Center.
      */
-    public void syncRolePermissions(Long roleId, Long organizationId) {
-        if (roleId == null || organizationId == null) {
+    public void syncGlobalRolePermissions(Long roleId) {
+        if (roleId == null) {
             return;
         }
-        afterCommitOrNow(() -> syncRolePermissionsNow(roleId, organizationId));
+        afterCommitOrNow(() -> syncGlobalRolePermissionsNow(roleId));
     }
 
-    private void syncRolePermissionsNow(Long roleId, Long organizationId) {
-        TenantRegistry tenant = tenantRegistryRepository.findByOrganization_Id(organizationId).orElse(null);
-        if (tenant == null || !completedTenants().stream().anyMatch(t -> t.getId().equals(tenant.getId()))) {
-            return;
-        }
-        String source = quoteIdent(resolveSourceSchema());
-        String schema = quoteIdent(tenant.getSchemaName());
-        Long version = inNewTransaction(
-                () -> recordCatalogChange(
-                        "RECONCILE", "ROLE_PERMISSION", roleId + ":" + organizationId, tenant.getId()));
-        Long executionId = inNewTransaction(() -> {
-            Long id = startSync(version, tenant.getId());
-            auditCatalog("CATALOG_SYNC_STARTED", tenant, id, version, "RUNNING", null);
-            return id;
-        });
-        try {
-            inNewTransaction(() -> {
-                reconcileRolePermissions(source, schema, roleId, organizationId);
-                Organization organization = organizationRepository.findById(organizationId)
-                        .orElseThrow(() -> new IllegalStateException(
-                                "Organization not found: " + organizationId));
-                // Refresh the materialized entitlement cache from the existing
-                // subscription. This never grants a feature outside the plan.
-                upsertFeaturesByNaturalKey(source, schema, "true");
-                copyOrgFacingMenus(source, schema);
-                reseedEntitlements(schema, organization);
-                completeSync(executionId, tenant, version, null);
-                auditCatalog("CATALOG_SYNC_COMPLETED", tenant, executionId, version, "SUCCESS", null);
+    private void syncGlobalRolePermissionsNow(Long roleId) {
+        String source = resolveSourceSchema();
+        String sourceQuoted = quoteIdent(source);
+        List<TenantRegistry> tenants = inNewTransaction(() ->
+                tenantRegistryRepository.findByActiveTrueAndProvisionStatusWithOrganization(ProvisionStatus.COMPLETED))
+                .stream()
+                .filter(t -> StringUtils.hasText(t.getSchemaName()))
+                .toList();
+        for (TenantRegistry tenant : tenants) {
+            if (tenant.getSchemaName() != null && tenant.getSchemaName().equalsIgnoreCase(source)) {
+                continue;
+            }
+            Long tenantOrganizationId = tenant.getOrganization() != null
+                    ? tenant.getOrganization().getId()
+                    : null;
+            if (tenantOrganizationId == null) {
+                continue;
+            }
+            String schema = quoteIdent(tenant.getSchemaName());
+            Long version = inNewTransaction(() -> recordCatalogChange(
+                    "RECONCILE", "ROLE_PERMISSION",
+                    roleId + ":" + tenantOrganizationId, tenant.getId()));
+            Long executionId = inNewTransaction(() -> {
+                Long id = startSync(version, tenant.getId());
+                auditCatalog("CATALOG_SYNC_STARTED", tenant, id, version, "RUNNING", null);
+                return id;
             });
-        } catch (Exception ex) {
-            inNewTransaction(() -> {
-                failLatestSync(version, tenant.getId(), ex);
-                auditCatalog("CATALOG_SYNC_FAILED", tenant, executionId, version, "FAILED", ex.getMessage());
-            });
-            throw ex;
+            try {
+                inNewTransaction(() -> {
+                    reconcileGlobalRolePermissions(sourceQuoted, schema, roleId,
+                            tenantOrganizationId, platformOrganizationId);
+                    completeSync(executionId, tenant, version, null);
+                    auditCatalog("CATALOG_SYNC_COMPLETED", tenant, executionId, version, "SUCCESS", null);
+                });
+            } catch (Exception ex) {
+                log.error("Failed to sync global role permissions for role {} to tenant {}: {}",
+                        roleId, tenant.getTenantIdentifier(), ex.getMessage(), ex);
+                inNewTransaction(() -> {
+                    failLatestSync(version, tenant.getId(), ex);
+                    auditCatalog("CATALOG_SYNC_FAILED", tenant, executionId, version, "FAILED", ex.getMessage());
+                });
+            }
         }
     }
 
-    private void reconcileRolePermissions(String source, String schema, Long roleId, Long organizationId) {
+    /**
+     * Idempotent, full-replace reconciliation of a role's permissions inside one
+     * tenant schema: every existing row for the role is removed and the global
+     * matrix is materialized under the tenant's own organization id.
+     */
+    private void reconcileGlobalRolePermissions(String source, String schema, Long roleId,
+                                                Long targetOrganizationId, Long globalOrganizationId) {
         jdbcTemplate.update("DELETE FROM " + schema + ".\"role_permissions\" rp USING "
-                        + schema + ".\"roles\" r WHERE rp.role_id=r.id AND rp.organization_id=? "
+                        + schema + ".\"roles\" r WHERE rp.role_id=r.id "
                         + "AND r.role_code=(SELECT role_code FROM " + source + ".\"roles\" WHERE id=?)",
-                organizationId, roleId);
+                roleId);
         jdbcTemplate.update("""
                 INSERT INTO %s."role_permissions"
                     (organization_id, role_id, menu_id, can_view, can_manage, can_approve, created_on, version)
-                SELECT rp.organization_id, tr.id, tm.id, rp.can_view, rp.can_manage, rp.can_approve, now(), 0
+                SELECT ?, tr.id, tm.id, rp.can_view, rp.can_manage, rp.can_approve, now(), 0
                 FROM %s."role_permissions" rp
                 JOIN %s."roles" sr ON sr.id=rp.role_id
                 JOIN %s."menus" sm ON sm.id=rp.menu_id
@@ -347,7 +376,8 @@ public class TenantCatalogSyncService {
                 ON CONFLICT (organization_id, role_id, menu_id) DO UPDATE SET
                     can_view=EXCLUDED.can_view, can_manage=EXCLUDED.can_manage,
                     can_approve=EXCLUDED.can_approve, updated_on=now()
-                """.formatted(schema, source, source, source, schema, schema), roleId, organizationId);
+                """.formatted(schema, source, source, source, schema, schema),
+                targetOrganizationId, roleId, globalOrganizationId);
     }
 
     @Transactional
@@ -368,8 +398,15 @@ public class TenantCatalogSyncService {
             roleRepository.findByRoleCode(key).ifPresent(this::syncRole);
         } else if ("ROLE_PERMISSION".equals(type)) {
             String[] parts = key.split(":");
-            syncRolePermissions(Long.valueOf(parts[0]), Long.valueOf(parts[1]));
+            retryGlobalRolePermission(Long.valueOf(parts[0]), Long.valueOf(parts[1]));
         }
+    }
+
+    private void retryGlobalRolePermission(Long roleId, Long tenantOrganizationId) {
+        TenantRegistry tenant = tenantRegistryRepository.findByOrganization_Id(tenantOrganizationId)
+                .orElseThrow(() -> new IllegalArgumentException("Tenant not found for organization"));
+        reconcileGlobalRolePermissions(quoteIdent(resolveSourceSchema()),
+                quoteIdent(tenant.getSchemaName()), roleId, tenantOrganizationId, platformOrganizationId);
     }
 
     public CatalogSyncExecutionResponse retryLatestForTenant(Long tenantId) {
@@ -408,8 +445,8 @@ public class TenantCatalogSyncService {
                     upsertRole(source, schema, role.getId());
                 } else if ("ROLE_PERMISSION".equals(type)) {
                     String[] parts = key.split(":");
-                    reconcileRolePermissions(source, schema,
-                            Long.valueOf(parts[0]), Long.valueOf(parts[1]));
+                    reconcileGlobalRolePermissions(source, schema,
+                            Long.valueOf(parts[0]), Long.valueOf(parts[1]), platformOrganizationId);
                 }
                 completeSync(executionId, tenant, versionId, null);
             });

@@ -32,6 +32,7 @@ import java.util.TimeZone;
         "com.thinkerscave.platform",
         "com.thinkerscave.retention",
         "com.thinkerscave.security",
+        "com.thinkerscave.settings",
         "com.thinkerscave.shared",
         "com.thinkerscave.staff",
         "com.thinkerscave.student"

@@ -1,8 +1,10 @@
 package com.thinkerscave.staff.dto.request;
 
+import com.thinkerscave.shared.dto.AddressDto;
 import com.thinkerscave.staff.enums.EmploymentCategory;
 import com.thinkerscave.staff.enums.EmploymentStatus;
 import com.thinkerscave.staff.enums.StaffType;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -29,19 +31,17 @@ public class StaffCreateRequest {
     private String gender;
 
     @NotNull(message = "Date of birth is required")
+    @Past(message = "Date of birth must be in the past")
     private LocalDate dateOfBirth;
 
     @Size(max = 10)
     private String bloodGroup;
 
     @Size(max = 50)
-    private String religion;
-
-    @Size(max = 50)
     private String nationality;
 
     @NotBlank(message = "Mobile number is required")
-    @Size(max = 15)
+    @Pattern(regexp = "^[0-9+\\- ]{7,15}$", message = "Mobile number is invalid")
     private String mobileNumber;
 
     @NotBlank(message = "Email is required")
@@ -65,11 +65,20 @@ public class StaffCreateRequest {
     @NotNull(message = "Joining date is required")
     private LocalDate joiningDate;
 
+    private LocalDate contractStartDate;
+
+    private LocalDate contractEndDate;
+
     @Size(max = 255)
     private String highestQualification;
 
     @Min(0)
     private Integer experienceYears;
+
+    /** Required for teaching staff; must be empty for non-teaching staff. */
+    private Long primarySubjectId;
+
+    private Long secondarySubjectId;
 
     @Size(max = 150)
     private String emergencyContactName;
@@ -77,10 +86,17 @@ public class StaffCreateRequest {
     @Size(max = 100)
     private String emergencyContactRelation;
 
-    @Size(max = 15)
+    @Pattern(regexp = "^$|^[0-9+\\- ]{7,15}$", message = "Emergency contact number is invalid")
     private String emergencyContactNumber;
 
-    private String photoUrl;
+    @Valid
+    private AddressDto presentAddress;
 
-    private String remarks;
+    @Valid
+    private AddressDto permanentAddress;
+
+    private Boolean sameAsPresentAddress;
+
+    @Valid
+    private StaffBankDetailsRequest bankDetails;
 }

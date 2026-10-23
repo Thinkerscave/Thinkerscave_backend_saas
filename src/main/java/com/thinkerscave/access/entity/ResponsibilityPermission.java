@@ -2,7 +2,7 @@ package com.thinkerscave.access.entity;
 
 import com.thinkerscave.platform.entity.Organization;
 import com.thinkerscave.shared.entity.Auditable;
-import com.thinkerscave.staff.entity.Responsibility;
+import com.thinkerscave.access.entity.Responsibility;
 import jakarta.persistence.*;
 import lombok.*;
 

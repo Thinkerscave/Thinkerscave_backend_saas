@@ -24,6 +24,8 @@ public class TimetableConflictResponse {
     private Long relatedEntryId;
     private Long sectionId;
     private String sectionName;
+    private String className;
+    private String periodName;
     private Long teacherAllocationId;
     private Long resourceId;
     private DayOfWeek dayOfWeek;

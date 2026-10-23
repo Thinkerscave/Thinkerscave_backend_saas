@@ -95,23 +95,31 @@ public class RoleController {
     }
 
     @GetMapping("/{roleId}/permissions")
-    @Operation(summary = "Get permission matrix for a role scoped to an organization")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    @Operation(summary = "Get the global (organization-independent) permission matrix for a role")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<PermissionMatrixResponse>> getPermissionMatrix(
-            @PathVariable Long roleId,
-            @RequestParam Long organizationId) {
-        return ResponseEntity.ok(ApiResponse.success(roleService.getPermissionMatrix(roleId, organizationId)));
+            @PathVariable Long roleId) {
+        return ResponseEntity.ok(ApiResponse.success(roleService.getPermissionMatrix(roleId)));
     }
 
     @PutMapping("/{roleId}/permissions")
-    @Operation(summary = "Update (replace) permission matrix for a role")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN', 'ORGANIZATION_ADMIN', 'ORGANIZATION_OWNER')")
+    @Operation(summary = "Replace a role's global permission matrix and sync it to every tenant")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> updatePermissionMatrix(
             @PathVariable Long roleId,
-            @RequestParam Long organizationId,
             @Valid @RequestBody UpdateRolePermissionsRequest request) {
-        roleService.updatePermissionMatrix(roleId, organizationId, request);
-        return ResponseEntity.ok(ApiResponse.noContent("Permission matrix updated"));
+        roleService.updatePermissionMatrix(roleId, request);
+        return ResponseEntity.ok(ApiResponse.noContent("Global permission matrix updated"));
+    }
+
+    @DeleteMapping("/{roleId}/permissions/{menuId}")
+    @Operation(summary = "Remove a menu from a role's global permission matrix")
+    @PreAuthorize("hasAuthority('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> removePermission(
+            @PathVariable Long roleId,
+            @PathVariable Long menuId) {
+        roleService.removeRolePermission(roleId, menuId);
+        return ResponseEntity.ok(ApiResponse.noContent("Role permission removed"));
     }
 
     @DeleteMapping("/{roleId}/permissions/{menuId}")

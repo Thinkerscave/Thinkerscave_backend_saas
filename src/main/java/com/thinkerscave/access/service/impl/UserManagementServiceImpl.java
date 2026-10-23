@@ -10,6 +10,8 @@ import com.thinkerscave.access.repository.*;
 import com.thinkerscave.access.service.PermissionService;
 import com.thinkerscave.access.service.UserManagementService;
 import com.thinkerscave.security.service.OutboundMessageService;
+import com.thinkerscave.security.service.impl.PublicSchemaUserLookupService;
+import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.enums.CodeType;
 import com.thinkerscave.shared.exceptions.*;
 import com.thinkerscave.shared.service.CodeGeneratorService;
@@ -19,12 +21,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -41,6 +45,7 @@ public class UserManagementServiceImpl implements UserManagementService {
     private final PasswordEncoder passwordEncoder;
     private final PermissionService permissionService;
     private final OutboundMessageService outboundMessageService;
+    private final PublicSchemaUserLookupService publicSchemaUserLookupService;
 
     @Value("${app.platform.login-url:http://localhost:4200/auth/login}")
     private String platformLoginUrl;
@@ -78,7 +83,6 @@ public class UserManagementServiceImpl implements UserManagementService {
                 .build();
 
         user = userRepository.save(user);
-        ensureCreatedOn(user);
 
         UserRole userRole = UserRole.builder()
                 .user(user)
@@ -130,7 +134,6 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Override
     @Transactional
     public Page<UserSummaryResponse> searchUsers(Long organizationId, UserStatus status, RoleType roleType, String search, Pageable pageable) {
-        userRepository.backfillMissingCreatedOn();
         var spec = com.thinkerscave.access.specification.UserSpecification.filter(organizationId, status, roleType, search);
         return userRepository.findAll(spec, pageable).map(this::toSummary);
     }
@@ -286,8 +289,34 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Override
     @Transactional(readOnly = true)
     public List<EffectivePermissionResponse> getEffectivePermissions(Long organizationId, Long userId) {
-        findUserInOrg(organizationId, userId);
+        try {
+            findUserInOrg(organizationId, userId);
+        } catch (ResourceNotFoundException ex) {
+            if (!isCurrentPublicOwner(userId, organizationId)) {
+                throw ex;
+            }
+        }
         return permissionService.getEffectivePermissions(userId, organizationId);
+    }
+
+    private boolean isCurrentPublicOwner(Long userId, Long organizationId) {
+        String principal = SecurityContextHolder.getContext().getAuthentication().getName();
+        String previousTenant = TenantContext.getTenant();
+        try {
+            TenantContext.setTenant("public");
+            return publicSchemaUserLookupService.findInstitutionUserInPublicSchema(principal, organizationId)
+                    .filter(user -> Objects.equals(user.getId(), userId))
+                    .filter(user -> user.getUserRoles().stream().anyMatch(userRole ->
+                            Boolean.TRUE.equals(userRole.getActive())
+                                    && userRole.getRole().getRoleType() == RoleType.ORGANIZATION_OWNER))
+                    .isPresent();
+        } finally {
+            if (previousTenant == null) {
+                TenantContext.clear();
+            } else {
+                TenantContext.setTenant(previousTenant);
+            }
+        }
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────
@@ -339,24 +368,12 @@ public class UserManagementServiceImpl implements UserManagementService {
     }
 
     private UserSummaryResponse toSummary(User user) {
-        ensureCreatedOn(user);
         UserSummaryResponse response = userMapper.toSummary(user);
         if (Boolean.TRUE.equals(user.getAccountLocked()) || user.getStatus() == UserStatus.LOCKED) {
             response.setStatus(UserStatus.LOCKED);
             response.setAccountLocked(true);
         }
         return response;
-    }
-
-    private void ensureCreatedOn(User user) {
-        if (user.getCreatedOn() != null) {
-            return;
-        }
-        LocalDateTime fallback = user.getUpdatedOn() != null ? user.getUpdatedOn() : LocalDateTime.now();
-        user.setCreatedOn(fallback);
-        if (user.getId() != null) {
-            userRepository.backfillCreatedOnIfMissing(user.getId(), fallback);
-        }
     }
 
     private String resolveResetPassword() {
