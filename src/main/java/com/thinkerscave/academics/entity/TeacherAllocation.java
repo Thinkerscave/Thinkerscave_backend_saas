@@ -53,6 +53,11 @@ public class TeacherAllocation extends Auditable {
     @Column(name = "is_active", nullable = false)
     private Boolean active = true;
 
+    /** TRUE when the teacher comes from the Academic Group default; FALSE for a section-level override. */
+    @NotNull
+    @Column(name = "inherited", nullable = false)
+    private Boolean inherited = false;
+
         public AcademicGroupSubjectMapping getClassSubjectMapping() {
                 return academicGroupSubjectMapping;
         }
