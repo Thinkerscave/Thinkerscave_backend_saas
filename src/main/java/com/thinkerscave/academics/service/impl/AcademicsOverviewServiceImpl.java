@@ -116,16 +116,16 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
                 .academicGroupsTotal(academicGroupRepo.countByAcademicYear_AcademicYearId(yearId))
                 .sectionsActive(sectionRepo.countByAcademicGroup_AcademicYear_AcademicYearIdAndActiveTrue(yearId))
                 .sectionsTotal(sectionRepo.countByAcademicGroup_AcademicYear_AcademicYearId(yearId))
-                .subjectsActive(subjectRepo.countByAcademicYear_AcademicYearIdAndActiveTrue(yearId))
-                .subjectsTotal(subjectRepo.countByAcademicYear_AcademicYearId(yearId))
+                .subjectsActive(subjectRepo.countByActiveTrue())
+                .subjectsTotal(mappingRepo.countDistinctMappedSubjectsInYear(yearId))
                 .studentsActive(studentsActive)
                 .build();
     }
 
     private MappingSummary buildMappingSummary(Long yearId) {
-        long subjectsTotal = subjectRepo.countByAcademicYear_AcademicYearIdAndActiveTrue(yearId);
+        long subjectsTotal = subjectRepo.countByActiveTrue();
         long unmapped = mappingRepo.countUnmappedActiveSubjects(yearId);
-        long mapped = Math.max(0, subjectsTotal - unmapped);
+        long mapped = mappingRepo.countDistinctActiveMappedSubjectsInYear(yearId);
 
         return MappingSummary.builder()
                 .subjectsMapped(mapped)
@@ -189,7 +189,7 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
         List<ReadinessStep> steps = new ArrayList<>();
         long academicGroupsActive = academicGroupRepo.countByAcademicYear_AcademicYearIdAndActiveTrue(yearId);
         long sectionsActive = sectionRepo.countByAcademicGroup_AcademicYear_AcademicYearIdAndActiveTrue(yearId);
-        long subjectsActive = subjectRepo.countByAcademicYear_AcademicYearIdAndActiveTrue(yearId);
+        long subjectsActive = subjectRepo.countByActiveTrue();
         long unmappedSubjects = mappingRepo.countUnmappedActiveSubjects(yearId);
 
         List<TeacherAllocation> allocs = allocationRepo
@@ -337,12 +337,13 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
     }
 
     private List<SubjectCard> buildTopSubjects(Long yearId) {
-        List<Subject> subjects = subjectRepo
-                .findByAcademicYear_AcademicYearIdAndActiveTrueOrderByNameAsc(yearId);
         List<TeacherAllocation> allocs = allocationRepo
                 .findBySection_AcademicGroup_AcademicYear_AcademicYearId(yearId);
 
-        return subjects.stream()
+        return mappingRepo.findActiveForTimetableByYear(yearId).stream()
+                .map(m -> m.getSubject())
+                .distinct()
+                .sorted(java.util.Comparator.comparing(Subject::getName))
                 .limit(6)
                 .map(s -> {
                     long mappedAcademicGroups = mappingRepo.countBySubject_SubjectIdAndActiveTrue(s.getSubjectId());
@@ -362,9 +363,8 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
                             .subjectId(s.getSubjectId())
                             .subjectName(s.getName())
                             .code(s.getCode())
-                            .category(s.getCategory() != null ? s.getCategory().name() : null)
+                            .subjectType(s.getSubjectType() != null ? s.getSubjectType().name() : null)
                             .mappedAcademicGroupCount(mappedAcademicGroups)
-                            .defaultWeeklyPeriods(s.getDefaultWeeklyPeriods())
                             .teacherStatus(teacherStatus)
                             .build();
                 })

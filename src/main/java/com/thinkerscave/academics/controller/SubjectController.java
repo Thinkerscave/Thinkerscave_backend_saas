@@ -1,14 +1,13 @@
 package com.thinkerscave.academics.controller;
 
-import com.thinkerscave.academics.dto.request.AcademicGroupSubjectMappingRequest;
 import com.thinkerscave.academics.dto.request.SubjectRequest;
-import com.thinkerscave.academics.dto.response.AcademicGroupMappingBoardResponse;
-import com.thinkerscave.academics.dto.response.AcademicGroupSubjectMappingResponse;
 import com.thinkerscave.academics.dto.response.SubjectResponse;
-import com.thinkerscave.academics.dto.response.SubjectsMappingDashboardResponse;
-import com.thinkerscave.academics.enums.SubjectCategory;
+import com.thinkerscave.academics.dto.response.SubjectUsageResponse;
+import com.thinkerscave.academics.enums.SubjectType;
 import com.thinkerscave.academics.service.SubjectService;
 import com.thinkerscave.shared.dto.ApiResponse;
+import com.thinkerscave.shared.dto.PageResponse;
+import com.thinkerscave.shared.exceptions.BadRequestException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -17,90 +16,81 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @RestController
-@RequestMapping("/api/v1/academics")
+@RequestMapping("/api/v1/academics/subjects")
 @RequiredArgsConstructor
-@Tag(name = "Subjects & Mapping", description = "Manage subjects and Academic Group curriculum mapping")
+@Tag(name = "Subjects", description = "Reusable subject catalog")
 public class SubjectController {
 
     private final SubjectService subjectService;
 
-    @GetMapping("/years/{yearId}/subjects/dashboard")
+    @GetMapping
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
-    @Operation(summary = "Subjects & Mapping dashboard")
-    public ResponseEntity<ApiResponse<SubjectsMappingDashboardResponse>> dashboard(
-            @PathVariable Long yearId,
+    @Operation(summary = "Subject directory with search, type and status filters")
+    public ResponseEntity<ApiResponse<PageResponse<SubjectResponse>>> directory(
             @RequestParam(required = false) String q,
-            @RequestParam(required = false) SubjectCategory category,
-            @RequestParam(required = false) Boolean active) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Subjects dashboard", subjectService.getDashboard(yearId, q, category, active)));
+            @RequestParam(required = false) SubjectType subjectType,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(ApiResponse.success("Subjects retrieved",
+                subjectService.getDirectory(q, subjectType, parseStatus(status), page, size)));
     }
 
-    @GetMapping("/years/{yearId}/subjects")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
-    @Operation(summary = "List subjects for academic year")
-    public ResponseEntity<ApiResponse<List<SubjectResponse>>> byYear(@PathVariable Long yearId) {
-        return ResponseEntity.ok(ApiResponse.success("Subjects retrieved", subjectService.getByYear(yearId)));
-    }
-
-    @PostMapping("/subjects")
+    @PostMapping
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Create subject")
+    @Operation(summary = "Create a reusable subject")
     public ResponseEntity<ApiResponse<SubjectResponse>> create(@Valid @RequestBody SubjectRequest request) {
-        return ResponseEntity.status(201)
-                .body(ApiResponse.success("Subject created", subjectService.create(request)));
+        return ResponseEntity.status(201).body(ApiResponse.success("Subject created", subjectService.create(request)));
     }
 
-    @PutMapping("/subjects/{subjectId}")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Update subject")
-    public ResponseEntity<ApiResponse<SubjectResponse>> update(
-            @PathVariable Long subjectId, @Valid @RequestBody SubjectRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Subject updated", subjectService.update(subjectId, request)));
-    }
-
-    @GetMapping("/subjects/{subjectId}")
+    @GetMapping("/{subjectId}")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
-    @Operation(summary = "Get subject by ID")
+    @Operation(summary = "Subject details with usage summary")
     public ResponseEntity<ApiResponse<SubjectResponse>> getById(@PathVariable Long subjectId) {
         return ResponseEntity.ok(ApiResponse.success("Subject found", subjectService.getById(subjectId)));
     }
 
-    @PatchMapping("/subjects/{subjectId}/deactivate")
+    @PutMapping("/{subjectId}")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Deactivate subject")
+    @Operation(summary = "Update catalog attributes of a subject")
+    public ResponseEntity<ApiResponse<SubjectResponse>> update(
+            @PathVariable Long subjectId, @Valid @RequestBody SubjectRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Subject updated", subjectService.update(subjectId, request)));
+    }
+
+    @PatchMapping("/{subjectId}/deactivate")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @Operation(summary = "Deactivate a subject (existing mappings are kept)")
     public ResponseEntity<ApiResponse<SubjectResponse>> deactivate(@PathVariable Long subjectId) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Subject deactivated", subjectService.deactivate(subjectId)));
+        return ResponseEntity.ok(ApiResponse.success("Subject deactivated", subjectService.deactivate(subjectId)));
     }
 
-    @PatchMapping("/subjects/{subjectId}/activate")
+    @PatchMapping("/{subjectId}/activate")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Activate subject")
+    @Operation(summary = "Reactivate a subject")
     public ResponseEntity<ApiResponse<SubjectResponse>> activate(@PathVariable Long subjectId) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Subject activated", subjectService.activate(subjectId)));
+        return ResponseEntity.ok(ApiResponse.success("Subject activated", subjectService.activate(subjectId)));
     }
 
-    @GetMapping("/academic-groups/{academicGroupId}/subject-mappings")
+    @GetMapping("/{subjectId}/mappings")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
-    @Operation(summary = "Academic Group subject mapping board")
-    public ResponseEntity<ApiResponse<AcademicGroupMappingBoardResponse>> classMappingBoard(
-            @PathVariable Long academicGroupId) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Academic Group mapping board", subjectService.getAcademicGroupMappingBoard(academicGroupId)));
+    @Operation(summary = "Academic groups where a subject is currently mapped")
+    public ResponseEntity<ApiResponse<PageResponse<SubjectUsageResponse>>> usages(
+            @PathVariable Long subjectId,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(ApiResponse.success("Subject usages retrieved",
+                subjectService.getUsages(subjectId, q, page, size)));
     }
 
-    @PutMapping("/academic-groups/{academicGroupId}/subject-mappings")
-    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Include/update or exclude a subject for an Academic Group")
-    public ResponseEntity<ApiResponse<AcademicGroupSubjectMappingResponse>> upsertMapping(
-            @PathVariable Long academicGroupId, @Valid @RequestBody AcademicGroupSubjectMappingRequest request) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Academic Group subject mapping saved", subjectService.upsertAcademicGroupMapping(academicGroupId, request)));
+    private Boolean parseStatus(String status) {
+        if (status == null || status.isBlank()) return null;
+        return switch (status.trim().toUpperCase()) {
+            case "ACTIVE" -> Boolean.TRUE;
+            case "INACTIVE" -> Boolean.FALSE;
+            default -> throw new BadRequestException("Status must be ACTIVE or INACTIVE");
+        };
     }
 }

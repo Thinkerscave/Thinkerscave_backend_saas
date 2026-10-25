@@ -344,8 +344,8 @@ public class AcademicYearServiceImpl implements AcademicYearService {
             sectionsActive += sections.stream().filter(s -> Boolean.TRUE.equals(s.getActive())).count();
         }
 
-        var subjects = subjectRepository.findByAcademicYear_AcademicYearIdOrderByNameAsc(yearId);
-        long subjectsActive = subjects.stream().filter(s -> Boolean.TRUE.equals(s.getActive())).count();
+        long subjectsTotal = subjectRepository.count();
+        long subjectsActive = subjectRepository.countByActiveTrue();
         long studentsActive = studentEnrollmentRepository.countByAcademicYearAcademicYearIdAndActiveTrue(yearId);
 
         return AcademicYearResponse.YearStructureStats.builder()
@@ -353,7 +353,7 @@ public class AcademicYearServiceImpl implements AcademicYearService {
                 .academicGroupsActive(academicGroupsActive)
                 .sectionsTotal(sectionsTotal)
                 .sectionsActive(sectionsActive)
-                .subjectsTotal(subjects.size())
+                .subjectsTotal(subjectsTotal)
                 .subjectsActive(subjectsActive)
                 .studentsActive(studentsActive)
                 .build();
@@ -371,16 +371,16 @@ public class AcademicYearServiceImpl implements AcademicYearService {
         steps.add(step("ACADEMIC_GROUPS_SECTIONS", "Academic Groups & Sections",
                 hasClasses && hasSections ? "COMPLETE" : (hasClasses ? "IN_PROGRESS" : "NOT_STARTED"), null));
 
-        var subjects = subjectRepository.findByAcademicYear_AcademicYearIdAndActiveTrueOrderByNameAsc(yearId);
+        boolean hasActiveSubjects = subjectRepository.countByActiveTrue() > 0;
         steps.add(step("SUBJECTS", "Subjects",
-                subjects.isEmpty() ? "NOT_STARTED" : "COMPLETE", null));
+                hasActiveSubjects ? "COMPLETE" : "NOT_STARTED", null));
 
         long mappingCount = academicGroups.stream()
                 .mapToLong(A -> academicGroupSubjectMappingRepository.findByAcademicGroup_AcademicGroupIdAndActiveTrue(A.getAcademicGroupId()).size())
                 .sum();
         steps.add(step("SUBJECT_MAPPING", "Subject Mapping",
-                mappingCount == 0 ? (subjects.isEmpty() ? "NOT_STARTED" : "PENDING") : "COMPLETE",
-                mappingCount == 0 && !subjects.isEmpty() ? "Mappings pending" : null));
+                mappingCount == 0 ? (hasActiveSubjects ? "PENDING" : "NOT_STARTED") : "COMPLETE",
+                mappingCount == 0 && hasActiveSubjects ? "Mappings pending" : null));
 
         long allocationCount = TeacherAllocationRepository
                 .findBySection_AcademicGroup_AcademicYear_AcademicYearId(yearId).stream()

@@ -1,46 +1,27 @@
 package com.thinkerscave.academics.repository;
 
 import com.thinkerscave.academics.entity.Subject;
-import com.thinkerscave.academics.enums.AcademicYearStatus;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface SubjectRepository extends JpaRepository<Subject, Long> {
+public interface SubjectRepository extends JpaRepository<Subject, Long>, JpaSpecificationExecutor<Subject> {
 
-    boolean existsByAcademicYear_AcademicYearIdAndCodeIgnoreCase(Long yearId, String code);
+    boolean existsByCodeIgnoreCase(String code);
 
-    boolean existsByAcademicYear_AcademicYearIdAndCodeIgnoreCaseAndSubjectIdNot(Long yearId, String code, Long subjectId);
+    boolean existsByCodeIgnoreCaseAndSubjectIdNot(String code, Long subjectId);
 
-    boolean existsByAcademicYear_AcademicYearIdAndNameIgnoreCase(Long yearId, String name);
+    boolean existsByNameIgnoreCase(String name);
 
-    boolean existsByAcademicYear_AcademicYearIdAndNameIgnoreCaseAndSubjectIdNot(Long yearId, String name, Long subjectId);
+    boolean existsByNameIgnoreCaseAndSubjectIdNot(String name, Long subjectId);
 
-    List<Subject> findByAcademicYear_AcademicYearIdAndActiveTrueOrderByNameAsc(Long yearId);
+    Optional<Subject> findFirstByCodeIgnoreCase(String code);
 
-    List<Subject> findByAcademicYear_AcademicYearIdOrderByNameAsc(Long yearId);
+    List<Subject> findByActiveTrueOrderByNameAsc();
 
-    Optional<Subject> findByAcademicYear_AcademicYearIdAndCodeIgnoreCase(Long yearId, String code);
-
-    @Query("SELECT s FROM Subject s JOIN FETCH s.academicYear WHERE s.subjectId = :subjectId")
-    Optional<Subject> findByIdWithYear(@Param("subjectId") Long subjectId);
-
-    @Query("SELECT s FROM Subject s JOIN FETCH s.academicYear y WHERE y.academicYearId = :yearId ORDER BY s.name ASC")
-    List<Subject> findWithYearByAcademicYearIdOrderByNameAsc(@Param("yearId") Long yearId);
-
-    long countByAcademicYear_AcademicYearId(Long yearId);
-
-    long countByAcademicYear_AcademicYearIdAndActiveTrue(Long yearId);
-
-    List<Subject> findByNameContainingIgnoreCaseOrCodeContainingIgnoreCase(String name, String code);
-
-    @Query("SELECT s FROM Subject s JOIN FETCH s.academicYear y WHERE s.active = true AND y.active = true "
-            + "AND y.status NOT IN :excluded ORDER BY y.startDate DESC, s.name ASC")
-    List<Subject> findSelectableWithYear(@Param("excluded") Collection<AcademicYearStatus> excluded);
+    long countByActiveTrue();
 }

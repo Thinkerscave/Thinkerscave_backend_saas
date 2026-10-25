@@ -11,6 +11,7 @@ import com.thinkerscave.academics.entity.AcademicGroup;
 import com.thinkerscave.academics.entity.AcademicSection;
 import com.thinkerscave.academics.entity.AcademicYear;
 import com.thinkerscave.academics.entity.AcademicGroupSubjectMapping;
+import com.thinkerscave.academics.enums.SubjectMappingScope;
 import com.thinkerscave.academics.entity.SectionTeacherAssignment;
 import com.thinkerscave.academics.entity.TeacherAllocation;
 import com.thinkerscave.academics.entity.TeacherAllocationTeacher;
@@ -163,6 +164,9 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
         }
         if (!Objects.equals(mapping.getAcademicGroup().getAcademicGroupId(), section.getAcademicGroup().getAcademicGroupId())) {
             throw new BusinessException("Subject mapping does not belong to this section's Academic Group");
+        }
+        if (!mapping.appliesToSection(section.getSectionId())) {
+            throw new BusinessException("Subject mapping does not include this section");
         }
 
         Staff staff = staffRepository.findById(request.getStaffId())
@@ -379,6 +383,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
 
             for (AcademicSection section : sections) {
                 for (AcademicGroupSubjectMapping mapping : mappings) {
+                    if (!mapping.appliesToSection(section.getSectionId())) continue;
                     TeacherAllocation allocation = allocationRepository
                             .findBySection_SectionIdAndAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(
                                     section.getSectionId(), mapping.getAcademicGroupSubjectMappingId())
@@ -412,7 +417,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
                 .subjectId(mapping.getSubject().getSubjectId())
                 .subjectName(mapping.getSubject().getName())
                 .subjectCode(mapping.getSubject().getCode())
-                .subjectCategory(mapping.getSubject().getCategory())
+                .subjectType(mapping.getSubject().getSubjectType())
                 .weeklyPeriods(mapping.getWeeklyPeriods())
                 .primaryStaffId(null)
                 .primaryStaffName(null)
@@ -462,7 +467,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
                 .subjectId(mapping.getSubject().getSubjectId())
                 .subjectName(mapping.getSubject().getName())
                 .subjectCode(mapping.getSubject().getCode())
-                .subjectCategory(mapping.getSubject().getCategory())
+                .subjectType(mapping.getSubject().getSubjectType())
                 .weeklyPeriods(mapping.getWeeklyPeriods())
                 .primaryStaffId(staffId)
                 .primaryStaffName(primary == null || primary.getStaff() == null

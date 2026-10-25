@@ -125,6 +125,7 @@ public class TimetablePlanningDataLoader {
         for (AcademicSection section : sections) {
             for (AcademicGroupSubjectMapping mapping : mappingsByClass.getOrDefault(
                     section.getAcademicGroup().getAcademicGroupId(), List.of())) {
+                                if (!mapping.appliesToSection(section.getSectionId())) continue;
                 TeacherAllocation allocation = allocationByKey.get(
                         key(section.getSectionId(), mapping.getAcademicGroupSubjectMappingId()));
                 if (allocation == null) {

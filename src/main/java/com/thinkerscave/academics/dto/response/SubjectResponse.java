@@ -1,52 +1,30 @@
 package com.thinkerscave.academics.dto.response;
 
-import com.thinkerscave.academics.enums.AcademicYearStatus;
-import com.thinkerscave.academics.enums.SubjectCategory;
-import com.thinkerscave.academics.enums.SubjectTimetablePreference;
+import com.thinkerscave.academics.enums.SubjectType;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Getter
 @Setter
 @Builder
 public class SubjectResponse {
     private Long subjectId;
-    private Long academicYearId;
-    private String academicYearName;
-    private AcademicYearStatus academicYearStatus;
-    private boolean yearReadOnly;
-
     private String name;
     private String code;
-    private SubjectCategory category;
-    private Short defaultWeeklyPeriods;
-    private SubjectTimetablePreference timetablePreference;
+    private SubjectType subjectType;
     private String description;
     private Boolean active;
 
+    /** Active curriculum mappings across all academic years. */
     private long mappedAcademicGroupCount;
-    private long teacherAllocationCount;
-
-    private List<AcademicGroupSubjectMappingResponse> mappings;
+    /** Sections covered by active mappings. */
+    private long mappedSectionCount;
 
     private String createdBy;
     private LocalDateTime createdOn;
     private String updatedBy;
     private LocalDateTime updatedOn;
-
-    public String getSubjectName() {
-        return name;
-    }
-
-    public String getSubjectCode() {
-        return code;
-    }
-
-    public String getSubjectType() {
-        return category == null ? null : category.name();
-    }
 }

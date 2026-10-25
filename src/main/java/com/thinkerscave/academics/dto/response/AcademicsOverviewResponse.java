@@ -106,9 +106,8 @@ public class AcademicsOverviewResponse {
         private Long subjectId;
         private String subjectName;
         private String code;
-        private String category;
+        private String subjectType;
         private Long mappedAcademicGroupCount;
-        private Short defaultWeeklyPeriods;
         private String teacherStatus;
     }
 

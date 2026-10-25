@@ -1,6 +1,6 @@
 package com.thinkerscave.academics.dto.response;
 
-import com.thinkerscave.academics.enums.SubjectCategory;
+import com.thinkerscave.academics.enums.SubjectType;
 import com.thinkerscave.academics.enums.TeacherAllocationStatus;
 import lombok.Builder;
 import lombok.Getter;
@@ -21,7 +21,7 @@ public class TeacherAllocationRowResponse {
     private Long subjectId;
     private String subjectName;
     private String subjectCode;
-    private SubjectCategory subjectCategory;
+    private SubjectType subjectType;
     private Short weeklyPeriods;
 
     private Long primaryStaffId;

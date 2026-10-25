@@ -4,6 +4,7 @@ import com.thinkerscave.academics.dto.request.AcademicYearTransitionRequest;
 import com.thinkerscave.academics.dto.response.AcademicYearTransitionResponse;
 import com.thinkerscave.academics.entity.*;
 import com.thinkerscave.academics.enums.AcademicTransitionStatus;
+import com.thinkerscave.academics.enums.SubjectMappingScope;
 import com.thinkerscave.academics.repository.*;
 import com.thinkerscave.academics.security.AcademicsAccessGuard;
 import com.thinkerscave.academics.service.AcademicYearTransitionService;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -29,8 +31,8 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
     private final AcademicYearTransitionRepository transitionRepo;
     private final AcademicGroupRepository academicGroupRepo;
     private final SectionRepository sectionRepo;
-    private final SubjectRepository subjectRepo;
     private final AcademicGroupSubjectMappingRepository mappingRepo;
+    private final AcademicGroupSubjectMappingSectionRepository mappingSectionRepo;
     private final TeacherAllocationRepository allocationRepo;
     private final TeacherAllocationTeacherRepository tatRepo;
 
@@ -137,10 +139,6 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
             copyAcademicGroups(sourceYearId, targetYear, transition);
         }
 
-        if (Boolean.TRUE.equals(transition.getCopySubjects())) {
-            copySubjects(sourceYearId, targetYear, transition);
-        }
-
         if (Boolean.TRUE.equals(transition.getCopyMappings())) {
             copyMappings(sourceYearId, targetYear);
         }
@@ -197,30 +195,6 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
         }
     }
 
-    private void copySubjects(Long sourceYearId, AcademicYear targetYear,
-                              AcademicYearTransition transition) {
-        List<Subject> sourceSubjects = subjectRepo
-                .findByAcademicYear_AcademicYearIdAndActiveTrueOrderByNameAsc(sourceYearId);
-
-        for (Subject src : sourceSubjects) {
-            if (subjectRepo.existsByAcademicYear_AcademicYearIdAndCodeIgnoreCase(
-                    targetYear.getAcademicYearId(), src.getCode())) {
-                continue;
-            }
-
-            Subject target = new Subject();
-            target.setAcademicYear(targetYear);
-            target.setName(src.getName());
-            target.setCode(src.getCode());
-            target.setCategory(src.getCategory());
-            target.setDefaultWeeklyPeriods(src.getDefaultWeeklyPeriods());
-            target.setTimetablePreference(src.getTimetablePreference());
-            target.setDescription(src.getDescription());
-            target.setActive(true);
-            subjectRepo.save(target);
-        }
-    }
-
     private void copyMappings(Long sourceYearId, AcademicYear targetYear) {
         List<AcademicGroup> sourceClasses = academicGroupRepo
                 .findByAcademicYear_AcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(sourceYearId);
@@ -236,23 +210,42 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
                     .findByAcademicGroup_AcademicGroupIdAndActiveTrue(srcClass.getAcademicGroupId());
 
             for (AcademicGroupSubjectMapping srcMapping : srcMappings) {
-                Optional<Subject> targetSubjectOpt = subjectRepo
-                        .findByAcademicYear_AcademicYearIdAndCodeIgnoreCase(
-                                targetYear.getAcademicYearId(), srcMapping.getSubject().getCode());
-                if (targetSubjectOpt.isEmpty()) continue;
+                Subject sharedSubject = srcMapping.getSubject();
+                if (!sharedSubject.isActive()) continue;
 
                 Optional<AcademicGroupSubjectMapping> existing = mappingRepo
                         .findByAcademicGroup_AcademicGroupIdAndSubject_SubjectId(
-                                targetClass.getAcademicGroupId(), targetSubjectOpt.get().getSubjectId());
+                        targetClass.getAcademicGroupId(), sharedSubject.getSubjectId());
                 if (existing.isPresent()) continue;
 
                 AcademicGroupSubjectMapping targetMapping = new AcademicGroupSubjectMapping();
                 targetMapping.setAcademicGroup(targetClass);
-                targetMapping.setSubject(targetSubjectOpt.get());
+                targetMapping.setSubject(sharedSubject);
                 targetMapping.setWeeklyPeriods(srcMapping.getWeeklyPeriods());
                 targetMapping.setTimetablePreference(srcMapping.getTimetablePreference());
+                targetMapping.setRequirement(srcMapping.getRequirement());
+                targetMapping.setScope(srcMapping.getScope());
                 targetMapping.setActive(true);
-                mappingRepo.save(targetMapping);
+                if (srcMapping.getScope() == SubjectMappingScope.SELECTED_SECTIONS) {
+                    List<AcademicSection> targetSections = mappingSectionRepo
+                            .findByMapping_AcademicGroupSubjectMappingId(srcMapping.getAcademicGroupSubjectMappingId())
+                            .stream()
+                            .map(AcademicGroupSubjectMappingSection::getSection)
+                            .map(sourceSection -> sectionRepo.findByAcademicGroup_AcademicGroupIdAndCodeIgnoreCase(
+                                    targetClass.getAcademicGroupId(), sourceSection.getCode()).orElse(null))
+                            .filter(Objects::nonNull)
+                            .toList();
+                    if (targetSections.isEmpty()) continue;
+                    targetMapping = mappingRepo.save(targetMapping);
+                    for (AcademicSection targetSection : targetSections) {
+                        AcademicGroupSubjectMappingSection mappingSection = new AcademicGroupSubjectMappingSection();
+                        mappingSection.setMapping(targetMapping);
+                        mappingSection.setSection(targetSection);
+                        mappingSectionRepo.save(mappingSection);
+                    }
+                } else {
+                    mappingRepo.save(targetMapping);
+                }
             }
         }
     }
@@ -275,16 +268,12 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
                             targetClassOpt.get().getAcademicGroupId(), srcSection.getCode());
             if (targetSectionOpt.isEmpty()) continue;
 
-            Optional<Subject> targetSubjectOpt = subjectRepo
-                    .findByAcademicYear_AcademicYearIdAndCodeIgnoreCase(
-                            targetYear.getAcademicYearId(),
-                            srcAlloc.getAcademicGroupSubjectMapping().getSubject().getCode());
-            if (targetSubjectOpt.isEmpty()) continue;
+            Subject sharedSubject = srcAlloc.getAcademicGroupSubjectMapping().getSubject();
 
             Optional<AcademicGroupSubjectMapping> targetMappingOpt = mappingRepo
                     .findByAcademicGroup_AcademicGroupIdAndSubject_SubjectId(
                             targetClassOpt.get().getAcademicGroupId(),
-                            targetSubjectOpt.get().getSubjectId());
+                        sharedSubject.getSubjectId());
             if (targetMappingOpt.isEmpty()) continue;
 
             Optional<TeacherAllocation> existing = allocationRepo

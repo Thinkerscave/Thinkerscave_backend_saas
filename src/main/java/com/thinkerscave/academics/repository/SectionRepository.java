@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -75,4 +76,11 @@ public interface SectionRepository extends JpaRepository<AcademicSection, Long> 
 
         @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicGroup A WHERE A.academicYear.academicYearId = :yearId")
     List<AcademicSection> findWithAcademicGroupByYearId(@Param("yearId") Long yearId);
+
+    @Query("""
+            SELECT s.academicGroup.academicGroupId AS id, COUNT(s) AS total FROM AcademicSection s
+            WHERE s.active = true AND s.academicGroup.academicGroupId IN :groupIds
+            GROUP BY s.academicGroup.academicGroupId
+            """)
+    List<IdCount> countActiveByGroupIds(@Param("groupIds") Collection<Long> groupIds);
 }
