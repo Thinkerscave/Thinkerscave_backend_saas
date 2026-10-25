@@ -13,15 +13,15 @@ import java.util.Optional;
 @Repository
 public interface TeacherAllocationRepository extends JpaRepository<TeacherAllocation, Long> {
 
-    Optional<TeacherAllocation> findBySection_SectionIdAndClassSubjectMapping_ClassSubjectMappingId(
+    Optional<TeacherAllocation> findBySection_SectionIdAndAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(
             Long sectionId, Long mappingId);
 
     @Query("""
             SELECT a FROM TeacherAllocation a
             JOIN FETCH a.section s
-            JOIN FETCH s.academicClass c
-            JOIN FETCH c.academicYear
-            JOIN FETCH a.classSubjectMapping m
+            JOIN FETCH s.academicGroup A
+            JOIN FETCH A.academicYear
+            JOIN FETCH a.academicGroupSubjectMapping m
             JOIN FETCH m.subject
             WHERE a.teacherAllocationId = :id
             """)
@@ -29,25 +29,25 @@ public interface TeacherAllocationRepository extends JpaRepository<TeacherAlloca
 
     List<TeacherAllocation> findBySection_SectionIdAndStatus(Long sectionId, TeacherAllocationStatus status);
 
-    List<TeacherAllocation> findBySection_AcademicClass_AcademicYear_AcademicYearId(Long academicYearId);
+    List<TeacherAllocation> findBySection_AcademicGroup_AcademicYear_AcademicYearId(Long academicYearId);
 
     @Query("""
             SELECT a FROM TeacherAllocation a
             JOIN FETCH a.section s
-            JOIN FETCH s.academicClass c
-            JOIN FETCH a.classSubjectMapping m
+            JOIN FETCH s.academicGroup A
+            JOIN FETCH a.academicGroupSubjectMapping m
             JOIN FETCH m.subject
-            WHERE c.academicYear.academicYearId = :yearId
+            WHERE A.academicYear.academicYearId = :yearId
               AND a.active = true
             """)
     List<TeacherAllocation> findActiveWithDetailsByYear(@Param("yearId") Long yearId);
 
     List<TeacherAllocation> findByStatus(TeacherAllocationStatus status);
 
-    List<TeacherAllocation> findByClassSubjectMapping_ClassSubjectMappingId(Long mappingId);
+    List<TeacherAllocation> findByAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(Long mappingId);
 
-    long countByClassSubjectMapping_ClassSubjectMappingId(Long mappingId);
+    long countByAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(Long mappingId);
 
-    long countByClassSubjectMapping_ClassSubjectMappingIdAndStatus(
+    long countByAcademicGroupSubjectMapping_AcademicGroupSubjectMappingIdAndStatus(
             Long mappingId, TeacherAllocationStatus status);
 }

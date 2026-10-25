@@ -1,17 +1,17 @@
 package com.thinkerscave.academics.service.impl;
 
-import com.thinkerscave.academics.dto.request.ClassTeacherAssignmentRequest;
+import com.thinkerscave.academics.dto.request.SectionTeacherAssignmentRequest;
 import com.thinkerscave.academics.dto.request.TeacherAllocationAssignRequest;
-import com.thinkerscave.academics.dto.response.ClassTeacherAssignmentResponse;
+import com.thinkerscave.academics.dto.response.SectionTeacherAssignmentResponse;
 import com.thinkerscave.academics.dto.response.TeacherAllocationDashboardResponse;
 import com.thinkerscave.academics.dto.response.TeacherAllocationRowResponse;
 import com.thinkerscave.academics.dto.response.TeacherRecommendationResponse;
 import com.thinkerscave.academics.dto.response.TeacherWorkloadResponse;
-import com.thinkerscave.academics.entity.AcademicClass;
+import com.thinkerscave.academics.entity.AcademicGroup;
 import com.thinkerscave.academics.entity.AcademicSection;
 import com.thinkerscave.academics.entity.AcademicYear;
-import com.thinkerscave.academics.entity.ClassSubjectMapping;
-import com.thinkerscave.academics.entity.ClassTeacherAssignment;
+import com.thinkerscave.academics.entity.AcademicGroupSubjectMapping;
+import com.thinkerscave.academics.entity.SectionTeacherAssignment;
 import com.thinkerscave.academics.entity.TeacherAllocation;
 import com.thinkerscave.academics.entity.TeacherAllocationTeacher;
 import com.thinkerscave.academics.entity.TimetableConfiguration;
@@ -19,9 +19,9 @@ import com.thinkerscave.academics.enums.AcademicYearStatus;
 import com.thinkerscave.academics.enums.TeacherAllocationStatus;
 import com.thinkerscave.academics.enums.TeacherAllocationTeacherRole;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
-import com.thinkerscave.academics.repository.ClassRepository;
-import com.thinkerscave.academics.repository.ClassSubjectMappingRepository;
-import com.thinkerscave.academics.repository.ClassTeacherAssignmentRepository;
+import com.thinkerscave.academics.repository.AcademicGroupRepository;
+import com.thinkerscave.academics.repository.AcademicGroupSubjectMappingRepository;
+import com.thinkerscave.academics.repository.SectionTeacherAssignmentRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.academics.repository.TeacherAllocationRepository;
 import com.thinkerscave.academics.repository.TeacherAllocationTeacherRepository;
@@ -61,13 +61,13 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
     );
 
     private final AcademicYearRepository academicYearRepository;
-    private final ClassRepository classRepository;
+    private final AcademicGroupRepository academicGroupRepository;
     private final SectionRepository sectionRepository;
-    private final ClassSubjectMappingRepository mappingRepository;
+    private final AcademicGroupSubjectMappingRepository mappingRepository;
     private final TeacherAllocationRepository allocationRepository;
     private final TeacherAllocationTeacherRepository allocationTeacherRepository;
-    private final ClassTeacherAssignmentRepository classTeacherAssignmentRepository;
-    private final TimetableConfigurationRepository timetableConfigurationRepository;
+    private final SectionTeacherAssignmentRepository SectionTeacherAssignmentRepository;
+    private final TimetableConfigurationRepository TimetableConfigurationRepository;
     private final StaffRepository staffRepository;
     private final AcademicsAccessGuard accessGuard;
 
@@ -75,7 +75,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
     @Transactional(readOnly = true)
     public TeacherAllocationDashboardResponse getDashboard(
             Long academicYearId,
-            Long classId,
+            Long academicGroupId,
             Long sectionId,
             Long subjectId,
             TeacherAllocationStatus status,
@@ -88,11 +88,11 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
 
         Map<Long, Integer> workloadByStaff = computeWorkloadMap(academicYearId);
         List<TeacherAllocationRowResponse> filteredRows = buildRows(year, maxPeriods, workloadByStaff).stream()
-                .filter(r -> classId == null || Objects.equals(r.getClassId(), classId))
+                .filter(r -> academicGroupId == null || Objects.equals(r.getAcademicGroupId(), academicGroupId))
                 .filter(r -> sectionId == null || Objects.equals(r.getSectionId(), sectionId))
                 .filter(r -> subjectId == null || Objects.equals(r.getSubjectId(), subjectId))
                 .filter(r -> status == null || r.getStatus() == status)
-            .sorted(Comparator.comparing(TeacherAllocationRowResponse::getClassName,
+            .sorted(Comparator.comparing(TeacherAllocationRowResponse::getAcademicGroupName,
                     Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER))
                 .thenComparing(TeacherAllocationRowResponse::getSectionName,
                     Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER))
@@ -151,31 +151,31 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
     public TeacherAllocationRowResponse assign(TeacherAllocationAssignRequest request) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_TEACHER_ALLOCATION);
 
-        AcademicSection section = sectionRepository.findByIdWithClass(request.getSectionId())
+        AcademicSection section = sectionRepository.findByIdWithAcademicGroup(request.getSectionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + request.getSectionId()));
-        assertYearMutable(section.getAcademicClass().getAcademicYear());
+        assertYearMutable(section.getAcademicGroup().getAcademicYear());
 
-        ClassSubjectMapping mapping = mappingRepository.findById(request.getClassSubjectMappingId())
+        AcademicGroupSubjectMapping mapping = mappingRepository.findById(request.getAcademicGroupSubjectMappingId())
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Class subject mapping not found: " + request.getClassSubjectMappingId()));
+                        "Academic Group subject mapping not found: " + request.getAcademicGroupSubjectMappingId()));
         if (!mapping.isActive()) {
             throw new BusinessException("Cannot assign teacher to an inactive subject mapping");
         }
-        if (!Objects.equals(mapping.getAcademicClass().getClassId(), section.getAcademicClass().getClassId())) {
-            throw new BusinessException("Subject mapping does not belong to this section's class");
+        if (!Objects.equals(mapping.getAcademicGroup().getAcademicGroupId(), section.getAcademicGroup().getAcademicGroupId())) {
+            throw new BusinessException("Subject mapping does not belong to this section's Academic Group");
         }
 
         Staff staff = staffRepository.findById(request.getStaffId())
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + request.getStaffId()));
 
         TeacherAllocation allocation = allocationRepository
-                .findBySection_SectionIdAndClassSubjectMapping_ClassSubjectMappingId(
-                        section.getSectionId(), mapping.getClassSubjectMappingId())
+                .findBySection_SectionIdAndAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(
+                        section.getSectionId(), mapping.getAcademicGroupSubjectMappingId())
                 .orElseGet(TeacherAllocation::new);
 
         if (allocation.getTeacherAllocationId() == null) {
             allocation.setSection(section);
-            allocation.setClassSubjectMapping(mapping);
+            allocation.setAcademicGroupSubjectMapping(mapping);
         }
         allocation.setActive(true);
 
@@ -183,7 +183,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
                 ? TeacherAllocationTeacherRole.PRIMARY
                 : request.getRole();
 
-        Long yearId = section.getAcademicClass().getAcademicYear().getAcademicYearId();
+        Long yearId = section.getAcademicGroup().getAcademicYear().getAcademicYearId();
         int maxPeriods = resolveMaxWeeklyPeriods(yearId);
 
         closeOpenRole(allocation, role);
@@ -213,29 +213,29 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
         TeacherAllocation allocation = allocationRepository.findByIdWithDetails(teacherAllocationId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Teacher allocation not found: " + teacherAllocationId));
-        assertYearMutable(allocation.getSection().getAcademicClass().getAcademicYear());
+        assertYearMutable(allocation.getSection().getAcademicGroup().getAcademicYear());
 
         closeOpenRole(allocation, TeacherAllocationTeacherRole.PRIMARY);
         closeOpenRole(allocation, TeacherAllocationTeacherRole.SECONDARY);
         allocation.setStatus(TeacherAllocationStatus.UNASSIGNED);
         TeacherAllocation saved = allocationRepository.save(allocation);
 
-        Long yearId = saved.getSection().getAcademicClass().getAcademicYear().getAcademicYearId();
+        Long yearId = saved.getSection().getAcademicGroup().getAcademicYear().getAcademicYearId();
         int maxPeriods = resolveMaxWeeklyPeriods(yearId);
         return toRow(saved, maxPeriods, computeWorkloadMap(yearId));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<TeacherRecommendationResponse> recommendations(Long sectionId, Long classSubjectMappingId) {
+    public List<TeacherRecommendationResponse> recommendations(Long sectionId, Long academicGroupSubjectMappingId) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_TEACHER_ALLOCATION);
-        AcademicSection section = sectionRepository.findByIdWithClass(sectionId)
+        AcademicSection section = sectionRepository.findByIdWithAcademicGroup(sectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + sectionId));
-        ClassSubjectMapping mapping = mappingRepository.findById(classSubjectMappingId)
+        AcademicGroupSubjectMapping mapping = mappingRepository.findById(academicGroupSubjectMappingId)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        "Class subject mapping not found: " + classSubjectMappingId));
+                        "Academic Group subject mapping not found: " + academicGroupSubjectMappingId));
 
-        Long yearId = section.getAcademicClass().getAcademicYear().getAcademicYearId();
+        Long yearId = section.getAcademicGroup().getAcademicYear().getAcademicYearId();
         int maxPeriods = resolveMaxWeeklyPeriods(yearId);
         short weekly = mapping.getWeeklyPeriods() == null ? 0 : mapping.getWeeklyPeriods();
         Map<Long, Integer> workload = computeWorkloadMap(yearId);
@@ -294,15 +294,15 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
     }
 
     @Override
-    public ClassTeacherAssignmentResponse assignClassTeacher(ClassTeacherAssignmentRequest request) {
+    public SectionTeacherAssignmentResponse assignSectionTeacher(SectionTeacherAssignmentRequest request) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_TEACHER_ALLOCATION);
-        AcademicSection section = sectionRepository.findByIdWithClass(request.getSectionId())
+        AcademicSection section = sectionRepository.findByIdWithAcademicGroup(request.getSectionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + request.getSectionId()));
-        assertYearMutable(section.getAcademicClass().getAcademicYear());
+        assertYearMutable(section.getAcademicGroup().getAcademicYear());
         Staff staff = staffRepository.findById(request.getStaffId())
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + request.getStaffId()));
 
-        classTeacherAssignmentRepository.findBySection_SectionIdAndEffectiveToIsNull(section.getSectionId())
+        SectionTeacherAssignmentRepository.findBySection_SectionIdAndEffectiveToIsNull(section.getSectionId())
                 .ifPresent(existing -> {
                     LocalDate end = LocalDate.now();
                     if (existing.getEffectiveFrom() != null && end.isBefore(existing.getEffectiveFrom())) {
@@ -310,81 +310,81 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
                     }
                     existing.setEffectiveTo(end);
                     existing.setActive(false);
-                    classTeacherAssignmentRepository.save(existing);
+                    SectionTeacherAssignmentRepository.save(existing);
                 });
 
-        ClassTeacherAssignment assignment = new ClassTeacherAssignment();
+        SectionTeacherAssignment assignment = new SectionTeacherAssignment();
         assignment.setSection(section);
         assignment.setStaff(staff);
         assignment.setEffectiveFrom(request.getEffectiveFrom() == null ? LocalDate.now() : request.getEffectiveFrom());
         assignment.setActive(true);
-        return toClassTeacherResponse(classTeacherAssignmentRepository.save(assignment));
+        return toSectionTeacherResponse(SectionTeacherAssignmentRepository.save(assignment));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ClassTeacherAssignmentResponse> getClassTeachers(Long yearId, Long classId, Long sectionId) {
+    public List<SectionTeacherAssignmentResponse> getSectionTeachers(Long yearId, Long academicGroupId, Long sectionId) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_TEACHER_ALLOCATION);
         requireYear(yearId);
         List<AcademicSection> sections;
         if (sectionId != null) {
-            AcademicSection section = sectionRepository.findByIdWithClass(sectionId)
+            AcademicSection section = sectionRepository.findByIdWithAcademicGroup(sectionId)
                     .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + sectionId));
             sections = List.of(section);
-        } else if (classId != null) {
-            sections = sectionRepository.findByAcademicClass_ClassIdOrderByDisplayOrderAsc(classId);
+        } else if (academicGroupId != null) {
+            sections = sectionRepository.findByAcademicGroup_AcademicGroupIdOrderByDisplayOrderAsc(academicGroupId);
         } else {
-            sections = classRepository.findByAcademicYear_AcademicYearIdOrderByDisplayOrderAsc(yearId).stream()
-                    .flatMap(c -> sectionRepository.findByAcademicClass_ClassIdOrderByDisplayOrderAsc(c.getClassId()).stream())
+            sections = academicGroupRepository.findByAcademicYear_AcademicYearIdOrderByDisplayOrderAsc(yearId).stream()
+                    .flatMap(A -> sectionRepository.findByAcademicGroup_AcademicGroupIdOrderByDisplayOrderAsc(A.getAcademicGroupId()).stream())
                     .toList();
         }
-        List<ClassTeacherAssignmentResponse> result = new ArrayList<>();
+        List<SectionTeacherAssignmentResponse> result = new ArrayList<>();
         for (AcademicSection section : sections) {
-            classTeacherAssignmentRepository
+            SectionTeacherAssignmentRepository
                     .findFirstBySection_SectionIdAndActiveTrueAndEffectiveToIsNullOrderByEffectiveFromDesc(
                             section.getSectionId())
-                    .ifPresent(a -> result.add(toClassTeacherResponse(a)));
+                    .ifPresent(a -> result.add(toSectionTeacherResponse(a)));
         }
         return result;
     }
 
     @Override
-    public void removeClassTeacher(Long assignmentId) {
+    public void removeSectionTeacher(Long assignmentId) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_TEACHER_ALLOCATION);
-        ClassTeacherAssignment assignment = classTeacherAssignmentRepository.findById(assignmentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Class teacher assignment not found: " + assignmentId));
-        AcademicSection section = sectionRepository.findByIdWithClass(assignment.getSection().getSectionId())
+        SectionTeacherAssignment assignment = SectionTeacherAssignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Section teacher assignment not found: " + assignmentId));
+        AcademicSection section = sectionRepository.findByIdWithAcademicGroup(assignment.getSection().getSectionId())
                 .orElse(assignment.getSection());
-        assertYearMutable(section.getAcademicClass().getAcademicYear());
+        assertYearMutable(section.getAcademicGroup().getAcademicYear());
         LocalDate end = LocalDate.now();
         if (assignment.getEffectiveFrom() != null && end.isBefore(assignment.getEffectiveFrom())) {
             end = assignment.getEffectiveFrom();
         }
         assignment.setEffectiveTo(end);
         assignment.setActive(false);
-        classTeacherAssignmentRepository.save(assignment);
+        SectionTeacherAssignmentRepository.save(assignment);
     }
 
     private List<TeacherAllocationRowResponse> buildRows(
             AcademicYear year, int maxPeriods, Map<Long, Integer> workloadByStaff) {
-        List<AcademicClass> classes = classRepository
+        List<AcademicGroup> academicGroups = academicGroupRepository
                 .findWithYearByAcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(year.getAcademicYearId());
         List<TeacherAllocationRowResponse> rows = new ArrayList<>();
 
-        for (AcademicClass academicClass : classes) {
+        for (AcademicGroup academicGroup : academicGroups) {
             List<AcademicSection> sections = sectionRepository
-                    .findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(academicClass.getClassId());
-            List<ClassSubjectMapping> mappings = mappingRepository
-                    .findActiveWithSubjectByClassId(academicClass.getClassId());
+                    .findByAcademicGroup_AcademicGroupIdAndActiveTrueOrderByDisplayOrderAsc(academicGroup.getAcademicGroupId());
+            List<AcademicGroupSubjectMapping> mappings = mappingRepository
+                    .findActiveWithSubjectByAcademicGroupId(academicGroup.getAcademicGroupId());
 
             for (AcademicSection section : sections) {
-                for (ClassSubjectMapping mapping : mappings) {
+                for (AcademicGroupSubjectMapping mapping : mappings) {
                     TeacherAllocation allocation = allocationRepository
-                            .findBySection_SectionIdAndClassSubjectMapping_ClassSubjectMappingId(
-                                    section.getSectionId(), mapping.getClassSubjectMappingId())
+                            .findBySection_SectionIdAndAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(
+                                    section.getSectionId(), mapping.getAcademicGroupSubjectMappingId())
                             .orElse(null);
                     if (allocation == null) {
-                        rows.add(toVirtualRow(year, academicClass, section, mapping, maxPeriods));
+                        rows.add(toVirtualRow(year, academicGroup, section, mapping, maxPeriods));
                     } else {
                         rows.add(toRow(allocation, maxPeriods, workloadByStaff));
                     }
@@ -396,19 +396,19 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
 
     private TeacherAllocationRowResponse toVirtualRow(
             AcademicYear year,
-            AcademicClass academicClass,
+            AcademicGroup academicGroup,
             AcademicSection section,
-            ClassSubjectMapping mapping,
+            AcademicGroupSubjectMapping mapping,
             int maxPeriods) {
         return TeacherAllocationRowResponse.builder()
                 .teacherAllocationId(null)
                 .academicYearId(year.getAcademicYearId())
-                .classId(academicClass.getClassId())
-                .className(academicClass.getName())
-                .classCode(academicClass.getCode())
+                .academicGroupId(academicGroup.getAcademicGroupId())
+                .academicGroupName(academicGroup.getName())
+                .academicGroupCode(academicGroup.getCode())
                 .sectionId(section.getSectionId())
                 .sectionName(section.getName())
-                .classSubjectMappingId(mapping.getClassSubjectMappingId())
+                .academicGroupSubjectMappingId(mapping.getAcademicGroupSubjectMappingId())
                 .subjectId(mapping.getSubject().getSubjectId())
                 .subjectName(mapping.getSubject().getName())
                 .subjectCode(mapping.getSubject().getCode())
@@ -427,8 +427,8 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
     private TeacherAllocationRowResponse toRow(
             TeacherAllocation allocation, int maxPeriods, Map<Long, Integer> workloadByStaff) {
         AcademicSection section = allocation.getSection();
-        AcademicClass academicClass = section.getAcademicClass();
-        ClassSubjectMapping mapping = allocation.getClassSubjectMapping();
+        AcademicGroup academicGroup = section.getAcademicGroup();
+        AcademicGroupSubjectMapping mapping = allocation.getAcademicGroupSubjectMapping();
 
         TeacherAllocationTeacher primary = allocation.getTeacherAllocationId() == null
                 ? null
@@ -452,13 +452,13 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
 
         return TeacherAllocationRowResponse.builder()
                 .teacherAllocationId(allocation.getTeacherAllocationId())
-                .academicYearId(academicClass.getAcademicYear().getAcademicYearId())
-                .classId(academicClass.getClassId())
-                .className(academicClass.getName())
-                .classCode(academicClass.getCode())
+                .academicYearId(academicGroup.getAcademicYear().getAcademicYearId())
+                .academicGroupId(academicGroup.getAcademicGroupId())
+                .academicGroupName(academicGroup.getName())
+                .academicGroupCode(academicGroup.getCode())
                 .sectionId(section.getSectionId())
                 .sectionName(section.getName())
-                .classSubjectMappingId(mapping.getClassSubjectMappingId())
+                .academicGroupSubjectMappingId(mapping.getAcademicGroupSubjectMappingId())
                 .subjectId(mapping.getSubject().getSubjectId())
                 .subjectName(mapping.getSubject().getName())
                 .subjectCode(mapping.getSubject().getCode())
@@ -502,7 +502,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
             if (row.getRole() != TeacherAllocationTeacherRole.PRIMARY) {
                 continue;
             }
-            Short weekly = row.getTeacherAllocation().getClassSubjectMapping().getWeeklyPeriods();
+            Short weekly = row.getTeacherAllocation().getAcademicGroupSubjectMapping().getWeeklyPeriods();
             if (weekly == null) {
                 continue;
             }
@@ -542,7 +542,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
     }
 
     private int resolveMaxWeeklyPeriods(Long yearId) {
-        return timetableConfigurationRepository.findByAcademicYear_AcademicYearId(yearId).stream()
+        return TimetableConfigurationRepository.findByAcademicYear_AcademicYearId(yearId).stream()
                 .filter(TimetableConfiguration::isActive)
                 .map(TimetableConfiguration::getMaxTeacherWeeklyPeriods)
                 .filter(Objects::nonNull)
@@ -552,8 +552,8 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
     }
 
     private boolean hasConfiguredMax(Long yearId) {
-        return timetableConfigurationRepository.findByAcademicYear_AcademicYearId(yearId).stream()
-                .anyMatch(c -> c.isActive() && c.getMaxTeacherWeeklyPeriods() != null);
+        return TimetableConfigurationRepository.findByAcademicYear_AcademicYearId(yearId).stream()
+                .anyMatch(A -> A.isActive() && A.getMaxTeacherWeeklyPeriods() != null);
     }
 
     private String workloadStatus(int assigned, int max) {
@@ -563,15 +563,15 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
         return "AVAILABLE";
     }
 
-    private ClassTeacherAssignmentResponse toClassTeacherResponse(ClassTeacherAssignment assignment) {
+    private SectionTeacherAssignmentResponse toSectionTeacherResponse(SectionTeacherAssignment assignment) {
         AcademicSection section = assignment.getSection();
-        AcademicClass academicClass = section.getAcademicClass();
-        return ClassTeacherAssignmentResponse.builder()
-                .classTeacherAssignmentId(assignment.getClassTeacherAssignmentId())
+        AcademicGroup academicGroup = section.getAcademicGroup();
+        return SectionTeacherAssignmentResponse.builder()
+                .sectionTeacherAssignmentId(assignment.getSectionTeacherAssignmentId())
                 .sectionId(section.getSectionId())
                 .sectionName(section.getName())
-                .classId(academicClass == null ? null : academicClass.getClassId())
-                .className(academicClass == null ? null : academicClass.getName())
+                .academicGroupId(academicGroup == null ? null : academicGroup.getAcademicGroupId())
+                .academicGroupName(academicGroup == null ? null : academicGroup.getName())
                 .staffId(assignment.getStaff().getStaffId())
                 .staffName(staffDisplayName(assignment.getStaff()))
                 .effectiveFrom(assignment.getEffectiveFrom())

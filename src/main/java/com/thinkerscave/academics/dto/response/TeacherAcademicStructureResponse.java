@@ -13,13 +13,13 @@ public class TeacherAcademicStructureResponse {
 
     private Long academicYearId;
     private String academicYearName;
-    private List<ClassNode> classes;
+    private List<AcademicGroupNode> academicGroups;
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class ClassNode {
-        private Long classId;
-        private String className;
-        private String classCode;
+    public static class AcademicGroupNode {
+        private Long academicGroupId;
+        private String academicGroupName;
+        private String academicGroupCode;
         private List<SectionNode> sections;
     }
 

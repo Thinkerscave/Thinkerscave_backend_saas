@@ -52,8 +52,8 @@ public class AcademicYearResponse {
     @Setter
     @Builder
     public static class YearStructureStats {
-        private long classesTotal;
-        private long classesActive;
+        private long academicGroupsTotal;
+        private long academicGroupsActive;
         private long sectionsTotal;
         private long sectionsActive;
         private long subjectsTotal;

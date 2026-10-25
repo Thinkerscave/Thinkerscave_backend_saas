@@ -8,7 +8,7 @@ import java.time.LocalDate;
 
 @Getter
 @Setter
-public class ClassTeacherAssignmentRequest {
+public class SectionTeacherAssignmentRequest {
 
     @NotNull(message = "Section ID is mandatory")
     private Long sectionId;

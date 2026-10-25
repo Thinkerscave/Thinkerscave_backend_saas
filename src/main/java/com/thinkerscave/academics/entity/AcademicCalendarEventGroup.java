@@ -11,16 +11,16 @@ import lombok.Setter;
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Table(
-        name = "academic_calendar_event_class",
+        name = "academic_calendar_event_group",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_ace_class", columnNames = {"event_id", "class_id"})
+                @UniqueConstraint(name = "uk_ace_group", columnNames = {"event_id", "academic_group_id"})
         },
         indexes = {
-                @Index(name = "idx_ace_class_event", columnList = "event_id"),
-                @Index(name = "idx_ace_class_class", columnList = "class_id")
+                @Index(name = "idx_ace_group_event", columnList = "event_id"),
+                @Index(name = "idx_ace_group_group", columnList = "academic_group_id")
         }
 )
-public class AcademicCalendarEventClass {
+public class AcademicCalendarEventGroup {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,6 +35,6 @@ public class AcademicCalendarEventClass {
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "class_id", nullable = false)
-    private AcademicClass academicClass;
+    @JoinColumn(name = "academic_group_id", nullable = false)
+    private AcademicGroup academicGroup;
 }

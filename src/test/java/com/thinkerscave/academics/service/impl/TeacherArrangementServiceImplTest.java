@@ -60,7 +60,7 @@ class TeacherArrangementServiceImplTest {
         assertEquals(1, slots.size());
         assertEquals(List.of(new TeacherArrangementEligibleSlotResponse.StaffOption(2L, "Available Teacher")),
                 slots.get(0).candidates());
-        assertEquals("Class II", slots.get(0).className());
+        assertEquals("Class II", slots.get(0).academicGroupName());
         assertEquals("A", slots.get(0).sectionName());
     }
 

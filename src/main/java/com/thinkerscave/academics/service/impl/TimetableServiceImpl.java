@@ -79,13 +79,13 @@ public class TimetableServiceImpl implements TimetableService {
         TimetablePlanningData data = planningDataLoader.load(yearId);
         TimetableReadinessResponse readiness = readinessEvaluator.evaluate(data);
         List<TimetableDashboardResponse.ReadinessItem> checks = readiness.getChecks().stream()
-                .map(c -> TimetableDashboardResponse.ReadinessItem.builder()
-                        .key(c.getCode())
-                        .label(c.getTitle() != null ? c.getTitle() : c.getCode())
-                        .status(c.getStatus() == TimetableReadinessResponse.ReadinessStatus.PASSED ? "PASS"
-                                : c.getStatus() == TimetableReadinessResponse.ReadinessStatus.WARNING ? "WARN" : "FAIL")
-                        .message(c.getMessage())
-                        .blocking(c.getSeverity() == TimetableReadinessResponse.ReadinessSeverity.BLOCKING)
+                .map(A -> TimetableDashboardResponse.ReadinessItem.builder()
+                        .key(A.getCode())
+                        .label(A.getTitle() != null ? A.getTitle() : A.getCode())
+                        .status(A.getStatus() == TimetableReadinessResponse.ReadinessStatus.PASSED ? "PASS"
+                                : A.getStatus() == TimetableReadinessResponse.ReadinessStatus.WARNING ? "WARN" : "FAIL")
+                        .message(A.getMessage())
+                        .blocking(A.getSeverity() == TimetableReadinessResponse.ReadinessSeverity.BLOCKING)
                         .build())
                 .toList();
 
@@ -128,17 +128,17 @@ public class TimetableServiceImpl implements TimetableService {
         Comparator<Integer> order = Comparator.nullsLast(Comparator.naturalOrder());
         List<AcademicSection> sections = data.getSections().stream()
                 .sorted(Comparator
-                        .comparing((AcademicSection s) -> s.getAcademicClass().getDisplayOrder(), order)
-                        .thenComparing(s -> Objects.toString(s.getAcademicClass().getName(), ""))
+                        .comparing((AcademicSection s) -> s.getAcademicGroup().getDisplayOrder(), order)
+                        .thenComparing(s -> Objects.toString(s.getAcademicGroup().getName(), ""))
                         .thenComparing(AcademicSection::getDisplayOrder, order)
                         .thenComparing(s -> Objects.toString(s.getName(), "")))
                 .toList();
 
-        Map<Long, TimetableFiltersResponse.ClassOption> classes = new LinkedHashMap<>();
+        Map<Long, TimetableFiltersResponse.AcademicGroupOption> academicGroups = new LinkedHashMap<>();
         for (AcademicSection s : sections) {
-            AcademicClass cls = s.getAcademicClass();
-            classes.computeIfAbsent(cls.getClassId(),
-                            id -> new TimetableFiltersResponse.ClassOption(id, cls.getName(), new ArrayList<>()))
+            AcademicGroup cls = s.getAcademicGroup();
+            academicGroups.computeIfAbsent(cls.getAcademicGroupId(),
+                            id -> new TimetableFiltersResponse.AcademicGroupOption(id, cls.getName(), new ArrayList<>()))
                     .getSections()
                     .add(new TimetableFiltersResponse.Option(s.getSectionId(), s.getName()));
         }
@@ -156,7 +156,7 @@ public class TimetableServiceImpl implements TimetableService {
                 .map(r -> new TimetableFiltersResponse.Option(r.getAcademicResourceId(), r.getName()))
                 .toList();
 
-        return new TimetableFiltersResponse(new ArrayList<>(classes.values()), teacherOptions, roomOptions);
+        return new TimetableFiltersResponse(new ArrayList<>(academicGroups.values()), teacherOptions, roomOptions);
     }
 
     // ─── Configuration ────────────────────────────────────────────────────
@@ -217,7 +217,7 @@ public class TimetableServiceImpl implements TimetableService {
         List<TimetableConfiguration> all = configurationRepository.findByAcademicYear_AcademicYearId(yearId);
         TimetableConfiguration active = TimetablePlanningDataLoader.selectActive(all);
         TimetableConfiguration config = all.stream()
-                .filter(c -> c.getShiftType() == shift)
+                .filter(A -> A.getShiftType() == shift)
                 .findFirst()
                 .orElse(null);
         if (config == null && active != null && !Boolean.TRUE.equals(active.getIsLocked())) {
@@ -550,7 +550,7 @@ public class TimetableServiceImpl implements TimetableService {
 
     @Override
     @Transactional(readOnly = true)
-    public TimetableGridResponse getGrid(Long versionId, String view, Long classId,
+    public TimetableGridResponse getGrid(Long versionId, String view, Long academicGroupId,
                                          Long sectionId, Long staffId, Long resourceId) {
         if ("TEACHER".equalsIgnoreCase(view) && !accessGuard.hasElevatedRole()) {
             accessGuard.requireView(AcademicsAccessGuard.RESOURCE_MY_TIMETABLE);
@@ -597,10 +597,10 @@ public class TimetableServiceImpl implements TimetableService {
             entries = entries.stream()
                     .filter(e -> e.getSection() != null && Objects.equals(e.getSection().getSectionId(), sectionId))
                     .toList();
-        } else if (classId != null) {
+        } else if (academicGroupId != null) {
             entries = entries.stream()
-                    .filter(e -> e.getSection() != null && e.getSection().getAcademicClass() != null
-                            && Objects.equals(e.getSection().getAcademicClass().getClassId(), classId))
+                    .filter(e -> e.getSection() != null && e.getSection().getAcademicGroup() != null
+                            && Objects.equals(e.getSection().getAcademicGroup().getAcademicGroupId(), academicGroupId))
                     .toList();
         }
 
@@ -625,7 +625,7 @@ public class TimetableServiceImpl implements TimetableService {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_TIMETABLE);
         requireVersion(versionId);
         return conflictRepository.findDetailedByVersion(versionId).stream()
-                .map(c -> toConflictResponse(c, versionId))
+                .map(A -> toConflictResponse(A, versionId))
                 .toList();
     }
 
@@ -796,7 +796,7 @@ public class TimetableServiceImpl implements TimetableService {
 
     private static String describeBlocking(TimetableReadinessResponse readiness) {
         return readiness.getBlockingIssues().stream()
-                .map(c -> (c.getTitle() != null ? c.getTitle() : c.getCode()) + " — " + c.getMessage())
+                .map(A -> (A.getTitle() != null ? A.getTitle() : A.getCode()) + " — " + A.getMessage())
                 .collect(Collectors.joining("; "));
     }
 
@@ -1136,8 +1136,8 @@ public class TimetableServiceImpl implements TimetableService {
                 .entryType(entry.getEntryType())
                 .sectionId(section == null ? null : section.getSectionId())
                 .sectionName(section == null ? null : section.getName())
-                .className(section == null || section.getAcademicClass() == null
-                        ? null : section.getAcademicClass().getName())
+                .academicGroupName(section == null || section.getAcademicGroup() == null
+                        ? null : section.getAcademicGroup().getName())
                 .subjectName(entry.getSubjectNameSnapshot())
                 .staffId(teacher == null ? null : teacher.getStaffId())
                 .staffName(teacher == null ? null : TimetablePlanningData.staffName(teacher))
@@ -1146,30 +1146,30 @@ public class TimetableServiceImpl implements TimetableService {
                 .build();
     }
 
-    private TimetableConflictResponse toConflictResponse(TimetableConflict c, Long versionId) {
-        AcademicSection section = c.getSection();
+    private TimetableConflictResponse toConflictResponse(TimetableConflict A, Long versionId) {
+        AcademicSection section = A.getSection();
         return TimetableConflictResponse.builder()
-                .timetableConflictId(c.getTimetableConflictId())
+                .timetableConflictId(A.getTimetableConflictId())
                 .timetableVersionId(versionId)
-                .conflictType(c.getConflictType())
-                .blocking(c.getBlocking())
-                .status(c.getStatus())
-                .message(c.getMessage())
-                .entryId(c.getTimetableEntry() == null ? null : c.getTimetableEntry().getTimetableEntryId())
-                .relatedEntryId(c.getRelatedTimetableEntry() == null
-                        ? null : c.getRelatedTimetableEntry().getTimetableEntryId())
+                .conflictType(A.getConflictType())
+                .blocking(A.getBlocking())
+                .status(A.getStatus())
+                .message(A.getMessage())
+                .entryId(A.getTimetableEntry() == null ? null : A.getTimetableEntry().getTimetableEntryId())
+                .relatedEntryId(A.getRelatedTimetableEntry() == null
+                        ? null : A.getRelatedTimetableEntry().getTimetableEntryId())
                 .sectionId(section == null ? null : section.getSectionId())
                 .sectionName(section == null ? null : section.getName())
-                .className(section == null || section.getAcademicClass() == null
-                        ? null : section.getAcademicClass().getName())
-                .teacherAllocationId(c.getTeacherAllocation() == null
-                        ? null : c.getTeacherAllocation().getTeacherAllocationId())
-                .resourceId(c.getResource() == null ? null : c.getResource().getAcademicResourceId())
-                .dayOfWeek(c.getDayOfWeek())
-                .periodId(c.getTimetablePeriod() == null ? null : c.getTimetablePeriod().getTimetablePeriodId())
-                .periodName(c.getTimetablePeriod() == null ? null : c.getTimetablePeriod().getName())
-                .resolvedAt(c.getResolvedAt())
-                .resolvedByUserId(c.getResolvedByUserId())
+                .academicGroupName(section == null || section.getAcademicGroup() == null
+                        ? null : section.getAcademicGroup().getName())
+                .teacherAllocationId(A.getTeacherAllocation() == null
+                        ? null : A.getTeacherAllocation().getTeacherAllocationId())
+                .resourceId(A.getResource() == null ? null : A.getResource().getAcademicResourceId())
+                .dayOfWeek(A.getDayOfWeek())
+                .periodId(A.getTimetablePeriod() == null ? null : A.getTimetablePeriod().getTimetablePeriodId())
+                .periodName(A.getTimetablePeriod() == null ? null : A.getTimetablePeriod().getName())
+                .resolvedAt(A.getResolvedAt())
+                .resolvedByUserId(A.getResolvedByUserId())
                 .build();
     }
 

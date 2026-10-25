@@ -12,8 +12,8 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
-public class AcademicClassResponse {
-    private Long classId;
+public class AcademicGroupResponse {
+    private Long academicGroupId;
     private Long academicYearId;
     private String academicYearName;
     private AcademicYearStatus academicYearStatus;
@@ -22,6 +22,7 @@ public class AcademicClassResponse {
     private String name;
     private String code;
     private AcademicStage stage;
+    private String description;
     private Integer displayOrder;
     private Boolean active;
 
@@ -34,10 +35,10 @@ public class AcademicClassResponse {
      * always null and kept only for JSON compatibility with older clients.
      */
     @Deprecated
-    private String classTeacherName;
-    /** @deprecated See {@link #classTeacherName}. */
+    private String sectionTeacherName;
+    /** @deprecated See {@link #sectionTeacherName}. */
     @Deprecated
-    private Long classTeacherStaffId;
+    private Long sectionTeacherStaffId;
 
     private List<AcademicSectionResponse> sections;
 
@@ -47,11 +48,11 @@ public class AcademicClassResponse {
     private LocalDateTime updatedOn;
 
     /** Compatibility aliases used by legacy FE callers. */
-    public String getClassName() {
+    public String getAcademicGroupName() {
         return name;
     }
 
-    public String getClassCode() {
+    public String getAcademicGroupCode() {
         return code;
     }
 

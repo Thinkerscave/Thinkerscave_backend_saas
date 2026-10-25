@@ -1,9 +1,9 @@
 package com.thinkerscave.academics.controller;
 
-import com.thinkerscave.academics.dto.request.ClassSubjectMappingRequest;
+import com.thinkerscave.academics.dto.request.AcademicGroupSubjectMappingRequest;
 import com.thinkerscave.academics.dto.request.SubjectRequest;
-import com.thinkerscave.academics.dto.response.ClassMappingBoardResponse;
-import com.thinkerscave.academics.dto.response.ClassSubjectMappingResponse;
+import com.thinkerscave.academics.dto.response.AcademicGroupMappingBoardResponse;
+import com.thinkerscave.academics.dto.response.AcademicGroupSubjectMappingResponse;
 import com.thinkerscave.academics.dto.response.SubjectResponse;
 import com.thinkerscave.academics.dto.response.SubjectsMappingDashboardResponse;
 import com.thinkerscave.academics.enums.SubjectCategory;
@@ -22,7 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/academics")
 @RequiredArgsConstructor
-@Tag(name = "Subjects & Mapping", description = "Manage subjects and class-subject mapping")
+@Tag(name = "Subjects & Mapping", description = "Manage subjects and Academic Group curriculum mapping")
 public class SubjectController {
 
     private final SubjectService subjectService;
@@ -86,21 +86,21 @@ public class SubjectController {
                 "Subject activated", subjectService.activate(subjectId)));
     }
 
-    @GetMapping("/classes/{classId}/subject-mappings")
+    @GetMapping("/academic-groups/{academicGroupId}/subject-mappings")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
-    @Operation(summary = "Class subject mapping board")
-    public ResponseEntity<ApiResponse<ClassMappingBoardResponse>> classMappingBoard(
-            @PathVariable Long classId) {
+    @Operation(summary = "Academic Group subject mapping board")
+    public ResponseEntity<ApiResponse<AcademicGroupMappingBoardResponse>> classMappingBoard(
+            @PathVariable Long academicGroupId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Class mapping board", subjectService.getClassMappingBoard(classId)));
+                "Academic Group mapping board", subjectService.getAcademicGroupMappingBoard(academicGroupId)));
     }
 
-    @PutMapping("/classes/{classId}/subject-mappings")
+    @PutMapping("/academic-groups/{academicGroupId}/subject-mappings")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Include/update or exclude a subject for a class")
-    public ResponseEntity<ApiResponse<ClassSubjectMappingResponse>> upsertMapping(
-            @PathVariable Long classId, @Valid @RequestBody ClassSubjectMappingRequest request) {
+    @Operation(summary = "Include/update or exclude a subject for an Academic Group")
+    public ResponseEntity<ApiResponse<AcademicGroupSubjectMappingResponse>> upsertMapping(
+            @PathVariable Long academicGroupId, @Valid @RequestBody AcademicGroupSubjectMappingRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Class subject mapping saved", subjectService.upsertClassMapping(classId, request)));
+                "Academic Group subject mapping saved", subjectService.upsertAcademicGroupMapping(academicGroupId, request)));
     }
 }

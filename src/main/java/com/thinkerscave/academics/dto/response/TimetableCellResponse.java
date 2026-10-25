@@ -18,7 +18,7 @@ public class TimetableCellResponse {
     private TimetableEntryType entryType;
     private Long sectionId;
     private String sectionName;
-    private String className;
+    private String academicGroupName;
     private String subjectName;
     private Long staffId;
     private String staffName;

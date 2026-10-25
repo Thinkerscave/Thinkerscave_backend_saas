@@ -97,7 +97,7 @@ public class AcademicCalendarEvent extends Auditable {
     private LocalDateTime publishedOn;
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<AcademicCalendarEventClass> classes = new ArrayList<>();
+    private List<AcademicCalendarEventGroup> academicGroups = new ArrayList<>();
 
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AcademicCalendarEventSection> sections = new ArrayList<>();

@@ -24,7 +24,7 @@ public class MyTimetableResponse {
         private String startTime;
         private String endTime;
         private String subjectName;
-        private String className;
+        private String academicGroupName;
         private String sectionName;
         private String roomName;
     }

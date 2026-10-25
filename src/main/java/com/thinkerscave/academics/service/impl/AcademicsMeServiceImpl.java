@@ -3,7 +3,7 @@ package com.thinkerscave.academics.service.impl;
 import com.thinkerscave.academics.dto.response.*;
 import com.thinkerscave.academics.dto.response.MyTimetableResponse.TodayEntry;
 import com.thinkerscave.academics.dto.response.TeacherAcademicStructureResponse.*;
-import com.thinkerscave.academics.dto.response.TeacherMyClassesResponse.*;
+import com.thinkerscave.academics.dto.response.TeacherMyAcademicGroupsResponse.*;
 import com.thinkerscave.academics.entity.*;
 import com.thinkerscave.academics.enums.TimetableSlotKind;
 import com.thinkerscave.academics.enums.TimetableStatus;
@@ -40,15 +40,15 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
     private final StudentRepository studentRepo;
     private final StudentEnrollmentRepository enrollmentRepo;
     private final TeacherAllocationTeacherRepository tatRepo;
-    private final ClassTeacherAssignmentRepository ctaRepo;
-    private final ClassSubjectMappingRepository mappingRepo;
+    private final SectionTeacherAssignmentRepository ctaRepo;
+    private final AcademicGroupSubjectMappingRepository mappingRepo;
     private final TimetableVersionRepository versionRepo;
     private final TimetableService timetableService;
 
-    // ─── Teacher: My Classes ──────────────────────────────────────────────
+    // ─── Teacher: My AcademicGroups ──────────────────────────────────────────────
 
     @Override
-    public TeacherMyClassesResponse getTeacherMyClasses(Long academicYearId) {
+    public TeacherMyAcademicGroupsResponse getTeacherMyAcademicGroups(Long academicYearId) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_MY_CLASSES);
         Long yearId = resolveYearId(academicYearId);
         Staff staff = resolveStaff();
@@ -56,29 +56,29 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
         List<TeacherAllocationTeacher> allocations = tatRepo
                 .findActiveByStaffAndYear(staff.getStaffId(), yearId);
 
-        Set<Long> classTeacherSectionIds = ctaRepo
+        Set<Long> sectionTeacherSectionIds = ctaRepo
                 .findByStaff_StaffIdOrderByEffectiveFromDesc(staff.getStaffId())
                 .stream()
                 .filter(a -> a.isActive() && a.getEffectiveTo() == null)
                 .map(a -> a.getSection().getSectionId())
                 .collect(Collectors.toSet());
 
-        Map<String, ClassCard> cardMap = new LinkedHashMap<>();
+        Map<String, AcademicGrouplard> cardMap = new LinkedHashMap<>();
 
         for (TeacherAllocationTeacher tat : allocations) {
             TeacherAllocation ta = tat.getTeacherAllocation();
             AcademicSection section = ta.getSection();
-            AcademicClass cls = section.getAcademicClass();
-            ClassSubjectMapping csm = ta.getClassSubjectMapping();
+            AcademicGroup cls = section.getAcademicGroup();
+            AcademicGroupSubjectMapping csm = ta.getAcademicGroupSubjectMapping();
 
-            String key = cls.getClassId() + "-" + section.getSectionId();
-            ClassCard card = cardMap.computeIfAbsent(key, k -> {
+            String key = cls.getAcademicGroupId() + "-" + section.getSectionId();
+            AcademicGrouplard card = cardMap.computeIfAbsent(key, k -> {
                 Integer studentCount = null;
                 try {
                     studentCount = (int) enrollmentRepo.countBySectionSectionIdAndActiveTrue(section.getSectionId());
                 } catch (Exception ignored) {
                     try {
-                        studentCount = (int) enrollmentRepo.countByClassEntityClassIdAndActiveTrue(cls.getClassId());
+                        studentCount = (int) enrollmentRepo.countByAcademicGroupEntityAcademicGroupIdAndActiveTrue(cls.getAcademicGroupId());
                     } catch (Exception ignored2) {
                     }
                 }
@@ -86,16 +86,16 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
                 if (section.getDefaultResource() != null) {
                     roomName = section.getDefaultResource().getName();
                 }
-                return ClassCard.builder()
-                        .classId(cls.getClassId())
-                        .className(cls.getName())
-                        .classCode(cls.getCode())
+                return AcademicGrouplard.builder()
+                        .academicGroupId(cls.getAcademicGroupId())
+                        .academicGroupName(cls.getName())
+                        .academicGroupCode(cls.getCode())
                         .sectionId(section.getSectionId())
                         .sectionName(section.getName())
                         .studentCount(studentCount)
                         .roomName(roomName)
                         .subjects(new ArrayList<>())
-                        .classTeacher(classTeacherSectionIds.contains(section.getSectionId()))
+                        .sectionTeacher(sectionTeacherSectionIds.contains(section.getSectionId()))
                         .build();
             });
 
@@ -107,32 +107,32 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
                     .build());
         }
 
-        List<ClassCard> cards = new ArrayList<>(cardMap.values());
-        int classCount = (int) cards.stream().map(ClassCard::getClassId).distinct().count();
+        List<AcademicGrouplard> cards = new ArrayList<>(cardMap.values());
+        int academicGroupCount = (int) cards.stream().map(AcademicGrouplard::getAcademicGroupId).distinct().count();
         int sectionCount = cards.size();
         int subjectCount = (int) cards.stream()
-                .flatMap(c -> c.getSubjects().stream())
+                .flatMap(A -> A.getSubjects().stream())
                 .map(SubjectSlot::getSubjectId)
                 .distinct().count();
         int weeklyPeriods = cards.stream()
-                .flatMap(c -> c.getSubjects().stream())
+                .flatMap(A -> A.getSubjects().stream())
                 .mapToInt(SubjectSlot::getWeeklyPeriods)
                 .sum();
         int studentCount = cards.stream()
-                .map(ClassCard::getStudentCount)
+                .map(AcademicGrouplard::getStudentCount)
                 .filter(Objects::nonNull)
                 .mapToInt(Integer::intValue)
                 .sum();
 
-        return TeacherMyClassesResponse.builder()
+        return TeacherMyAcademicGroupsResponse.builder()
                 .summary(Summary.builder()
-                        .classCount(classCount)
+                        .academicGroupCount(academicGroupCount)
                         .sectionCount(sectionCount)
                         .subjectCount(subjectCount)
                         .weeklyPeriods(weeklyPeriods)
                         .studentCount(studentCount)
                         .build())
-                .classes(cards)
+                .academicGroups(cards)
                 .build();
     }
 
@@ -181,7 +181,7 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
     private MyTimetableResponse buildStudentTimetable(Long yearId) {
         Student student = resolveStudent();
         StudentEnrollment enrollment = enrollmentRepo
-                .findActiveWithClassByStudentId(student.getStudentId())
+                .findActiveWithAcademicGroupByStudentId(student.getStudentId())
                 .orElseThrow(() -> new BusinessException("No active enrollment found"));
 
         Long sectionId = enrollment.getSection() != null
@@ -210,7 +210,7 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
 
         TimetableVersion version = pubVersion.get();
         TimetableGridResponse grid = timetableService.getGrid(
-                version.getTimetableVersionId(), "CLASS", null, sectionId, null, null);
+                version.getTimetableVersionId(), "ACADEMIC_GROUP", null, sectionId, null, null);
 
         List<TodayEntry> today = extractTodaySchedule(grid);
 
@@ -237,22 +237,22 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
         }
 
         return grid.getCells().stream()
-                .filter(c -> c.getDayOfWeek() == today)
+                .filter(A -> A.getDayOfWeek() == today)
                 .sorted(Comparator.comparing(TimetableCellResponse::getPeriodNumber,
                         Comparator.nullsLast(Comparator.naturalOrder())))
-                .map(c -> {
-                    TimetablePeriodResponse period = periodMap.get(c.getPeriodNumber());
+                .map(A -> {
+                    TimetablePeriodResponse period = periodMap.get(A.getPeriodNumber());
                     return TodayEntry.builder()
-                            .periodNumber(c.getPeriodNumber() != null ? c.getPeriodNumber() : 0)
+                            .periodNumber(A.getPeriodNumber() != null ? A.getPeriodNumber() : 0)
                             .periodLabel(period != null ? period.getName() : null)
                             .startTime(period != null && period.getStartTime() != null
                                     ? period.getStartTime().toString() : null)
                             .endTime(period != null && period.getEndTime() != null
                                     ? period.getEndTime().toString() : null)
-                            .subjectName(c.getSubjectName())
-                            .className(c.getClassName())
-                            .sectionName(c.getSectionName())
-                            .roomName(c.getResourceName())
+                            .subjectName(A.getSubjectName())
+                            .academicGroupName(A.getAcademicGroupName())
+                            .sectionName(A.getSectionName())
+                            .roomName(A.getResourceName())
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -272,19 +272,19 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
         List<TeacherAllocationTeacher> allocations = tatRepo
                 .findActiveByStaffAndYear(staff.getStaffId(), yearId);
 
-        Map<Long, ClassNode> classNodeMap = new LinkedHashMap<>();
+        Map<Long, AcademicGroupNode> classNodeMap = new LinkedHashMap<>();
 
         for (TeacherAllocationTeacher tat : allocations) {
             TeacherAllocation ta = tat.getTeacherAllocation();
             AcademicSection section = ta.getSection();
-            AcademicClass cls = section.getAcademicClass();
-            ClassSubjectMapping csm = ta.getClassSubjectMapping();
+            AcademicGroup cls = section.getAcademicGroup();
+            AcademicGroupSubjectMapping csm = ta.getAcademicGroupSubjectMapping();
 
-            ClassNode classNode = classNodeMap.computeIfAbsent(cls.getClassId(), k ->
-                    ClassNode.builder()
-                            .classId(cls.getClassId())
-                            .className(cls.getName())
-                            .classCode(cls.getCode())
+            AcademicGroupNode classNode = classNodeMap.computeIfAbsent(cls.getAcademicGroupId(), k ->
+                    AcademicGroupNode.builder()
+                            .academicGroupId(cls.getAcademicGroupId())
+                            .academicGroupName(cls.getName())
+                            .academicGroupCode(cls.getCode())
                             .sections(new ArrayList<>())
                             .build());
 
@@ -313,7 +313,7 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
         return TeacherAcademicStructureResponse.builder()
                 .academicYearId(yearId)
                 .academicYearName(year.getName())
-                .classes(new ArrayList<>(classNodeMap.values()))
+                .academicGroups(new ArrayList<>(classNodeMap.values()))
                 .build();
     }
 
@@ -325,15 +325,15 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
         Student student = resolveStudent();
 
         StudentEnrollment enrollment = enrollmentRepo
-                .findActiveWithClassByStudentId(student.getStudentId())
+                .findActiveWithAcademicGroupByStudentId(student.getStudentId())
                 .orElseThrow(() -> new BusinessException("No active enrollment found"));
 
-        AcademicClass cls = enrollment.getClassEntity();
+        AcademicGroup cls = enrollment.getAcademicGroupEntity();
         AcademicSection section = enrollment.getSection();
         AcademicYear year = enrollment.getAcademicYear();
 
-        List<ClassSubjectMapping> mappings = mappingRepo
-                .findActiveWithSubjectByClassId(cls.getClassId());
+        List<AcademicGroupSubjectMapping> mappings = mappingRepo
+                .findActiveWithSubjectByAcademicGroupId(cls.getAcademicGroupId());
 
         List<StudentMyAcademicsResponse.SubjectInfo> subjects = mappings.stream()
                 .map(m -> StudentMyAcademicsResponse.SubjectInfo.builder()
@@ -344,17 +344,17 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
                         .build())
                 .collect(Collectors.toList());
 
-        StudentMyAcademicsResponse.ClassTeacherInfo ctInfo = null;
+        StudentMyAcademicsResponse.SectionTeacherInfo ctInfo = null;
         if (section != null) {
             ctaRepo.findFirstBySection_SectionIdAndActiveTrueAndEffectiveToIsNullOrderByEffectiveFromDesc(
                     section.getSectionId()).ifPresent(cta -> {});
 
-            Optional<ClassTeacherAssignment> cta = ctaRepo
+            Optional<SectionTeacherAssignment> cta = ctaRepo
                     .findFirstBySection_SectionIdAndActiveTrueAndEffectiveToIsNullOrderByEffectiveFromDesc(
                             section.getSectionId());
             if (cta.isPresent()) {
                 Staff teacher = cta.get().getStaff();
-                ctInfo = StudentMyAcademicsResponse.ClassTeacherInfo.builder()
+                ctInfo = StudentMyAcademicsResponse.SectionTeacherInfo.builder()
                         .staffId(teacher.getStaffId())
                         .staffName(teacher.getFirstName() + " " + teacher.getLastName())
                         .build();
@@ -369,15 +369,15 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
         return StudentMyAcademicsResponse.builder()
                 .studentName(student.getFirstName() + " " + student.getLastName())
                 .admissionNumber(student.getAdmissionNumber())
-                .classId(cls.getClassId())
-                .className(cls.getName())
+                .academicGroupId(cls.getAcademicGroupId())
+                .academicGroupName(cls.getName())
                 .sectionId(section != null ? section.getSectionId() : null)
                 .sectionName(section != null ? section.getName() : null)
                 .rollNumber(enrollment.getRollNumber())
                 .academicYearId(yearId)
                 .academicYearName(year != null ? year.getName() : null)
                 .subjects(subjects)
-                .classTeacher(ctInfo)
+                .sectionTeacher(ctInfo)
                 .publishedTimetableExists(hasTimetable)
                 .build();
     }

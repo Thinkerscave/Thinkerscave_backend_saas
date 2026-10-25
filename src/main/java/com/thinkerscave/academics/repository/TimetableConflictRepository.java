@@ -31,16 +31,16 @@ public interface TimetableConflictRepository extends JpaRepository<TimetableConf
             Long versionId, TimetableConflictStatus status);
 
     @Query("""
-            SELECT c FROM TimetableConflict c
-            LEFT JOIN FETCH c.section s
-            LEFT JOIN FETCH s.academicClass
-            LEFT JOIN FETCH c.timetablePeriod
-            WHERE c.timetableVersion.timetableVersionId = :versionId
-            ORDER BY c.blocking DESC, c.timetableConflictId ASC
+            SELECT A FROM TimetableConflict A
+            LEFT JOIN FETCH A.section s
+            LEFT JOIN FETCH s.academicGroup
+            LEFT JOIN FETCH A.timetablePeriod
+            WHERE A.timetableVersion.timetableVersionId = :versionId
+            ORDER BY A.blocking DESC, A.timetableConflictId ASC
             """)
     List<TimetableConflict> findDetailedByVersion(@Param("versionId") Long versionId);
 
     @Modifying
-    @Query("DELETE FROM TimetableConflict c WHERE c.timetableVersion.timetableVersionId IN :versionIds")
+    @Query("DELETE FROM TimetableConflict A WHERE A.timetableVersion.timetableVersionId IN :versionIds")
     int deleteByVersionIds(@Param("versionIds") Collection<Long> versionIds);
 }

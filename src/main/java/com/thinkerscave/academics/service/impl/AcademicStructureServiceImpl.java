@@ -1,22 +1,27 @@
 package com.thinkerscave.academics.service.impl;
 
-import com.thinkerscave.academics.dto.request.AcademicClassRequest;
+import com.thinkerscave.academics.dto.request.AcademicGroupRequest;
 import com.thinkerscave.academics.dto.request.AcademicSectionRequest;
-import com.thinkerscave.academics.dto.response.AcademicClassResponse;
+import com.thinkerscave.academics.dto.response.AcademicGroupResponse;
+import com.thinkerscave.academics.dto.response.AcademicGroupSummaryResponse;
 import com.thinkerscave.academics.dto.response.AcademicSectionResponse;
 import com.thinkerscave.academics.dto.response.AcademicStructureTreeResponse;
-import com.thinkerscave.academics.dto.response.ClassesSectionsDashboardResponse;
-import com.thinkerscave.academics.entity.AcademicClass;
+import com.thinkerscave.academics.dto.response.AcademicGroupsDashboardResponse;
+import com.thinkerscave.academics.entity.AcademicGroup;
 import com.thinkerscave.academics.entity.AcademicResource;
 import com.thinkerscave.academics.entity.AcademicSection;
 import com.thinkerscave.academics.entity.AcademicYear;
-import com.thinkerscave.academics.entity.ClassTeacherAssignment;
+import com.thinkerscave.academics.entity.SectionTeacherAssignment;
 import com.thinkerscave.academics.enums.AcademicStage;
 import com.thinkerscave.academics.enums.AcademicYearStatus;
+import com.thinkerscave.academics.enums.TimetableStatus;
 import com.thinkerscave.academics.repository.AcademicResourceRepository;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
-import com.thinkerscave.academics.repository.ClassRepository;
-import com.thinkerscave.academics.repository.ClassTeacherAssignmentRepository;
+import com.thinkerscave.academics.repository.AcademicGroupRepository;
+import com.thinkerscave.academics.repository.AcademicGroupSubjectMappingRepository;
+import com.thinkerscave.academics.repository.SectionTeacherAssignmentRepository;
+import com.thinkerscave.academics.repository.TeacherAllocationTeacherRepository;
+import com.thinkerscave.academics.repository.TimetableVersionRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.academics.security.AcademicsAccessGuard;
 import com.thinkerscave.academics.service.AcademicStructureService;
@@ -34,12 +39,14 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Service
@@ -53,163 +60,186 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     );
 
     private final AcademicYearRepository academicYearRepository;
-    private final ClassRepository classRepository;
+    private final AcademicGroupRepository academicGroupRepository;
     private final SectionRepository sectionRepository;
-    private final ClassTeacherAssignmentRepository classTeacherAssignmentRepository;
+    private final SectionTeacherAssignmentRepository SectionTeacherAssignmentRepository;
     private final AcademicResourceRepository academicResourceRepository;
     private final StaffRepository staffRepository;
     private final StudentEnrollmentRepository studentEnrollmentRepository;
+    private final AcademicGroupSubjectMappingRepository academicGroupSubjectMappingRepository;
+    private final TeacherAllocationTeacherRepository TeacherAllocationTeacherRepository;
+    private final TimetableVersionRepository timetableVersionRepository;
     private final AcademicsAccessGuard accessGuard;
 
     @Override
     @Transactional(readOnly = true)
-    public ClassesSectionsDashboardResponse getDashboard(
+    public AcademicGroupsDashboardResponse getDashboard(
             Long academicYearId, String q, AcademicStage stage, Boolean active) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_CLASSES);
         AcademicYear year = requireYear(academicYearId);
 
-        List<AcademicClass> classes = classRepository
+        List<AcademicGroup> academicGroups = academicGroupRepository
                 .findWithYearByAcademicYearIdOrderByDisplayOrderAsc(academicYearId)
                 .stream()
-                .filter(c -> stage == null || c.getStage() == stage)
-                .filter(c -> active == null || Objects.equals(c.getActive(), active))
-                .filter(c -> matchesQuery(c, q))
+                .filter(A -> stage == null || A.getStage() == stage)
+                .filter(A -> active == null || Objects.equals(A.getActive(), active))
+                .filter(A -> matchesQuery(A, q))
                 .toList();
 
-        List<AcademicClassResponse> classResponses = classes.stream()
-                .map(c -> toClassResponse(c, true, false))
+        // Bulk counts: one query per metric for the whole year, not per group.
+        Map<Long, long[]> sectionCountsByAcademicGroup = new HashMap<>();
+        for (AcademicSection s : sectionRepository.findWithAcademicGroupByYearId(academicYearId)) {
+            long[] counts = sectionCountsByAcademicGroup.computeIfAbsent(s.getAcademicGroup().getAcademicGroupId(), k -> new long[2]);
+            counts[0]++;
+            if (s.isActive()) counts[1]++;
+        }
+        Map<Long, Long> studentsByAcademicGroup = new HashMap<>();
+        for (Object[] row : studentEnrollmentRepository.countActiveByAcademicGroupForYear(academicYearId)) {
+            studentsByAcademicGroup.put((Long) row[0], (Long) row[1]);
+        }
+        List<AcademicGroupResponse> academicGroupResponses = academicGroups.stream()
+                .map(A -> {
+                    long[] counts = sectionCountsByAcademicGroup.getOrDefault(A.getAcademicGroupId(), new long[2]);
+                    return toDirectoryResponse(A, counts[0], counts[1],
+                            studentsByAcademicGroup.getOrDefault(A.getAcademicGroupId(), 0L));
+                })
                 .toList();
 
-        long sectionCount = sectionRepository.countByAcademicClass_AcademicYear_AcademicYearId(academicYearId);
-        long sectionsActive = sectionRepository.countByAcademicClass_AcademicYear_AcademicYearIdAndActiveTrue(academicYearId);
+        long sectionCount = sectionRepository.countByAcademicGroup_AcademicYear_AcademicYearId(academicYearId);
+        long sectionsActive = sectionRepository.countByAcademicGroup_AcademicYear_AcademicYearIdAndActiveTrue(academicYearId);
 
-        return ClassesSectionsDashboardResponse.builder()
+        return AcademicGroupsDashboardResponse.builder()
                 .academicYearId(year.getAcademicYearId())
                 .academicYearName(year.getName())
                 .academicYearStatus(year.getStatus())
                 .yearReadOnly(isYearReadOnly(year))
-                .classCount(classRepository.countByAcademicYear_AcademicYearId(academicYearId))
-                .classesActive(classRepository.countByAcademicYear_AcademicYearIdAndActiveTrue(academicYearId))
+                .academicGroupCount(academicGroupRepository.countByAcademicYear_AcademicYearId(academicYearId))
+                .academicGroupsActive(academicGroupRepository.countByAcademicYear_AcademicYearIdAndActiveTrue(academicYearId))
                 .sectionCount(sectionCount)
                 .sectionsActive(sectionsActive)
                 .studentCount(studentEnrollmentRepository.countByAcademicYearAcademicYearIdAndActiveTrue(academicYearId))
-                .classes(classResponses)
+                .academicGroups(academicGroupResponses)
                 .build();
     }
 
     @Override
-    public AcademicClassResponse createClass(AcademicClassRequest request) {
+    public AcademicGroupResponse createAcademicGroup(AcademicGroupRequest request) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_CLASSES);
         AcademicYear year = requireYear(request.getAcademicYearId());
         assertYearMutable(year);
 
         String name = request.getName().trim();
-        String code = resolveClassCode(request.getCode(), name);
-        validateClassUniqueness(year.getAcademicYearId(), name, code, null);
+        String code = StringUtils.hasText(request.getCode())
+                ? request.getCode().trim().toUpperCase(Locale.ROOT)
+                : generateUniqueAcademicGroupCode(year.getAcademicYearId(), name);
+        validateAcademicGroupUniqueness(year.getAcademicYearId(), name, code, null);
 
-        AcademicClass entity = new AcademicClass();
+        AcademicGroup entity = new AcademicGroup();
         entity.setAcademicYear(year);
         entity.setName(name);
         entity.setCode(code);
         entity.setStage(request.getStage());
+        entity.setDescription(trimToNull(request.getDescription()));
         entity.setDisplayOrder(request.getDisplayOrder() != null
                 ? request.getDisplayOrder()
-                : nextClassDisplayOrder(year.getAcademicYearId()));
+                : nextAcademicGroupDisplayOrder(year.getAcademicYearId()));
         entity.setActive(true);
-        return toClassResponse(classRepository.save(entity), true, false);
+
+        List<AcademicSectionRequest> sectionRequests = request.getSections() == null
+                ? List.of()
+                : request.getSections();
+        validateNewSectionNames(sectionRequests);
+        AcademicGroup saved = academicGroupRepository.save(entity);
+
+        // Sections are saved in this same transaction; any failure rolls back the group too.
+        for (AcademicSectionRequest sectionRequest : sectionRequests) {
+            createSectionEntity(saved, sectionRequest);
+        }
+        return toAcademicGroupResponse(saved, true, true);
     }
 
     @Override
-    public AcademicClassResponse updateClass(Long classId, AcademicClassRequest request) {
+    public AcademicGroupResponse updateAcademicGroup(Long academicGroupId, AcademicGroupRequest request) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_CLASSES);
-        AcademicClass entity = requireClass(classId);
+        AcademicGroup entity = requireAcademicGroup(academicGroupId);
         assertYearMutable(entity.getAcademicYear());
 
         String name = request.getName().trim();
-        String code = resolveClassCode(request.getCode(), name);
-        validateClassUniqueness(entity.getAcademicYear().getAcademicYearId(), name, code, classId);
+        String code = StringUtils.hasText(request.getCode())
+                ? request.getCode().trim().toUpperCase(Locale.ROOT)
+                : entity.getCode();
+        validateAcademicGroupUniqueness(entity.getAcademicYear().getAcademicYearId(), name, code, academicGroupId);
 
         entity.setName(name);
         entity.setCode(code);
         entity.setStage(request.getStage());
+        entity.setDescription(trimToNull(request.getDescription()));
         if (request.getDisplayOrder() != null) {
             entity.setDisplayOrder(request.getDisplayOrder());
         }
-        return toClassResponse(classRepository.save(entity), true, true);
+        return toAcademicGroupResponse(academicGroupRepository.save(entity), true, true);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public AcademicClassResponse getClassById(Long classId) {
+    public AcademicGroupResponse getAcademicGroupById(Long academicGroupId) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_CLASSES);
-        return toClassResponse(requireClass(classId), true, true);
+        return toAcademicGroupResponse(requireAcademicGroup(academicGroupId), true, true);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<AcademicClassResponse> getClassesByYear(Long academicYearId) {
+    public List<AcademicGroupResponse> getAcademicGroupsByYear(Long academicYearId) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_CLASSES);
         requireYear(academicYearId);
-        return classRepository.findWithYearByAcademicYearIdOrderByDisplayOrderAsc(academicYearId).stream()
-                .map(c -> toClassResponse(c, true, false))
+        return academicGroupRepository.findWithYearByAcademicYearIdOrderByDisplayOrderAsc(academicYearId).stream()
+                .map(A -> toAcademicGroupResponse(A, true, false))
                 .toList();
     }
 
     @Override
-    public AcademicClassResponse deactivateClass(Long classId) {
+    public AcademicGroupResponse deactivateAcademicGroup(Long academicGroupId) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_CLASSES);
-        AcademicClass entity = requireClass(classId);
+        AcademicGroup entity = requireAcademicGroup(academicGroupId);
         assertYearMutable(entity.getAcademicYear());
+        long activeStudents = studentEnrollmentRepository.countByAcademicGroupEntityAcademicGroupIdAndActiveTrue(academicGroupId);
+        if (activeStudents > 0) {
+            throw new BusinessException("Cannot deactivate " + entity.getName() + ": " + activeStudents
+                    + " active student(s) are enrolled. Move or withdraw them first.");
+        }
         entity.setActive(false);
-        return toClassResponse(classRepository.save(entity), true, false);
+        return toAcademicGroupResponse(academicGroupRepository.save(entity), true, false);
     }
 
     @Override
-    public AcademicClassResponse activateClass(Long classId) {
+    public AcademicGroupResponse activateAcademicGroup(Long academicGroupId) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_CLASSES);
-        AcademicClass entity = requireClass(classId);
+        AcademicGroup entity = requireAcademicGroup(academicGroupId);
         assertYearMutable(entity.getAcademicYear());
         entity.setActive(true);
-        return toClassResponse(classRepository.save(entity), true, false);
+        return toAcademicGroupResponse(academicGroupRepository.save(entity), true, false);
     }
 
     @Override
-    public AcademicSectionResponse createSection(Long classId, AcademicSectionRequest request) {
+    public AcademicSectionResponse createSection(Long academicGroupId, AcademicSectionRequest request) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_CLASSES);
-        AcademicClass academicClass = requireClass(classId);
-        assertYearMutable(academicClass.getAcademicYear());
+        AcademicGroup academicGroup = requireAcademicGroup(academicGroupId);
+        assertYearMutable(academicGroup.getAcademicYear());
 
-        String name = request.getName().trim();
-        String code = resolveSectionCode(request.getCode(), academicClass.getCode(), name);
-        validateSectionUniqueness(classId, name, code, null);
-
-        AcademicSection section = new AcademicSection();
-        section.setAcademicClass(academicClass);
-        section.setName(name);
-        section.setCode(code);
-        section.setCapacity(request.getCapacity());
-        section.setDisplayOrder(request.getDisplayOrder() != null
-                ? request.getDisplayOrder()
-                : nextSectionDisplayOrder(classId));
-        section.setDefaultResource(resolveResource(request.getDefaultResourceId()));
-        section.setActive(true);
-        AcademicSection saved = sectionRepository.save(section);
-
-        if (request.getClassTeacherStaffId() != null) {
-            assignClassTeacher(saved, request.getClassTeacherStaffId());
-        }
-        return toSectionResponse(saved);
+        return toSectionResponse(createSectionEntity(academicGroup, request));
     }
 
     @Override
     public AcademicSectionResponse updateSection(Long sectionId, AcademicSectionRequest request) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_CLASSES);
         AcademicSection section = requireSection(sectionId);
-        assertYearMutable(section.getAcademicClass().getAcademicYear());
+        assertYearMutable(section.getAcademicGroup().getAcademicYear());
 
         String name = request.getName().trim();
-        String code = resolveSectionCode(request.getCode(), section.getAcademicClass().getCode(), name);
-        validateSectionUniqueness(section.getAcademicClass().getClassId(), name, code, sectionId);
+        String code = StringUtils.hasText(request.getCode())
+                ? request.getCode().trim().toUpperCase(Locale.ROOT)
+                : section.getCode();
+        validateSectionUniqueness(section.getAcademicGroup().getAcademicGroupId(), name, code, sectionId);
 
         section.setName(name);
         section.setCode(code);
@@ -225,10 +255,10 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         AcademicSection saved = sectionRepository.save(section);
 
         // Class teacher belongs to the Section. Null clears the active assignment.
-        if (request.getClassTeacherStaffId() != null) {
-            assignClassTeacher(saved, request.getClassTeacherStaffId());
+        if (request.getSectionTeacherStaffId() != null) {
+            assignSectionTeacher(saved, request.getSectionTeacherStaffId());
         } else {
-            clearClassTeacher(saved);
+            clearSectionTeacher(saved);
         }
         return toSectionResponse(saved);
     }
@@ -242,10 +272,10 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<AcademicSectionResponse> getSectionsByClass(Long classId) {
+    public List<AcademicSectionResponse> getSectionsByAcademicGroup(Long academicGroupId) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_CLASSES);
-        requireClass(classId);
-        return sectionRepository.findWithClassByAcademicClass_ClassIdOrderByDisplayOrderAsc(classId).stream()
+        requireAcademicGroup(academicGroupId);
+        return sectionRepository.findWithAcademicGroupByAcademicGroup_AcademicGroupIdOrderByDisplayOrderAsc(academicGroupId).stream()
                 .map(this::toSectionResponse)
                 .toList();
     }
@@ -254,7 +284,12 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     public AcademicSectionResponse deactivateSection(Long sectionId) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_CLASSES);
         AcademicSection section = requireSection(sectionId);
-        assertYearMutable(section.getAcademicClass().getAcademicYear());
+        assertYearMutable(section.getAcademicGroup().getAcademicYear());
+        long activeStudents = studentEnrollmentRepository.countBySectionSectionIdAndActiveTrue(sectionId);
+        if (activeStudents > 0) {
+            throw new BusinessException("Cannot deactivate " + section.getName() + ": " + activeStudents
+                    + " active student(s) are enrolled. Move or withdraw them first.");
+        }
         section.setActive(false);
         return toSectionResponse(sectionRepository.save(section));
     }
@@ -263,9 +298,26 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     public AcademicSectionResponse activateSection(Long sectionId) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_CLASSES);
         AcademicSection section = requireSection(sectionId);
-        assertYearMutable(section.getAcademicClass().getAcademicYear());
+        assertYearMutable(section.getAcademicGroup().getAcademicYear());
         section.setActive(true);
         return toSectionResponse(sectionRepository.save(section));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AcademicGroupSummaryResponse getGroupSummary(Long academicGroupId) {
+        accessGuard.requireView(AcademicsAccessGuard.RESOURCE_CLASSES);
+        AcademicGroup academicGroup = requireAcademicGroup(academicGroupId);
+        Long yearId = academicGroup.getAcademicYear().getAcademicYearId();
+        return AcademicGroupSummaryResponse.builder()
+                .academicGroupId(academicGroupId)
+                .sectionCount(sectionRepository.countByAcademicGroup_AcademicGroupId(academicGroupId))
+                .activeSectionCount(sectionRepository.countByAcademicGroup_AcademicGroupIdAndActiveTrue(academicGroupId))
+                .studentCount(studentEnrollmentRepository.countByAcademicGroupEntityAcademicGroupIdAndActiveTrue(academicGroupId))
+                .subjectCount(academicGroupSubjectMappingRepository.countByAcademicGroup_AcademicGroupIdAndActiveTrue(academicGroupId))
+                .teacherCount(TeacherAllocationTeacherRepository.countDistinctPrimaryTeachersByAcademicGroup(academicGroupId))
+                .timetableStatus(resolveTimetableStatus(yearId))
+                .build();
     }
 
     @Override
@@ -274,30 +326,30 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_CLASSES);
         requireYear(academicYearId);
 
-        List<AcademicClass> classes = classRepository
+        List<AcademicGroup> academicGroups = academicGroupRepository
                 .findWithYearByAcademicYearIdOrderByDisplayOrderAsc(academicYearId);
 
-        Map<AcademicStage, List<AcademicClass>> byStage = classes.stream()
+        Map<AcademicStage, List<AcademicGroup>> byStage = academicGroups.stream()
                 .collect(Collectors.groupingBy(
-                        AcademicClass::getStage,
+                        AcademicGroup::getStage,
                         LinkedHashMap::new,
                         Collectors.toList()));
 
         List<AcademicStructureTreeResponse> tree = new ArrayList<>();
         for (AcademicStage stage : AcademicStage.values()) {
-            List<AcademicClass> stageClasses = byStage.getOrDefault(stage, List.of());
+            List<AcademicGroup> stageClasses = byStage.getOrDefault(stage, List.of());
             if (stageClasses.isEmpty()) {
                 continue;
             }
-            List<AcademicStructureTreeResponse.ClassNode> classNodes = stageClasses.stream()
-                    .map(c -> AcademicStructureTreeResponse.ClassNode.builder()
-                            .classId(c.getClassId())
-                            .name(c.getName())
-                            .code(c.getCode())
-                            .active(c.getActive())
-                            .displayOrder(c.getDisplayOrder())
+            List<AcademicStructureTreeResponse.AcademicGroupNode> classNodes = stageClasses.stream()
+                    .map(A -> AcademicStructureTreeResponse.AcademicGroupNode.builder()
+                            .academicGroupId(A.getAcademicGroupId())
+                            .name(A.getName())
+                            .code(A.getCode())
+                            .active(A.getActive())
+                            .displayOrder(A.getDisplayOrder())
                             .sections(sectionRepository
-                                    .findByAcademicClass_ClassIdOrderByDisplayOrderAsc(c.getClassId())
+                                    .findByAcademicGroup_AcademicGroupIdOrderByDisplayOrderAsc(A.getAcademicGroupId())
                                     .stream()
                                     .map(s -> AcademicStructureTreeResponse.SectionNode.builder()
                                             .sectionId(s.getSectionId())
@@ -311,14 +363,13 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
                     .toList();
             tree.add(AcademicStructureTreeResponse.builder()
                     .stage(stage)
-                    .classes(classNodes)
+                    .academicGroups(classNodes)
                     .build());
         }
         return tree;
     }
 
-    private AcademicClassResponse toClassResponse(AcademicClass entity, boolean withCounts, boolean withSections) {
-        AcademicYear year = entity.getAcademicYear();
+    private AcademicGroupResponse toAcademicGroupResponse(AcademicGroup entity, boolean withCounts, boolean withSections) {
         long sectionCount = 0;
         long sectionsActive = 0;
         long studentCount = 0;
@@ -326,20 +377,32 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
 
         if (withCounts || withSections) {
             List<AcademicSection> sectionEntities = sectionRepository
-                    .findByAcademicClass_ClassIdOrderByDisplayOrderAsc(entity.getClassId());
+                    .findByAcademicGroup_AcademicGroupIdOrderByDisplayOrderAsc(entity.getAcademicGroupId());
             sectionCount = sectionEntities.size();
             sectionsActive = sectionEntities.stream().filter(AcademicSection::isActive).count();
-            studentCount = studentEnrollmentRepository.countByClassEntityClassIdAndActiveTrue(entity.getClassId());
+            studentCount = studentEnrollmentRepository.countByAcademicGroupEntityAcademicGroupIdAndActiveTrue(entity.getAcademicGroupId());
 
             if (withSections) {
                 sections = sectionEntities.stream().map(this::toSectionResponse).toList();
             }
         }
 
+        return buildAcademicGroupResponse(entity, sectionCount, sectionsActive, studentCount, sections);
+    }
+
+    private AcademicGroupResponse toDirectoryResponse(AcademicGroup entity, long sectionCount,
+                                                      long sectionsActive, long studentCount) {
+        return buildAcademicGroupResponse(entity, sectionCount, sectionsActive, studentCount, null);
+    }
+
+    private AcademicGroupResponse buildAcademicGroupResponse(AcademicGroup entity, long sectionCount, long sectionsActive,
+                                                     long studentCount, List<AcademicSectionResponse> sections) {
+        AcademicYear year = entity.getAcademicYear();
+
         // Class Teacher is a Section relationship only — never roll up a single
         // teacher onto the Class response (that implied an incorrect Class→Teacher model).
-        return AcademicClassResponse.builder()
-                .classId(entity.getClassId())
+        return AcademicGroupResponse.builder()
+                .academicGroupId(entity.getAcademicGroupId())
                 .academicYearId(year.getAcademicYearId())
                 .academicYearName(year.getName())
                 .academicYearStatus(year.getStatus())
@@ -347,13 +410,14 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
                 .name(entity.getName())
                 .code(entity.getCode())
                 .stage(entity.getStage())
+                .description(entity.getDescription())
                 .displayOrder(entity.getDisplayOrder())
                 .active(entity.getActive())
                 .sectionCount(sectionCount)
                 .sectionsActive(sectionsActive)
                 .studentCount(studentCount)
-                .classTeacherName(null)
-                .classTeacherStaffId(null)
+                .sectionTeacherName(null)
+                .sectionTeacherStaffId(null)
                 .sections(sections)
                 .createdBy(entity.getCreatedBy())
                 .createdOn(entity.getCreatedOn())
@@ -363,17 +427,17 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     }
 
     private AcademicSectionResponse toSectionResponse(AcademicSection section) {
-        AcademicClass academicClass = section.getAcademicClass();
-        ClassTeacherAssignment teacher = classTeacherAssignmentRepository
+        AcademicGroup academicGroup = section.getAcademicGroup();
+        SectionTeacherAssignment teacher = SectionTeacherAssignmentRepository
                 .findFirstBySection_SectionIdAndActiveTrueAndEffectiveToIsNullOrderByEffectiveFromDesc(
                         section.getSectionId())
                 .orElse(null);
 
         return AcademicSectionResponse.builder()
                 .sectionId(section.getSectionId())
-                .classId(academicClass.getClassId())
-                .className(academicClass.getName())
-                .classCode(academicClass.getCode())
+                .academicGroupId(academicGroup.getAcademicGroupId())
+                .academicGroupName(academicGroup.getName())
+                .academicGroupCode(academicGroup.getCode())
                 .name(section.getName())
                 .code(section.getCode())
                 .capacity(section.getCapacity())
@@ -383,10 +447,10 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
                         : section.getDefaultResource().getAcademicResourceId())
                 .active(section.getActive())
                 .studentCount(studentEnrollmentRepository.countBySectionSectionIdAndActiveTrue(section.getSectionId()))
-                .classTeacherName(teacher == null || teacher.getStaff() == null
+                .sectionTeacherName(teacher == null || teacher.getStaff() == null
                         ? null
                         : staffDisplayName(teacher.getStaff()))
-                .classTeacherStaffId(teacher == null || teacher.getStaff() == null
+                .sectionTeacherStaffId(teacher == null || teacher.getStaff() == null
                         ? null
                         : teacher.getStaff().getStaffId())
                 .createdBy(section.getCreatedBy())
@@ -396,22 +460,22 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
                 .build();
     }
 
-    private void assignClassTeacher(AcademicSection section, Long staffId) {
+    private void assignSectionTeacher(AcademicSection section, Long staffId) {
         Staff staff = staffRepository.findById(staffId)
                 .orElseThrow(() -> new ResourceNotFoundException("Staff not found: " + staffId));
 
-        clearClassTeacher(section);
+        clearSectionTeacher(section);
 
-        ClassTeacherAssignment assignment = new ClassTeacherAssignment();
+        SectionTeacherAssignment assignment = new SectionTeacherAssignment();
         assignment.setSection(section);
         assignment.setStaff(staff);
         assignment.setEffectiveFrom(LocalDate.now());
         assignment.setActive(true);
-        classTeacherAssignmentRepository.save(assignment);
+        SectionTeacherAssignmentRepository.save(assignment);
     }
 
-    private void clearClassTeacher(AcademicSection section) {
-        classTeacherAssignmentRepository.findBySection_SectionIdAndEffectiveToIsNull(section.getSectionId())
+    private void clearSectionTeacher(AcademicSection section) {
+        SectionTeacherAssignmentRepository.findBySection_SectionIdAndEffectiveToIsNull(section.getSectionId())
                 .ifPresent(existing -> {
                     LocalDate end = LocalDate.now();
                     // CHECK (effective_to IS NULL OR effective_to >= effective_from)
@@ -420,7 +484,7 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
                     }
                     existing.setEffectiveTo(end);
                     existing.setActive(false);
-                    classTeacherAssignmentRepository.save(existing);
+                    SectionTeacherAssignmentRepository.save(existing);
                 });
     }
 
@@ -432,75 +496,145 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
                 .orElseThrow(() -> new ResourceNotFoundException("Academic resource not found: " + resourceId));
     }
 
-    private void validateClassUniqueness(Long yearId, String name, String code, Long excludeId) {
+    private void validateAcademicGroupUniqueness(Long yearId, String name, String code, Long excludeId) {
         boolean codeTaken = excludeId == null
-                ? classRepository.existsByAcademicYear_AcademicYearIdAndCodeIgnoreCase(yearId, code)
-                : classRepository.existsByAcademicYear_AcademicYearIdAndCodeIgnoreCaseAndClassIdNot(yearId, code, excludeId);
+                ? academicGroupRepository.existsByAcademicYear_AcademicYearIdAndCodeIgnoreCase(yearId, code)
+                : academicGroupRepository.existsByAcademicYear_AcademicYearIdAndCodeIgnoreCaseAndAcademicGroupIdNot(yearId, code, excludeId);
         if (codeTaken) {
-            throw new BusinessException("Class code already exists in this academic year: " + code);
+            throw new BusinessException("Group code already exists in this academic year: " + code);
         }
         boolean nameTaken = excludeId == null
-                ? classRepository.existsByAcademicYear_AcademicYearIdAndNameIgnoreCase(yearId, name)
-                : classRepository.existsByAcademicYear_AcademicYearIdAndNameIgnoreCaseAndClassIdNot(yearId, name, excludeId);
+                ? academicGroupRepository.existsByAcademicYear_AcademicYearIdAndNameIgnoreCase(yearId, name)
+                : academicGroupRepository.existsByAcademicYear_AcademicYearIdAndNameIgnoreCaseAndAcademicGroupIdNot(yearId, name, excludeId);
         if (nameTaken) {
-            throw new BusinessException("Class name already exists in this academic year: " + name);
+            throw new BusinessException("Group name already exists in this academic year: " + name);
         }
     }
 
-    private void validateSectionUniqueness(Long classId, String name, String code, Long excludeId) {
+    private void validateSectionUniqueness(Long academicGroupId, String name, String code, Long excludeId) {
         boolean codeTaken = excludeId == null
-                ? sectionRepository.existsByAcademicClass_ClassIdAndCodeIgnoreCase(classId, code)
-                : sectionRepository.existsByAcademicClass_ClassIdAndCodeIgnoreCaseAndSectionIdNot(classId, code, excludeId);
+                ? sectionRepository.existsByAcademicGroup_AcademicGroupIdAndCodeIgnoreCase(academicGroupId, code)
+                : sectionRepository.existsByAcademicGroup_AcademicGroupIdAndCodeIgnoreCaseAndSectionIdNot(academicGroupId, code, excludeId);
         if (codeTaken) {
-            throw new BusinessException("Section code already exists in this class: " + code);
+            throw new BusinessException("Section code already exists in this Academic Group: " + code);
         }
         boolean nameTaken = excludeId == null
-                ? sectionRepository.existsByAcademicClass_ClassIdAndNameIgnoreCase(classId, name)
-                : sectionRepository.existsByAcademicClass_ClassIdAndNameIgnoreCaseAndSectionIdNot(classId, name, excludeId);
+                ? sectionRepository.existsByAcademicGroup_AcademicGroupIdAndNameIgnoreCase(academicGroupId, name)
+                : sectionRepository.existsByAcademicGroup_AcademicGroupIdAndNameIgnoreCaseAndSectionIdNot(academicGroupId, name, excludeId);
         if (nameTaken) {
-            throw new BusinessException("Section name already exists in this class: " + name);
+            throw new BusinessException("Section name already exists in this Academic Group: " + name);
         }
     }
 
-    private String resolveClassCode(String requested, String name) {
-        if (StringUtils.hasText(requested)) {
-            return requested.trim().toUpperCase(Locale.ROOT);
-        }
-        String cleaned = name.trim().replaceAll("[^A-Za-z0-9]+", "-").replaceAll("(^-|-$)", "");
-        return ("CLS-" + cleaned).toUpperCase(Locale.ROOT);
+    private String generateUniqueAcademicGroupCode(Long yearId, String name) {
+        String base = "AG-" + codeSlug(name, "GROUP");
+        return nextFreeCode(base, 50, candidate ->
+                academicGroupRepository.existsByAcademicYear_AcademicYearIdAndCodeIgnoreCase(yearId, candidate));
     }
 
-    private String resolveSectionCode(String requested, String classCode, String sectionName) {
-        if (StringUtils.hasText(requested)) {
-            return requested.trim().toUpperCase(Locale.ROOT);
-        }
-        String base = StringUtils.hasText(classCode) ? classCode : "SEC";
-        return (base + "-" + sectionName.trim()).toUpperCase(Locale.ROOT).replaceAll("\\s+", "");
+    private String generateUniqueSectionCode(String academicGroupCode, Long academicGroupId, String sectionName) {
+        String base = (StringUtils.hasText(academicGroupCode) ? academicGroupCode : "SEC") + "-" + codeSlug(sectionName, "A");
+        return nextFreeCode(base, 50, candidate ->
+                sectionRepository.existsByAcademicGroup_AcademicGroupIdAndCodeIgnoreCase(academicGroupId, candidate));
     }
 
-    private int nextClassDisplayOrder(Long yearId) {
-        return classRepository.findByAcademicYear_AcademicYearIdOrderByDisplayOrderAsc(yearId).stream()
-                .map(AcademicClass::getDisplayOrder)
+    /** cppends -2, -3, ... until the candidate is free. Bounded so a bad data set cannot loop forever. */
+    private static String nextFreeCode(String base, int maxLength, Predicate<String> taken) {
+        String first = base.length() > maxLength ? base.substring(0, maxLength) : base;
+        if (!taken.test(first)) {
+            return first;
+        }
+        for (int n = 2; n < 1000; n++) {
+            String suffix = "-" + n;
+            int stemLength = Math.min(first.length(), maxLength - suffix.length());
+            String candidate = first.substring(0, stemLength) + suffix;
+            if (!taken.test(candidate)) {
+                return candidate;
+            }
+        }
+        throw new BusinessException("Unable to generate a unique code for " + base);
+    }
+
+    private static String codeSlug(String text, String fallback) {
+        String cleaned = text.trim().replaceAll("[^A-Za-z0-9]+", "-").replaceAll("(^-|-$)", "");
+        return (cleaned.isEmpty() ? fallback : cleaned).toUpperCase(Locale.ROOT);
+    }
+
+    private static String trimToNull(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    /** Section names must be unique within one group request, case-insensitively. */
+    private void validateNewSectionNames(List<AcademicSectionRequest> sections) {
+        Set<String> seen = new java.util.HashSet<>();
+        for (AcademicSectionRequest section : sections) {
+            String key = section.getName().trim().toLowerCase(Locale.ROOT);
+            if (!seen.add(key)) {
+                throw new BusinessException("Two sections in this group have the same name: " + section.getName().trim());
+            }
+        }
+    }
+
+    private AcademicSection createSectionEntity(AcademicGroup academicGroup, AcademicSectionRequest request) {
+        Long academicGroupId = academicGroup.getAcademicGroupId();
+        String name = request.getName().trim();
+        String code = StringUtils.hasText(request.getCode())
+                ? request.getCode().trim().toUpperCase(Locale.ROOT)
+                : generateUniqueSectionCode(academicGroup.getCode(), academicGroupId, name);
+        validateSectionUniqueness(academicGroupId, name, code, null);
+
+        AcademicSection section = new AcademicSection();
+        section.setAcademicGroup(academicGroup);
+        section.setName(name);
+        section.setCode(code);
+        section.setCapacity(request.getCapacity());
+        section.setDisplayOrder(request.getDisplayOrder() != null
+                ? request.getDisplayOrder()
+                : nextSectionDisplayOrder(academicGroupId));
+        section.setDefaultResource(resolveResource(request.getDefaultResourceId()));
+        section.setActive(true);
+        AcademicSection saved = sectionRepository.save(section);
+
+        if (request.getSectionTeacherStaffId() != null) {
+            assignSectionTeacher(saved, request.getSectionTeacherStaffId());
+        }
+        return saved;
+    }
+
+    /** Live timetable state for the year: PUBLISHED, DRAFT, or NOT_GENERATED. */
+    private String resolveTimetableStatus(Long yearId) {
+        if (timetableVersionRepository
+                .findByAcademicYear_AcademicYearIdAndStatus(yearId, TimetableStatus.PUBLISHED).isPresent()) {
+            return "PUBLISHED";
+        }
+        boolean hasDrafts = !timetableVersionRepository
+                .findByAcademicYear_AcademicYearIdOrderByVersionNumberDesc(yearId).isEmpty();
+        return hasDrafts ? "DRAFT" : "NOT_GENERATED";
+    }
+
+    private int nextAcademicGroupDisplayOrder(Long yearId) {
+        return academicGroupRepository.findByAcademicYear_AcademicYearIdOrderByDisplayOrderAsc(yearId).stream()
+                .map(AcademicGroup::getDisplayOrder)
                 .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .orElse(0) + 1;
     }
 
-    private int nextSectionDisplayOrder(Long classId) {
-        return sectionRepository.findByAcademicClass_ClassIdOrderByDisplayOrderAsc(classId).stream()
+    private int nextSectionDisplayOrder(Long academicGroupId) {
+        return sectionRepository.findByAcademicGroup_AcademicGroupIdOrderByDisplayOrderAsc(academicGroupId).stream()
                 .map(AcademicSection::getDisplayOrder)
                 .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .orElse(0) + 1;
     }
 
-    private boolean matchesQuery(AcademicClass c, String q) {
+    private boolean matchesQuery(AcademicGroup A, String q) {
         if (!StringUtils.hasText(q)) {
             return true;
         }
         String needle = q.trim().toLowerCase(Locale.ROOT);
-        return (c.getName() != null && c.getName().toLowerCase(Locale.ROOT).contains(needle))
-                || (c.getCode() != null && c.getCode().toLowerCase(Locale.ROOT).contains(needle));
+        return (A.getName() != null && A.getName().toLowerCase(Locale.ROOT).contains(needle))
+                || (A.getCode() != null && A.getCode().toLowerCase(Locale.ROOT).contains(needle));
     }
 
     private boolean isYearReadOnly(AcademicYear year) {
@@ -521,13 +655,13 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
                 .orElseThrow(() -> new ResourceNotFoundException("Academic year not found: " + yearId));
     }
 
-    private AcademicClass requireClass(Long classId) {
-        return classRepository.findByIdWithYear(classId)
-                .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + classId));
+    private AcademicGroup requireAcademicGroup(Long academicGroupId) {
+        return academicGroupRepository.findByIdWithYear(academicGroupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Academic Group not found: " + academicGroupId));
     }
 
     private AcademicSection requireSection(Long sectionId) {
-        return sectionRepository.findByIdWithClass(sectionId)
+        return sectionRepository.findByIdWithAcademicGroup(sectionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + sectionId));
     }
 

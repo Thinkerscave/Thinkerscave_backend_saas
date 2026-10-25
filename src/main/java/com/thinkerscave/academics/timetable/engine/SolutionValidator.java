@@ -43,7 +43,7 @@ public class SolutionValidator {
     private void validateCompleteness(SchedulingSolution solution, ValidationResult result) {
         Map<String, List<SchedulingRequirement>> grouped = new LinkedHashMap<>();
         for (SchedulingRequirement unplaced : solution.getUnplacedRequirements()) {
-            grouped.computeIfAbsent(unplaced.getSectionId() + ":" + unplaced.getClassSubjectMappingId(),
+            grouped.computeIfAbsent(unplaced.getSectionId() + ":" + unplaced.getAcademicGroupSubjectMappingId(),
                     k -> new ArrayList<>()).add(unplaced);
         }
         for (List<SchedulingRequirement> group : grouped.values()) {
@@ -86,7 +86,7 @@ public class SolutionValidator {
             if (sectionClash != null) {
                 result.addBlocking(new ValidationConflict(
                         TimetableConflictType.SECTION_CONFLICT,
-                        "Class clash: " + label(p, reqMap) + " and " + label(sectionClash, reqMap)
+                        "Academic Group clash: " + label(p, reqMap) + " and " + label(sectionClash, reqMap)
                                 + " share " + slotLabel(p),
                         p.getSectionId(), p.getTeacherAllocationId(), null, p.getDayOfWeek(), p.getPeriodId()));
             }
@@ -152,7 +152,7 @@ public class SolutionValidator {
             boolean firstHalf = p.getTeachingIndex() < halfIndex;
             boolean missed = req.getPreference() == SubjectTimetablePreference.FIRST_HALF ? !firstHalf : firstHalf;
             if (missed) {
-                String key = req.getSectionId() + ":" + req.getClassSubjectMappingId();
+                String key = req.getSectionId() + ":" + req.getAcademicGroupSubjectMappingId();
                 missesByLesson.computeIfAbsent(key, k -> new int[1])[0]++;
                 lessonReq.putIfAbsent(key, req);
             }
@@ -190,8 +190,8 @@ public class SolutionValidator {
         private final List<ValidationConflict> blockingConflicts = new ArrayList<>();
         private final List<ValidationConflict> warnings = new ArrayList<>();
 
-        public void addBlocking(ValidationConflict c) { blockingConflicts.add(c); }
-        public void addWarning(ValidationConflict c) { warnings.add(c); }
+        public void addBlocking(ValidationConflict A) { blockingConflicts.add(A); }
+        public void addWarning(ValidationConflict A) { warnings.add(A); }
         public boolean hasBlockingIssues() { return !blockingConflicts.isEmpty(); }
     }
 

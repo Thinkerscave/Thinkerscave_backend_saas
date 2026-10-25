@@ -17,12 +17,12 @@ import lombok.Setter;
         uniqueConstraints = {
                 @UniqueConstraint(
                         name = "uk_teacher_allocation_section_mapping",
-                        columnNames = {"section_id", "class_subject_mapping_id"}
+                        columnNames = {"section_id", "academic_group_subject_mapping_id"}
                 )
         },
         indexes = {
                 @Index(name = "idx_teacher_allocation_section_status", columnList = "section_id, status"),
-                @Index(name = "idx_teacher_allocation_mapping_status", columnList = "class_subject_mapping_id, status"),
+                @Index(name = "idx_teacher_allocation_mapping_status", columnList = "academic_group_subject_mapping_id, status"),
                 @Index(name = "idx_teacher_allocation_active", columnList = "is_active")
         }
 )
@@ -41,8 +41,8 @@ public class TeacherAllocation extends Auditable {
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "class_subject_mapping_id", nullable = false)
-    private ClassSubjectMapping classSubjectMapping;
+    @JoinColumn(name = "academic_group_subject_mapping_id", nullable = false)
+    private AcademicGroupSubjectMapping academicGroupSubjectMapping;
 
     @NotNull
     @Enumerated(EnumType.STRING)
@@ -52,6 +52,10 @@ public class TeacherAllocation extends Auditable {
     @NotNull
     @Column(name = "is_active", nullable = false)
     private Boolean active = true;
+
+        public AcademicGroupSubjectMapping getClassSubjectMapping() {
+                return academicGroupSubjectMapping;
+        }
 
     public boolean isActive() {
         return Boolean.TRUE.equals(active);

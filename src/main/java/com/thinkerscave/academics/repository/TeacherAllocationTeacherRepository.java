@@ -26,14 +26,14 @@ public interface TeacherAllocationTeacherRepository extends JpaRepository<Teache
     @Query("""
             SELECT t FROM TeacherAllocationTeacher t
             JOIN FETCH t.teacherAllocation a
-            JOIN FETCH a.classSubjectMapping m
+            JOIN FETCH a.academicGroupSubjectMapping m
             JOIN FETCH a.section s
-            JOIN FETCH s.academicClass c
+            JOIN FETCH s.academicGroup A
             WHERE t.staff.staffId = :staffId
               AND t.active = true
               AND t.effectiveTo IS NULL
               AND a.active = true
-              AND c.academicYear.academicYearId = :yearId
+              AND A.academicYear.academicYearId = :yearId
             """)
     List<TeacherAllocationTeacher> findActiveByStaffAndYear(
             @Param("staffId") Long staffId, @Param("yearId") Long yearId);
@@ -42,15 +42,27 @@ public interface TeacherAllocationTeacherRepository extends JpaRepository<Teache
             SELECT t FROM TeacherAllocationTeacher t
             JOIN FETCH t.staff
             JOIN FETCH t.teacherAllocation a
-            JOIN FETCH a.classSubjectMapping m
+            JOIN FETCH a.academicGroupSubjectMapping m
             JOIN FETCH m.subject
             JOIN FETCH a.section s
             LEFT JOIN FETCH s.defaultResource
-            JOIN FETCH s.academicClass c
-            WHERE c.academicYear.academicYearId = :yearId
+            JOIN FETCH s.academicGroup A
+            WHERE A.academicYear.academicYearId = :yearId
               AND t.active = true
               AND t.effectiveTo IS NULL
               AND a.active = true
             """)
     List<TeacherAllocationTeacher> findActiveByYear(@Param("yearId") Long yearId);
+
+    @Query("""
+            SELECT Count(DISTINCT t.staff.staffId) FROM TeacherAllocationTeacher t
+            JOIN t.teacherAllocation a
+            JOIN a.section s
+            WHERE s.academicGroup.academicGroupId = :academicGroupId
+              AND t.role = com.thinkerscave.academics.enums.TeacherAllocationTeacherRole.PRIMARY
+              AND t.active = true
+              AND t.effectiveTo IS NULL
+              AND a.active = true
+            """)
+    long countDistinctPrimaryTeachersByAcademicGroup(@Param("academicGroupId") Long academicGroupId);
 }

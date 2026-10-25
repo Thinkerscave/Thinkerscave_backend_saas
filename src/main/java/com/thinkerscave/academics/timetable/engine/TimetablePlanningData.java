@@ -24,10 +24,10 @@ public class TimetablePlanningData {
     private final List<TimetablePeriod> allPeriods;
     private final List<TimetablePeriod> teachingPeriods;
     private final List<AcademicSection> sections;
-    private final List<ClassSubjectMapping> mappings;
+    private final List<AcademicGroupSubjectMapping> mappings;
     private final List<Lesson> lessons;
     private final List<MissingTeacher> missingTeachers;
-    private final List<ClassSubjectMapping> zeroPeriodMappings;
+    private final List<AcademicGroupSubjectMapping> zeroPeriodMappings;
     private final List<AcademicResource> resources;
     private final List<TimetableVersion> versions;
 
@@ -40,7 +40,7 @@ public class TimetablePlanningData {
     }
 
     public record Lesson(AcademicSection section,
-                         ClassSubjectMapping mapping,
+                         AcademicGroupSubjectMapping mapping,
                          TeacherAllocation allocation,
                          Staff teacher) {
         public int weeklyPeriods() {
@@ -66,7 +66,7 @@ public class TimetablePlanningData {
     }
 
     public record MissingTeacher(AcademicSection section,
-                                 ClassSubjectMapping mapping,
+                                 AcademicGroupSubjectMapping mapping,
                                  MissingTeacherReason reason,
                                  String teacherName) {
         public int weeklyPeriods() {
@@ -75,8 +75,8 @@ public class TimetablePlanningData {
     }
 
     public static String sectionLabel(AcademicSection section) {
-        String className = section.getAcademicClass() == null ? "" : section.getAcademicClass().getName();
-        return (className + " - " + section.getName()).trim();
+        String academicGroupName = section.getAcademicGroup() == null ? "" : section.getAcademicGroup().getName();
+        return (academicGroupName + " - " + section.getName()).trim();
     }
 
     public static String staffName(Staff staff) {

@@ -12,12 +12,12 @@ import lombok.Setter;
 public class TeacherAllocationRowResponse {
     private Long teacherAllocationId;
     private Long academicYearId;
-    private Long classId;
-    private String className;
-    private String classCode;
+    private Long academicGroupId;
+    private String academicGroupName;
+    private String academicGroupCode;
     private Long sectionId;
     private String sectionName;
-    private Long classSubjectMappingId;
+    private Long academicGroupSubjectMappingId;
     private Long subjectId;
     private String subjectName;
     private String subjectCode;

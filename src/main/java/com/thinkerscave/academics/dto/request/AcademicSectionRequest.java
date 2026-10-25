@@ -25,5 +25,5 @@ public class AcademicSectionRequest {
     private Long defaultResourceId;
 
     /** Optional class teacher assignment on create/update. */
-    private Long classTeacherStaffId;
+    private Long sectionTeacherStaffId;
 }

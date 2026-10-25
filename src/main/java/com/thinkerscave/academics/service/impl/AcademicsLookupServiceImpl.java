@@ -3,7 +3,7 @@ package com.thinkerscave.academics.service.impl;
 import com.thinkerscave.academics.dto.response.LookupDTO;
 import com.thinkerscave.academics.enums.AcademicYearStatus;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
-import com.thinkerscave.academics.repository.ClassRepository;
+import com.thinkerscave.academics.repository.AcademicGroupRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.academics.repository.SubjectRepository;
 import com.thinkerscave.academics.service.AcademicsLookupService;
@@ -20,7 +20,7 @@ import java.util.List;
 public class AcademicsLookupServiceImpl implements AcademicsLookupService {
 
     private final AcademicYearRepository academicYearRepository;
-    private final ClassRepository classRepository;
+    private final AcademicGroupRepository academicGroupRepository;
     private final SectionRepository sectionRepository;
     private final SubjectRepository subjectRepository;
 
@@ -38,16 +38,16 @@ public class AcademicsLookupServiceImpl implements AcademicsLookupService {
     }
 
     @Override
-    public List<LookupDTO> getClassesByYear(Long academicYearId) {
-        return classRepository.findByAcademicYear_AcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(academicYearId)
+    public List<LookupDTO> getAcademicGroupsByYear(Long academicYearId) {
+        return academicGroupRepository.findByAcademicYear_AcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(academicYearId)
                 .stream()
-                .map(c -> new LookupDTO(c.getClassId(), c.getName()))
+                .map(A -> new LookupDTO(A.getAcademicGroupId(), A.getName()))
                 .toList();
     }
 
     @Override
-    public List<LookupDTO> getSectionsByClass(Long classId) {
-        return sectionRepository.findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(classId)
+    public List<LookupDTO> getSectionsByAcademicGroup(Long academicGroupId) {
+        return sectionRepository.findByAcademicGroup_AcademicGroupIdAndActiveTrueOrderByDisplayOrderAsc(academicGroupId)
                 .stream()
                 .map(s -> new LookupDTO(s.getSectionId(), s.getName()))
                 .toList();

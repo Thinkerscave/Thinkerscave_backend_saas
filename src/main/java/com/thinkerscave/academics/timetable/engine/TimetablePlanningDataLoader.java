@@ -27,7 +27,7 @@ public class TimetablePlanningDataLoader {
 
     private final AcademicYearRepository academicYearRepository;
     private final SectionRepository sectionRepository;
-    private final ClassSubjectMappingRepository mappingRepository;
+    private final AcademicGroupSubjectMappingRepository mappingRepository;
     private final TeacherAllocationRepository allocationRepository;
     private final TeacherAllocationTeacherRepository allocationTeacherRepository;
     private final TimetableConfigurationRepository configurationRepository;
@@ -44,7 +44,7 @@ public class TimetablePlanningDataLoader {
         return configurations.stream()
                 .filter(TimetableConfiguration::isActive)
                 .min(Comparator
-                        .comparing((TimetableConfiguration c) -> c.getShiftType() == TimetableShiftType.REGULAR ? 0 : 1)
+                        .comparing((TimetableConfiguration A) -> A.getShiftType() == TimetableShiftType.REGULAR ? 0 : 1)
                         .thenComparing(TimetableConfiguration::getTimetableConfigurationId))
                 .orElse(null);
     }
@@ -90,16 +90,16 @@ public class TimetablePlanningDataLoader {
                 .toList();
 
         List<AcademicSection> sections = sectionRepository.findActiveForTimetableByYear(yearId);
-        List<ClassSubjectMapping> mappings = mappingRepository.findActiveForTimetableByYear(yearId).stream()
+        List<AcademicGroupSubjectMapping> mappings = mappingRepository.findActiveForTimetableByYear(yearId).stream()
                 .sorted(Comparator
-                        .comparing((ClassSubjectMapping m) -> m.getAcademicClass().getDisplayOrder(),
+                        .comparing((AcademicGroupSubjectMapping m) -> m.getAcademicGroup().getDisplayOrder(),
                                 Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(m -> m.getSubject().getName()))
                 .toList();
 
         Map<String, TeacherAllocation> allocationByKey = new HashMap<>();
         for (TeacherAllocation a : allocationRepository.findActiveWithDetailsByYear(yearId)) {
-            allocationByKey.put(key(a.getSection().getSectionId(), a.getClassSubjectMapping().getClassSubjectMappingId()), a);
+            allocationByKey.put(key(a.getSection().getSectionId(), a.getAcademicGroupSubjectMapping().getAcademicGroupSubjectMappingId()), a);
         }
 
         Map<Long, TeacherAllocationTeacher> primaryByAllocation = new HashMap<>();
@@ -110,23 +110,23 @@ public class TimetablePlanningDataLoader {
                     effectiveFrom(b).isAfter(effectiveFrom(a)) ? b : a);
         }
 
-        Map<Long, List<ClassSubjectMapping>> mappingsByClass = new HashMap<>();
-        List<ClassSubjectMapping> zeroPeriodMappings = new ArrayList<>();
-        for (ClassSubjectMapping m : mappings) {
+        Map<Long, List<AcademicGroupSubjectMapping>> mappingsByClass = new HashMap<>();
+        List<AcademicGroupSubjectMapping> zeroPeriodMappings = new ArrayList<>();
+        for (AcademicGroupSubjectMapping m : mappings) {
             if (m.getWeeklyPeriods() == null || m.getWeeklyPeriods() <= 0) {
                 zeroPeriodMappings.add(m);
                 continue;
             }
-            mappingsByClass.computeIfAbsent(m.getAcademicClass().getClassId(), k -> new ArrayList<>()).add(m);
+            mappingsByClass.computeIfAbsent(m.getAcademicGroup().getAcademicGroupId(), k -> new ArrayList<>()).add(m);
         }
 
         List<TimetablePlanningData.Lesson> lessons = new ArrayList<>();
         List<TimetablePlanningData.MissingTeacher> missing = new ArrayList<>();
         for (AcademicSection section : sections) {
-            for (ClassSubjectMapping mapping : mappingsByClass.getOrDefault(
-                    section.getAcademicClass().getClassId(), List.of())) {
+            for (AcademicGroupSubjectMapping mapping : mappingsByClass.getOrDefault(
+                    section.getAcademicGroup().getAcademicGroupId(), List.of())) {
                 TeacherAllocation allocation = allocationByKey.get(
-                        key(section.getSectionId(), mapping.getClassSubjectMappingId()));
+                        key(section.getSectionId(), mapping.getAcademicGroupSubjectMappingId()));
                 if (allocation == null) {
                     missing.add(new TimetablePlanningData.MissingTeacher(section, mapping,
                             TimetablePlanningData.MissingTeacherReason.NO_ALLOCATION, null));

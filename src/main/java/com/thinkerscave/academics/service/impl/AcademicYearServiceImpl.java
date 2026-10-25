@@ -7,8 +7,8 @@ import com.thinkerscave.academics.dto.response.AcademicYearResponse;
 import com.thinkerscave.academics.entity.AcademicYear;
 import com.thinkerscave.academics.enums.AcademicYearStatus;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
-import com.thinkerscave.academics.repository.ClassRepository;
-import com.thinkerscave.academics.repository.ClassSubjectMappingRepository;
+import com.thinkerscave.academics.repository.AcademicGroupRepository;
+import com.thinkerscave.academics.repository.AcademicGroupSubjectMappingRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.academics.repository.SubjectRepository;
 import com.thinkerscave.academics.repository.TeacherAllocationRepository;
@@ -57,12 +57,12 @@ public class AcademicYearServiceImpl implements AcademicYearService {
     );
 
     private final AcademicYearRepository academicYearRepository;
-    private final ClassRepository classRepository;
+    private final AcademicGroupRepository academicGroupRepository;
     private final SectionRepository sectionRepository;
     private final SubjectRepository subjectRepository;
-    private final ClassSubjectMappingRepository classSubjectMappingRepository;
-    private final TeacherAllocationRepository teacherAllocationRepository;
-    private final TimetableConfigurationRepository timetableConfigurationRepository;
+    private final AcademicGroupSubjectMappingRepository academicGroupSubjectMappingRepository;
+    private final TeacherAllocationRepository TeacherAllocationRepository;
+    private final TimetableConfigurationRepository TimetableConfigurationRepository;
     private final TimetableVersionRepository timetableVersionRepository;
     private final StudentEnrollmentRepository studentEnrollmentRepository;
     private final AcademicsAccessGuard accessGuard;
@@ -333,13 +333,13 @@ public class AcademicYearServiceImpl implements AcademicYearService {
     }
 
     private AcademicYearResponse.YearStructureStats buildStructureStats(Long yearId) {
-        var classes = classRepository.findByAcademicYear_AcademicYearIdOrderByDisplayOrderAsc(yearId);
-        long classesActive = classes.stream().filter(c -> Boolean.TRUE.equals(c.getActive())).count();
+        var academicGroups = academicGroupRepository.findByAcademicYear_AcademicYearIdOrderByDisplayOrderAsc(yearId);
+        long academicGroupsActive = academicGroups.stream().filter(A -> Boolean.TRUE.equals(A.getActive())).count();
 
         long sectionsTotal = 0;
         long sectionsActive = 0;
-        for (var cls : classes) {
-            var sections = sectionRepository.findByAcademicClass_ClassIdOrderByDisplayOrderAsc(cls.getClassId());
+        for (var cls : academicGroups) {
+            var sections = sectionRepository.findByAcademicGroup_AcademicGroupIdOrderByDisplayOrderAsc(cls.getAcademicGroupId());
             sectionsTotal += sections.size();
             sectionsActive += sections.stream().filter(s -> Boolean.TRUE.equals(s.getActive())).count();
         }
@@ -349,8 +349,8 @@ public class AcademicYearServiceImpl implements AcademicYearService {
         long studentsActive = studentEnrollmentRepository.countByAcademicYearAcademicYearIdAndActiveTrue(yearId);
 
         return AcademicYearResponse.YearStructureStats.builder()
-                .classesTotal(classes.size())
-                .classesActive(classesActive)
+                .academicGroupsTotal(academicGroups.size())
+                .academicGroupsActive(academicGroupsActive)
                 .sectionsTotal(sectionsTotal)
                 .sectionsActive(sectionsActive)
                 .subjectsTotal(subjects.size())
@@ -364,33 +364,33 @@ public class AcademicYearServiceImpl implements AcademicYearService {
 
         steps.add(step("YEAR_CREATED", "Academic Year Created", "COMPLETE", null));
 
-        var classes = classRepository.findByAcademicYear_AcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(yearId);
-        boolean hasClasses = !classes.isEmpty();
-        boolean hasSections = classes.stream()
-                .anyMatch(c -> !sectionRepository.findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(c.getClassId()).isEmpty());
-        steps.add(step("CLASSES_SECTIONS", "Classes & Sections",
+        var academicGroups = academicGroupRepository.findByAcademicYear_AcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(yearId);
+        boolean hasClasses = !academicGroups.isEmpty();
+        boolean hasSections = academicGroups.stream()
+                .anyMatch(A -> !sectionRepository.findByAcademicGroup_AcademicGroupIdAndActiveTrueOrderByDisplayOrderAsc(A.getAcademicGroupId()).isEmpty());
+        steps.add(step("ACADEMIC_GROUPS_SECTIONS", "Academic Groups & Sections",
                 hasClasses && hasSections ? "COMPLETE" : (hasClasses ? "IN_PROGRESS" : "NOT_STARTED"), null));
 
         var subjects = subjectRepository.findByAcademicYear_AcademicYearIdAndActiveTrueOrderByNameAsc(yearId);
         steps.add(step("SUBJECTS", "Subjects",
                 subjects.isEmpty() ? "NOT_STARTED" : "COMPLETE", null));
 
-        long mappingCount = classes.stream()
-                .mapToLong(c -> classSubjectMappingRepository.findByAcademicClass_ClassIdAndActiveTrue(c.getClassId()).size())
+        long mappingCount = academicGroups.stream()
+                .mapToLong(A -> academicGroupSubjectMappingRepository.findByAcademicGroup_AcademicGroupIdAndActiveTrue(A.getAcademicGroupId()).size())
                 .sum();
         steps.add(step("SUBJECT_MAPPING", "Subject Mapping",
                 mappingCount == 0 ? (subjects.isEmpty() ? "NOT_STARTED" : "PENDING") : "COMPLETE",
                 mappingCount == 0 && !subjects.isEmpty() ? "Mappings pending" : null));
 
-        long allocationCount = teacherAllocationRepository
-                .findBySection_AcademicClass_AcademicYear_AcademicYearId(yearId).stream()
+        long allocationCount = TeacherAllocationRepository
+                .findBySection_AcademicGroup_AcademicYear_AcademicYearId(yearId).stream()
                 .filter(a -> Boolean.TRUE.equals(a.getActive()))
                 .count();
         steps.add(step("TEACHER_ALLOCATION", "Teacher Allocation",
                 allocationCount == 0 ? "PENDING" : "COMPLETE",
                 allocationCount == 0 ? "Allocations pending" : null));
 
-        boolean hasConfig = !timetableConfigurationRepository.findByAcademicYear_AcademicYearId(yearId).isEmpty();
+        boolean hasConfig = !TimetableConfigurationRepository.findByAcademicYear_AcademicYearId(yearId).isEmpty();
         steps.add(step("TIMETABLE_CONFIG", "Timetable Configuration",
                 hasConfig ? "IN_PROGRESS" : "NOT_STARTED", null));
 

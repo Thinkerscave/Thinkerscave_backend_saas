@@ -15,20 +15,20 @@ import java.time.LocalDate;
 @Setter
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Table(
-        name = "class_teacher_assignment",
+        name = "section_teacher_assignment",
         indexes = {
-                @Index(name = "idx_cta_section_effective", columnList = "section_id, effective_from"),
-                @Index(name = "idx_cta_staff_effective", columnList = "staff_id, effective_from"),
-                @Index(name = "idx_cta_active", columnList = "is_active")
+            @Index(name = "idx_sta_section_effective", columnList = "section_id, effective_from"),
+            @Index(name = "idx_sta_staff_effective", columnList = "staff_id, effective_from"),
+            @Index(name = "idx_sta_active", columnList = "is_active")
         }
 )
-public class ClassTeacherAssignment extends Auditable {
+public class SectionTeacherAssignment extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "class_teacher_assignment_id")
+    @Column(name = "section_teacher_assignment_id")
     @EqualsAndHashCode.Include
-    private Long classTeacherAssignmentId;
+    private Long sectionTeacherAssignmentId;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

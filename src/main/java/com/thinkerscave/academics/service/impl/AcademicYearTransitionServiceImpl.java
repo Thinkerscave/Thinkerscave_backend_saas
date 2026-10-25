@@ -27,10 +27,10 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
     private final AcademicsAccessGuard accessGuard;
     private final AcademicYearRepository yearRepo;
     private final AcademicYearTransitionRepository transitionRepo;
-    private final ClassRepository classRepo;
+    private final AcademicGroupRepository academicGroupRepo;
     private final SectionRepository sectionRepo;
     private final SubjectRepository subjectRepo;
-    private final ClassSubjectMappingRepository mappingRepo;
+    private final AcademicGroupSubjectMappingRepository mappingRepo;
     private final TeacherAllocationRepository allocationRepo;
     private final TeacherAllocationTeacherRepository tatRepo;
 
@@ -56,7 +56,7 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
         transition.setSourceAcademicYear(source);
         transition.setTargetAcademicYear(target);
         transition.setStatus(AcademicTransitionStatus.NOT_STARTED);
-        transition.setCopyClasses(request.isCopyClasses());
+        transition.setCopyAcademicGroups(request.isCopyAcademicGroups());
         transition.setCopySections(request.isCopySections());
         transition.setCopySubjects(request.isCopySubjects());
         transition.setCopyMappings(request.isCopyMappings());
@@ -133,8 +133,8 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
         Long sourceYearId = transition.getSourceAcademicYear().getAcademicYearId();
         AcademicYear targetYear = transition.getTargetAcademicYear();
 
-        if (Boolean.TRUE.equals(transition.getCopyClasses())) {
-            copyClasses(sourceYearId, targetYear, transition);
+        if (Boolean.TRUE.equals(transition.getCopyAcademicGroups())) {
+            copyAcademicGroups(sourceYearId, targetYear, transition);
         }
 
         if (Boolean.TRUE.equals(transition.getCopySubjects())) {
@@ -150,44 +150,44 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
         }
     }
 
-    private void copyClasses(Long sourceYearId, AcademicYear targetYear,
+    private void copyAcademicGroups(Long sourceYearId, AcademicYear targetYear,
                              AcademicYearTransition transition) {
-        List<AcademicClass> sourceClasses = classRepo
+        List<AcademicGroup> sourceClasses = academicGroupRepo
                 .findByAcademicYear_AcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(sourceYearId);
 
-        for (AcademicClass src : sourceClasses) {
-            if (classRepo.existsByAcademicYear_AcademicYearIdAndCodeIgnoreCase(
+        for (AcademicGroup src : sourceClasses) {
+            if (academicGroupRepo.existsByAcademicYear_AcademicYearIdAndCodeIgnoreCase(
                     targetYear.getAcademicYearId(), src.getCode())) {
                 continue;
             }
 
-            AcademicClass target = new AcademicClass();
+            AcademicGroup target = new AcademicGroup();
             target.setAcademicYear(targetYear);
             target.setName(src.getName());
             target.setCode(src.getCode());
             target.setStage(src.getStage());
             target.setDisplayOrder(src.getDisplayOrder());
             target.setActive(true);
-            target = classRepo.save(target);
+            target = academicGroupRepo.save(target);
 
             if (Boolean.TRUE.equals(transition.getCopySections())) {
-                copySections(src.getClassId(), target);
+                copySections(src.getAcademicGroupId(), target);
             }
         }
     }
 
-    private void copySections(Long sourceClassId, AcademicClass targetClass) {
+    private void copySections(Long sourceAcademicGroupId, AcademicGroup targetClass) {
         List<AcademicSection> sourceSections = sectionRepo
-                .findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(sourceClassId);
+                .findByAcademicGroup_AcademicGroupIdAndActiveTrueOrderByDisplayOrderAsc(sourceAcademicGroupId);
 
         for (AcademicSection src : sourceSections) {
-            if (sectionRepo.existsByAcademicClass_ClassIdAndCodeIgnoreCase(
-                    targetClass.getClassId(), src.getCode())) {
+            if (sectionRepo.existsByAcademicGroup_AcademicGroupIdAndCodeIgnoreCase(
+                    targetClass.getAcademicGroupId(), src.getCode())) {
                 continue;
             }
 
             AcademicSection target = new AcademicSection();
-            target.setAcademicClass(targetClass);
+            target.setAcademicGroup(targetClass);
             target.setName(src.getName());
             target.setCode(src.getCode());
             target.setCapacity(src.getCapacity());
@@ -222,32 +222,32 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
     }
 
     private void copyMappings(Long sourceYearId, AcademicYear targetYear) {
-        List<AcademicClass> sourceClasses = classRepo
+        List<AcademicGroup> sourceClasses = academicGroupRepo
                 .findByAcademicYear_AcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(sourceYearId);
 
-        for (AcademicClass srcClass : sourceClasses) {
-            Optional<AcademicClass> targetClassOpt = classRepo
+        for (AcademicGroup srcClass : sourceClasses) {
+            Optional<AcademicGroup> targetClassOpt = academicGroupRepo
                     .findByAcademicYear_AcademicYearIdAndCodeIgnoreCase(
                             targetYear.getAcademicYearId(), srcClass.getCode());
             if (targetClassOpt.isEmpty()) continue;
-            AcademicClass targetClass = targetClassOpt.get();
+            AcademicGroup targetClass = targetClassOpt.get();
 
-            List<ClassSubjectMapping> srcMappings = mappingRepo
-                    .findByAcademicClass_ClassIdAndActiveTrue(srcClass.getClassId());
+            List<AcademicGroupSubjectMapping> srcMappings = mappingRepo
+                    .findByAcademicGroup_AcademicGroupIdAndActiveTrue(srcClass.getAcademicGroupId());
 
-            for (ClassSubjectMapping srcMapping : srcMappings) {
+            for (AcademicGroupSubjectMapping srcMapping : srcMappings) {
                 Optional<Subject> targetSubjectOpt = subjectRepo
                         .findByAcademicYear_AcademicYearIdAndCodeIgnoreCase(
                                 targetYear.getAcademicYearId(), srcMapping.getSubject().getCode());
                 if (targetSubjectOpt.isEmpty()) continue;
 
-                Optional<ClassSubjectMapping> existing = mappingRepo
-                        .findByAcademicClass_ClassIdAndSubject_SubjectId(
-                                targetClass.getClassId(), targetSubjectOpt.get().getSubjectId());
+                Optional<AcademicGroupSubjectMapping> existing = mappingRepo
+                        .findByAcademicGroup_AcademicGroupIdAndSubject_SubjectId(
+                                targetClass.getAcademicGroupId(), targetSubjectOpt.get().getSubjectId());
                 if (existing.isPresent()) continue;
 
-                ClassSubjectMapping targetMapping = new ClassSubjectMapping();
-                targetMapping.setAcademicClass(targetClass);
+                AcademicGroupSubjectMapping targetMapping = new AcademicGroupSubjectMapping();
+                targetMapping.setAcademicGroup(targetClass);
                 targetMapping.setSubject(targetSubjectOpt.get());
                 targetMapping.setWeeklyPeriods(srcMapping.getWeeklyPeriods());
                 targetMapping.setTimetablePreference(srcMapping.getTimetablePreference());
@@ -263,39 +263,39 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
 
         for (TeacherAllocation srcAlloc : srcAllocations) {
             AcademicSection srcSection = srcAlloc.getSection();
-            AcademicClass srcClass = srcSection.getAcademicClass();
+            AcademicGroup srcClass = srcSection.getAcademicGroup();
 
-            Optional<AcademicClass> targetClassOpt = classRepo
+            Optional<AcademicGroup> targetClassOpt = academicGroupRepo
                     .findByAcademicYear_AcademicYearIdAndCodeIgnoreCase(
                             targetYear.getAcademicYearId(), srcClass.getCode());
             if (targetClassOpt.isEmpty()) continue;
 
             Optional<AcademicSection> targetSectionOpt = sectionRepo
-                    .findByAcademicClass_ClassIdAndCodeIgnoreCase(
-                            targetClassOpt.get().getClassId(), srcSection.getCode());
+                    .findByAcademicGroup_AcademicGroupIdAndCodeIgnoreCase(
+                            targetClassOpt.get().getAcademicGroupId(), srcSection.getCode());
             if (targetSectionOpt.isEmpty()) continue;
 
             Optional<Subject> targetSubjectOpt = subjectRepo
                     .findByAcademicYear_AcademicYearIdAndCodeIgnoreCase(
                             targetYear.getAcademicYearId(),
-                            srcAlloc.getClassSubjectMapping().getSubject().getCode());
+                            srcAlloc.getAcademicGroupSubjectMapping().getSubject().getCode());
             if (targetSubjectOpt.isEmpty()) continue;
 
-            Optional<ClassSubjectMapping> targetMappingOpt = mappingRepo
-                    .findByAcademicClass_ClassIdAndSubject_SubjectId(
-                            targetClassOpt.get().getClassId(),
+            Optional<AcademicGroupSubjectMapping> targetMappingOpt = mappingRepo
+                    .findByAcademicGroup_AcademicGroupIdAndSubject_SubjectId(
+                            targetClassOpt.get().getAcademicGroupId(),
                             targetSubjectOpt.get().getSubjectId());
             if (targetMappingOpt.isEmpty()) continue;
 
             Optional<TeacherAllocation> existing = allocationRepo
-                    .findBySection_SectionIdAndClassSubjectMapping_ClassSubjectMappingId(
+                    .findBySection_SectionIdAndAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(
                             targetSectionOpt.get().getSectionId(),
-                            targetMappingOpt.get().getClassSubjectMappingId());
+                            targetMappingOpt.get().getAcademicGroupSubjectMappingId());
             if (existing.isPresent()) continue;
 
             TeacherAllocation targetAlloc = new TeacherAllocation();
             targetAlloc.setSection(targetSectionOpt.get());
-            targetAlloc.setClassSubjectMapping(targetMappingOpt.get());
+            targetAlloc.setAcademicGroupSubjectMapping(targetMappingOpt.get());
             targetAlloc.setStatus(srcAlloc.getStatus());
             targetAlloc.setActive(true);
             allocationRepo.save(targetAlloc);
@@ -312,7 +312,7 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
                 .targetAcademicYearId(t.getTargetAcademicYear().getAcademicYearId())
                 .targetAcademicYearName(t.getTargetAcademicYear().getName())
                 .status(t.getStatus())
-                .copyClasses(t.getCopyClasses())
+                .copyAcademicGroups(t.getCopyAcademicGroups())
                 .copySections(t.getCopySections())
                 .copySubjects(t.getCopySubjects())
                 .copyMappings(t.getCopyMappings())

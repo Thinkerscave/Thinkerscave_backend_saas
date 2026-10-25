@@ -38,7 +38,7 @@ public interface TimetableService {
     @Deprecated
     TimetableGenerateResultResponse generate(Long yearId);
 
-    TimetableGridResponse getGrid(Long versionId, String view, Long classId, Long sectionId, Long staffId, Long resourceId);
+    TimetableGridResponse getGrid(Long versionId, String view, Long academicGroupId, Long sectionId, Long staffId, Long resourceId);
 
     List<TimetableConflictResponse> getConflicts(Long versionId);
 

@@ -21,7 +21,7 @@ import java.util.*;
 public class TimetableReadinessEvaluator {
 
     static final String ROUTE_ACADEMIC_YEAR = "/app/academics/academic-year";
-    static final String ROUTE_CLASSES = "/app/academics/classes-sections";
+    static final String ROUTE_CLASSES = "/app/academics/academic-groups-sections";
     static final String ROUTE_SUBJECTS = "/app/academics/subjects-mapping";
     static final String ROUTE_TEACHER_ALLOCATION = "/app/academics/teacher-allocation";
     static final String TAB_CONFIGURATION = "tab:configuration";
@@ -124,8 +124,8 @@ public class TimetableReadinessEvaluator {
 
         if (data.getActiveConfigurations().size() > 1) {
             List<String> others = data.getActiveConfigurations().stream()
-                    .filter(c -> !Objects.equals(c.getTimetableConfigurationId(), config.getTimetableConfigurationId()))
-                    .map(c -> "'" + c.getName() + "' (" + c.getShiftType() + ") is also active and will be ignored")
+                    .filter(A -> !Objects.equals(A.getTimetableConfigurationId(), config.getTimetableConfigurationId()))
+                    .map(A -> "'" + A.getName() + "' (" + A.getShiftType() + ") is also active and will be ignored")
                     .toList();
             checks.add(warn("SINGLE_ACTIVE_CONFIGURATION", "Duplicate school day setups",
                     data.getActiveConfigurations().size() + " active configurations found. Generation uses '"
@@ -200,32 +200,32 @@ public class TimetableReadinessEvaluator {
     private void checkSectionsAndSubjects(TimetablePlanningData data, List<ReadinessCheck> checks) {
         int sectionCount = data.getSections().size();
         checks.add(sectionCount > 0
-                ? pass("ACTIVE_SECTIONS_PRESENT", "Classes & sections", sectionCount + " active section(s)")
-                : fail("ACTIVE_SECTIONS_PRESENT", "Classes & sections",
-                "No active classes with sections exist for this academic year.", null,
-                "Open Classes & Sections", ROUTE_CLASSES));
+                ? pass("ACTIVE_SECTIONS_PRESENT", "AcademicGroups & sections", sectionCount + " active section(s)")
+                : fail("ACTIVE_SECTIONS_PRESENT", "AcademicGroups & sections",
+                "No active academicGroups with sections exist for this academic year.", null,
+                "Open Academic Groups", ROUTE_CLASSES));
 
         int schedulable = data.getMappings().size() - data.getZeroPeriodMappings().size();
         if (schedulable == 0) {
-            checks.add(fail("SUBJECT_MAPPINGS_PRESENT", "Class subjects",
-                    "No subjects with weekly periods are mapped to classes.", null,
+            checks.add(fail("SUBJECT_MAPPINGS_PRESENT", "Academic Group subjects",
+                    "No subjects with weekly periods are mapped to academicGroups.", null,
                     "Map subjects", ROUTE_SUBJECTS));
         } else {
             Set<Long> classesWithSubjects = new HashSet<>();
-            for (ClassSubjectMapping m : data.getMappings()) {
+            for (AcademicGroupSubjectMapping m : data.getMappings()) {
                 if (m.getWeeklyPeriods() != null && m.getWeeklyPeriods() > 0) {
-                    classesWithSubjects.add(m.getAcademicClass().getClassId());
+                    classesWithSubjects.add(m.getAcademicGroup().getAcademicGroupId());
                 }
             }
             List<String> sectionsWithoutSubjects = data.getSections().stream()
-                    .filter(s -> !classesWithSubjects.contains(s.getAcademicClass().getClassId()))
+                    .filter(s -> !classesWithSubjects.contains(s.getAcademicGroup().getAcademicGroupId()))
                     .map(s -> TimetablePlanningData.sectionLabel(s) + " has no subjects mapped (it will have an empty timetable)")
                     .toList();
             if (sectionsWithoutSubjects.isEmpty()) {
-                checks.add(pass("SUBJECT_MAPPINGS_PRESENT", "Class subjects",
-                        schedulable + " class-subject mapping(s) with weekly periods"));
+                checks.add(pass("SUBJECT_MAPPINGS_PRESENT", "Academic Group subjects",
+                    schedulable + " Academic Group subject mapping(s) with weekly periods"));
             } else {
-                checks.add(warn("SUBJECT_MAPPINGS_PRESENT", "Class subjects",
+                checks.add(warn("SUBJECT_MAPPINGS_PRESENT", "Academic Group subjects",
                         sectionsWithoutSubjects.size() + " section(s) have no subjects mapped.",
                         sectionsWithoutSubjects, "Map subjects", ROUTE_SUBJECTS));
             }
@@ -233,11 +233,11 @@ public class TimetableReadinessEvaluator {
 
         if (!data.getZeroPeriodMappings().isEmpty()) {
             List<String> details = data.getZeroPeriodMappings().stream()
-                    .map(m -> m.getAcademicClass().getName() + " · " + m.getSubject().getName()
+                    .map(m -> m.getAcademicGroup().getName() + " · " + m.getSubject().getName()
                             + " has 0 weekly periods (skipped)")
                     .toList();
             checks.add(warn("WEEKLY_PERIODS_POSITIVE", "Weekly periods",
-                    details.size() + " class subject(s) have no weekly periods and will be skipped.",
+                    details.size() + " Academic Group subject(s) have no weekly periods and will be skipped.",
                     details, "Set weekly periods", ROUTE_SUBJECTS));
         } else {
             checks.add(pass("WEEKLY_PERIODS_POSITIVE", "Weekly periods",
@@ -248,14 +248,14 @@ public class TimetableReadinessEvaluator {
     private void checkSectionCapacity(TimetablePlanningData data, List<ReadinessCheck> checks) {
         int slots = data.weeklySlotCount();
         Map<Long, Integer> requiredByClass = new HashMap<>();
-        for (ClassSubjectMapping m : data.getMappings()) {
+        for (AcademicGroupSubjectMapping m : data.getMappings()) {
             if (m.getWeeklyPeriods() != null && m.getWeeklyPeriods() > 0) {
-                requiredByClass.merge(m.getAcademicClass().getClassId(), (int) m.getWeeklyPeriods(), Integer::sum);
+                requiredByClass.merge(m.getAcademicGroup().getAcademicGroupId(), (int) m.getWeeklyPeriods(), Integer::sum);
             }
         }
         List<String> over = new ArrayList<>();
         for (AcademicSection s : data.getSections()) {
-            int required = requiredByClass.getOrDefault(s.getAcademicClass().getClassId(), 0);
+            int required = requiredByClass.getOrDefault(s.getAcademicGroup().getAcademicGroupId(), 0);
             if (required > slots) {
                 over.add(TimetablePlanningData.sectionLabel(s) + " needs " + required
                         + " periods/week but only " + slots + " teaching slots exist");
@@ -358,10 +358,10 @@ public class TimetableReadinessEvaluator {
                                                      TimetablePlanningData data,
                                                      ReadinessSummary summary) {
         List<ReadinessCheck> blocking = checks.stream()
-                .filter(c -> c.getSeverity() == ReadinessSeverity.BLOCKING && c.getStatus() == ReadinessStatus.FAILED)
+                .filter(A -> A.getSeverity() == ReadinessSeverity.BLOCKING && A.getStatus() == ReadinessStatus.FAILED)
                 .toList();
         List<ReadinessCheck> warnings = checks.stream()
-                .filter(c -> c.getStatus() == ReadinessStatus.WARNING)
+                .filter(A -> A.getStatus() == ReadinessStatus.WARNING)
                 .toList();
         TimetableConfiguration config = data.getConfiguration();
         return TimetableReadinessResponse.builder()

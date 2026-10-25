@@ -34,7 +34,7 @@ public class AcademicCalendarEventResponse {
     private CalendarAudienceType audienceType;
     private CalendarEventStatus status;
 
-    private List<CalendarClassRef> classes;
+    private List<CalendarGroupRef> academicGroups;
     private List<CalendarSectionRef> sections;
 
     private String publishedBy;
@@ -48,8 +48,8 @@ public class AcademicCalendarEventResponse {
     @Getter
     @Setter
     @Builder
-    public static class CalendarClassRef {
-        private Long classId;
+    public static class CalendarGroupRef {
+        private Long academicGroupId;
         private String name;
         private String code;
     }
@@ -61,6 +61,6 @@ public class AcademicCalendarEventResponse {
         private Long sectionId;
         private String name;
         private String code;
-        private String className;
+        private String academicGroupName;
     }
 }

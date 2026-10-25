@@ -10,7 +10,7 @@ import com.thinkerscave.academics.enums.CalendarEventStatus;
 import com.thinkerscave.academics.enums.CalendarEventType;
 import com.thinkerscave.academics.repository.AcademicCalendarEventRepository;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
-import com.thinkerscave.academics.repository.ClassRepository;
+import com.thinkerscave.academics.repository.AcademicGroupRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.academics.repository.TeacherAllocationTeacherRepository;
 import com.thinkerscave.academics.security.AcademicsAccessGuard;
@@ -57,7 +57,7 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
 
     private final AcademicCalendarEventRepository eventRepository;
     private final AcademicYearRepository academicYearRepository;
-    private final ClassRepository classRepository;
+    private final AcademicGroupRepository academicGroupRepository;
     private final SectionRepository sectionRepository;
     private final TeacherAllocationTeacherRepository tatRepository;
     private final StaffRepository staffRepository;
@@ -324,9 +324,9 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
         }
         return switch (event.getAudienceType()) {
             case EVERYONE -> true;
-            case CLASS -> event.getClasses().stream()
-                    .map(c -> c.getAcademicClass().getClassId())
-                    .anyMatch(scope.classIds()::contains);
+            case ACADEMIC_GROUP -> event.getAcademicGroups().stream()
+                    .map(A -> A.getAcademicGroup().getAcademicGroupId())
+                    .anyMatch(scope.academicGroupIds()::contains);
             case SECTION -> event.getSections().stream()
                     .map(s -> s.getSection().getSectionId())
                     .anyMatch(scope.sectionIds()::contains);
@@ -346,28 +346,28 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
             return AudienceScope.empty();
         }
 
-        Set<Long> classIds = new HashSet<>();
+        Set<Long> academicGroupIds = new HashSet<>();
         Set<Long> sectionIds = new HashSet<>();
 
-        staffRepository.findByUser_Id(userId).ifPresent(staff -> addTeacherScope(staff, yearId, classIds, sectionIds));
-        studentRepository.findByUser_Id(userId).ifPresent(student -> addStudentScope(student, classIds, sectionIds));
-        parentRepository.findByUser_Id(userId).ifPresent(parent -> addParentScope(parent, classIds, sectionIds));
+        staffRepository.findByUser_Id(userId).ifPresent(staff -> addTeacherScope(staff, yearId, academicGroupIds, sectionIds));
+        studentRepository.findByUser_Id(userId).ifPresent(student -> addStudentScope(student, academicGroupIds, sectionIds));
+        parentRepository.findByUser_Id(userId).ifPresent(parent -> addParentScope(parent, academicGroupIds, sectionIds));
 
-        return new AudienceScope(false, classIds, sectionIds);
+        return new AudienceScope(false, academicGroupIds, sectionIds);
     }
 
-    private void addTeacherScope(Staff staff, Long yearId, Set<Long> classIds, Set<Long> sectionIds) {
+    private void addTeacherScope(Staff staff, Long yearId, Set<Long> academicGroupIds, Set<Long> sectionIds) {
         tatRepository.findActiveByStaffAndYear(staff.getStaffId(), yearId).forEach(tat -> {
             AcademicSection section = tat.getTeacherAllocation().getSection();
             sectionIds.add(section.getSectionId());
-            classIds.add(section.getAcademicClass().getClassId());
+            academicGroupIds.add(section.getAcademicGroup().getAcademicGroupId());
         });
     }
 
-    private void addStudentScope(Student student, Set<Long> classIds, Set<Long> sectionIds) {
-        enrollmentRepository.findActiveWithClassByStudentId(student.getStudentId()).ifPresent(e -> {
-            if (e.getClassEntity() != null) {
-                classIds.add(e.getClassEntity().getClassId());
+    private void addStudentScope(Student student, Set<Long> academicGroupIds, Set<Long> sectionIds) {
+        enrollmentRepository.findActiveWithAcademicGroupByStudentId(student.getStudentId()).ifPresent(e -> {
+            if (e.getAcademicGroupEntity() != null) {
+                academicGroupIds.add(e.getAcademicGroupEntity().getAcademicGroupId());
             }
             if (e.getSection() != null) {
                 sectionIds.add(e.getSection().getSectionId());
@@ -375,13 +375,13 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
         });
     }
 
-    private void addParentScope(Parent parent, Set<Long> classIds, Set<Long> sectionIds) {
+    private void addParentScope(Parent parent, Set<Long> academicGroupIds, Set<Long> sectionIds) {
         List<StudentParent> links = studentParentRepository.findByParent_ParentIdAndActiveTrue(parent.getParentId());
         for (StudentParent link : links) {
             if (link.getStudent() == null) {
                 continue;
             }
-            addStudentScope(link.getStudent(), classIds, sectionIds);
+            addStudentScope(link.getStudent(), academicGroupIds, sectionIds);
         }
     }
 
@@ -415,28 +415,28 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
         }
 
         CalendarAudienceType audience = request.getAudienceType();
-        List<Long> classIds = request.getClassIds() == null ? List.of() : request.getClassIds().stream()
+        List<Long> academicGroupIds = request.getAcademicGroupIds() == null ? List.of() : request.getAcademicGroupIds().stream()
                 .filter(Objects::nonNull).distinct().toList();
         List<Long> sectionIds = request.getSectionIds() == null ? List.of() : request.getSectionIds().stream()
                 .filter(Objects::nonNull).distinct().toList();
 
         switch (audience) {
             case EVERYONE -> {
-                request.setClassIds(Collections.emptyList());
+                request.setAcademicGroupIds(Collections.emptyList());
                 request.setSectionIds(Collections.emptyList());
             }
-            case CLASS -> {
-                if (classIds.isEmpty()) {
-                    throw new BusinessException("At least one class is required for CLASS audience");
+            case ACADEMIC_GROUP -> {
+                if (academicGroupIds.isEmpty()) {
+                    throw new BusinessException("At least one Academic Group is required for this audience");
                 }
-                for (Long classId : classIds) {
-                    AcademicClass cls = classRepository.findByIdWithYear(classId)
-                            .orElseThrow(() -> new BusinessException("Class not found: " + classId));
+                for (Long academicGroupId : academicGroupIds) {
+                    AcademicGroup cls = academicGroupRepository.findByIdWithYear(academicGroupId)
+                            .orElseThrow(() -> new BusinessException("Academic Group not found: " + academicGroupId));
                     if (!Objects.equals(cls.getAcademicYear().getAcademicYearId(), year.getAcademicYearId())) {
-                        throw new BusinessException("Class must belong to the same academic year");
+                        throw new BusinessException("Academic Group must belong to the same academic year");
                     }
                 }
-                request.setClassIds(classIds);
+                request.setAcademicGroupIds(academicGroupIds);
                 request.setSectionIds(Collections.emptyList());
             }
             case SECTION -> {
@@ -444,15 +444,15 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
                     throw new BusinessException("At least one section is required for SECTION audience");
                 }
                 for (Long sectionId : sectionIds) {
-                    AcademicSection section = sectionRepository.findByIdWithClass(sectionId)
+                    AcademicSection section = sectionRepository.findByIdWithAcademicGroup(sectionId)
                             .orElseThrow(() -> new BusinessException("Section not found: " + sectionId));
-                    Long sectionYearId = section.getAcademicClass().getAcademicYear().getAcademicYearId();
+                    Long sectionYearId = section.getAcademicGroup().getAcademicYear().getAcademicYearId();
                     if (!Objects.equals(sectionYearId, year.getAcademicYearId())) {
                         throw new BusinessException("Section must belong to the same academic year");
                     }
                 }
                 request.setSectionIds(sectionIds);
-                request.setClassIds(Collections.emptyList());
+                request.setAcademicGroupIds(Collections.emptyList());
             }
         }
     }
@@ -473,22 +473,22 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
 
     private void replaceAudienceMappings(AcademicCalendarEvent event, AcademicCalendarEventRequest request) {
         initializeMappings(event);
-        event.getClasses().clear();
+        event.getAcademicGroups().clear();
         event.getSections().clear();
 
-        if (request.getAudienceType() == CalendarAudienceType.CLASS && request.getClassIds() != null) {
-            for (Long classId : request.getClassIds()) {
-                AcademicClass cls = classRepository.findByIdWithYear(classId)
-                        .orElseThrow(() -> new BusinessException("Class not found: " + classId));
-                AcademicCalendarEventClass link = new AcademicCalendarEventClass();
+        if (request.getAudienceType() == CalendarAudienceType.ACADEMIC_GROUP && request.getAcademicGroupIds() != null) {
+            for (Long academicGroupId : request.getAcademicGroupIds()) {
+                AcademicGroup cls = academicGroupRepository.findByIdWithYear(academicGroupId)
+                        .orElseThrow(() -> new BusinessException("Academic Group not found: " + academicGroupId));
+                AcademicCalendarEventGroup link = new AcademicCalendarEventGroup();
                 link.setEvent(event);
-                link.setAcademicClass(cls);
-                event.getClasses().add(link);
+                link.setAcademicGroup(cls);
+                event.getAcademicGroups().add(link);
             }
         }
         if (request.getAudienceType() == CalendarAudienceType.SECTION && request.getSectionIds() != null) {
             for (Long sectionId : request.getSectionIds()) {
-                AcademicSection section = sectionRepository.findByIdWithClass(sectionId)
+                AcademicSection section = sectionRepository.findByIdWithAcademicGroup(sectionId)
                         .orElseThrow(() -> new BusinessException("Section not found: " + sectionId));
                 AcademicCalendarEventSection link = new AcademicCalendarEventSection();
                 link.setEvent(event);
@@ -505,15 +505,15 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
     }
 
     private void initializeMappings(AcademicCalendarEvent event) {
-        Hibernate.initialize(event.getClasses());
+        Hibernate.initialize(event.getAcademicGroups());
         Hibernate.initialize(event.getSections());
-        for (AcademicCalendarEventClass link : event.getClasses()) {
-            Hibernate.initialize(link.getAcademicClass());
+        for (AcademicCalendarEventGroup link : event.getAcademicGroups()) {
+            Hibernate.initialize(link.getAcademicGroup());
         }
         for (AcademicCalendarEventSection link : event.getSections()) {
             Hibernate.initialize(link.getSection());
             if (link.getSection() != null) {
-                Hibernate.initialize(link.getSection().getAcademicClass());
+                Hibernate.initialize(link.getSection().getAcademicGroup());
             }
         }
     }
@@ -522,11 +522,11 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
         initializeMappings(event);
         AcademicYear year = event.getAcademicYear();
 
-        List<AcademicCalendarEventResponse.CalendarClassRef> classes = event.getClasses().stream()
-                .map(link -> AcademicCalendarEventResponse.CalendarClassRef.builder()
-                        .classId(link.getAcademicClass().getClassId())
-                        .name(link.getAcademicClass().getName())
-                        .code(link.getAcademicClass().getCode())
+        List<AcademicCalendarEventResponse.CalendarGroupRef> academicGroups = event.getAcademicGroups().stream()
+                .map(link -> AcademicCalendarEventResponse.CalendarGroupRef.builder()
+                        .academicGroupId(link.getAcademicGroup().getAcademicGroupId())
+                        .name(link.getAcademicGroup().getName())
+                        .code(link.getAcademicGroup().getCode())
                         .build())
                 .collect(Collectors.toList());
 
@@ -535,8 +535,8 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
                         .sectionId(link.getSection().getSectionId())
                         .name(link.getSection().getName())
                         .code(link.getSection().getCode())
-                        .className(link.getSection().getAcademicClass() != null
-                                ? link.getSection().getAcademicClass().getName() : null)
+                        .academicGroupName(link.getSection().getAcademicGroup() != null
+                                ? link.getSection().getAcademicGroup().getName() : null)
                         .build())
                 .collect(Collectors.toList());
 
@@ -556,7 +556,7 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
                 .location(event.getLocation())
                 .audienceType(event.getAudienceType())
                 .status(event.getStatus())
-                .classes(classes)
+                .academicGroups(academicGroups)
                 .sections(sections)
                 .publishedBy(event.getPublishedBy())
                 .publishedOn(event.getPublishedOn())
@@ -601,7 +601,7 @@ public class AcademicCalendarServiceImpl implements AcademicCalendarService {
         return value.trim();
     }
 
-    private record AudienceScope(boolean viewAll, Set<Long> classIds, Set<Long> sectionIds) {
+    private record AudienceScope(boolean viewAll, Set<Long> academicGroupIds, Set<Long> sectionIds) {
         static AudienceScope all() {
             return new AudienceScope(true, Set.of(), Set.of());
         }

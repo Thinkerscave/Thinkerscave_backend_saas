@@ -9,14 +9,14 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TeacherMyClassesResponse {
+public class TeacherMyAcademicGroupsResponse {
 
     private Summary summary;
-    private List<ClassCard> classes;
+    private List<AcademicGrouplard> academicGroups;
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
     public static class Summary {
-        private int classCount;
+        private int academicGroupCount;
         private int sectionCount;
         private int subjectCount;
         private int weeklyPeriods;
@@ -24,16 +24,16 @@ public class TeacherMyClassesResponse {
     }
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class ClassCard {
-        private Long classId;
-        private String className;
-        private String classCode;
+    public static class AcademicGrouplard {
+        private Long academicGroupId;
+        private String academicGroupName;
+        private String academicGroupCode;
         private Long sectionId;
         private String sectionName;
         private Integer studentCount;
         private String roomName;
         private List<SubjectSlot> subjects;
-        private boolean classTeacher;
+        private boolean sectionTeacher;
     }
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor

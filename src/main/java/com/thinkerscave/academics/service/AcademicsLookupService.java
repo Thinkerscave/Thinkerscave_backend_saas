@@ -8,9 +8,17 @@ public interface AcademicsLookupService {
 
     List<LookupDTO> getActiveAcademicYears();
 
-    List<LookupDTO> getClassesByYear(Long academicYearId);
+    List<LookupDTO> getAcademicGroupsByYear(Long academicYearId);
 
-    List<LookupDTO> getSectionsByClass(Long classId);
+    default List<LookupDTO> getClassesByYear(Long academicYearId) {
+        return getAcademicGroupsByYear(academicYearId);
+    }
+
+    List<LookupDTO> getSectionsByAcademicGroup(Long academicGroupId);
+
+    default List<LookupDTO> getSectionsByClass(Long classId) {
+        return getSectionsByAcademicGroup(classId);
+    }
 
     List<LookupDTO> getActiveSubjects();
 

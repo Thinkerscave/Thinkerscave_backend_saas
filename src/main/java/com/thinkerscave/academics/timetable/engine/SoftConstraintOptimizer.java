@@ -58,7 +58,7 @@ public class SoftConstraintOptimizer {
             for (int b = a + 1; b < placements.size(); b++) {
                 Placement pA = placements.get(a);
                 Placement pB = placements.get(b);
-                if (Objects.equals(pA.getClassSubjectMappingId(), pB.getClassSubjectMappingId())) continue;
+                if (Objects.equals(pA.getAcademicGroupSubjectMappingId(), pB.getAcademicGroupSubjectMappingId())) continue;
                 if (pA.getDayOfWeek() == pB.getDayOfWeek() && pA.getPeriodId().equals(pB.getPeriodId())) continue;
 
                 double before = evaluate(pA, solution, source, requirementsById)
@@ -125,7 +125,7 @@ public class SoftConstraintOptimizer {
         int weekly = req == null ? 1 : req.getWeeklyPeriods();
         int cap = CandidateScorer.dailyCap(weekly, source.workingDayCount());
         int sameDay = solution.countPlacementsForSubjectInDay(
-                p.getSectionId(), p.getClassSubjectMappingId(), p.getDayOfWeek());
+                p.getSectionId(), p.getAcademicGroupSubjectMappingId(), p.getDayOfWeek());
         double score = sameDay > cap ? -40.0 * (sameDay - cap) : 0;
 
         if (req != null && req.getPreference() != null && req.getPreference() != SubjectTimetablePreference.ANY) {

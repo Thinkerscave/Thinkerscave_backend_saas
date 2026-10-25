@@ -8,7 +8,7 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class ClassSubjectMappingRequest {
+public class AcademicGroupSubjectMappingRequest {
 
     @NotNull(message = "Subject ID is mandatory")
     private Long subjectId;

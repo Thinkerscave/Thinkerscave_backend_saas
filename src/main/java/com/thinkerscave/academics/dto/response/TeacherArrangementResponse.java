@@ -21,7 +21,7 @@ public record TeacherArrangementResponse(
 
     public record Slot(
             Long timetableEntryId,
-            String className,
+            String academicGroupName,
             String sectionName,
             String subjectName,
             Short periodNumber,

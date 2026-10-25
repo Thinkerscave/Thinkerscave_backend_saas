@@ -12,56 +12,67 @@ import java.util.Optional;
 @Repository
 public interface SectionRepository extends JpaRepository<AcademicSection, Long> {
 
-    boolean existsByAcademicClass_ClassIdAndCodeIgnoreCase(Long classId, String code);
+    boolean existsByAcademicGroup_AcademicGroupIdAndCodeIgnoreCase(Long academicGroupId, String code);
 
-    boolean existsByAcademicClass_ClassIdAndCodeIgnoreCaseAndSectionIdNot(Long classId, String code, Long sectionId);
+    boolean existsByAcademicGroup_AcademicGroupIdAndCodeIgnoreCaseAndSectionIdNot(Long academicGroupId, String code, Long sectionId);
 
-    boolean existsByAcademicClass_ClassIdAndNameIgnoreCase(Long classId, String name);
+    boolean existsByAcademicGroup_AcademicGroupIdAndNameIgnoreCase(Long academicGroupId, String name);
 
-    boolean existsByAcademicClass_ClassIdAndNameIgnoreCaseAndSectionIdNot(Long classId, String name, Long sectionId);
+    boolean existsByAcademicGroup_AcademicGroupIdAndNameIgnoreCaseAndSectionIdNot(Long academicGroupId, String name, Long sectionId);
 
-    List<AcademicSection> findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(Long classId);
+        List<AcademicSection> findByAcademicGroup_AcademicGroupIdAndActiveTrueOrderByDisplayOrderAsc(Long academicGroupId);
 
-    List<AcademicSection> findByAcademicClass_ClassIdOrderByDisplayOrderAsc(Long classId);
+        List<AcademicSection> findByAcademicGroup_AcademicGroupIdOrderByDisplayOrderAsc(Long academicGroupId);
 
-    @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicClass WHERE s.academicClass.classId = :classId ORDER BY s.displayOrder ASC")
-    List<AcademicSection> findWithClassByAcademicClass_ClassIdOrderByDisplayOrderAsc(@Param("classId") Long classId);
+        @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicGroup WHERE s.academicGroup.academicGroupId = :academicGroupId ORDER BY s.displayOrder ASC")
+        List<AcademicSection> findWithAcademicGroupByAcademicGroup_AcademicGroupIdOrderByDisplayOrderAsc(@Param("academicGroupId") Long academicGroupId);
 
-    @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicClass WHERE s.academicClass.classId = :classId AND s.active = true ORDER BY s.displayOrder ASC")
-    List<AcademicSection> findWithClassByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(
-            @Param("classId") Long classId);
+        @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicGroup WHERE s.academicGroup.academicGroupId = :academicGroupId AND s.active = true ORDER BY s.displayOrder ASC")
+        List<AcademicSection> findWithAcademicGroupByAcademicGroup_AcademicGroupIdAndActiveTrueOrderByDisplayOrderAsc(
+            @Param("academicGroupId") Long academicGroupId);
 
     @Query("""
             SELECT s FROM AcademicSection s
-            JOIN FETCH s.academicClass c
+            JOIN FETCH s.academicGroup A
             LEFT JOIN FETCH s.defaultResource
-            WHERE c.academicYear.academicYearId = :yearId
-              AND c.active = true
+            WHERE A.academicYear.academicYearId = :yearId
+              AND A.active = true
               AND s.active = true
-            ORDER BY c.displayOrder ASC, s.displayOrder ASC, s.name ASC
+            ORDER BY A.displayOrder ASC, s.displayOrder ASC, s.name ASC
             """)
     List<AcademicSection> findActiveForTimetableByYear(@Param("yearId") Long yearId);
 
-    @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicClass c JOIN FETCH c.academicYear WHERE s.sectionId = :sectionId")
-    Optional<AcademicSection> findByIdWithClass(@Param("sectionId") Long sectionId);
+        @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicGroup A JOIN FETCH A.academicYear WHERE s.sectionId = :sectionId")
+        Optional<AcademicSection> findByIdWithAcademicGroup(@Param("sectionId") Long sectionId);
 
-    Optional<AcademicSection> findByAcademicClass_ClassIdAndCodeIgnoreCase(Long classId, String code);
+        Optional<AcademicSection> findByAcademicGroup_AcademicGroupIdAndCodeIgnoreCase(Long academicGroupId, String code);
 
-    Optional<AcademicSection> findByAcademicClass_ClassIdAndNameIgnoreCase(Long classId, String name);
+        Optional<AcademicSection> findByAcademicGroup_AcademicGroupIdAndNameIgnoreCase(Long academicGroupId, String name);
+
+        @Query("SELECT s FROM AcademicSection s WHERE s.academicGroup.academicGroupId = :classId AND LOWER(s.name) = LOWER(:name)")
+        Optional<AcademicSection> findByAcademicClass_ClassIdAndNameIgnoreCase(@Param("classId") Long classId,
+                                                                                @Param("name") String name);
+
+        @Query("SELECT s FROM AcademicSection s WHERE s.academicGroup.academicGroupId = :classId AND LOWER(s.name) = LOWER(:name)")
+        Optional<AcademicSection> findByAcademicClass_ClassIdAndSectionNameIgnoreCase(@Param("classId") Long classId,
+                                                                                        @Param("name") String name);
 
     /** Legacy alias: section name maps to {@code name}. */
-    default Optional<AcademicSection> findByAcademicClass_ClassIdAndSectionNameIgnoreCase(
-            Long classId, String sectionName) {
-        return findByAcademicClass_ClassIdAndNameIgnoreCase(classId, sectionName);
+        default Optional<AcademicSection> findByAcademicGroup_AcademicGroupIdAndSectionNameIgnoreCase(
+            Long academicGroupId, String sectionName) {
+        return findByAcademicGroup_AcademicGroupIdAndNameIgnoreCase(academicGroupId, sectionName);
     }
 
-    boolean existsByAcademicClass_ClassId(Long classId);
+    boolean existsByAcademicGroup_AcademicGroupId(Long academicGroupId);
 
-    long countByAcademicClass_AcademicYear_AcademicYearId(Long yearId);
+    long countByAcademicGroup_AcademicYear_AcademicYearId(Long yearId);
 
-    long countByAcademicClass_AcademicYear_AcademicYearIdAndActiveTrue(Long yearId);
+    long countByAcademicGroup_AcademicYear_AcademicYearIdAndActiveTrue(Long yearId);
 
-    long countByAcademicClass_ClassId(Long classId);
+    long countByAcademicGroup_AcademicGroupId(Long academicGroupId);
 
-    long countByAcademicClass_ClassIdAndActiveTrue(Long classId);
+    long countByAcademicGroup_AcademicGroupIdAndActiveTrue(Long academicGroupId);
+
+        @Query("SELECT s FROM AcademicSection s JOIN FETCH s.academicGroup A WHERE A.academicYear.academicYearId = :yearId")
+    List<AcademicSection> findWithAcademicGroupByYearId(@Param("yearId") Long yearId);
 }

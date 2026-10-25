@@ -10,12 +10,12 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Builder
-public class ClassTeacherAssignmentResponse {
-    private Long classTeacherAssignmentId;
+public class SectionTeacherAssignmentResponse {
+    private Long sectionTeacherAssignmentId;
     private Long sectionId;
     private String sectionName;
-    private Long classId;
-    private String className;
+    private Long academicGroupId;
+    private String academicGroupName;
     private Long staffId;
     private String staffName;
     private LocalDate effectiveFrom;

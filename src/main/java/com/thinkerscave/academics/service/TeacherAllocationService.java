@@ -1,8 +1,8 @@
 package com.thinkerscave.academics.service;
 
-import com.thinkerscave.academics.dto.request.ClassTeacherAssignmentRequest;
+import com.thinkerscave.academics.dto.request.SectionTeacherAssignmentRequest;
 import com.thinkerscave.academics.dto.request.TeacherAllocationAssignRequest;
-import com.thinkerscave.academics.dto.response.ClassTeacherAssignmentResponse;
+import com.thinkerscave.academics.dto.response.SectionTeacherAssignmentResponse;
 import com.thinkerscave.academics.dto.response.TeacherAllocationDashboardResponse;
 import com.thinkerscave.academics.dto.response.TeacherAllocationRowResponse;
 import com.thinkerscave.academics.dto.response.TeacherRecommendationResponse;
@@ -15,7 +15,7 @@ public interface TeacherAllocationService {
 
     TeacherAllocationDashboardResponse getDashboard(
             Long academicYearId,
-            Long classId,
+            Long academicGroupId,
             Long sectionId,
             Long subjectId,
             TeacherAllocationStatus status,
@@ -26,15 +26,15 @@ public interface TeacherAllocationService {
 
     TeacherAllocationRowResponse unassign(Long teacherAllocationId);
 
-    List<TeacherRecommendationResponse> recommendations(Long sectionId, Long classSubjectMappingId);
+    List<TeacherRecommendationResponse> recommendations(Long sectionId, Long academicGroupSubjectMappingId);
 
     TeacherWorkloadResponse getTeacherWorkload(Long staffId, Long academicYearId);
 
     List<TeacherWorkloadResponse> listWorkloads(Long academicYearId);
 
-    ClassTeacherAssignmentResponse assignClassTeacher(ClassTeacherAssignmentRequest request);
+    SectionTeacherAssignmentResponse assignSectionTeacher(SectionTeacherAssignmentRequest request);
 
-    List<ClassTeacherAssignmentResponse> getClassTeachers(Long yearId, Long classId, Long sectionId);
+    List<SectionTeacherAssignmentResponse> getSectionTeachers(Long yearId, Long academicGroupId, Long sectionId);
 
-    void removeClassTeacher(Long assignmentId);
+    void removeSectionTeacher(Long assignmentId);
 }

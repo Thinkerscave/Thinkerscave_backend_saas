@@ -10,13 +10,13 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
-public class ClassMappingBoardResponse {
-    private Long classId;
-    private String className;
-    private String classCode;
+public class AcademicGroupMappingBoardResponse {
+    private Long academicGroupId;
+    private String academicGroupName;
+    private String academicGroupCode;
     private AcademicStage stage;
     private List<String> sectionNames;
-    private List<ClassSubjectMappingResponse> mappings;
+    private List<AcademicGroupSubjectMappingResponse> mappings;
     private long includedCount;
     private long missingTeacherCount;
 }

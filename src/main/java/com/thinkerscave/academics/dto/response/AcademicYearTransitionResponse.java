@@ -18,7 +18,7 @@ public class AcademicYearTransitionResponse {
     private Long targetAcademicYearId;
     private String targetAcademicYearName;
     private AcademicTransitionStatus status;
-    private Boolean copyClasses;
+    private Boolean copyAcademicGroups;
     private Boolean copySections;
     private Boolean copySubjects;
     private Boolean copyMappings;

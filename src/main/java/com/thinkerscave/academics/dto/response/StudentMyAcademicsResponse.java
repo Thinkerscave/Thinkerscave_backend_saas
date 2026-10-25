@@ -13,15 +13,15 @@ public class StudentMyAcademicsResponse {
 
     private String studentName;
     private String admissionNumber;
-    private Long classId;
-    private String className;
+    private Long academicGroupId;
+    private String academicGroupName;
     private Long sectionId;
     private String sectionName;
     private String rollNumber;
     private Long academicYearId;
     private String academicYearName;
     private List<SubjectInfo> subjects;
-    private ClassTeacherInfo classTeacher;
+    private SectionTeacherInfo sectionTeacher;
     private boolean publishedTimetableExists;
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
@@ -33,7 +33,7 @@ public class StudentMyAcademicsResponse {
     }
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class ClassTeacherInfo {
+    public static class SectionTeacherInfo {
         private Long staffId;
         private String staffName;
     }

@@ -28,10 +28,10 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
 
     private final AcademicsAccessGuard accessGuard;
     private final AcademicYearRepository yearRepo;
-    private final ClassRepository classRepo;
+    private final AcademicGroupRepository academicGroupRepo;
     private final SectionRepository sectionRepo;
     private final SubjectRepository subjectRepo;
-    private final ClassSubjectMappingRepository mappingRepo;
+    private final AcademicGroupSubjectMappingRepository mappingRepo;
     private final TeacherAllocationRepository allocationRepo;
     private final TimetableVersionRepository versionRepo;
     private final TimetableConflictRepository conflictRepo;
@@ -45,7 +45,7 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
                 .orElseThrow(() -> new BusinessException("Academic year not found"));
 
         List<ReadinessStep> readinessSteps = buildReadinessSteps(yearId, year);
-        List<ClassCard> topClasses = buildTopClasses(yearId);
+        List<AcademicGroupCard> topAcademicGroups = buildTopAcademicGroups(yearId);
         long totalStudents = 0;
         try {
             totalStudents = enrollmentRepo.countByAcademicYearAcademicYearIdAndActiveTrue(yearId);
@@ -61,11 +61,11 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
                 .timetable(buildTimetableSummary(yearId))
                 .readinessSteps(readinessSteps)
                 .alerts(buildAlerts(yearId))
-                .topClasses(topClasses)
+                .topAcademicGroups(topAcademicGroups)
                 .topSubjects(buildTopSubjects(yearId))
                 .setupCompletePercent(computeSetupPercent(readinessSteps))
                 .importantDates(buildImportantDates(year))
-                .studentsByClass(buildStudentsByClass(topClasses, totalStudents))
+                .studentsByAcademicGroup(buildStudentsByAcademicGroup(topAcademicGroups, totalStudents))
                 .build();
     }
 
@@ -110,12 +110,12 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
                 .build();
     }
 
-    private StructureCounts buildStructureCounts(Long yearId, long studentsActive) {
-        return StructureCounts.builder()
-                .classesActive(classRepo.countByAcademicYear_AcademicYearIdAndActiveTrue(yearId))
-                .classesTotal(classRepo.countByAcademicYear_AcademicYearId(yearId))
-                .sectionsActive(sectionRepo.countByAcademicClass_AcademicYear_AcademicYearIdAndActiveTrue(yearId))
-                .sectionsTotal(sectionRepo.countByAcademicClass_AcademicYear_AcademicYearId(yearId))
+        private StructureCounts buildStructureCounts(Long yearId, long studentsActive) {
+                return StructureCounts.builder()
+                .academicGroupsActive(academicGroupRepo.countByAcademicYear_AcademicYearIdAndActiveTrue(yearId))
+                .academicGroupsTotal(academicGroupRepo.countByAcademicYear_AcademicYearId(yearId))
+                .sectionsActive(sectionRepo.countByAcademicGroup_AcademicYear_AcademicYearIdAndActiveTrue(yearId))
+                .sectionsTotal(sectionRepo.countByAcademicGroup_AcademicYear_AcademicYearId(yearId))
                 .subjectsActive(subjectRepo.countByAcademicYear_AcademicYearIdAndActiveTrue(yearId))
                 .subjectsTotal(subjectRepo.countByAcademicYear_AcademicYearId(yearId))
                 .studentsActive(studentsActive)
@@ -136,7 +136,7 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
 
     private AllocationSummary buildAllocationSummary(Long yearId) {
         List<TeacherAllocation> allocations = allocationRepo
-                .findBySection_AcademicClass_AcademicYear_AcademicYearId(yearId);
+                .findBySection_AcademicGroup_AcademicYear_AcademicYearId(yearId);
         long total = allocations.size();
         long assigned = allocations.stream()
                 .filter(a -> a.getStatus() == TeacherAllocationStatus.ASSIGNED)
@@ -187,13 +187,13 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
 
     private List<ReadinessStep> buildReadinessSteps(Long yearId, AcademicYear year) {
         List<ReadinessStep> steps = new ArrayList<>();
-        long classesActive = classRepo.countByAcademicYear_AcademicYearIdAndActiveTrue(yearId);
-        long sectionsActive = sectionRepo.countByAcademicClass_AcademicYear_AcademicYearIdAndActiveTrue(yearId);
+        long academicGroupsActive = academicGroupRepo.countByAcademicYear_AcademicYearIdAndActiveTrue(yearId);
+        long sectionsActive = sectionRepo.countByAcademicGroup_AcademicYear_AcademicYearIdAndActiveTrue(yearId);
         long subjectsActive = subjectRepo.countByAcademicYear_AcademicYearIdAndActiveTrue(yearId);
         long unmappedSubjects = mappingRepo.countUnmappedActiveSubjects(yearId);
 
         List<TeacherAllocation> allocs = allocationRepo
-                .findBySection_AcademicClass_AcademicYear_AcademicYearId(yearId);
+                .findBySection_AcademicGroup_AcademicYear_AcademicYearId(yearId);
         long unassigned = allocs.stream()
                 .filter(a -> a.getStatus() == TeacherAllocationStatus.UNASSIGNED)
                 .count();
@@ -213,9 +213,9 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
                 .build());
 
         steps.add(ReadinessStep.builder()
-                .code("CLASSES").label("Classes & Sections")
-                .state(classesActive > 0 && sectionsActive > 0 ? "COMPLETE" : "PENDING")
-                .detail(classesActive + " classes, " + sectionsActive + " sections")
+                    .code("ACADEMIC_GROUPS").label("Academic Groups & Sections")
+                .state(academicGroupsActive > 0 && sectionsActive > 0 ? "COMPLETE" : "PENDING")
+                .detail(academicGroupsActive + " academicGroups, " + sectionsActive + " sections")
                 .build());
 
         steps.add(ReadinessStep.builder()
@@ -278,13 +278,13 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
         if (unmapped > 0) {
             alerts.add(OverviewAlert.builder()
                     .severity("WARNING").code("UNMAPPED_SUBJECTS")
-                    .message(unmapped + " subject(s) not mapped to any class")
+                    .message(unmapped + " subject(s) not mapped to any Academic Group")
                     .route("/app/academics/subjects-mapping")
                     .build());
         }
 
         List<TeacherAllocation> allocs = allocationRepo
-                .findBySection_AcademicClass_AcademicYear_AcademicYearId(yearId);
+                .findBySection_AcademicGroup_AcademicYear_AcademicYearId(yearId);
         long missing = allocs.stream()
                 .filter(a -> a.getStatus() == TeacherAllocationStatus.UNASSIGNED)
                 .count();
@@ -313,24 +313,24 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
         return alerts;
     }
 
-    private List<ClassCard> buildTopClasses(Long yearId) {
-        List<AcademicClass> classes = classRepo
+        private List<AcademicGroupCard> buildTopAcademicGroups(Long yearId) {
+        List<AcademicGroup> academicGroups = academicGroupRepo
                 .findByAcademicYear_AcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(yearId);
-        return classes.stream()
+        return academicGroups.stream()
                 .limit(6)
-                .map(c -> {
+                .map(A -> {
                     long studentCount = 0;
                     try {
-                        studentCount = enrollmentRepo.countByClassEntityClassIdAndActiveTrue(c.getClassId());
+                        studentCount = enrollmentRepo.countByAcademicGroupEntityAcademicGroupIdAndActiveTrue(A.getAcademicGroupId());
                     } catch (Exception ignored) {
                         // ignore
                     }
-                    return ClassCard.builder()
-                            .classId(c.getClassId())
-                            .className(c.getName())
-                            .sectionCount(sectionRepo.countByAcademicClass_ClassIdAndActiveTrue(c.getClassId()))
+                    return AcademicGroupCard.builder()
+                            .academicGroupId(A.getAcademicGroupId())
+                            .academicGroupName(A.getName())
+                            .sectionCount(sectionRepo.countByAcademicGroup_AcademicGroupIdAndActiveTrue(A.getAcademicGroupId()))
                             .studentCount(studentCount)
-                            .classTeacherName(null)
+                            .sectionTeacherName(null)
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -340,22 +340,22 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
         List<Subject> subjects = subjectRepo
                 .findByAcademicYear_AcademicYearIdAndActiveTrueOrderByNameAsc(yearId);
         List<TeacherAllocation> allocs = allocationRepo
-                .findBySection_AcademicClass_AcademicYear_AcademicYearId(yearId);
+                .findBySection_AcademicGroup_AcademicYear_AcademicYearId(yearId);
 
         return subjects.stream()
                 .limit(6)
                 .map(s -> {
-                    long mappedClasses = mappingRepo.countBySubject_SubjectIdAndActiveTrue(s.getSubjectId());
+                    long mappedAcademicGroups = mappingRepo.countBySubject_SubjectIdAndActiveTrue(s.getSubjectId());
                     boolean anyAssigned = allocs.stream()
-                            .filter(a -> a.getClassSubjectMapping() != null
-                                    && a.getClassSubjectMapping().getSubject() != null
-                                    && Objects.equals(a.getClassSubjectMapping().getSubject().getSubjectId(),
+                            .filter(a -> a.getAcademicGroupSubjectMapping() != null
+                                    && a.getAcademicGroupSubjectMapping().getSubject() != null
+                                    && Objects.equals(a.getAcademicGroupSubjectMapping().getSubject().getSubjectId(),
                                     s.getSubjectId()))
                             .anyMatch(a -> a.getStatus() == TeacherAllocationStatus.ASSIGNED);
                     boolean anySlot = allocs.stream()
-                            .anyMatch(a -> a.getClassSubjectMapping() != null
-                                    && a.getClassSubjectMapping().getSubject() != null
-                                    && Objects.equals(a.getClassSubjectMapping().getSubject().getSubjectId(),
+                            .anyMatch(a -> a.getAcademicGroupSubjectMapping() != null
+                                    && a.getAcademicGroupSubjectMapping().getSubject() != null
+                                    && Objects.equals(a.getAcademicGroupSubjectMapping().getSubject().getSubjectId(),
                                     s.getSubjectId()));
                     String teacherStatus = !anySlot ? "-" : (anyAssigned ? "Assigned" : "Pending");
                     return SubjectCard.builder()
@@ -363,7 +363,7 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
                             .subjectName(s.getName())
                             .code(s.getCode())
                             .category(s.getCategory() != null ? s.getCategory().name() : null)
-                            .mappedClassCount(mappedClasses)
+                            .mappedAcademicGroupCount(mappedAcademicGroups)
                             .defaultWeeklyPeriods(s.getDefaultWeeklyPeriods())
                             .teacherStatus(teacherStatus)
                             .build();
@@ -371,20 +371,20 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
                 .collect(Collectors.toList());
     }
 
-    private List<StudentsByClass> buildStudentsByClass(List<ClassCard> topClasses, long totalStudents) {
-        if (topClasses == null || topClasses.isEmpty()) {
+        private List<StudentsByAcademicGroup> buildStudentsByAcademicGroup(List<AcademicGroupCard> topAcademicGroups, long totalStudents) {
+        if (topAcademicGroups == null || topAcademicGroups.isEmpty()) {
             return Collections.emptyList();
         }
-        long shown = topClasses.stream()
-                .mapToLong(c -> c.getStudentCount() != null ? c.getStudentCount() : 0L)
+        long shown = topAcademicGroups.stream()
+                .mapToLong(A -> A.getStudentCount() != null ? A.getStudentCount() : 0L)
                 .sum();
-        List<StudentsByClass> rows = new ArrayList<>();
-        for (ClassCard c : topClasses) {
-            long count = c.getStudentCount() != null ? c.getStudentCount() : 0L;
+        List<StudentsByAcademicGroup> rows = new ArrayList<>();
+        for (AcademicGroupCard A : topAcademicGroups) {
+            long count = A.getStudentCount() != null ? A.getStudentCount() : 0L;
             double percent = totalStudents > 0 ? (count * 100.0) / totalStudents : 0;
-            rows.add(StudentsByClass.builder()
-                    .classId(c.getClassId())
-                    .className(c.getClassName())
+            rows.add(StudentsByAcademicGroup.builder()
+                    .academicGroupId(A.getAcademicGroupId())
+                    .academicGroupName(A.getAcademicGroupName())
                     .studentCount(count)
                     .percent(Math.round(percent * 10.0) / 10.0)
                     .build());
@@ -392,9 +392,9 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
         if (totalStudents > shown) {
             long others = totalStudents - shown;
             double percent = totalStudents > 0 ? (others * 100.0) / totalStudents : 0;
-            rows.add(StudentsByClass.builder()
-                    .classId(null)
-                    .className("Others")
+            rows.add(StudentsByAcademicGroup.builder()
+                    .academicGroupId(null)
+                    .academicGroupName("Others")
                     .studentCount(others)
                     .percent(Math.round(percent * 10.0) / 10.0)
                     .build());

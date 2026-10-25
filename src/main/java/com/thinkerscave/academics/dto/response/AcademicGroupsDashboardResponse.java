@@ -10,17 +10,17 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
-public class ClassesSectionsDashboardResponse {
+public class AcademicGroupsDashboardResponse {
     private Long academicYearId;
     private String academicYearName;
     private AcademicYearStatus academicYearStatus;
     private boolean yearReadOnly;
 
-    private long classCount;
-    private long classesActive;
+    private long academicGroupCount;
+    private long academicGroupsActive;
     private long sectionCount;
     private long sectionsActive;
     private long studentCount;
 
-    private List<AcademicClassResponse> classes;
+    private List<AcademicGroupResponse> academicGroups;
 }

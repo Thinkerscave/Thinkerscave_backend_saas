@@ -28,10 +28,10 @@ public class SubjectResponse {
     private String description;
     private Boolean active;
 
-    private long mappedClassCount;
+    private long mappedAcademicGroupCount;
     private long teacherAllocationCount;
 
-    private List<ClassSubjectMappingResponse> mappings;
+    private List<AcademicGroupSubjectMappingResponse> mappings;
 
     private String createdBy;
     private LocalDateTime createdOn;

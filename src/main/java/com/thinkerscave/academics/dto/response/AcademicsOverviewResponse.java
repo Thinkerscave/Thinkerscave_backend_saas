@@ -22,11 +22,11 @@ public class AcademicsOverviewResponse {
     private TimetableSummary timetable;
     private List<ReadinessStep> readinessSteps;
     private List<OverviewAlert> alerts;
-    private List<ClassCard> topClasses;
+    private List<AcademicGroupCard> topAcademicGroups;
     private List<SubjectCard> topSubjects;
     private Integer setupCompletePercent;
     private List<ImportantDate> importantDates;
-    private List<StudentsByClass> studentsByClass;
+    private List<StudentsByAcademicGroup> studentsByAcademicGroup;
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
     public static class YearHeader {
@@ -44,8 +44,8 @@ public class AcademicsOverviewResponse {
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
     public static class StructureCounts {
-        private long classesActive;
-        private long classesTotal;
+        private long academicGroupsActive;
+        private long academicGroupsTotal;
         private long sectionsActive;
         private long sectionsTotal;
         private long subjectsActive;
@@ -93,12 +93,12 @@ public class AcademicsOverviewResponse {
     }
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class ClassCard {
-        private Long classId;
-        private String className;
+    public static class AcademicGroupCard {
+        private Long academicGroupId;
+        private String academicGroupName;
         private long sectionCount;
         private Long studentCount;
-        private String classTeacherName;
+        private String sectionTeacherName;
     }
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
@@ -107,7 +107,7 @@ public class AcademicsOverviewResponse {
         private String subjectName;
         private String code;
         private String category;
-        private Long mappedClassCount;
+        private Long mappedAcademicGroupCount;
         private Short defaultWeeklyPeriods;
         private String teacherStatus;
     }
@@ -121,9 +121,9 @@ public class AcademicsOverviewResponse {
     }
 
     @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class StudentsByClass {
-        private Long classId;
-        private String className;
+    public static class StudentsByAcademicGroup {
+        private Long academicGroupId;
+        private String academicGroupName;
         private long studentCount;
         private double percent;
     }

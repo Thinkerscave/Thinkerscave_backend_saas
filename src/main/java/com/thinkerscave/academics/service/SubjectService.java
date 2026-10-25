@@ -1,9 +1,9 @@
 package com.thinkerscave.academics.service;
 
-import com.thinkerscave.academics.dto.request.ClassSubjectMappingRequest;
+import com.thinkerscave.academics.dto.request.AcademicGroupSubjectMappingRequest;
 import com.thinkerscave.academics.dto.request.SubjectRequest;
-import com.thinkerscave.academics.dto.response.ClassMappingBoardResponse;
-import com.thinkerscave.academics.dto.response.ClassSubjectMappingResponse;
+import com.thinkerscave.academics.dto.response.AcademicGroupMappingBoardResponse;
+import com.thinkerscave.academics.dto.response.AcademicGroupSubjectMappingResponse;
 import com.thinkerscave.academics.dto.response.SubjectResponse;
 import com.thinkerscave.academics.dto.response.SubjectsMappingDashboardResponse;
 import com.thinkerscave.academics.enums.SubjectCategory;
@@ -27,7 +27,7 @@ public interface SubjectService {
 
     SubjectResponse activate(Long subjectId);
 
-    ClassMappingBoardResponse getClassMappingBoard(Long classId);
+    AcademicGroupMappingBoardResponse getAcademicGroupMappingBoard(Long academicGroupId);
 
-    ClassSubjectMappingResponse upsertClassMapping(Long classId, ClassSubjectMappingRequest request);
+    AcademicGroupSubjectMappingResponse upsertAcademicGroupMapping(Long academicGroupId, AcademicGroupSubjectMappingRequest request);
 }

@@ -1,7 +1,7 @@
 package com.thinkerscave.academics.timetable.engine;
 
 import com.thinkerscave.academics.entity.AcademicSection;
-import com.thinkerscave.academics.entity.ClassSubjectMapping;
+import com.thinkerscave.academics.entity.AcademicGroupSubjectMapping;
 import com.thinkerscave.academics.enums.SubjectTimetablePreference;
 import com.thinkerscave.academics.timetable.engine.TimetablePlanningData.Lesson;
 import org.springframework.stereotype.Component;
@@ -18,7 +18,7 @@ public class RequirementExpander {
         int seq = 1;
 
         for (Lesson lesson : lessons) {
-            ClassSubjectMapping mapping = lesson.mapping();
+            AcademicGroupSubjectMapping mapping = lesson.mapping();
             AcademicSection section = lesson.section();
 
             int weeklyPeriods = lesson.weeklyPeriods();
@@ -37,9 +37,9 @@ public class RequirementExpander {
                 req.setRequirementId(String.format("REQ-%04d", seq++));
                 req.setSectionId(section.getSectionId());
                 req.setSectionName(TimetablePlanningData.sectionLabel(section));
-                req.setClassId(section.getAcademicClass().getClassId());
-                req.setClassName(section.getAcademicClass().getName());
-                req.setClassSubjectMappingId(mapping.getClassSubjectMappingId());
+                req.setAcademicGroupId(section.getAcademicGroup().getAcademicGroupId());
+                req.setAcademicGroupName(section.getAcademicGroup().getName());
+                req.setAcademicGroupSubjectMappingId(mapping.getAcademicGroupSubjectMappingId());
                 req.setSubjectId(mapping.getSubject().getSubjectId());
                 req.setSubjectName(mapping.getSubject().getName());
                 req.setWeeklyPeriods(weeklyPeriods);

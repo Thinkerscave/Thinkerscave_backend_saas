@@ -28,7 +28,7 @@ public interface TimetableEntryRepository extends JpaRepository<TimetableEntry, 
             SELECT e FROM TimetableEntry e
             JOIN FETCH e.timetablePeriod p
             LEFT JOIN FETCH e.section s
-            LEFT JOIN FETCH s.academicClass
+            LEFT JOIN FETCH s.academicGroup
             LEFT JOIN FETCH e.teacherAllocation
             LEFT JOIN FETCH e.resource
             WHERE e.timetableVersion.timetableVersionId = :versionId

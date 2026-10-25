@@ -2,6 +2,6 @@ package com.thinkerscave.academics.enums;
 
 public enum CalendarAudienceType {
     EVERYONE,
-    CLASS,
+    ACADEMIC_GROUP,
     SECTION
 }

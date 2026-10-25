@@ -299,27 +299,27 @@ public class TimetableGenerationEngine {
     private TimetableConflict toConflictEntity(TimetableVersion version,
                                                SolutionValidator.ValidationConflict vc,
                                                boolean blocking) {
-        TimetableConflict c = new TimetableConflict();
-        c.setTimetableVersion(version);
-        c.setConflictType(vc.getConflictType());
-        c.setBlocking(blocking);
-        c.setStatus(TimetableConflictStatus.OPEN);
+        TimetableConflict A = new TimetableConflict();
+        A.setTimetableVersion(version);
+        A.setConflictType(vc.getConflictType());
+        A.setBlocking(blocking);
+        A.setStatus(TimetableConflictStatus.OPEN);
         String message = vc.getMessage();
-        c.setMessage(message.length() > 1000 ? message.substring(0, 997) + "..." : message);
+        A.setMessage(message.length() > 1000 ? message.substring(0, 997) + "..." : message);
         if (vc.getSectionId() != null) {
-            c.setSection(sectionRepository.getReferenceById(vc.getSectionId()));
+            A.setSection(sectionRepository.getReferenceById(vc.getSectionId()));
         }
         if (vc.getTeacherAllocationId() != null) {
-            c.setTeacherAllocation(allocationRepository.getReferenceById(vc.getTeacherAllocationId()));
+            A.setTeacherAllocation(allocationRepository.getReferenceById(vc.getTeacherAllocationId()));
         }
         if (vc.getResourceId() != null) {
-            c.setResource(resourceRepository.getReferenceById(vc.getResourceId()));
+            A.setResource(resourceRepository.getReferenceById(vc.getResourceId()));
         }
-        c.setDayOfWeek(vc.getDayOfWeek());
+        A.setDayOfWeek(vc.getDayOfWeek());
         if (vc.getPeriodId() != null) {
-            c.setTimetablePeriod(periodRepository.getReferenceById(vc.getPeriodId()));
+            A.setTimetablePeriod(periodRepository.getReferenceById(vc.getPeriodId()));
         }
-        return c;
+        return A;
     }
 
     private TimetableGenerateResultResponse cancelled(TimetableVersion version,

@@ -37,7 +37,7 @@ public class SchedulingSolution {
         teacherWeeklyCount.merge(p.getStaffId(), 1, Integer::sum);
         teacherDayCount.merge(new TeacherDayKey(p.getStaffId(), p.getDayOfWeek()), 1, Integer::sum);
         subjectDayPeriods.computeIfAbsent(
-                new SubjectDayKey(p.getSectionId(), p.getClassSubjectMappingId(), p.getDayOfWeek()),
+                new SubjectDayKey(p.getSectionId(), p.getAcademicGroupSubjectMappingId(), p.getDayOfWeek()),
                 k -> new ArrayList<>()).add(p.getPeriodNumber());
     }
 
@@ -51,7 +51,7 @@ public class SchedulingSolution {
         teacherWeeklyCount.merge(p.getStaffId(), -1, Integer::sum);
         teacherDayCount.merge(new TeacherDayKey(p.getStaffId(), p.getDayOfWeek()), -1, Integer::sum);
         List<Short> periods = subjectDayPeriods.get(
-                new SubjectDayKey(p.getSectionId(), p.getClassSubjectMappingId(), p.getDayOfWeek()));
+                new SubjectDayKey(p.getSectionId(), p.getAcademicGroupSubjectMappingId(), p.getDayOfWeek()));
         if (periods != null) {
             periods.remove(Short.valueOf(p.getPeriodNumber()));
         }

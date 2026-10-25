@@ -13,9 +13,9 @@ public class SchedulingRequirement {
     private String requirementId;
     private Long sectionId;
     private String sectionName;
-    private Long classId;
-    private String className;
-    private Long classSubjectMappingId;
+    private Long academicGroupId;
+    private String academicGroupName;
+    private Long academicGroupSubjectMappingId;
     private Long subjectId;
     private String subjectName;
     private int weeklyPeriods;

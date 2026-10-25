@@ -15,24 +15,12 @@ import lombok.Setter;
 @Getter
 @Setter
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@Table(
-        name = "academic_class",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_academic_class_year_code",
-                        columnNames = {"academic_year_id", "code"}
-                )
-        },
-        indexes = {
-                @Index(name = "idx_academic_class_year_active", columnList = "academic_year_id, is_active"),
-                @Index(name = "idx_academic_class_stage", columnList = "stage")
-        }
-)
+@Table(name = "academic_group")
 public class AcademicClass extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "class_id")
+    @Column(name = "academic_group_id")
     @EqualsAndHashCode.Include
     private Long classId;
 
@@ -51,9 +39,8 @@ public class AcademicClass extends Auditable {
     @Column(name = "code", nullable = false, length = 50)
     private String code;
 
-    @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "stage", nullable = false, length = 40)
+    @Column(name = "stage", length = 40)
     private AcademicStage stage;
 
     @NotNull

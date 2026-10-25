@@ -14,30 +14,30 @@ import lombok.Setter;
 @Setter
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Table(
-        name = "class_subject_mapping",
+        name = "academic_group_subject_mapping",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_csm_class_subject",
-                        columnNames = {"academic_class_id", "subject_id"}
+                        name = "uk_group_subject_mapping_subject",
+                        columnNames = {"academic_group_id", "subject_id"}
                 )
         },
         indexes = {
-                @Index(name = "idx_csm_class_active", columnList = "academic_class_id, is_active"),
-                @Index(name = "idx_csm_subject", columnList = "subject_id")
+                @Index(name = "idx_group_subject_mapping_active", columnList = "academic_group_id, is_active"),
+                @Index(name = "idx_group_subject_mapping_subject", columnList = "subject_id")
         }
 )
-public class ClassSubjectMapping extends Auditable {
+public class AcademicGroupSubjectMapping extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "class_subject_mapping_id")
+    @Column(name = "academic_group_subject_mapping_id")
     @EqualsAndHashCode.Include
-    private Long classSubjectMappingId;
+    private Long academicGroupSubjectMappingId;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "academic_class_id", nullable = false)
-    private AcademicClass academicClass;
+    @JoinColumn(name = "academic_group_id", nullable = false)
+    private AcademicGroup academicGroup;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

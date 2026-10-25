@@ -1,23 +1,23 @@
 package com.thinkerscave.academics.service.impl;
 
-import com.thinkerscave.academics.dto.request.ClassSubjectMappingRequest;
+import com.thinkerscave.academics.dto.request.AcademicGroupSubjectMappingRequest;
 import com.thinkerscave.academics.dto.request.SubjectRequest;
-import com.thinkerscave.academics.dto.response.ClassMappingBoardResponse;
-import com.thinkerscave.academics.dto.response.ClassSubjectMappingResponse;
+import com.thinkerscave.academics.dto.response.AcademicGroupMappingBoardResponse;
+import com.thinkerscave.academics.dto.response.AcademicGroupSubjectMappingResponse;
 import com.thinkerscave.academics.dto.response.SubjectResponse;
 import com.thinkerscave.academics.dto.response.SubjectsMappingDashboardResponse;
-import com.thinkerscave.academics.entity.AcademicClass;
+import com.thinkerscave.academics.entity.AcademicGroup;
 import com.thinkerscave.academics.entity.AcademicSection;
 import com.thinkerscave.academics.entity.AcademicYear;
-import com.thinkerscave.academics.entity.ClassSubjectMapping;
+import com.thinkerscave.academics.entity.AcademicGroupSubjectMapping;
 import com.thinkerscave.academics.entity.Subject;
 import com.thinkerscave.academics.enums.AcademicYearStatus;
 import com.thinkerscave.academics.enums.SubjectCategory;
 import com.thinkerscave.academics.enums.SubjectTimetablePreference;
 import com.thinkerscave.academics.enums.TeacherAllocationStatus;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
-import com.thinkerscave.academics.repository.ClassRepository;
-import com.thinkerscave.academics.repository.ClassSubjectMappingRepository;
+import com.thinkerscave.academics.repository.AcademicGroupRepository;
+import com.thinkerscave.academics.repository.AcademicGroupSubjectMappingRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.academics.repository.SubjectRepository;
 import com.thinkerscave.academics.repository.TeacherAllocationRepository;
@@ -48,10 +48,10 @@ public class SubjectServiceImpl implements SubjectService {
 
     private final AcademicYearRepository academicYearRepository;
     private final SubjectRepository subjectRepository;
-    private final ClassRepository classRepository;
+    private final AcademicGroupRepository academicGroupRepository;
     private final SectionRepository sectionRepository;
-    private final ClassSubjectMappingRepository mappingRepository;
-    private final TeacherAllocationRepository teacherAllocationRepository;
+    private final AcademicGroupSubjectMappingRepository mappingRepository;
+    private final TeacherAllocationRepository TeacherAllocationRepository;
     private final AcademicsAccessGuard accessGuard;
 
     @Override
@@ -75,8 +75,8 @@ public class SubjectServiceImpl implements SubjectService {
                 .academicYearName(year.getName())
                 .academicYearStatus(year.getStatus())
                 .yearReadOnly(isYearReadOnly(year))
-                .classCount(classRepository.countByAcademicYear_AcademicYearId(academicYearId))
-                .sectionCount(sectionRepository.countByAcademicClass_AcademicYear_AcademicYearId(academicYearId))
+                .academicGroupCount(academicGroupRepository.countByAcademicYear_AcademicYearId(academicYearId))
+                .sectionCount(sectionRepository.countByAcademicGroup_AcademicYear_AcademicYearId(academicYearId))
                 .subjectCount(subjectRepository.countByAcademicYear_AcademicYearId(academicYearId))
                 .subjectsActive(subjectRepository.countByAcademicYear_AcademicYearIdAndActiveTrue(academicYearId))
                 .unmappedSubjectCount(mappingRepository.countUnmappedActiveSubjects(academicYearId))
@@ -166,40 +166,40 @@ public class SubjectServiceImpl implements SubjectService {
 
     @Override
     @Transactional(readOnly = true)
-    public ClassMappingBoardResponse getClassMappingBoard(Long classId) {
+    public AcademicGroupMappingBoardResponse getAcademicGroupMappingBoard(Long academicGroupId) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_SUBJECTS);
-        AcademicClass academicClass = requireClass(classId);
-        Long yearId = academicClass.getAcademicYear().getAcademicYearId();
+        AcademicGroup academicGroup = requireAcademicGroup(academicGroupId);
+        Long yearId = academicGroup.getAcademicYear().getAcademicYearId();
 
         List<Subject> subjects = subjectRepository
                 .findByAcademicYear_AcademicYearIdAndActiveTrueOrderByNameAsc(yearId);
 
-        List<ClassSubjectMappingResponse> mappings = subjects.stream()
+        List<AcademicGroupSubjectMappingResponse> mappings = subjects.stream()
                 .map(subject -> {
-                    ClassSubjectMapping existing = mappingRepository
-                            .findByAcademicClass_ClassIdAndSubject_SubjectId(classId, subject.getSubjectId())
+                    AcademicGroupSubjectMapping existing = mappingRepository
+                            .findByAcademicGroup_AcademicGroupIdAndSubject_SubjectId(academicGroupId, subject.getSubjectId())
                             .orElse(null);
-                    return toMappingResponse(academicClass, subject, existing);
+                    return toMappingResponse(academicGroup, subject, existing);
                 })
                 .toList();
 
         List<String> sectionNames = sectionRepository
-                .findByAcademicClass_ClassIdAndActiveTrueOrderByDisplayOrderAsc(classId)
+                .findByAcademicGroup_AcademicGroupIdAndActiveTrueOrderByDisplayOrderAsc(academicGroupId)
                 .stream()
                 .map(AcademicSection::getName)
                 .toList();
 
-        long included = mappings.stream().filter(ClassSubjectMappingResponse::isIncluded).count();
+        long included = mappings.stream().filter(AcademicGroupSubjectMappingResponse::isIncluded).count();
         long missingTeachers = mappings.stream()
-                .filter(ClassSubjectMappingResponse::isIncluded)
+                .filter(AcademicGroupSubjectMappingResponse::isIncluded)
                 .filter(m -> "MISSING".equals(m.getTeacherStatus()))
                 .count();
 
-        return ClassMappingBoardResponse.builder()
-                .classId(academicClass.getClassId())
-                .className(academicClass.getName())
-                .classCode(academicClass.getCode())
-                .stage(academicClass.getStage())
+        return AcademicGroupMappingBoardResponse.builder()
+                .academicGroupId(academicGroup.getAcademicGroupId())
+                .academicGroupName(academicGroup.getName())
+                .academicGroupCode(academicGroup.getCode())
+                .stage(academicGroup.getStage())
                 .sectionNames(sectionNames)
                 .mappings(mappings)
                 .includedCount(included)
@@ -208,26 +208,26 @@ public class SubjectServiceImpl implements SubjectService {
     }
 
     @Override
-    public ClassSubjectMappingResponse upsertClassMapping(Long classId, ClassSubjectMappingRequest request) {
+    public AcademicGroupSubjectMappingResponse upsertAcademicGroupMapping(Long academicGroupId, AcademicGroupSubjectMappingRequest request) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_SUBJECTS);
-        AcademicClass academicClass = requireClass(classId);
-        assertYearMutable(academicClass.getAcademicYear());
+        AcademicGroup academicGroup = requireAcademicGroup(academicGroupId);
+        assertYearMutable(academicGroup.getAcademicYear());
 
         Subject subject = requireSubject(request.getSubjectId());
         if (!Objects.equals(subject.getAcademicYear().getAcademicYearId(),
-                academicClass.getAcademicYear().getAcademicYearId())) {
-            throw new BusinessException("Subject and class must belong to the same academic year");
+                academicGroup.getAcademicYear().getAcademicYearId())) {
+            throw new BusinessException("Subject and Academic Group must belong to the same academic year");
         }
         if (!subject.isActive() && Boolean.TRUE.equals(request.getIncluded())) {
             throw new BusinessException("Cannot map an inactive subject");
         }
 
-        ClassSubjectMapping mapping = mappingRepository
-                .findByAcademicClass_ClassIdAndSubject_SubjectId(classId, subject.getSubjectId())
-                .orElseGet(ClassSubjectMapping::new);
+        AcademicGroupSubjectMapping mapping = mappingRepository
+                .findByAcademicGroup_AcademicGroupIdAndSubject_SubjectId(academicGroupId, subject.getSubjectId())
+                .orElseGet(AcademicGroupSubjectMapping::new);
 
-        if (mapping.getClassSubjectMappingId() == null) {
-            mapping.setAcademicClass(academicClass);
+        if (mapping.getAcademicGroupSubjectMappingId() == null) {
+            mapping.setAcademicGroup(academicGroup);
             mapping.setSubject(subject);
         }
 
@@ -245,27 +245,27 @@ public class SubjectServiceImpl implements SubjectService {
                 ? mapping.getTimetablePreference()
                 : subject.getTimetablePreference()));
 
-        ClassSubjectMapping saved = mappingRepository.save(mapping);
-        return toMappingResponse(academicClass, subject, saved);
+        AcademicGroupSubjectMapping saved = mappingRepository.save(mapping);
+        return toMappingResponse(academicGroup, subject, saved);
     }
 
     private SubjectResponse toSubjectResponse(Subject subject, boolean withCounts, boolean withMappings) {
         AcademicYear year = subject.getAcademicYear();
-        long mappedClassCount = 0;
+        long mappedAcademicGroupCount = 0;
         long teacherAllocationCount = 0;
-        List<ClassSubjectMappingResponse> mappings = null;
+        List<AcademicGroupSubjectMappingResponse> mappings = null;
 
         if (withCounts || withMappings) {
-            List<ClassSubjectMapping> subjectMappings = mappingRepository
+            List<AcademicGroupSubjectMapping> subjectMappings = mappingRepository
                     .findBySubject_SubjectIdAndActiveTrue(subject.getSubjectId());
-            mappedClassCount = subjectMappings.size();
+            mappedAcademicGroupCount = subjectMappings.size();
             teacherAllocationCount = subjectMappings.stream()
-                    .mapToLong(m -> teacherAllocationRepository
-                            .countByClassSubjectMapping_ClassSubjectMappingId(m.getClassSubjectMappingId()))
+                    .mapToLong(m -> TeacherAllocationRepository
+                            .countByAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(m.getAcademicGroupSubjectMappingId()))
                     .sum();
             if (withMappings) {
                 mappings = subjectMappings.stream()
-                        .map(m -> toMappingResponse(m.getAcademicClass(), subject, m))
+                        .map(m -> toMappingResponse(m.getAcademicGroup(), subject, m))
                         .toList();
             }
         }
@@ -283,7 +283,7 @@ public class SubjectServiceImpl implements SubjectService {
                 .timetablePreference(subject.getTimetablePreference())
                 .description(subject.getDescription())
                 .active(subject.getActive())
-                .mappedClassCount(mappedClassCount)
+                .mappedAcademicGroupCount(mappedAcademicGroupCount)
                 .teacherAllocationCount(teacherAllocationCount)
                 .mappings(mappings)
                 .createdBy(subject.getCreatedBy())
@@ -293,8 +293,8 @@ public class SubjectServiceImpl implements SubjectService {
                 .build();
     }
 
-    private ClassSubjectMappingResponse toMappingResponse(
-            AcademicClass academicClass, Subject subject, ClassSubjectMapping mapping) {
+    private AcademicGroupSubjectMappingResponse toMappingResponse(
+            AcademicGroup academicGroup, Subject subject, AcademicGroupSubjectMapping mapping) {
         boolean included = mapping != null && Boolean.TRUE.equals(mapping.getActive());
         Short weekly = mapping != null && mapping.getWeeklyPeriods() != null
                 ? mapping.getWeeklyPeriods()
@@ -308,23 +308,23 @@ public class SubjectServiceImpl implements SubjectService {
 
         long allocationCount = mapping == null
                 ? 0
-                : teacherAllocationRepository.countByClassSubjectMapping_ClassSubjectMappingId(
-                mapping.getClassSubjectMappingId());
+                : TeacherAllocationRepository.countByAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(
+                mapping.getAcademicGroupSubjectMappingId());
         long assignedCount = mapping == null
                 ? 0
-                : teacherAllocationRepository.countByClassSubjectMapping_ClassSubjectMappingIdAndStatus(
-                mapping.getClassSubjectMappingId(), TeacherAllocationStatus.ASSIGNED);
+                : TeacherAllocationRepository.countByAcademicGroupSubjectMapping_AcademicGroupSubjectMappingIdAndStatus(
+                mapping.getAcademicGroupSubjectMappingId(), TeacherAllocationStatus.ASSIGNED);
 
         String teacherStatus = "NONE";
         if (included) {
             teacherStatus = assignedCount > 0 ? "ASSIGNED" : "MISSING";
         }
 
-        return ClassSubjectMappingResponse.builder()
-                .classSubjectMappingId(mapping == null ? null : mapping.getClassSubjectMappingId())
-                .classId(academicClass.getClassId())
-                .className(academicClass.getName())
-                .classCode(academicClass.getCode())
+        return AcademicGroupSubjectMappingResponse.builder()
+                .academicGroupSubjectMappingId(mapping == null ? null : mapping.getAcademicGroupSubjectMappingId())
+                .academicGroupId(academicGroup.getAcademicGroupId())
+                .academicGroupName(academicGroup.getName())
+                .academicGroupCode(academicGroup.getCode())
                 .subjectId(subject.getSubjectId())
                 .subjectName(subject.getName())
                 .subjectCode(subject.getCode())
@@ -400,9 +400,9 @@ public class SubjectServiceImpl implements SubjectService {
                 .orElseThrow(() -> new ResourceNotFoundException("Subject not found: " + subjectId));
     }
 
-    private AcademicClass requireClass(Long classId) {
-        return classRepository.findByIdWithYear(classId)
-                .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + classId));
+    private AcademicGroup requireAcademicGroup(Long academicGroupId) {
+        return academicGroupRepository.findByIdWithYear(academicGroupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Academic Group not found: " + academicGroupId));
     }
 
     private String trimToNull(String value) {

@@ -10,7 +10,7 @@ public class Placement {
 
     private String requirementId;
     private Long sectionId;
-    private Long classSubjectMappingId;
+    private Long academicGroupSubjectMappingId;
     private Long teacherAllocationId;
     private Long staffId;
     private Long resourceId;
@@ -23,7 +23,7 @@ public class Placement {
     public Placement(SchedulingRequirement req, CandidateSlot slot) {
         this.requirementId = req.getRequirementId();
         this.sectionId = req.getSectionId();
-        this.classSubjectMappingId = req.getClassSubjectMappingId();
+        this.academicGroupSubjectMappingId = req.getAcademicGroupSubjectMappingId();
         this.teacherAllocationId = req.getTeacherAllocationId();
         this.staffId = slot.getStaffId();
         this.resourceId = slot.getResourceId();

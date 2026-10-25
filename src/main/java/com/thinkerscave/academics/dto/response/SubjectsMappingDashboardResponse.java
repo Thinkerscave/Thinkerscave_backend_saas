@@ -16,7 +16,7 @@ public class SubjectsMappingDashboardResponse {
     private AcademicYearStatus academicYearStatus;
     private boolean yearReadOnly;
 
-    private long classCount;
+    private long academicGroupCount;
     private long sectionCount;
     private long subjectCount;
     private long subjectsActive;

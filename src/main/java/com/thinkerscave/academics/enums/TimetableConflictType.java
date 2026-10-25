@@ -2,7 +2,7 @@ package com.thinkerscave.academics.enums;
 
 public enum TimetableConflictType {
     TEACHER_CONFLICT,
-    CLASS_CONFLICT,
+    ACADEMIC_GROUP_CONFLICT,
     SECTION_CONFLICT,
     ROOM_CONFLICT,
     RESOURCE_CONFLICT,

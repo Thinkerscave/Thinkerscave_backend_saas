@@ -9,11 +9,11 @@ import lombok.Setter;
 @Getter
 @Setter
 @Builder
-public class ClassSubjectMappingResponse {
-    private Long classSubjectMappingId;
-    private Long classId;
-    private String className;
-    private String classCode;
+public class AcademicGroupSubjectMappingResponse {
+    private Long academicGroupSubjectMappingId;
+    private Long academicGroupId;
+    private String academicGroupName;
+    private String academicGroupCode;
     private Long subjectId;
     private String subjectName;
     private String subjectCode;

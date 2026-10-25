@@ -48,7 +48,7 @@ public class AcademicCalendarEventRequest {
     @NotNull(message = "Audience type is mandatory")
     private CalendarAudienceType audienceType;
 
-    private List<Long> classIds;
+    private List<Long> academicGroupIds;
 
     private List<Long> sectionIds;
 
