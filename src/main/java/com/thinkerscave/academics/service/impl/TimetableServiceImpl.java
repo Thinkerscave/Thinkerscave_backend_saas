@@ -60,6 +60,8 @@ public class TimetableServiceImpl implements TimetableService {
     private final TimetableVersionRepository versionRepository;
     private final TimetableEntryRepository entryRepository;
     private final TimetableConflictRepository conflictRepository;
+    private final TimetableGenerationRunRepository generationRunRepository;
+    private final TimetableVersionEventRepository versionEventRepository;
     private final AcademicResourceRepository resourceRepository;
     private final StaffRepository staffRepository;
     private final AcademicsAccessGuard accessGuard;
@@ -411,15 +413,12 @@ public class TimetableServiceImpl implements TimetableService {
             versionRepository.save(v);
         }
 
-        TimetablePlanningData data = planningDataLoader.load(yearId);
+        TimetableConfiguration config = ensureSettingsConfiguration(year);
+        TimetablePlanningData data = planningDataLoader.load(yearId, config,
+                request == null ? null : request.getReferenceDate());
         TimetableReadinessResponse readiness = readinessEvaluator.evaluate(data);
         if (!readiness.isReady()) {
             throw new BusinessException("Cannot generate yet. Fix these first: " + describeBlocking(readiness));
-        }
-
-        TimetableConfiguration config = data.getConfiguration();
-        if (config == null) {
-            throw new BusinessException("Set up the timetable configuration (working days and periods) first");
         }
 
         int nextVersion = existing.isEmpty() ? 1 : existing.get(0).getVersionNumber() + 1;
@@ -432,22 +431,38 @@ public class TimetableServiceImpl implements TimetableService {
         version.setStatus(TimetableStatus.DRAFT);
         version = versionRepository.save(version);
 
+        TimetableGenerationRun run = new TimetableGenerationRun();
+        run.setTimetableVersion(version);
+        run.setAcademicYear(year);
+        run.setStatus(TimetableGenerationRunStatus.RUNNING);
+        run.setStartedAt(LocalDateTime.now());
+        run.setRequestedByUserId(accessGuard.currentUserIdOrNull());
+        run.setRequestedGroupIds(request == null || request.getAcademicGroupIds() == null
+                ? null : request.getAcademicGroupIds().stream().map(String::valueOf)
+                .collect(Collectors.joining(",")));
+        run = generationRunRepository.save(run);
+
         Long generationId = version.getTimetableVersionId();
         progressTracker.init(generationId);
 
         long seed = request != null && request.getSeed() != null
                 ? request.getSeed()
                 : Objects.hash(yearId, config.getTimetableConfigurationId(), nextVersion);
+        run.setSeed(seed);
+        generationRunRepository.save(run);
+        recordEvent(version, "GENERATION_STARTED", null, TimetableStatus.DRAFT.name(),
+                "Version " + nextVersion + " generation requested");
 
         String tenant = TenantContext.getTenant();
         Long orgId = OrganizationContext.getOrganizationId();
         Long userId = accessGuard.currentUserIdOrNull();
+        java.time.LocalDate referenceDate = request == null ? null : request.getReferenceDate();
 
         // Launch worker only after the GENERATING version row is committed.
         final Long committedGenerationId = generationId;
         final long committedSeed = seed;
         Runnable launch = () -> generationWorker.runGeneration(
-                committedGenerationId, committedSeed, committedGenerationId, tenant, orgId, userId);
+                committedGenerationId, committedSeed, committedGenerationId, tenant, orgId, userId, referenceDate);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -677,8 +692,12 @@ public class TimetableServiceImpl implements TimetableService {
         assertGenerated(version, "submit");
         assertNoOpenBlocking(versionId, "submit");
 
+        TimetableStatus from = version.getStatus();
         version.setStatus(TimetableStatus.PENDING_APPROVAL);
-        return toVersionResponse(versionRepository.save(version));
+        version = versionRepository.save(version);
+        recordEvent(version, "SUBMITTED", from.name(), version.getStatus().name(),
+                "Submitted for approval");
+        return toVersionResponse(version);
     }
 
     @Override
@@ -692,10 +711,13 @@ public class TimetableServiceImpl implements TimetableService {
         assertNoOpenBlocking(versionId, "approve");
         assertStillReady(version, "approve");
 
+        TimetableStatus from = version.getStatus();
         version.setStatus(TimetableStatus.APPROVED);
         version.setApprovedAt(LocalDateTime.now());
         version.setApprovedByUserId(accessGuard.currentUserIdOrNull());
-        return toVersionResponse(versionRepository.save(version));
+        version = versionRepository.save(version);
+        recordEvent(version, "APPROVED", from.name(), version.getStatus().name(), "Timetable approved");
+        return toVersionResponse(version);
     }
 
     @Override
@@ -707,8 +729,12 @@ public class TimetableServiceImpl implements TimetableService {
             throw new BusinessException("Cannot reject version in status: " + version.getStatus());
         }
 
+        TimetableStatus from = version.getStatus();
         version.setStatus(TimetableStatus.READY_FOR_REVIEW);
-        return toVersionResponse(versionRepository.save(version));
+        version = versionRepository.save(version);
+        recordEvent(version, "REJECTED", from.name(), version.getStatus().name(),
+                "Returned for review");
+        return toVersionResponse(version);
     }
 
     @Override
@@ -716,9 +742,15 @@ public class TimetableServiceImpl implements TimetableService {
         accessGuard.requireApprove(AcademicsAccessGuard.RESOURCE_TIMETABLE);
         TimetableVersion version = requireVersion(versionId);
 
-        if (version.getStatus() != TimetableStatus.APPROVED) {
+        if (version.getStatus() == TimetableStatus.PENDING_APPROVAL) {
+            throw new BusinessException("This version is awaiting approval. Approve it before publishing.");
+        }
+        if (version.getStatus() != TimetableStatus.APPROVED
+                && version.getStatus() != TimetableStatus.READY_FOR_REVIEW
+                && version.getStatus() != TimetableStatus.DRAFT) {
             throw new BusinessException("Cannot publish version in status: " + version.getStatus());
         }
+        assertGenerated(version, "publish");
         assertNoOpenBlocking(versionId, "publish");
         assertStillReady(version, "publish");
 
@@ -730,14 +762,19 @@ public class TimetableServiceImpl implements TimetableService {
                     versionRepository.saveAndFlush(published);
                 });
 
+        TimetableStatus from = version.getStatus();
         version.setStatus(TimetableStatus.PUBLISHED);
         version.setPublishedAt(LocalDateTime.now());
         version.setPublishedByUserId(accessGuard.currentUserIdOrNull());
-        versionRepository.save(version);
+        version = versionRepository.save(version);
+        recordEvent(version, "PUBLISHED", from.name(), version.getStatus().name(),
+                "Published to the organization");
 
         TimetableConfiguration config = version.getTimetableConfiguration();
-        config.setIsLocked(true);
-        configurationRepository.save(config);
+        if (config != null) {
+            config.setIsLocked(true);
+            configurationRepository.save(config);
+        }
 
         return toVersionResponse(version);
     }
@@ -747,6 +784,39 @@ public class TimetableServiceImpl implements TimetableService {
     private AcademicYear requireYear(Long yearId) {
         return academicYearRepository.findById(yearId)
                 .orElseThrow(() -> new ResourceNotFoundException("Academic year not found: " + yearId));
+    }
+
+    /**
+     * Keeps a year-level settings row (maximum teacher workload, legacy attendance working
+     * days). Patterns and group assignments are the scheduling source of truth.
+     */
+    private TimetableConfiguration ensureSettingsConfiguration(AcademicYear year) {
+        List<TimetableConfiguration> existing = configurationRepository
+                .findByAcademicYear_AcademicYearId(year.getAcademicYearId());
+        TimetableConfiguration active = TimetablePlanningDataLoader.selectActive(existing);
+        if (active != null) return active;
+        TimetableConfiguration config = existing.isEmpty() ? new TimetableConfiguration() : existing.get(0);
+        config.setAcademicYear(year);
+        config.setName("Timetable settings");
+        config.setShiftType(TimetableShiftType.REGULAR);
+        config.setSchoolStartTime(LocalTime.of(8, 0));
+        config.setSchoolEndTime(LocalTime.of(14, 0));
+        config.setDefaultPeriodDurationMin((short) 40);
+        config.setMaxTeacherWeeklyPeriods((short) 30);
+        config.setStatus(TimetableConfigurationStatus.READY);
+        config.setActive(true);
+        return configurationRepository.save(config);
+    }
+
+    private void recordEvent(TimetableVersion version, String type, String from, String to, String note) {
+        TimetableVersionEvent event = new TimetableVersionEvent();
+        event.setTimetableVersion(version);
+        event.setEventType(type);
+        event.setFromStatus(from);
+        event.setToStatus(to);
+        event.setNote(note);
+        event.setActorUserId(accessGuard.currentUserIdOrNull());
+        versionEventRepository.save(event);
     }
 
     private TimetableVersion requireVersion(Long versionId) {

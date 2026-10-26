@@ -12,26 +12,27 @@ public class CandidateCalculator {
 
     public void calculateCandidates(List<SchedulingRequirement> requirements,
                                     SchedulingSourceData source) {
-        List<DayOfWeek> workingDays = source.getWorkingDays();
-        List<TimetablePeriod> teachingPeriods = source.getTeachingPeriods();
-
         for (SchedulingRequirement req : requirements) {
             List<CandidateSlot> candidates = new ArrayList<>();
-
-            for (DayOfWeek day : workingDays) {
+            for (DayOfWeek day : source.getWorkingDays()) {
+                List<TimetablePeriod> teachingPeriods = source.slotsForUnitOnDay(req.getUnitId(), day);
                 for (int idx = 0; idx < teachingPeriods.size(); idx++) {
                     TimetablePeriod period = teachingPeriods.get(idx);
                     candidates.add(new CandidateSlot(
                             day,
+                            req.getUnitId(),
+                            req.getSectionId(),
+                            req.getAcademicGroupId(),
                             period.getTimetablePeriodId(),
                             period.getPeriodNumber(),
+                            period.getStartTime(),
+                            period.getEndTime(),
                             idx,
                             req.getPrimaryStaffId(),
                             req.getDefaultResourceId()
                     ));
                 }
             }
-
             req.setCandidates(candidates);
             req.setStaticCandidateCount(candidates.size());
         }

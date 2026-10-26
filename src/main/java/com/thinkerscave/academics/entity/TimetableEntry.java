@@ -66,12 +66,29 @@ public class TimetableEntry extends Auditable {
     private TimetablePeriod timetablePeriod;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "academic_group_id")
+    private AcademicGroup academicGroup;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "section_id")
     private AcademicSection section;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_allocation_id")
     private TeacherAllocation teacherAllocation;
+
+    /** Actual teacher placed on this lesson; may differ from the allocation's primary teacher. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "staff_id")
+    private com.thinkerscave.staff.entity.Staff staff;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subject_id")
+    private Subject subject;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fixed_activity_id")
+    private FixedActivity fixedActivity;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "resource_id")
@@ -85,4 +102,8 @@ public class TimetableEntry extends Auditable {
     @Size(max = 150)
     @Column(name = "subject_name_snapshot", length = 150)
     private String subjectNameSnapshot;
+
+    @NotNull
+    @Column(name = "is_locked", nullable = false)
+    private Boolean locked = false;
 }

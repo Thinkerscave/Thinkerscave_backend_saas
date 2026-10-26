@@ -30,16 +30,16 @@ public class SoftConstraintOptimizer {
                                        Map<String, SchedulingRequirement> requirementsById) {
         progress.advanceTo(GenerationPhase.OPTIMIZING, 72);
 
-        Map<Long, List<Placement>> bySection = new HashMap<>();
+        Map<Long, List<Placement>> byUnit = new HashMap<>();
         for (Placement p : solution.getPlacements()) {
-            bySection.computeIfAbsent(p.getSectionId(), k -> new ArrayList<>()).add(p);
+            byUnit.computeIfAbsent(p.getUnitId(), k -> new ArrayList<>()).add(p);
         }
 
         int improvementCount = 0;
         for (int pass = 0; pass < MAX_OPTIMIZATION_PASSES; pass++) {
             if (progress.isCancelRequested()) break;
             int passImprovements = 0;
-            for (List<Placement> sectionPlacements : bySection.values()) {
+            for (List<Placement> sectionPlacements : byUnit.values()) {
                 passImprovements += runSwapPass(sectionPlacements, solution, source, requirementsById);
             }
             improvementCount += passImprovements;
@@ -58,12 +58,16 @@ public class SoftConstraintOptimizer {
             for (int b = a + 1; b < placements.size(); b++) {
                 Placement pA = placements.get(a);
                 Placement pB = placements.get(b);
-                if (Objects.equals(pA.getAcademicGroupSubjectMappingId(), pB.getAcademicGroupSubjectMappingId())) continue;
+                if (pA.getEntryType() == com.thinkerscave.academics.enums.TimetableEntryType.ACTIVITY
+                        || pB.getEntryType() == com.thinkerscave.academics.enums.TimetableEntryType.ACTIVITY) continue;
+                if (pA.getAcademicGroupSubjectMappingId() == null
+                        || Objects.equals(pA.getAcademicGroupSubjectMappingId(),
+                        pB.getAcademicGroupSubjectMappingId())) continue;
                 if (pA.getDayOfWeek() == pB.getDayOfWeek() && pA.getPeriodId().equals(pB.getPeriodId())) continue;
 
                 double before = evaluate(pA, solution, source, requirementsById)
                         + evaluate(pB, solution, source, requirementsById);
-                if (!canSwapSlots(pA, pB, solution)) continue;
+                if (!canSwapSlots(pA, pB, solution, source)) continue;
 
                 swapSlots(pA, pB, solution);
                 double after = evaluate(pA, solution, source, requirementsById)
@@ -78,17 +82,26 @@ public class SoftConstraintOptimizer {
         return improvements;
     }
 
-    private boolean canSwapSlots(Placement pA, Placement pB, SchedulingSolution solution) {
+    private boolean canSwapSlots(Placement pA, Placement pB, SchedulingSolution solution,
+                                 SchedulingSourceData source) {
+        if (!source.isSlotAllowed(pA.getUnitId(), pB.getDayOfWeek(), pB.getPeriodId())) return false;
+        if (!source.isSlotAllowed(pB.getUnitId(), pA.getDayOfWeek(), pA.getPeriodId())) return false;
         solution.unplace(pA);
         solution.unplace(pB);
 
-        boolean canPlaceAinB = !solution.isSectionOccupied(pA.getSectionId(), pB.getDayOfWeek(), pB.getPeriodId())
-                && !solution.isTeacherOccupied(pA.getStaffId(), pB.getDayOfWeek(), pB.getPeriodId())
-                && (pA.getResourceId() == null || !solution.isResourceOccupied(pA.getResourceId(), pB.getDayOfWeek(), pB.getPeriodId()));
+        boolean canPlaceAinB = !solution.isSectionOccupied(pA.getUnitId(), pB.getDayOfWeek(),
+                pB.getStartTime(), pB.getEndTime())
+                && (pA.getStaffId() == null || !solution.isTeacherOccupied(pA.getStaffId(), pB.getDayOfWeek(),
+                pB.getStartTime(), pB.getEndTime()))
+                && (pA.getResourceId() == null || !solution.isResourceOccupied(pA.getResourceId(), pB.getDayOfWeek(),
+                pB.getStartTime(), pB.getEndTime()));
 
-        boolean canPlaceBinA = !solution.isSectionOccupied(pB.getSectionId(), pA.getDayOfWeek(), pA.getPeriodId())
-                && !solution.isTeacherOccupied(pB.getStaffId(), pA.getDayOfWeek(), pA.getPeriodId())
-                && (pB.getResourceId() == null || !solution.isResourceOccupied(pB.getResourceId(), pA.getDayOfWeek(), pA.getPeriodId()));
+        boolean canPlaceBinA = !solution.isSectionOccupied(pB.getUnitId(), pA.getDayOfWeek(),
+                pA.getStartTime(), pA.getEndTime())
+                && (pB.getStaffId() == null || !solution.isTeacherOccupied(pB.getStaffId(), pA.getDayOfWeek(),
+                pA.getStartTime(), pA.getEndTime()))
+                && (pB.getResourceId() == null || !solution.isResourceOccupied(pB.getResourceId(), pA.getDayOfWeek(),
+                pA.getStartTime(), pA.getEndTime()));
 
         solution.place(pA);
         solution.place(pB);
@@ -104,16 +117,22 @@ public class SoftConstraintOptimizer {
         Long periodIdA = pA.getPeriodId();
         short periodNumA = pA.getPeriodNumber();
         int teachingIdxA = pA.getTeachingIndex();
+        java.time.LocalTime startA = pA.getStartTime();
+        java.time.LocalTime endA = pA.getEndTime();
 
         pA.setDayOfWeek(pB.getDayOfWeek());
         pA.setPeriodId(pB.getPeriodId());
         pA.setPeriodNumber(pB.getPeriodNumber());
         pA.setTeachingIndex(pB.getTeachingIndex());
+        pA.setStartTime(pB.getStartTime());
+        pA.setEndTime(pB.getEndTime());
 
         pB.setDayOfWeek(dayA);
         pB.setPeriodId(periodIdA);
         pB.setPeriodNumber(periodNumA);
         pB.setTeachingIndex(teachingIdxA);
+        pB.setStartTime(startA);
+        pB.setEndTime(endA);
 
         solution.place(pA);
         solution.place(pB);
@@ -125,7 +144,7 @@ public class SoftConstraintOptimizer {
         int weekly = req == null ? 1 : req.getWeeklyPeriods();
         int cap = CandidateScorer.dailyCap(weekly, source.workingDayCount());
         int sameDay = solution.countPlacementsForSubjectInDay(
-                p.getSectionId(), p.getAcademicGroupSubjectMappingId(), p.getDayOfWeek());
+                p.getUnitId(), p.getAcademicGroupSubjectMappingId(), p.getDayOfWeek());
         double score = sameDay > cap ? -40.0 * (sameDay - cap) : 0;
 
         if (req != null && req.getPreference() != null && req.getPreference() != SubjectTimetablePreference.ANY) {

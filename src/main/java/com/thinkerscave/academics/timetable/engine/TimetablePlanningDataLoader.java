@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Loads {@link TimetablePlanningData}. Must be called inside a transaction because it walks
@@ -26,25 +27,25 @@ public class TimetablePlanningDataLoader {
     );
 
     private final AcademicYearRepository academicYearRepository;
+    private final AcademicGroupRepository academicGroupRepository;
     private final SectionRepository sectionRepository;
     private final AcademicGroupSubjectMappingRepository mappingRepository;
     private final TeacherAllocationRepository allocationRepository;
     private final TeacherAllocationTeacherRepository allocationTeacherRepository;
     private final TimetableConfigurationRepository configurationRepository;
-    private final TimetableWorkingDayRepository workingDayRepository;
     private final TimetablePeriodRepository periodRepository;
     private final TimetableVersionRepository versionRepository;
     private final AcademicResourceRepository resourceRepository;
+    private final SchedulePatternRepository patternRepository;
+    private final GroupScheduleAssignmentRepository assignmentRepository;
+    private final FixedActivityRepository fixedActivityRepository;
 
-    /**
-     * Picks the configuration timetable generation uses when a year has more than one active
-     * configuration: the REGULAR shift first, then the oldest configuration.
-     */
     public static TimetableConfiguration selectActive(List<TimetableConfiguration> configurations) {
         return configurations.stream()
                 .filter(TimetableConfiguration::isActive)
                 .min(Comparator
-                        .comparing((TimetableConfiguration A) -> A.getShiftType() == TimetableShiftType.REGULAR ? 0 : 1)
+                        .comparing((TimetableConfiguration A) ->
+                                A.getShiftType() == TimetableShiftType.REGULAR ? 0 : 1)
                         .thenComparing(TimetableConfiguration::getTimetableConfigurationId))
                 .orElse(null);
     }
@@ -57,11 +58,17 @@ public class TimetablePlanningDataLoader {
         return load(yearId, null);
     }
 
-    /**
-     * @param configurationOverride configuration to plan against (e.g. the one pinned on a
-     *                              timetable version); {@code null} resolves the active one.
-     */
     public TimetablePlanningData load(Long yearId, TimetableConfiguration configurationOverride) {
+        return load(yearId, configurationOverride, null);
+    }
+
+    /**
+     * @param configurationOverride settings carrier to use; {@code null} resolves the active one.
+     * @param referenceDate         date used to resolve effective pattern assignments and fixed
+     *                              activities; {@code null} clamps today to the academic year.
+     */
+    public TimetablePlanningData load(Long yearId, TimetableConfiguration configurationOverride,
+                                      LocalDate referenceDate) {
         AcademicYear year = academicYearRepository.findById(yearId).orElse(null);
 
         List<TimetableConfiguration> activeConfigs = configurationRepository
@@ -72,25 +79,101 @@ public class TimetablePlanningDataLoader {
         TimetableConfiguration config = configurationOverride != null
                 ? configurationOverride : selectActive(activeConfigs);
 
-        List<DayOfWeek> workingDays = List.of();
-        List<TimetablePeriod> allPeriods = List.of();
-        if (config != null) {
-            Long configId = config.getTimetableConfigurationId();
-            workingDays = workingDayRepository.findByTimetableConfiguration_TimetableConfigurationId(configId)
-                    .stream()
-                    .filter(w -> Boolean.TRUE.equals(w.getWorking()))
-                    .map(TimetableWorkingDay::getDayOfWeek)
-                    .sorted()
-                    .toList();
-            allPeriods = periodRepository
-                    .findByTimetableConfiguration_TimetableConfigurationIdOrderByPeriodNumberAsc(configId);
-        }
-        List<TimetablePeriod> teachingPeriods = allPeriods.stream()
-                .filter(p -> p.getSlotKind() == TimetableSlotKind.TEACHING)
-                .toList();
+        LocalDate effectiveDate = resolveReferenceDate(year, referenceDate);
 
+        List<SchedulePattern> patterns = patternRepository
+                .findByAcademicYear_AcademicYearIdOrderByNameAsc(yearId);
+        List<TimetablePeriod> allSlots = periodRepository.findAllSlotsForYear(yearId);
+        Map<Long, List<TimetablePeriod>> slotsByPattern = allSlots.stream()
+                .filter(s -> s.getSchedulePattern() != null)
+                .collect(Collectors.groupingBy(s -> s.getSchedulePattern().getSchedulePatternId()));
+        slotsByPattern.values().forEach(list -> list.sort(
+                Comparator.comparing(TimetablePeriod::getStartTime)
+                        .thenComparing(TimetablePeriod::getPeriodNumber)));
+
+        List<GroupScheduleAssignment> assignments = assignmentRepository.findDetailedByYear(yearId);
+        List<FixedActivity> fixedActivities = fixedActivityRepository.findDetailedByYear(yearId);
+
+        List<AcademicGroup> groups = academicGroupRepository
+                .findWithYearByAcademicYearIdAndActiveTrueOrderByDisplayOrderAsc(yearId);
         List<AcademicSection> sections = sectionRepository.findActiveForTimetableByYear(yearId);
-        List<AcademicGroupSubjectMapping> mappings = mappingRepository.findActiveForTimetableByYear(yearId).stream()
+
+        List<TimetablePlanningData.Unit> units = new ArrayList<>();
+        Map<Long, AcademicSection> sectionById = sections.stream()
+                .collect(Collectors.toMap(AcademicSection::getSectionId, s -> s));
+        for (AcademicGroup group : groups) {
+            List<AcademicSection> groupSections = sections.stream()
+                    .filter(s -> s.getAcademicGroup().getAcademicGroupId().equals(group.getAcademicGroupId()))
+                    .toList();
+            if (groupSections.isEmpty()) {
+                // Group without sections: represented as a group-level unit. Scheduling is
+                // blocked by readiness until a section is created, because teacher allocations
+                // are section-scoped in the existing academic model.
+                units.add(new TimetablePlanningData.Unit(-group.getAcademicGroupId(), null, group));
+            } else {
+                groupSections.forEach(section ->
+                        units.add(new TimetablePlanningData.Unit(section.getSectionId(), section, group)));
+            }
+        }
+
+        Map<Long, Map<DayOfWeek, List<TimetablePeriod>>> scheduleByUnit = new HashMap<>();
+        for (TimetablePlanningData.Unit unit : units) {
+            Map<DayOfWeek, List<TimetablePeriod>> byDay = new LinkedHashMap<>();
+            if (unit.section() != null) {
+                for (DayOfWeek day : DayOfWeek.values()) {
+                    List<GroupScheduleAssignment> dayAssignments = assignments.stream()
+                            .filter(a -> a.isActive() && a.isEffectiveOn(effectiveDate))
+                            .filter(a -> a.getAcademicGroup().getAcademicGroupId()
+                                    .equals(unit.academicGroupId()))
+                            .filter(a -> a.getDayOfWeek() == day)
+                            .toList();
+                    List<GroupScheduleAssignment> sectionSpecific = dayAssignments.stream()
+                            .filter(a -> a.getSection() != null
+                                    && a.getSection().getSectionId().equals(unit.sectionId()))
+                            .toList();
+                    List<GroupScheduleAssignment> selected = sectionSpecific.isEmpty()
+                            ? dayAssignments.stream().filter(a -> a.getSection() == null).toList()
+                            : sectionSpecific;
+                    List<TimetablePeriod> slots = new ArrayList<>();
+                    Set<Long> seen = new HashSet<>();
+                    for (GroupScheduleAssignment assignment : selected) {
+                        List<TimetablePeriod> patternSlots = slotsByPattern.getOrDefault(
+                                assignment.getSchedulePattern().getSchedulePatternId(), List.of());
+                        for (TimetablePeriod slot : patternSlots) {
+                            if (seen.add(slot.getTimetablePeriodId())) slots.add(slot);
+                        }
+                    }
+                    slots.sort(Comparator.comparing(TimetablePeriod::getStartTime)
+                            .thenComparing(TimetablePeriod::getPeriodNumber));
+                    if (!slots.isEmpty()) byDay.put(day, slots);
+                }
+            }
+            scheduleByUnit.put(unit.unitId(), byDay);
+        }
+
+        Set<DayOfWeek> workingDays = new TreeSet<>();
+        Set<Long> teachingIds = new HashSet<>();
+        List<TimetablePeriod> teachingPeriods = new ArrayList<>();
+        List<TimetablePeriod> unionPeriods = new ArrayList<>();
+        Set<Long> unionIds = new HashSet<>();
+        for (Map<DayOfWeek, List<TimetablePeriod>> byDay : scheduleByUnit.values()) {
+            for (Map.Entry<DayOfWeek, List<TimetablePeriod>> entry : byDay.entrySet()) {
+                workingDays.add(entry.getKey());
+                for (TimetablePeriod slot : entry.getValue()) {
+                    if (unionIds.add(slot.getTimetablePeriodId())) unionPeriods.add(slot);
+                    if (slot.getSlotKind() == TimetableSlotKind.TEACHING && teachingIds.add(slot.getTimetablePeriodId())) {
+                        teachingPeriods.add(slot);
+                    }
+                }
+            }
+        }
+        unionPeriods.sort(Comparator.comparing(TimetablePeriod::getStartTime)
+                .thenComparing(TimetablePeriod::getPeriodNumber));
+        teachingPeriods.sort(Comparator.comparing(TimetablePeriod::getStartTime)
+                .thenComparing(TimetablePeriod::getPeriodNumber));
+
+        List<AcademicGroupSubjectMapping> mappings = mappingRepository.findActiveForTimetableByYear(yearId)
+                .stream()
                 .sorted(Comparator
                         .comparing((AcademicGroupSubjectMapping m) -> m.getAcademicGroup().getDisplayOrder(),
                                 Comparator.nullsLast(Comparator.naturalOrder()))
@@ -99,7 +182,8 @@ public class TimetablePlanningDataLoader {
 
         Map<String, TeacherAllocation> allocationByKey = new HashMap<>();
         for (TeacherAllocation a : allocationRepository.findActiveWithDetailsByYear(yearId)) {
-            allocationByKey.put(key(a.getSection().getSectionId(), a.getAcademicGroupSubjectMapping().getAcademicGroupSubjectMappingId()), a);
+            allocationByKey.put(key(a.getSection().getSectionId(),
+                    a.getAcademicGroupSubjectMapping().getAcademicGroupSubjectMappingId()), a);
         }
 
         Map<Long, TeacherAllocationTeacher> primaryByAllocation = new HashMap<>();
@@ -110,48 +194,53 @@ public class TimetablePlanningDataLoader {
                     effectiveFrom(b).isAfter(effectiveFrom(a)) ? b : a);
         }
 
-        Map<Long, List<AcademicGroupSubjectMapping>> mappingsByClass = new HashMap<>();
+        Map<Long, List<AcademicGroupSubjectMapping>> mappingsByGroup = new HashMap<>();
         List<AcademicGroupSubjectMapping> zeroPeriodMappings = new ArrayList<>();
         for (AcademicGroupSubjectMapping m : mappings) {
             if (m.getWeeklyPeriods() == null || m.getWeeklyPeriods() <= 0) {
                 zeroPeriodMappings.add(m);
                 continue;
             }
-            mappingsByClass.computeIfAbsent(m.getAcademicGroup().getAcademicGroupId(), k -> new ArrayList<>()).add(m);
+            mappingsByGroup.computeIfAbsent(m.getAcademicGroup().getAcademicGroupId(),
+                    k -> new ArrayList<>()).add(m);
         }
 
         List<TimetablePlanningData.Lesson> lessons = new ArrayList<>();
         List<TimetablePlanningData.MissingTeacher> missing = new ArrayList<>();
-        for (AcademicSection section : sections) {
-            for (AcademicGroupSubjectMapping mapping : mappingsByClass.getOrDefault(
-                    section.getAcademicGroup().getAcademicGroupId(), List.of())) {
-                                if (!mapping.appliesToSection(section.getSectionId())) continue;
+        for (TimetablePlanningData.Unit unit : units) {
+            if (unit.section() == null) {
+                // Section-less groups are reported once by the readiness "active sections" check.
+                continue;
+            }
+            for (AcademicGroupSubjectMapping mapping : mappingsByGroup.getOrDefault(
+                    unit.academicGroupId(), List.of())) {
+                if (!mapping.appliesToSection(unit.sectionId())) continue;
                 TeacherAllocation allocation = allocationByKey.get(
-                        key(section.getSectionId(), mapping.getAcademicGroupSubjectMappingId()));
+                        key(unit.sectionId(), mapping.getAcademicGroupSubjectMappingId()));
                 if (allocation == null) {
-                    missing.add(new TimetablePlanningData.MissingTeacher(section, mapping,
+                    missing.add(new TimetablePlanningData.MissingTeacher(unit, mapping,
                             TimetablePlanningData.MissingTeacherReason.NO_ALLOCATION, null));
                     continue;
                 }
                 if (allocation.getStatus() != TeacherAllocationStatus.ASSIGNED) {
-                    missing.add(new TimetablePlanningData.MissingTeacher(section, mapping,
+                    missing.add(new TimetablePlanningData.MissingTeacher(unit, mapping,
                             TimetablePlanningData.MissingTeacherReason.UNASSIGNED, null));
                     continue;
                 }
                 TeacherAllocationTeacher primary = primaryByAllocation.get(allocation.getTeacherAllocationId());
                 if (primary == null || primary.getStaff() == null) {
-                    missing.add(new TimetablePlanningData.MissingTeacher(section, mapping,
+                    missing.add(new TimetablePlanningData.MissingTeacher(unit, mapping,
                             TimetablePlanningData.MissingTeacherReason.NO_PRIMARY_TEACHER, null));
                     continue;
                 }
                 Staff staff = primary.getStaff();
                 if (!isStaffAvailable(staff)) {
-                    missing.add(new TimetablePlanningData.MissingTeacher(section, mapping,
+                    missing.add(new TimetablePlanningData.MissingTeacher(unit, mapping,
                             TimetablePlanningData.MissingTeacherReason.TEACHER_INACTIVE,
                             TimetablePlanningData.staffName(staff)));
                     continue;
                 }
-                lessons.add(new TimetablePlanningData.Lesson(section, mapping, allocation, staff));
+                lessons.add(new TimetablePlanningData.Lesson(unit, mapping, allocation, staff));
             }
         }
 
@@ -162,9 +251,15 @@ public class TimetablePlanningDataLoader {
         return TimetablePlanningData.builder()
                 .year(year)
                 .configuration(config)
-                .activeConfigurations(activeConfigs)
-                .workingDays(workingDays)
-                .allPeriods(allPeriods)
+                .patterns(patterns)
+                .slotsByPattern(slotsByPattern)
+                .assignments(assignments)
+                .fixedActivities(fixedActivities)
+                .units(units)
+                .scheduleByUnit(scheduleByUnit)
+                .referenceDate(effectiveDate)
+                .workingDays(new ArrayList<>(workingDays))
+                .allPeriods(unionPeriods)
                 .teachingPeriods(teachingPeriods)
                 .sections(sections)
                 .mappings(mappings)
@@ -174,6 +269,20 @@ public class TimetablePlanningDataLoader {
                 .resources(resources)
                 .versions(versions)
                 .build();
+    }
+
+    public static LocalDate resolveReferenceDate(AcademicYear year, LocalDate requested) {
+        if (requested != null) {
+            if (year == null) return requested;
+            if (year.getStartDate() != null && requested.isBefore(year.getStartDate())) return year.getStartDate();
+            if (year.getEndDate() != null && requested.isAfter(year.getEndDate())) return year.getEndDate();
+            return requested;
+        }
+        LocalDate today = LocalDate.now();
+        if (year == null) return today;
+        if (year.getStartDate() != null && today.isBefore(year.getStartDate())) return year.getStartDate();
+        if (year.getEndDate() != null && today.isAfter(year.getEndDate())) return year.getEndDate();
+        return today;
     }
 
     private static boolean isStaffAvailable(Staff staff) {

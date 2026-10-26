@@ -32,6 +32,14 @@ public class ConstraintScheduler {
                                     SchedulingSourceData source,
                                     long seed,
                                     GenerationProgress progress) {
+        return solve(requirements, source, seed, progress, List.of());
+    }
+
+    public SchedulingSolution solve(List<SchedulingRequirement> requirements,
+                                    SchedulingSourceData source,
+                                    long seed,
+                                    GenerationProgress progress,
+                                    List<Placement> reservations) {
         Map<String, SchedulingRequirement> byId = new HashMap<>();
         Map<Long, Integer> teacherDemand = new HashMap<>();
         for (SchedulingRequirement r : requirements) {
@@ -46,7 +54,7 @@ public class ConstraintScheduler {
             attempts++;
             Random random = new Random(seed + attempt * 7919L);
             SchedulingSolution candidate = runAttempt(requirements, byId, teacherDemand, source, random,
-                    progress, attempt == 0);
+                    progress, attempt == 0, reservations);
             if (best == null
                     || candidate.getUnplacedRequirements().size() < best.getUnplacedRequirements().size()) {
                 best = candidate;
@@ -72,8 +80,10 @@ public class ConstraintScheduler {
                                           SchedulingSourceData source,
                                           Random random,
                                           GenerationProgress progress,
-                                          boolean reportProgress) {
+                                          boolean reportProgress,
+                                          List<Placement> reservations) {
         SchedulingSolution solution = new SchedulingSolution();
+        reservations.forEach(solution::place);
         List<SchedulingRequirement> remaining = new ArrayList<>(requirements);
         Collections.shuffle(remaining, random);
         int total = requirements.size();
@@ -112,7 +122,7 @@ public class ConstraintScheduler {
         int bestCount = Integer.MAX_VALUE;
         for (int i = 0; i < remaining.size(); i++) {
             SchedulingRequirement r = remaining.get(i);
-            String owner = r.getSectionId() + "|" + r.getPrimaryStaffId() + "|" + r.getDefaultResourceId();
+            String owner = r.getUnitId() + "|" + r.getPrimaryStaffId() + "|" + r.getDefaultResourceId();
             int count = feasibleByOwner.computeIfAbsent(owner, k -> countFeasible(r, solution, source));
             if (count < bestCount || (count == bestCount && isTighter(r, remaining.get(bestIdx), teacherDemand))) {
                 bestCount = count;
@@ -157,13 +167,17 @@ public class ConstraintScheduler {
         return best;
     }
 
-    private record Position(DayOfWeek day, Long periodId, short periodNumber, int teachingIndex) {
+    private record Position(DayOfWeek day, Long periodId, short periodNumber, int teachingIndex,
+                            java.time.LocalTime startTime, java.time.LocalTime endTime) {
         static Position of(Placement p) {
-            return new Position(p.getDayOfWeek(), p.getPeriodId(), p.getPeriodNumber(), p.getTeachingIndex());
+            return new Position(p.getDayOfWeek(), p.getPeriodId(), p.getPeriodNumber(), p.getTeachingIndex(),
+                    p.getStartTime(), p.getEndTime());
         }
 
         CandidateSlot asSlot(Placement p) {
-            return new CandidateSlot(day, periodId, periodNumber, teachingIndex, p.getStaffId(), p.getResourceId());
+            return new CandidateSlot(day, p.getUnitId(), p.getSectionId(), p.getAcademicGroupId(),
+                    periodId, periodNumber, startTime, endTime, teachingIndex,
+                    p.getStaffId(), p.getResourceId());
         }
     }
 
@@ -182,7 +196,7 @@ public class ConstraintScheduler {
 
         for (CandidateSlot slot : slots) {
             Set<Placement> blockers = Collections.newSetFromMap(new IdentityHashMap<>());
-            addIfPresent(blockers, solution.placementAtSection(req.getSectionId(), slot.getDayOfWeek(), slot.getPeriodId()));
+            addIfPresent(blockers, solution.placementAtSection(req.getUnitId(), slot.getDayOfWeek(), slot.getPeriodId()));
             addIfPresent(blockers, solution.placementAtTeacher(slot.getStaffId(), slot.getDayOfWeek(), slot.getPeriodId()));
             addIfPresent(blockers, solution.placementAtResource(slot.getResourceId(), slot.getDayOfWeek(), slot.getPeriodId()));
             if (blockers.isEmpty() || blockers.size() > 2) continue;
@@ -226,10 +240,13 @@ public class ConstraintScheduler {
 
     static boolean isHardViolation(CandidateSlot slot, SchedulingRequirement req,
                                    SchedulingSolution solution, SchedulingSourceData source) {
-        if (solution.isSectionOccupied(req.getSectionId(), slot.getDayOfWeek(), slot.getPeriodId())) return true;
-        if (solution.isTeacherOccupied(slot.getStaffId(), slot.getDayOfWeek(), slot.getPeriodId())) return true;
+        if (solution.isSectionOccupied(req.getUnitId(), slot.getDayOfWeek(),
+                slot.getStartTime(), slot.getEndTime())) return true;
+        if (solution.isTeacherOccupied(slot.getStaffId(), slot.getDayOfWeek(),
+                slot.getStartTime(), slot.getEndTime())) return true;
         if (slot.getResourceId() != null
-                && solution.isResourceOccupied(slot.getResourceId(), slot.getDayOfWeek(), slot.getPeriodId())) {
+                && solution.isResourceOccupied(slot.getResourceId(), slot.getDayOfWeek(),
+                slot.getStartTime(), slot.getEndTime())) {
             return true;
         }
         return solution.getTeacherWeeklyLoad(slot.getStaffId()) >= source.getMaxTeacherWeeklyPeriods();

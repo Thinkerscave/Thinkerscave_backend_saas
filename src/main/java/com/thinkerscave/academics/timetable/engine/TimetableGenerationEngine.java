@@ -5,6 +5,7 @@ import com.thinkerscave.academics.entity.*;
 import com.thinkerscave.academics.enums.*;
 import com.thinkerscave.academics.repository.*;
 import com.thinkerscave.academics.timetable.engine.TimetablePlanningData.MissingTeacher;
+import com.thinkerscave.academics.timetable.engine.TimetablePlanningData.Unit;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.sql.PreparedStatement;
 import java.sql.Types;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -25,7 +27,7 @@ import java.util.*;
 public class TimetableGenerationEngine {
 
     private static final Logger log = LoggerFactory.getLogger(TimetableGenerationEngine.class);
-    public static final String ALGORITHM_VERSION = "v2";
+    public static final String ALGORITHM_VERSION = "v3";
     private static final String SYSTEM_USER = "system";
     private static final int INSERT_BATCH_SIZE = 250;
 
@@ -49,11 +51,20 @@ public class TimetableGenerationEngine {
 
     private record Prepared(SchedulingSourceData source,
                             List<SchedulingRequirement> requirements,
+                            List<SolutionValidator.ValidationConflict> fixedIssues,
+                            List<Placement> fixedReservations,
                             List<SolutionValidator.ValidationConflict> unscheduled,
-                            int sectionCount) {}
+                            int unitCount,
+                            int fixedActivityCount) {}
 
     public TimetableGenerateResultResponse execute(Long versionId, long seed,
                                                    GenerationProgress progress) {
+        return execute(versionId, seed, progress, null);
+    }
+
+    public TimetableGenerateResultResponse execute(Long versionId, long seed,
+                                                   GenerationProgress progress,
+                                                   LocalDate referenceDate) {
         log.info("Engine start: versionId={}, seed={}, algorithm={}", versionId, seed, ALGORITHM_VERSION);
         long startedAt = System.nanoTime();
 
@@ -65,24 +76,27 @@ public class TimetableGenerationEngine {
             if (progress.isCancelRequested()) return cancelled(version, progress);
 
             progress.advanceTo(GenerationPhase.LOADING_DATA, 10);
-            Prepared prepared = transactionTemplate.execute(status -> prepare(versionId, progress));
+            Prepared prepared = transactionTemplate.execute(status -> prepare(versionId, referenceDate, progress));
             if (prepared == null) {
                 throw new IllegalStateException("Failed to prepare scheduling data for version " + versionId);
             }
             SchedulingSourceData source = prepared.source();
             List<SchedulingRequirement> requirements = prepared.requirements();
-            log.info("Expanded {} scheduling requirements, {} unscheduled lesson(s) without teacher",
-                    requirements.size(), prepared.unscheduled().size());
+            log.info("Expanded {} scheduling requirements, {} fixed reservations, {} unscheduled lesson(s)",
+                    requirements.size(), prepared.fixedReservations().size(), prepared.unscheduled().size());
 
             if (progress.isCancelRequested()) return cancelled(version, progress);
 
+            if (prepared.unitCount() == 0) {
+                throw new IllegalStateException("No active academic sections are available for scheduling");
+            }
             if (source.getWorkingDays().isEmpty() || source.getTeachingPeriods().isEmpty()) {
-                throw new IllegalStateException("The configuration has no working days or teaching periods");
+                throw new IllegalStateException("No group has an active schedule assignment with teaching slots");
             }
 
             SolutionValidator.ValidationResult validation;
             SchedulingSolution solution;
-            if (requirements.isEmpty()) {
+            if (requirements.isEmpty() && prepared.fixedReservations().isEmpty()) {
                 solution = new SchedulingSolution();
                 validation = new SolutionValidator.ValidationResult();
             } else {
@@ -92,7 +106,8 @@ public class TimetableGenerationEngine {
                 if (progress.isCancelRequested()) return cancelled(version, progress);
 
                 progress.advanceTo(GenerationPhase.SCHEDULING, 40);
-                solution = scheduler.solve(requirements, source, seed, progress);
+                solution = scheduler.solve(requirements, source, seed, progress,
+                        prepared.fixedReservations());
 
                 if (progress.isCancelRequested()) return cancelled(version, progress);
 
@@ -106,6 +121,7 @@ public class TimetableGenerationEngine {
                 progress.advanceTo(GenerationPhase.VALIDATING, 82);
                 validation = validator.validate(solution, requirements, source);
             }
+            prepared.fixedIssues().forEach(validation::addWarning);
             prepared.unscheduled().forEach(validation::addWarning);
 
             progress.advanceTo(GenerationPhase.GENERATING_CONFLICTS, 90);
@@ -127,20 +143,21 @@ public class TimetableGenerationEngine {
         }
     }
 
-    private Prepared prepare(Long versionId, GenerationProgress progress) {
+    private Prepared prepare(Long versionId, LocalDate referenceDate, GenerationProgress progress) {
         TimetableVersion version = versionRepository.findByIdWithConfigAndYear(versionId)
                 .orElseThrow(() -> new IllegalStateException("Version not found: " + versionId));
         TimetableConfiguration config = version.getTimetableConfiguration();
         TimetablePlanningData data = planningDataLoader.load(
-                version.getAcademicYear().getAcademicYearId(), config);
+                version.getAcademicYear().getAcademicYearId(), config, referenceDate);
 
         SchedulingSourceData source = SchedulingSourceData.builder()
                 .configuration(config)
                 .workingDays(data.getWorkingDays())
                 .teachingPeriods(data.getTeachingPeriods())
                 .allPeriods(data.getAllPeriods())
-                .maxTeacherWeeklyPeriods(config.getMaxTeacherWeeklyPeriods() == null
-                        ? Integer.MAX_VALUE : config.getMaxTeacherWeeklyPeriods())
+                .schedulesByUnit(data.getScheduleByUnit())
+                .maxTeacherWeeklyPeriods(config == null || config.getMaxTeacherWeeklyPeriods() == null
+                        ? 30 : config.getMaxTeacherWeeklyPeriods())
                 .halfIndex(firstHalfTeachingCount(data.getAllPeriods(), data.getTeachingPeriods().size()))
                 .build();
 
@@ -151,20 +168,79 @@ public class TimetableGenerationEngine {
         for (MissingTeacher m : data.getMissingTeachers()) {
             unscheduled.add(new SolutionValidator.ValidationConflict(
                     TimetableConflictType.SUBJECT_ALLOCATION_CONFLICT,
-                    m.mapping().getSubject().getName() + " for " + TimetablePlanningData.sectionLabel(m.section())
+                    m.mapping().getSubject().getName() + " for " + m.unit().label()
                             + " was not scheduled: " + m.reason().getLabel()
                             + (m.teacherName() != null ? " (" + m.teacherName() + ")" : "")
                             + ". Assign a teacher in Teacher Allocation and regenerate to fill its "
                             + m.weeklyPeriods() + " period(s).",
-                    m.section().getSectionId(), null, null, null, null));
+                    m.unit().sectionId(), null, null, null, null));
         }
-        return new Prepared(source, requirements, unscheduled, data.getSections().size());
+
+        List<SolutionValidator.ValidationConflict> fixedIssues = new ArrayList<>();
+        List<Placement> fixedReservations = new ArrayList<>();
+        int fixedCount = reserveFixedActivities(data, fixedReservations, fixedIssues);
+
+        return new Prepared(source, requirements, fixedIssues, fixedReservations, unscheduled,
+                data.getUnits().size(), fixedCount);
     }
 
-    /**
-     * Teaching periods before the longest break (usually lunch); falls back to half the day
-     * when there is no break splitting the teaching periods.
-     */
+    private int reserveFixedActivities(TimetablePlanningData data, List<Placement> reservations,
+                                       List<SolutionValidator.ValidationConflict> issues) {
+        int count = 0;
+        for (Unit unit : data.getUnits()) {
+            if (unit.section() == null) continue;
+            List<FixedActivity> activities = data.fixedActivitiesFor(unit);
+            for (FixedActivity activity : activities) {
+                for (DayOfWeek day : activity.getDays()) {
+                    if (!data.getScheduleByUnit().getOrDefault(unit.unitId(), Map.of()).containsKey(day)) continue;
+                    List<TimetablePeriod> slots = data.slotsFor(unit.unitId(), day);
+                    TimetablePeriod match = slots.stream()
+                            .filter(slot -> overlaps(slot, activity))
+                            .findFirst().orElse(null);
+                    if (match == null) {
+                        issues.add(new SolutionValidator.ValidationConflict(
+                                TimetableConflictType.FIXED_ACTIVITY_CONFLICT,
+                                "'" + activity.getName() + "' for " + unit.label() + " on " + day
+                                        + " (" + activity.getStartTime() + "–" + activity.getEndTime()
+                                        + ") does not fit any teaching slot in the assigned schedule. "
+                                        + "Adjust the activity time or the group's schedule pattern.",
+                                unit.sectionId(), null, null, day, null));
+                        continue;
+                    }
+                    boolean already = reservations.stream().anyMatch(p ->
+                            Objects.equals(p.getUnitId(), unit.unitId())
+                                    && p.getDayOfWeek() == day
+                                    && Objects.equals(p.getPeriodId(), match.getTimetablePeriodId()));
+                    if (already) continue;
+                    Placement p = new Placement();
+                    p.setUnitId(unit.unitId());
+                    p.setSectionId(unit.sectionId());
+                    p.setAcademicGroupId(unit.academicGroupId());
+                    p.setFixedActivityId(activity.getFixedActivityId());
+                    p.setDayOfWeek(day);
+                    p.setPeriodId(match.getTimetablePeriodId());
+                    p.setPeriodNumber(match.getPeriodNumber());
+                    p.setStartTime(match.getStartTime());
+                    p.setEndTime(match.getEndTime());
+                    p.setTeachingIndex(slots.indexOf(match));
+                    p.setEntryType(TimetableEntryType.ACTIVITY);
+                    p.setSubjectNameSnapshot(activity.getName());
+                    p.setStaffId(null);
+                    p.setTeacherAllocationId(null);
+                    reservations.add(p);
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static boolean overlaps(TimetablePeriod slot, FixedActivity activity) {
+        if (slot.getStartTime() == null || slot.getEndTime() == null) return false;
+        return slot.getStartTime().isBefore(activity.getEndTime())
+                && activity.getStartTime().isBefore(slot.getEndTime());
+    }
+
     static int firstHalfTeachingCount(List<TimetablePeriod> allPeriods, int teachingCount) {
         TimetablePeriod longestBreak = null;
         long longest = -1;
@@ -205,7 +281,6 @@ public class TimetableGenerationEngine {
         for (SolutionValidator.ValidationConflict vc : validation.getWarnings()) {
             conflicts.add(toConflictEntity(version, vc, false));
         }
-
         conflictRepository.saveAll(conflicts);
 
         long openBlocking = validation.getBlockingConflicts().size();
@@ -233,7 +308,10 @@ public class TimetableGenerationEngine {
                     .append(" unresolved issue(s): ").append(entries.size()).append(" periods placed");
         } else {
             msg.append("Timetable generated: ").append(entries.size()).append(" periods placed across ")
-                    .append(prepared.sectionCount()).append(" section(s) with no clashes");
+                    .append(prepared.unitCount()).append(" group/section unit(s) with no clashes");
+        }
+        if (prepared.fixedActivityCount() > 0) {
+            msg.append("; ").append(prepared.fixedActivityCount()).append(" fixed activity reservation(s)");
         }
         if (!prepared.unscheduled().isEmpty()) {
             msg.append("; ").append(prepared.unscheduled().size())
@@ -246,24 +324,27 @@ public class TimetableGenerationEngine {
                 .versionNumber(version.getVersionNumber())
                 .generationStatus(version.getGenerationStatus())
                 .totalEntries(entries.size())
+                .totalPlacements(entries.size())
                 .totalConflicts(conflicts.size())
                 .openBlockingConflicts(openBlocking)
                 .message(msg.toString())
                 .algorithmVersion(ALGORITHM_VERSION)
                 .resultKind(resultKind)
+                .unplacedLessons(solution.getUnplacedRequirements().stream()
+                        .map(r -> r.getSubjectName() + " · " + r.getSectionName())
+                        .distinct().toList())
+                .warnings(validation.getWarnings().stream()
+                        .map(SolutionValidator.ValidationConflict::getMessage).toList())
                 .build();
     }
 
-    /**
-     * Entries use IDENTITY keys, which disables Hibernate insert batching; a school timetable has
-     * hundreds of rows, so they are written as one JDBC batch on the session's tenant connection.
-     */
     private void insertEntries(Long versionId, List<Placement> placements) {
         if (placements.isEmpty()) return;
         String sql = "INSERT INTO timetable_entry (created_by, created_on, updated_by, updated_on, version, "
-                + "day_of_week, entry_type, resource_id, section_id, subject_name_snapshot, "
-                + "teacher_allocation_id, timetable_period_id, timetable_version_id) "
-                + "VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)";
+                + "day_of_week, entry_type, resource_id, section_id, academic_group_id, subject_id, staff_id, "
+                + "fixed_activity_id, subject_name_snapshot, teacher_allocation_id, timetable_period_id, "
+                + "timetable_version_id, is_locked) "
+                + "VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         LocalDateTime now = LocalDateTime.now();
         entityManager.unwrap(Session.class).doWork(connection -> {
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
@@ -274,17 +355,18 @@ public class TimetableGenerationEngine {
                     ps.setString(3, SYSTEM_USER);
                     ps.setObject(4, now);
                     ps.setString(5, p.getDayOfWeek().name());
-                    ps.setString(6, TimetableEntryType.SUBJECT.name());
-                    if (p.getResourceId() == null) {
-                        ps.setNull(7, Types.BIGINT);
-                    } else {
-                        ps.setLong(7, p.getResourceId());
-                    }
-                    ps.setLong(8, p.getSectionId());
-                    ps.setString(9, p.getSubjectNameSnapshot());
-                    ps.setLong(10, p.getTeacherAllocationId());
-                    ps.setLong(11, p.getPeriodId());
-                    ps.setLong(12, versionId);
+                    ps.setString(6, p.getEntryType().name());
+                    setNullableLong(ps, 7, p.getResourceId());
+                    setNullableLong(ps, 8, p.getSectionId());
+                    setNullableLong(ps, 9, p.getAcademicGroupId());
+                    setNullableLong(ps, 10, p.getSubjectId());
+                    setNullableLong(ps, 11, p.getStaffId());
+                    setNullableLong(ps, 12, p.getFixedActivityId());
+                    ps.setString(13, p.getSubjectNameSnapshot());
+                    setNullableLong(ps, 14, p.getTeacherAllocationId());
+                    ps.setLong(15, p.getPeriodId());
+                    ps.setLong(16, versionId);
+                    ps.setBoolean(17, p.isLocked());
                     ps.addBatch();
                     if (++pending == INSERT_BATCH_SIZE) {
                         ps.executeBatch();
@@ -294,6 +376,14 @@ public class TimetableGenerationEngine {
                 if (pending > 0) ps.executeBatch();
             }
         });
+    }
+
+    private static void setNullableLong(PreparedStatement ps, int index, Long value) throws java.sql.SQLException {
+        if (value == null) {
+            ps.setNull(index, Types.BIGINT);
+        } else {
+            ps.setLong(index, value);
+        }
     }
 
     private TimetableConflict toConflictEntity(TimetableVersion version,

@@ -1,6 +1,5 @@
 package com.thinkerscave.academics.timetable.engine;
 
-import com.thinkerscave.academics.entity.TimetablePeriod;
 import com.thinkerscave.academics.enums.DayOfWeek;
 import com.thinkerscave.academics.enums.SubjectTimetablePreference;
 import com.thinkerscave.academics.enums.TimetableConflictType;
@@ -43,7 +42,7 @@ public class SolutionValidator {
     private void validateCompleteness(SchedulingSolution solution, ValidationResult result) {
         Map<String, List<SchedulingRequirement>> grouped = new LinkedHashMap<>();
         for (SchedulingRequirement unplaced : solution.getUnplacedRequirements()) {
-            grouped.computeIfAbsent(unplaced.getSectionId() + ":" + unplaced.getAcademicGroupSubjectMappingId(),
+            grouped.computeIfAbsent(unplaced.getUnitId() + ":" + unplaced.getAcademicGroupSubjectMappingId(),
                     k -> new ArrayList<>()).add(unplaced);
         }
         for (List<SchedulingRequirement> group : grouped.values()) {
@@ -59,16 +58,16 @@ public class SolutionValidator {
 
     private void validateSlotsExist(SchedulingSolution solution, SchedulingSourceData source,
                                     Map<String, SchedulingRequirement> reqMap, ValidationResult result) {
-        Set<Long> teachingPeriodIds = new HashSet<>();
-        for (TimetablePeriod p : source.getTeachingPeriods()) teachingPeriodIds.add(p.getTimetablePeriodId());
         Set<DayOfWeek> days = EnumSet.noneOf(DayOfWeek.class);
         days.addAll(source.getWorkingDays());
 
         for (Placement p : solution.getPlacements()) {
-            if (!teachingPeriodIds.contains(p.getPeriodId()) || !days.contains(p.getDayOfWeek())) {
+            if (p.getEntryType() == com.thinkerscave.academics.enums.TimetableEntryType.ACTIVITY) continue;
+            boolean allowed = source.isSlotAllowed(p.getUnitId(), p.getDayOfWeek(), p.getPeriodId());
+            if (!allowed || !days.contains(p.getDayOfWeek())) {
                 result.addBlocking(new ValidationConflict(
                         TimetableConflictType.PERIOD_CAPACITY_CONFLICT,
-                        label(p, reqMap) + " is placed outside the configured teaching periods/working days",
+                        label(p, reqMap) + " is placed outside the group's assigned schedule",
                         p.getSectionId(), p.getTeacherAllocationId(), null, p.getDayOfWeek(), p.getPeriodId()));
             }
         }
@@ -76,43 +75,49 @@ public class SolutionValidator {
 
     private void validateUniqueness(SchedulingSolution solution, Map<String, SchedulingRequirement> reqMap,
                                     ValidationResult result) {
-        Map<String, Placement> sectionSlotMap = new HashMap<>();
-        Map<String, Placement> teacherSlotMap = new HashMap<>();
-        Map<String, Placement> resourceSlotMap = new HashMap<>();
+        Map<String, List<Placement>> unitSlots = new HashMap<>();
+        Map<String, List<Placement>> teacherSlots = new HashMap<>();
+        Map<String, List<Placement>> resourceSlots = new HashMap<>();
 
         for (Placement p : solution.getPlacements()) {
-            String sectionKey = p.getSectionId() + ":" + p.getDayOfWeek() + ":" + p.getPeriodId();
-            Placement sectionClash = sectionSlotMap.putIfAbsent(sectionKey, p);
-            if (sectionClash != null) {
+            String unitKey = p.getUnitId() + ":" + p.getDayOfWeek();
+            if (overlaps(unitSlots.computeIfAbsent(unitKey, k -> new ArrayList<>()), p)) {
                 result.addBlocking(new ValidationConflict(
                         TimetableConflictType.SECTION_CONFLICT,
-                        "Academic Group clash: " + label(p, reqMap) + " and " + label(sectionClash, reqMap)
-                                + " share " + slotLabel(p),
+                        "Academic group clash: " + label(p, reqMap) + " overlaps another lesson on " + slotLabel(p),
                         p.getSectionId(), p.getTeacherAllocationId(), null, p.getDayOfWeek(), p.getPeriodId()));
             }
+            unitSlots.get(unitKey).add(p);
 
-            String teacherKey = p.getStaffId() + ":" + p.getDayOfWeek() + ":" + p.getPeriodId();
-            Placement teacherClash = teacherSlotMap.putIfAbsent(teacherKey, p);
-            if (teacherClash != null) {
-                result.addBlocking(new ValidationConflict(
-                        TimetableConflictType.TEACHER_CONFLICT,
-                        "Teacher clash: " + teacherName(p, reqMap) + " is booked for " + label(p, reqMap)
-                                + " and " + label(teacherClash, reqMap) + " on " + slotLabel(p),
-                        p.getSectionId(), p.getTeacherAllocationId(), null, p.getDayOfWeek(), p.getPeriodId()));
+            if (p.getStaffId() != null) {
+                String teacherKey = p.getStaffId() + ":" + p.getDayOfWeek();
+                if (overlaps(teacherSlots.computeIfAbsent(teacherKey, k -> new ArrayList<>()), p)) {
+                    result.addBlocking(new ValidationConflict(
+                            TimetableConflictType.TEACHER_CONFLICT,
+                            "Teacher clash: " + teacherName(p, reqMap) + " is booked for " + label(p, reqMap)
+                                    + " in overlapping time on " + slotLabel(p),
+                            p.getSectionId(), p.getTeacherAllocationId(), null, p.getDayOfWeek(), p.getPeriodId()));
+                }
+                teacherSlots.get(teacherKey).add(p);
             }
 
             if (p.getResourceId() != null) {
-                String resourceKey = p.getResourceId() + ":" + p.getDayOfWeek() + ":" + p.getPeriodId();
-                Placement roomClash = resourceSlotMap.putIfAbsent(resourceKey, p);
-                if (roomClash != null) {
+                String resourceKey = p.getResourceId() + ":" + p.getDayOfWeek();
+                if (overlaps(resourceSlots.computeIfAbsent(resourceKey, k -> new ArrayList<>()), p)) {
                     result.addBlocking(new ValidationConflict(
                             TimetableConflictType.ROOM_CONFLICT,
-                            "Room clash: " + label(p, reqMap) + " and " + label(roomClash, reqMap)
-                                    + " use the same room on " + slotLabel(p),
+                            "Room clash: " + label(p, reqMap) + " overlaps another lesson in the same room on "
+                                    + slotLabel(p),
                             p.getSectionId(), null, p.getResourceId(), p.getDayOfWeek(), p.getPeriodId()));
                 }
+                resourceSlots.get(resourceKey).add(p);
             }
         }
+    }
+
+    private static boolean overlaps(List<Placement> list, Placement candidate) {
+        return list.stream().anyMatch(p -> p.startMinute() < candidate.endMinute()
+                && candidate.startMinute() < p.endMinute());
     }
 
     private void validateWorkload(SchedulingSolution solution, SchedulingSourceData source,
@@ -120,6 +125,7 @@ public class SolutionValidator {
         Map<Long, Integer> weeklyLoad = new HashMap<>();
         Map<Long, String> names = new HashMap<>();
         for (Placement p : solution.getPlacements()) {
+            if (p.getStaffId() == null) continue;
             weeklyLoad.merge(p.getStaffId(), 1, Integer::sum);
             names.putIfAbsent(p.getStaffId(), teacherName(p, reqMap));
         }
@@ -152,7 +158,7 @@ public class SolutionValidator {
             boolean firstHalf = p.getTeachingIndex() < halfIndex;
             boolean missed = req.getPreference() == SubjectTimetablePreference.FIRST_HALF ? !firstHalf : firstHalf;
             if (missed) {
-                String key = req.getSectionId() + ":" + req.getAcademicGroupSubjectMappingId();
+                String key = req.getUnitId() + ":" + req.getAcademicGroupSubjectMappingId();
                 missesByLesson.computeIfAbsent(key, k -> new int[1])[0]++;
                 lessonReq.putIfAbsent(key, req);
             }
@@ -182,7 +188,8 @@ public class SolutionValidator {
 
     private static String slotLabel(Placement p) {
         String day = p.getDayOfWeek().name();
-        return day.charAt(0) + day.substring(1).toLowerCase() + " period " + p.getPeriodNumber();
+        return day.charAt(0) + day.substring(1).toLowerCase() + " "
+                + (p.getStartTime() == null ? "period " + p.getPeriodNumber() : p.getStartTime() + "–" + p.getEndTime());
     }
 
     @lombok.Getter
