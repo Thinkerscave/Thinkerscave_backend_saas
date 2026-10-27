@@ -210,9 +210,12 @@ public class TimetableConfigurationServiceImpl implements TimetableConfiguration
                     .findByAcademicGroup_AcademicGroupIdOrderByDisplayOrderAsc(group.getAcademicGroupId());
             List<AcademicSection> activeSections = sections.stream().filter(AcademicSection::isActive).toList();
             if (activeSections.isEmpty()) {
-                rows.add(matrixRow(group, null, byUnit));
+                rows.add(matrixRow(group, null, byUnit, null));
             } else {
-                activeSections.forEach(section -> rows.add(matrixRow(group, section, byUnit)));
+                if (!byUnit.getOrDefault(unitKey(group.getAcademicGroupId(), null), List.of()).isEmpty()) {
+                    rows.add(matrixRow(group, null, byUnit, "All Sections"));
+                }
+                activeSections.forEach(section -> rows.add(matrixRow(group, section, byUnit, null)));
             }
         }
         return GroupAssignmentMatrixResponse.builder()
@@ -223,7 +226,8 @@ public class TimetableConfigurationServiceImpl implements TimetableConfiguration
     }
 
     private GroupAssignmentMatrixResponse.Row matrixRow(AcademicGroup group, AcademicSection section,
-                                                         Map<String, List<GroupScheduleAssignment>> byUnit) {
+                                                         Map<String, List<GroupScheduleAssignment>> byUnit,
+                                                         String scopeLabel) {
         List<GroupAssignmentMatrixResponse.Cell> cells = new ArrayList<>();
         for (GroupScheduleAssignment a : byUnit.getOrDefault(
                 unitKey(group.getAcademicGroupId(), section == null ? null : section.getSectionId()), List.of())) {
@@ -252,6 +256,7 @@ public class TimetableConfigurationServiceImpl implements TimetableConfiguration
                 .academicGroupCode(group.getCode())
                 .sectionId(section == null ? null : section.getSectionId())
                 .sectionName(section == null ? null : section.getName())
+                .scopeLabel(scopeLabel)
                 .active(group.isActive())
                 .cells(cells)
                 .build();

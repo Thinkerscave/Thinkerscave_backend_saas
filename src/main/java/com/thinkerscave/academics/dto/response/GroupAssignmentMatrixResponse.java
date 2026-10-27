@@ -26,6 +26,7 @@ public class GroupAssignmentMatrixResponse {
         private String academicGroupCode;
         private Long sectionId;
         private String sectionName;
+        private String scopeLabel;
         private Boolean active;
         private List<Cell> cells;
     }
