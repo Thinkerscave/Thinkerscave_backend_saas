@@ -80,7 +80,7 @@ public class TenantInsightService {
         tenant.setStudentCount((int) countRows(schema, "student"));
         tenant.setStaffCount((int) countRows(schema, "staff"));
         tenant.setBranchCount((int) countRows(schema, "branch"));
-        tenant.setClassCount((int) countRows(schema, "academic_class"));
+        tenant.setClassCount((int) countRows(schema, "academic_group"));
         tenant.setSectionCount((int) countRows(schema, "academic_section"));
         long sizeMb = schemaSizeMb(schema);
         if (sizeMb >= 0) {

@@ -238,6 +238,29 @@ public class AcademicYearServiceImpl implements AcademicYearService {
     }
 
     @Override
+    public AcademicYearResponse complete(Long id) {
+        accessGuard.requireApprove(AcademicsAccessGuard.RESOURCE_ACADEMIC_YEAR);
+        AcademicYear year = requireYear(id);
+        if (year.getStatus() != AcademicYearStatus.CURRENT) {
+            throw new BusinessException("Only the current academic year can be completed");
+        }
+        year.setStatus(AcademicYearStatus.COMPLETED);
+        return toResponse(academicYearRepository.save(year), true);
+    }
+
+    @Override
+    public AcademicYearResponse archive(Long id) {
+        accessGuard.requireApprove(AcademicsAccessGuard.RESOURCE_ACADEMIC_YEAR);
+        AcademicYear year = requireYear(id);
+        if (year.getStatus() != AcademicYearStatus.COMPLETED) {
+            throw new BusinessException("Only a completed academic year can be archived");
+        }
+        year.setStatus(AcademicYearStatus.ARCHIVED);
+        year.setActive(false);
+        return toResponse(academicYearRepository.save(year), true);
+    }
+
+    @Override
     public AcademicYearResponse activate(Long id) {
         accessGuard.requireApprove(AcademicsAccessGuard.RESOURCE_ACADEMIC_YEAR);
         AcademicYear year = requireYear(id);

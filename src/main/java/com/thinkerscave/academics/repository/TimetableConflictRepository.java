@@ -30,6 +30,9 @@ public interface TimetableConflictRepository extends JpaRepository<TimetableConf
     long countByTimetableVersion_TimetableVersionIdAndBlockingFalseAndStatus(
             Long versionId, TimetableConflictStatus status);
 
+    long countByTimetableVersion_TimetableVersionIdAndBlockingTrueAndStatusAndSection_AcademicGroup_AcademicGroupId(
+            Long versionId, TimetableConflictStatus status, Long academicGroupId);
+
     @Query("""
             SELECT A FROM TimetableConflict A
             LEFT JOIN FETCH A.section s

@@ -24,6 +24,8 @@ public class SubjectMappingRowResponse {
     private Short weeklyPeriods;
     private SubjectTimetablePreference timetablePreference;
     private SubjectMappingScope scope;
+    private String choiceGroup;
+    private Short consecutivePeriods;
     private List<Long> sectionIds;
     private List<String> sectionNames;
     private int totalSectionCount;

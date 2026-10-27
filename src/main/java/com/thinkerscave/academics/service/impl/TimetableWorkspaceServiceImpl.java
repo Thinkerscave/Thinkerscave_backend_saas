@@ -43,6 +43,7 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
     private final AcademicGroupSubjectMappingRepository mappingRepository;
     private final TeacherAllocationRepository allocationRepository;
     private final TeacherAllocationTeacherRepository allocationTeacherRepository;
+    private final TeacherGroupAllocationRepository groupAllocationRepository;
     private final TimetableVersionRepository versionRepository;
     private final TimetableEntryRepository entryRepository;
     private final TimetableConflictRepository conflictRepository;
@@ -160,13 +161,12 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                 : (validMappings == mappings.size() ? "COMPLETE" : "IN_PROGRESS");
         String mappingSummary = validMappings + " / " + mappings.size() + " subjects mapped";
 
-        int schedulable = (int) validMappings;
-        int allocated = schedulable - data.getMissingTeachers().size();
-        allocated = Math.max(0, allocated);
-        String allocationStatus = schedulable == 0 ? "INCOMPLETE"
-                : allocated >= schedulable ? "COMPLETE" : "IN_PROGRESS";
-        String allocationSummary = allocated + " / " + schedulable + " subjects assigned"
-                + (data.getMissingTeachers().isEmpty() ? "" : " • " + data.getMissingTeachers().size() + " pending");
+        int allocatableAssignments = data.getLessons().size() + data.getMissingTeachers().size();
+        int allocated = data.getLessons().size();
+        String allocationStatus = allocatableAssignments == 0 ? "INCOMPLETE"
+                : allocated >= allocatableAssignments ? "COMPLETE" : "IN_PROGRESS";
+        String allocationSummary = allocated + " / " + allocatableAssignments + " subject assignments"
+                + (data.getMissingTeachers().isEmpty() ? "" : " - " + data.getMissingTeachers().size() + " pending");
 
         long units = data.getUnits().size();
         long scheduled = data.getUnits().stream().filter(u -> data.hasSchedule(u.unitId())).count();
@@ -184,7 +184,7 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                         .build(),
                 TimetableWorkspaceResponse.SetupItem.builder()
                         .key("allocation").label("Teacher Allocation").status(allocationStatus)
-                        .summary(allocationSummary).completed(allocated).total(schedulable)
+                        .summary(allocationSummary).completed(allocated).total(allocatableAssignments)
                         .actionLabel("Go to Teacher Allocation")
                         .actionRoute("/app/academics/teacher-allocation")
                         .build(),
@@ -216,7 +216,7 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
         }
         Set<String> missingUnits = new HashSet<>();
         for (TimetablePlanningData.Unit unit : data.getUnits()) {
-            if (unit.section() != null && !data.hasSchedule(unit.unitId())
+            if (!data.hasSchedule(unit.unitId())
                     && missingUnits.add(unit.unitId() + ":" + unit.label())) {
                 issues.add(TimetableWorkspaceResponse.Issue.builder()
                         .code("SCHEDULE_NOT_CONFIGURED")
@@ -269,6 +269,12 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                             id -> new TimetableFiltersResponse.AcademicGroupOption(id, group.getName(), new ArrayList<>()))
                     .getSections().add(new TimetableFiltersResponse.Option(s.getSectionId(), s.getName()));
         }
+        // Groups without sections are scheduled as one unit; they must still appear in the Class View selector.
+        data.getMappings().stream()
+                .map(m -> m.getAcademicGroup())
+                .sorted(Comparator.comparing((AcademicGroup g) -> g.getDisplayOrder(), order))
+                .forEach(g -> groups.computeIfAbsent(g.getAcademicGroupId(),
+                        id -> new TimetableFiltersResponse.AcademicGroupOption(id, g.getName(), new ArrayList<>())));
         Map<Long, String> teachers = new HashMap<>();
         for (TimetablePlanningData.Lesson lesson : data.getLessons()) {
             teachers.putIfAbsent(lesson.teacher().getStaffId(),
@@ -424,9 +430,12 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
         if (groupId != null) {
             return data.getUnits().stream()
                     .filter(u -> u.academicGroupId().equals(groupId) && u.section() != null)
-                    .findFirst().orElse(null);
+                    .findFirst()
+                    .orElseGet(() -> data.getUnits().stream()
+                            .filter(u -> u.academicGroupId().equals(groupId))
+                            .findFirst().orElse(null));
         }
-        return data.getUnits().stream().filter(u -> u.section() != null).findFirst().orElse(null);
+        return data.getUnits().stream().findFirst().orElse(null);
     }
 
     // ─── Manual editing ───────────────────────────────────────────────────
@@ -435,31 +444,58 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
     public TimetableCellResponse addEntry(Long versionId, TimetableEntryRequest request) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_TIMETABLE);
         TimetableVersion version = requireEditableVersion(versionId);
-        if (request.getSectionId() == null || request.getAcademicGroupSubjectMappingId() == null
+        if ((request.getSectionId() == null && request.getAcademicGroupId() == null)
+                || request.getAcademicGroupSubjectMappingId() == null
                 || request.getPeriodId() == null || request.getDayOfWeek() == null) {
-            throw new BusinessException("Section, subject, day and slot are required to place a lesson");
+            throw new BusinessException("Academic group, subject, day and slot are required to place a lesson");
         }
-        AcademicSection section = sectionRepository.findByIdWithAcademicGroup(request.getSectionId())
+        AcademicSection section = request.getSectionId() == null ? null
+                : sectionRepository.findByIdWithAcademicGroup(request.getSectionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Section not found"));
+        Long groupId = section != null ? section.getAcademicGroup().getAcademicGroupId()
+                : request.getAcademicGroupId();
+        AcademicGroup group = section != null ? section.getAcademicGroup()
+                : academicGroupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Academic group not found"));
         AcademicGroupSubjectMapping mapping = mappingRepository.findById(
                         request.getAcademicGroupSubjectMappingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Subject mapping not found"));
-        if (!mapping.getAcademicGroup().getAcademicGroupId()
-                .equals(section.getAcademicGroup().getAcademicGroupId())) {
+        if (!mapping.getAcademicGroup().getAcademicGroupId().equals(group.getAcademicGroupId())) {
             throw new BusinessException("The selected subject does not belong to the selected group");
         }
-        TeacherAllocation allocation = allocationRepository
-                .findBySection_SectionIdAndAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(
-                        section.getSectionId(), mapping.getAcademicGroupSubjectMappingId())
-                .orElseThrow(() -> new BusinessException("Assign a teacher to this subject before placing it"));
-        Staff staff = request.getStaffId() == null ? primaryTeacher(allocation) : staffById(request.getStaffId());
-        if (staff == null) throw new BusinessException("Choose an active teacher for this lesson");
+
+        TeacherAllocation allocation = null;
+        Staff staff;
+        if (section != null) {
+            allocation = allocationRepository
+                    .findBySection_SectionIdAndAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(
+                            section.getSectionId(), mapping.getAcademicGroupSubjectMappingId())
+                    .orElse(null);
+            staff = request.getStaffId() != null ? staffById(request.getStaffId())
+                    : (allocation == null ? null : primaryTeacher(allocation));
+            if (staff == null) {
+                throw new BusinessException("Assign a teacher to this subject before placing it");
+            }
+        } else {
+            TeacherGroupAllocation groupAllocation = groupAllocationRepository
+                    .findByMapping_AcademicGroupSubjectMappingId(mapping.getAcademicGroupSubjectMappingId())
+                    .filter(TeacherGroupAllocation::isActive)
+                    .orElse(null);
+            staff = request.getStaffId() != null ? staffById(request.getStaffId())
+                    : (groupAllocation == null ? null : groupAllocation.getStaff());
+            if (staff == null) {
+                throw new BusinessException("Assign a group teacher to this subject before placing it");
+            }
+        }
 
         TimetablePlanningData data = planningDataLoader.load(version.getAcademicYear().getAcademicYearId(),
                 version.getTimetableConfiguration(), null);
         TimetablePlanningData.Unit unit = data.getUnits().stream()
-                .filter(u -> Objects.equals(u.sectionId(), section.getSectionId()))
-                .findFirst().orElseThrow(() -> new BusinessException("This section is not an active scheduling unit"));
+                .filter(u -> section != null
+                        ? Objects.equals(u.sectionId(), section.getSectionId())
+                        : Objects.equals(u.academicGroupId(), group.getAcademicGroupId()))
+                .findFirst().orElseThrow(() -> new BusinessException(
+                        "This academic group is not an active scheduling unit"));
         TimetablePeriod period = requireAllowedSlot(data, unit, request.getDayOfWeek(), request.getPeriodId());
 
         assertNoClashes(versionId, unit, request.getDayOfWeek(), period, staff.getStaffId(), null);
@@ -469,7 +505,7 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
         entry.setDayOfWeek(request.getDayOfWeek());
         entry.setTimetablePeriod(period);
         entry.setSection(section);
-        entry.setAcademicGroup(section.getAcademicGroup());
+        entry.setAcademicGroup(group);
         entry.setSubject(mapping.getSubject());
         entry.setTeacherAllocation(allocation);
         entry.setStaff(staff);

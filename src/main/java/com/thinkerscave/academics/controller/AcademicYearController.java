@@ -103,6 +103,20 @@ public class AcademicYearController {
         return ResponseEntity.ok(ApiResponse.success("Academic year rejected", academicYearService.reject(id, request)));
     }
 
+
+    @PostMapping("/{id}/complete")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @Operation(summary = "Mark the current academic year as COMPLETED")
+    public ResponseEntity<ApiResponse<AcademicYearResponse>> complete(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Academic year completed", academicYearService.complete(id)));
+    }
+
+    @PostMapping("/{id}/archive")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @Operation(summary = "Archive a completed academic year")
+    public ResponseEntity<ApiResponse<AcademicYearResponse>> archive(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Academic year archived", academicYearService.archive(id)));
+    }
     @PostMapping("/{id}/activate")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
     @Operation(summary = "Activate academic year as CURRENT")

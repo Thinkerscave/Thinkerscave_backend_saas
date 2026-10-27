@@ -70,6 +70,8 @@ public class SubjectServiceImpl implements SubjectService {
         subject.setCode(code);
         subject.setSubjectType(requireType(request.getSubjectType()));
         subject.setDescription(SubjectInputRules.cleanDescription(request.getDescription()));
+        subject.setDefaultLessonDurationMin(request.getDefaultLessonDurationMin());
+        subject.setDefaultTimetablePreference(request.getDefaultTimetablePreference());
         subject.setActive(true);
         return toResponse(saveWithUniqueGuard(subject), UsageSummary.NONE);
     }
@@ -88,6 +90,8 @@ public class SubjectServiceImpl implements SubjectService {
         subject.setCode(code);
         subject.setSubjectType(requireType(request.getSubjectType()));
         subject.setDescription(SubjectInputRules.cleanDescription(request.getDescription()));
+        subject.setDefaultLessonDurationMin(request.getDefaultLessonDurationMin());
+        subject.setDefaultTimetablePreference(request.getDefaultTimetablePreference());
         return toResponse(saveWithUniqueGuard(subject), usageOf(subjectId));
     }
 
@@ -200,6 +204,8 @@ public class SubjectServiceImpl implements SubjectService {
                 .code(subject.getCode())
                 .subjectType(subject.getSubjectType())
                 .description(subject.getDescription())
+                .defaultLessonDurationMin(subject.getDefaultLessonDurationMin())
+                .defaultTimetablePreference(subject.getDefaultTimetablePreference())
                 .active(subject.getActive())
                 .mappedAcademicGroupCount(usage.groups())
                 .mappedSectionCount(usage.sections())

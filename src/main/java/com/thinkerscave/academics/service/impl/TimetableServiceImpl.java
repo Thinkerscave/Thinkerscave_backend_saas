@@ -144,6 +144,12 @@ public class TimetableServiceImpl implements TimetableService {
                     .getSections()
                     .add(new TimetableFiltersResponse.Option(s.getSectionId(), s.getName()));
         }
+        // Groups without sections are scheduled as one unit; they must still appear in the Class View selector.
+        data.getMappings().stream()
+                .map(m -> m.getAcademicGroup())
+                .sorted(Comparator.comparing((AcademicGroup g) -> g.getDisplayOrder(), order))
+                .forEach(g -> academicGroups.computeIfAbsent(g.getAcademicGroupId(),
+                        id -> new TimetableFiltersResponse.AcademicGroupOption(id, g.getName(), new ArrayList<>())));
 
         Map<Long, String> teachers = new HashMap<>();
         for (TimetablePlanningData.Lesson lesson : data.getLessons()) {
@@ -414,19 +420,27 @@ public class TimetableServiceImpl implements TimetableService {
         }
 
         TimetableConfiguration config = ensureSettingsConfiguration(year);
+        java.util.Set<Long> requestedGroups = request == null || request.getAcademicGroupIds() == null
+                ? java.util.Set.of() : new java.util.LinkedHashSet<>(request.getAcademicGroupIds());
         TimetablePlanningData data = planningDataLoader.load(yearId, config,
-                request == null ? null : request.getReferenceDate());
+                request == null ? null : request.getReferenceDate(), requestedGroups);
         TimetableReadinessResponse readiness = readinessEvaluator.evaluate(data);
         if (!readiness.isReady()) {
             throw new BusinessException("Cannot generate yet. Fix these first: " + describeBlocking(readiness));
         }
 
         int nextVersion = existing.isEmpty() ? 1 : existing.get(0).getVersionNumber() + 1;
+        TimetableVersion sourceVersion = existing.stream()
+                .filter(v -> v.getStatus() == TimetableStatus.DRAFT || v.getStatus() == TimetableStatus.READY_FOR_REVIEW)
+                .filter(v -> v.getGenerationStatus() == TimetableGenerationStatus.GENERATED
+                        || v.getGenerationStatus() == TimetableGenerationStatus.GENERATED_WITH_CONFLICTS)
+                .findFirst().orElse(null);
 
         TimetableVersion version = new TimetableVersion();
         version.setAcademicYear(year);
         version.setTimetableConfiguration(config);
         version.setVersionNumber(nextVersion);
+        version.setSourceVersionId(sourceVersion == null ? null : sourceVersion.getTimetableVersionId());
         version.setGenerationStatus(TimetableGenerationStatus.GENERATING);
         version.setStatus(TimetableStatus.DRAFT);
         version = versionRepository.save(version);
@@ -598,7 +612,8 @@ public class TimetableServiceImpl implements TimetableService {
         if ("TEACHER".equalsIgnoreCase(view)) {
             entries = staffId == null ? List.of() : entries.stream()
                     .filter(e -> {
-                        Staff teacher = e.getTeacherAllocation() == null ? null
+                        Staff teacher = e.getTeacherAllocation() == null
+                                ? e.getStaff()
                                 : teacherByAllocation.get(e.getTeacherAllocation().getTeacherAllocationId());
                         return teacher != null && Objects.equals(teacher.getStaffId(), staffId);
                     })
@@ -614,8 +629,11 @@ public class TimetableServiceImpl implements TimetableService {
                     .toList();
         } else if (academicGroupId != null) {
             entries = entries.stream()
-                    .filter(e -> e.getSection() != null && e.getSection().getAcademicGroup() != null
-                            && Objects.equals(e.getSection().getAcademicGroup().getAcademicGroupId(), academicGroupId))
+                    .filter(e -> e.getSection() != null
+                            ? e.getSection().getAcademicGroup() != null
+                                && Objects.equals(e.getSection().getAcademicGroup().getAcademicGroupId(), academicGroupId)
+                            : e.getAcademicGroup() != null
+                                && Objects.equals(e.getAcademicGroup().getAcademicGroupId(), academicGroupId))
                     .toList();
         }
 

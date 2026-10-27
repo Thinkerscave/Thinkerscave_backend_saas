@@ -16,6 +16,8 @@ public interface TimetableEntryRepository extends JpaRepository<TimetableEntry, 
 
     List<TimetableEntry> findByTimetableVersion_TimetableVersionId(Long versionId);
 
+    List<TimetableEntry> findByTimetableVersion_TimetableVersionIdAndLockedTrue(Long versionId);
+
     List<TimetableEntry> findByTimetableVersion_TimetableVersionIdAndSection_SectionId(
             Long versionId, Long sectionId);
 

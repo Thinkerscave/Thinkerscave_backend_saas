@@ -9,6 +9,7 @@ import lombok.Setter;
 @Setter
 public class TimetableEntryRequest {
 
+    private Long academicGroupId;
     private Long sectionId;
     private Long academicGroupSubjectMappingId;
     private Long teacherAllocationId;

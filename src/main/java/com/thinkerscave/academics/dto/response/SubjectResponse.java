@@ -17,6 +17,8 @@ public class SubjectResponse {
     private SubjectType subjectType;
     private String description;
     private Boolean active;
+    private Short defaultLessonDurationMin;
+    private com.thinkerscave.academics.enums.SubjectTimetablePreference defaultTimetablePreference;
 
     /** Active curriculum mappings across all academic years. */
     private long mappedAcademicGroupCount;

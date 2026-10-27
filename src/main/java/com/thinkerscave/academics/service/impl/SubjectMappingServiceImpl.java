@@ -221,6 +221,15 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                     ? SubjectTimetablePreference.ANY : entry.getTimetablePreference();
             SubjectMappingScope scope = entry.getScope() == null
                     ? SubjectMappingScope.ALL_SECTIONS : entry.getScope();
+            String choiceGroup = entry.getChoiceGroup() == null ? null : entry.getChoiceGroup().trim();
+            if (choiceGroup != null && choiceGroup.isEmpty()) choiceGroup = null;
+            if (choiceGroup != null && requirement != SubjectRequirement.OPTIONAL) {
+                throw new BusinessException("Choice group can only be set for optional subjects.");
+            }
+            short consecutivePeriods = entry.getConsecutivePeriods() == null ? 1 : entry.getConsecutivePeriods();
+            if (consecutivePeriods < 1 || consecutivePeriods > 10) {
+                throw new BusinessException("Consecutive periods must be between 1 and 10.");
+            }
             List<AcademicSection> covered = resolveCoverage(scope, entry.getSectionIds(), activeSections, activeById, subject.getName());
 
             if (existingActive) {
@@ -247,7 +256,9 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                 boolean scheduleChanged = !previousCoverage.equals(newCoverage)
                         || !Objects.equals(existing.getWeeklyPeriods(), weeklyPeriods)
                         || existing.getRequirement() != requirement
-                        || existing.getTimetablePreference() != preference;
+                        || existing.getTimetablePreference() != preference
+                        || !Objects.equals(existing.getChoiceGroup(), choiceGroup)
+                        || !Objects.equals(existing.getConsecutivePeriods(), consecutivePeriods);
                 long entries = entryCounts.getOrDefault(existing.getAcademicGroupSubjectMappingId(), 0L);
                 if (scheduleChanged && entries > 0) {
                     impacts.add(impact(subject, "SCHEDULE_CHANGE",
@@ -257,7 +268,8 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                 }
             }
 
-            planned.add(new PlannedUpsert(subject, existing, requirement, weeklyPeriods, preference, scope, covered));
+            planned.add(new PlannedUpsert(subject, existing, requirement, weeklyPeriods, preference, scope,
+                    choiceGroup, consecutivePeriods, covered));
         }
 
         List<PlannedRemoval> removals = new ArrayList<>();
@@ -286,8 +298,10 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                     ? upsert.existing() : newMapping(plan.group(), upsert.subject());
             mapping.setRequirement(upsert.requirement());
             mapping.setWeeklyPeriods(upsert.weeklyPeriods());
-            mapping.setTimetablePreference(upsert.preference());
-            mapping.setScope(upsert.scope());
+          mapping.setTimetablePreference(upsert.preference());
+          mapping.setScope(upsert.scope());
+          mapping.setChoiceGroup(upsert.choiceGroup());
+          mapping.setConsecutivePeriods(upsert.consecutivePeriods());
             mapping.setActive(true);
             mapping = mappingRepository.save(mapping);
             syncSections(mapping, upsert.scope(), upsert.covered());
@@ -408,6 +422,8 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                             .weeklyPeriods(mapping.getWeeklyPeriods())
                             .timetablePreference(mapping.getTimetablePreference())
                             .scope(mapping.getScope())
+                          .choiceGroup(mapping.getChoiceGroup())
+                          .consecutivePeriods(mapping.getConsecutivePeriods())
                             .sectionIds(covered.stream().map(AcademicSection::getSectionId).toList())
                             .sectionNames(covered.stream().map(AcademicSection::getName).toList())
                             .totalSectionCount(sections.size())
@@ -499,6 +515,7 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
     private record PlannedUpsert(Subject subject, AcademicGroupSubjectMapping existing,
                                  SubjectRequirement requirement, short weeklyPeriods,
                                  SubjectTimetablePreference preference, SubjectMappingScope scope,
+                                 String choiceGroup, short consecutivePeriods,
                                  List<AcademicSection> covered) {
     }
 

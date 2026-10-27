@@ -33,6 +33,8 @@ import com.thinkerscave.academics.repository.TeacherAllocationTeacherRepository;
 import com.thinkerscave.academics.repository.TeacherGroupAllocationRepository;
 import com.thinkerscave.academics.repository.TimetableConfigurationRepository;
 import com.thinkerscave.academics.repository.TimetableEntryRepository;
+import com.thinkerscave.academics.repository.TimetableConflictRepository;
+import com.thinkerscave.academics.repository.TimetableVersionRepository;
 import com.thinkerscave.academics.security.AcademicsAccessGuard;
 import com.thinkerscave.academics.service.TeacherCoverageService;
 import com.thinkerscave.shared.exceptions.BusinessException;
@@ -78,6 +80,8 @@ public class TeacherCoverageServiceImpl implements TeacherCoverageService {
     private final TeacherGroupAllocationRepository groupAllocationRepository;
     private final TimetableConfigurationRepository configurationRepository;
     private final TimetableEntryRepository timetableEntryRepository;
+    private final TimetableConflictRepository timetableConflictRepository;
+    private final TimetableVersionRepository timetableVersionRepository;
     private final StaffRepository staffRepository;
     private final AcademicsAccessGuard accessGuard;
 
@@ -499,6 +503,25 @@ public class TeacherCoverageServiceImpl implements TeacherCoverageService {
                         .build())
                 .rows(rows)
                 .build();
+    }
+
+    private long resolveTimetableConflicts(Context ctx) {
+        return timetableVersionRepository
+                .findByAcademicYear_AcademicYearIdOrderByVersionNumberDesc(ctx.year.getAcademicYearId())
+                .stream().findFirst()
+                .map(v -> timetableConflictRepository
+                        .countByTimetableVersion_TimetableVersionIdAndBlockingTrueAndStatusAndSection_AcademicGroup_AcademicGroupId(
+                                v.getTimetableVersionId(),
+                                com.thinkerscave.academics.enums.TimetableConflictStatus.OPEN,
+                                ctx.group.getAcademicGroupId()))
+                .orElse(0L);
+    }
+
+    private String resolveTimetableConflictStatus(Context ctx) {
+        boolean generated = timetableVersionRepository
+                .findByAcademicYear_AcademicYearIdOrderByVersionNumberDesc(ctx.year.getAcademicYearId())
+                .stream().findFirst().isPresent();
+        return generated ? "AVAILABLE" : "NOT_GENERATED";
     }
 
     private Row buildRow(Context ctx, AcademicGroupSubjectMapping mapping) {

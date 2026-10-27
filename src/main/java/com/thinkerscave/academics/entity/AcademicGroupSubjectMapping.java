@@ -7,6 +7,7 @@ import com.thinkerscave.shared.entity.Auditable;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -71,6 +72,14 @@ public class AcademicGroupSubjectMapping extends Auditable {
 
     @OneToMany(mappedBy = "mapping", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AcademicGroupSubjectMappingSection> sectionMappings = new ArrayList<>();
+
+    @Size(max = 60)
+    @Column(name = "choice_group", length = 60)
+    private String choiceGroup;
+
+    @NotNull
+    @Column(name = "consecutive_periods", nullable = false)
+    private Short consecutivePeriods = 1;
 
     @NotNull
     @Column(name = "is_active", nullable = false)

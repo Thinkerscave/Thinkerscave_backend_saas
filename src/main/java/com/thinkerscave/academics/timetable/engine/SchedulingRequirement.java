@@ -29,6 +29,7 @@ public class SchedulingRequirement {
     private Long defaultResourceId;
     private SubjectTimetablePreference preference;
     private boolean optional;
+    private int consecutivePeriods = 1;
     private List<CandidateSlot> candidates;
     private int staticCandidateCount;
 }

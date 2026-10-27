@@ -26,7 +26,10 @@ public class RequirementExpander {
             if (weeklyPeriods <= 0) continue;
 
             SubjectTimetablePreference pref = mapping.getTimetablePreference() == null
-                    ? SubjectTimetablePreference.ANY : mapping.getTimetablePreference();
+                    || mapping.getTimetablePreference() == SubjectTimetablePreference.ANY
+                    ? (mapping.getSubject().getDefaultTimetablePreference() == null
+                    ? SubjectTimetablePreference.ANY : mapping.getSubject().getDefaultTimetablePreference())
+                    : mapping.getTimetablePreference();
 
             Long defaultResourceId = unit.section() == null || unit.section().getDefaultResource() == null
                     ? null : unit.section().getDefaultResource().getAcademicResourceId();
@@ -46,12 +49,13 @@ public class RequirementExpander {
                 req.setSubjectName(mapping.getSubject().getName());
                 req.setWeeklyPeriods(weeklyPeriods);
                 req.setPeriodIndex(i);
-                req.setTeacherAllocationId(lesson.allocation().getTeacherAllocationId());
+                req.setTeacherAllocationId(lesson.allocation() == null ? null : lesson.allocation().getTeacherAllocationId());
                 req.setPrimaryStaffId(lesson.teacher().getStaffId());
                 req.setPrimaryStaffName(staffName);
                 req.setDefaultResourceId(defaultResourceId);
                 req.setPreference(pref);
                 req.setOptional(mapping.getRequirement() == SubjectRequirement.OPTIONAL);
+                req.setConsecutivePeriods(mapping.getConsecutivePeriods() == null ? 1 : mapping.getConsecutivePeriods());
                 requirements.add(req);
             }
         }

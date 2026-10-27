@@ -6,6 +6,7 @@ import com.thinkerscave.academics.enums.SubjectTimetablePreference;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -30,6 +31,13 @@ public class SubjectMappingEntryRequest {
     private SubjectTimetablePreference timetablePreference = SubjectTimetablePreference.ANY;
 
     private SubjectMappingScope scope = SubjectMappingScope.ALL_SECTIONS;
+
+    @Size(max = 60)
+    private String choiceGroup;
+
+    @Min(value = 1, message = "Consecutive periods must be at least 1")
+    @Max(value = 10, message = "Consecutive periods cannot exceed 10")
+    private Short consecutivePeriods = 1;
 
     private List<Long> sectionIds = new ArrayList<>();
 }

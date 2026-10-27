@@ -71,7 +71,7 @@ public class TimetableReadinessEvaluator {
         }
         int schedulableMappings = data.getMappings().size() - data.getZeroPeriodMappings().size();
         ReadinessSummary summary = new ReadinessSummary(
-                data.getUnits().stream().filter(u -> u.section() != null).toList().size(),
+                data.getUnits().size(),
                 schedulableMappings,
                 requirementCount,
                 teacherIds.size(),
@@ -139,22 +139,15 @@ public class TimetableReadinessEvaluator {
     }
 
     private void checkUnits(TimetablePlanningData data, List<ReadinessCheck> checks) {
-        List<Unit> sectionless = data.getUnits().stream().filter(u -> u.section() == null).toList();
         if (data.getUnits().isEmpty()) {
             checks.add(fail("ACTIVE_SECTIONS_PRESENT", "Academic Groups & sections",
-                    "No active academic groups with sections exist for this academic year.", null,
+                    "No active academic groups exist for this academic year.", null,
                     "Open Academic Groups", ROUTE_CLASSES));
-        } else if (!sectionless.isEmpty()) {
-            List<String> details = sectionless.stream()
-                    .map(u -> u.academicGroupName() + " has no active section")
-                    .toList();
-            checks.add(fail("ACTIVE_SECTIONS_PRESENT", "Academic Groups & sections",
-                    sectionless.size() + " academic group(s) have no section, so teacher allocation "
-                            + "and scheduling cannot be completed for them.", details,
-                    "Add sections", ROUTE_CLASSES));
         } else {
+            long withSections = data.getUnits().stream().filter(u -> u.section() != null).count();
+            long groupOnly = data.getUnits().size() - withSections;
             checks.add(pass("ACTIVE_SECTIONS_PRESENT", "Academic Groups & sections",
-                    data.getUnits().size() + " active section unit(s)"));
+                    withSections + " section unit(s) and " + groupOnly + " whole-group unit(s)"));
         }
     }
 
@@ -162,7 +155,6 @@ public class TimetableReadinessEvaluator {
         List<String> missing = new ArrayList<>();
         List<String> overlaps = new ArrayList<>();
         for (Unit unit : data.getUnits()) {
-            if (unit.section() == null) continue;
             if (!data.hasSchedule(unit.unitId())) {
                 missing.add(unit.label() + " has no schedule pattern assigned on any day");
                 continue;
@@ -281,7 +273,6 @@ public class TimetableReadinessEvaluator {
         }
         List<String> over = new ArrayList<>();
         for (Unit unit : data.getUnits()) {
-            if (unit.section() == null) continue;
             int required = requiredByGroup.getOrDefault(unit.academicGroupId(), 0);
             int slots = data.getScheduleByUnit().getOrDefault(unit.unitId(), Map.of()).values().stream()
                     .mapToInt(list -> (int) list.stream()
@@ -356,27 +347,44 @@ public class TimetableReadinessEvaluator {
 
     private void checkChoiceGroups(TimetablePlanningData data, List<ReadinessCheck> checks) {
         Map<Long, List<AcademicGroupSubjectMapping>> optionalByGroup = new HashMap<>();
+        Map<String, List<AcademicGroupSubjectMapping>> choiceGroups = new HashMap<>();
         for (AcademicGroupSubjectMapping m : data.getMappings()) {
-            if (m.getRequirement() == SubjectRequirement.OPTIONAL) {
-                optionalByGroup.computeIfAbsent(m.getAcademicGroup().getAcademicGroupId(),
+            if (m.getRequirement() != SubjectRequirement.OPTIONAL) continue;
+            optionalByGroup.computeIfAbsent(m.getAcademicGroup().getAcademicGroupId(),
+                    k -> new ArrayList<>()).add(m);
+            if (m.getChoiceGroup() != null && !m.getChoiceGroup().isBlank()) {
+                choiceGroups.computeIfAbsent(m.getAcademicGroup().getAcademicGroupId()
+                        + "|" + m.getChoiceGroup().trim().toLowerCase(Locale.ROOT),
                         k -> new ArrayList<>()).add(m);
             }
         }
+        List<String> configured = choiceGroups.entrySet().stream()
+                .filter(e -> e.getValue().size() > 1)
+                .map(e -> {
+                    AcademicGroupSubjectMapping first = e.getValue().get(0);
+                    return first.getAcademicGroup().getName() + " / " + first.getChoiceGroup() + ": "
+                            + e.getValue().stream().map(m -> m.getSubject().getName())
+                            .sorted().reduce((a, b) -> a + ", " + b).orElse("");
+                }).sorted().toList();
         List<String> groups = optionalByGroup.entrySet().stream()
                 .filter(e -> e.getValue().size() > 1)
                 .map(e -> e.getValue().get(0).getAcademicGroup().getName() + ": "
                         + e.getValue().stream().map(m -> m.getSubject().getName())
                         .sorted().reduce((a, b) -> a + ", " + b).orElse(""))
                 .toList();
-        if (groups.isEmpty()) {
+        if (!configured.isEmpty()) {
+            checks.add(warn("CHOICE_GROUPS_CONFIGURED", "Choice groups",
+                    "Choice groups are configured. Group-level timetables schedule the published "
+                            + "alternative periods; learner-level subject selection is required to choose "
+                            + "one alternative per student.", configured, "Review mapping", ROUTE_SUBJECTS));
+        } else if (!groups.isEmpty()) {
+            checks.add(warn("CHOICE_GROUPS_CONFIGURED", "Choice groups",
+                    "Competing optional subjects have no choice group. Add a choice group in Subject "
+                            + "Mapping so alternatives are identified, or their periods will all be scheduled.",
+                    groups, "Review mapping", ROUTE_SUBJECTS));
+        } else {
             checks.add(pass("CHOICE_GROUPS_CONFIGURED", "Choice groups",
                     "No competing optional subjects require a choice-group rule"));
-        } else {
-            checks.add(warn("CHOICE_GROUPS_CONFIGURED", "Choice groups",
-                    "Optional subjects are mapped as independent weekly requirements. No learner-level "
-                            + "choice-group selection data exists, so their group-level periods will be "
-                            + "scheduled. Report this to the academic administrator if alternatives should "
-                            + "run in parallel.", groups, "Review mapping", ROUTE_SUBJECTS));
         }
     }
 

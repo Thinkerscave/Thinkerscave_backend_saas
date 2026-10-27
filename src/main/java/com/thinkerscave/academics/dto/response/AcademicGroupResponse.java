@@ -29,6 +29,9 @@ public class AcademicGroupResponse {
     private long sectionCount;
     private long sectionsActive;
     private long studentCount;
+    private long subjectCount;
+    private long teacherCount;
+    private String timetableStatus;
 
     /**
      * @deprecated Class Teacher is a Section-level relationship. These fields are

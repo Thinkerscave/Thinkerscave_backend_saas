@@ -179,6 +179,8 @@ public class TimetableGenerationEngine {
         List<SolutionValidator.ValidationConflict> fixedIssues = new ArrayList<>();
         List<Placement> fixedReservations = new ArrayList<>();
         int fixedCount = reserveFixedActivities(data, fixedReservations, fixedIssues);
+        fixedCount += carryLockedLessons(version, data, requirements, fixedReservations, fixedIssues);
+        fixedCount += reserveConsecutiveLessons(source, data, requirements, fixedReservations, fixedIssues);
 
         return new Prepared(source, requirements, fixedIssues, fixedReservations, unscheduled,
                 data.getUnits().size(), fixedCount);
@@ -188,7 +190,6 @@ public class TimetableGenerationEngine {
                                        List<SolutionValidator.ValidationConflict> issues) {
         int count = 0;
         for (Unit unit : data.getUnits()) {
-            if (unit.section() == null) continue;
             List<FixedActivity> activities = data.fixedActivitiesFor(unit);
             for (FixedActivity activity : activities) {
                 for (DayOfWeek day : activity.getDays()) {
@@ -233,6 +234,167 @@ public class TimetableGenerationEngine {
             }
         }
         return count;
+    }
+
+    /**
+     * Carries locked lessons from the source draft into the new version and removes the
+     * matching scheduled requirement so the generator does not create a duplicate.
+     */
+    private int carryLockedLessons(TimetableVersion version, TimetablePlanningData data,
+                                   List<SchedulingRequirement> requirements,
+                                   List<Placement> reservations,
+                                   List<SolutionValidator.ValidationConflict> issues) {
+        if (version.getSourceVersionId() == null) return 0;
+        List<TimetableEntry> locked = entryRepository.findGridEntries(version.getSourceVersionId())
+                .stream().filter(e -> Boolean.TRUE.equals(e.getLocked())).toList();
+        int carried = 0;
+        for (TimetableEntry entry : locked) {
+            Long unitId = entry.getSection() != null ? entry.getSection().getSectionId()
+                    : entry.getAcademicGroup() != null ? -entry.getAcademicGroup().getAcademicGroupId() : null;
+            if (unitId == null) continue;
+            Unit unit = data.getUnits().stream().filter(u -> Objects.equals(u.unitId(), unitId))
+                    .findFirst().orElse(null);
+            if (unit == null) continue;
+            TimetablePeriod period = entry.getTimetablePeriod();
+            List<TimetablePeriod> slots = data.slotsFor(unitId, entry.getDayOfWeek());
+            if (period == null || slots.stream().noneMatch(s -> Objects.equals(
+                    s.getTimetablePeriodId(), period.getTimetablePeriodId()))) {
+                issues.add(new SolutionValidator.ValidationConflict(
+                        TimetableConflictType.FIXED_ACTIVITY_CONFLICT,
+                        "Locked lesson for " + unit.label() + " on " + entry.getDayOfWeek()
+                                + " no longer fits the assigned schedule and was not carried forward.",
+                        unit.sectionId(), entry.getSubject() == null ? null : entry.getSubject().getSubjectId(),
+                        entry.getStaff() == null ? null : entry.getStaff().getStaffId(), entry.getDayOfWeek(), null));
+                continue;
+            }
+            boolean slotTaken = reservations.stream().anyMatch(p ->
+                    Objects.equals(p.getUnitId(), unitId)
+                            && p.getDayOfWeek() == entry.getDayOfWeek()
+                            && Objects.equals(p.getPeriodId(), period.getTimetablePeriodId()));
+            if (slotTaken) continue;
+            Long mappingId = entry.getTeacherAllocation() == null
+                    || entry.getTeacherAllocation().getAcademicGroupSubjectMapping() == null ? null
+                    : entry.getTeacherAllocation().getAcademicGroupSubjectMapping()
+                    .getAcademicGroupSubjectMappingId();
+            Long subjectId = entry.getSubject() == null ? null : entry.getSubject().getSubjectId();
+            SchedulingRequirement matched = requirements.stream()
+                    .filter(r -> Objects.equals(r.getUnitId(), unitId))
+                    .filter(r -> mappingId != null
+                            ? Objects.equals(r.getAcademicGroupSubjectMappingId(), mappingId)
+                            : subjectId == null || Objects.equals(r.getSubjectId(), subjectId))
+                    .findFirst().orElse(null);
+            if (matched == null) continue;
+            requirements.remove(matched);
+            Placement p = new Placement();
+            p.setRequirementId(matched.getRequirementId());
+            p.setUnitId(unitId);
+            p.setSectionId(entry.getSection() == null ? null : entry.getSection().getSectionId());
+            p.setAcademicGroupId(unit.academicGroupId());
+            p.setAcademicGroupSubjectMappingId(mappingId);
+            p.setSubjectId(subjectId);
+            p.setTeacherAllocationId(entry.getTeacherAllocation() == null ? null
+                    : entry.getTeacherAllocation().getTeacherAllocationId());
+            p.setStaffId(entry.getStaff() == null ? null : entry.getStaff().getStaffId());
+            p.setResourceId(entry.getResource() == null ? null : entry.getResource().getAcademicResourceId());
+            p.setFixedActivityId(entry.getFixedActivity() == null ? null
+                    : entry.getFixedActivity().getFixedActivityId());
+            p.setDayOfWeek(entry.getDayOfWeek());
+            p.setPeriodId(period.getTimetablePeriodId());
+            p.setPeriodNumber(period.getPeriodNumber());
+            p.setStartTime(period.getStartTime());
+            p.setEndTime(period.getEndTime());
+            p.setTeachingIndex(slots.indexOf(period));
+            p.setEntryType(entry.getEntryType());
+            p.setSubjectNameSnapshot(entry.getSubjectNameSnapshot());
+            p.setLocked(true);
+            reservations.add(p);
+            carried++;
+        }
+        return carried;
+    }
+
+    /**
+     * Reserves contiguous blocks for curriculum mappings that require consecutive periods.
+     * If no contiguous block exists, the lessons remain for the normal scheduler and a
+     * warning is recorded instead of silently breaking the requirement.
+     */
+    private int reserveConsecutiveLessons(SchedulingSourceData source, TimetablePlanningData data,
+                                          List<SchedulingRequirement> requirements,
+                                          List<Placement> reservations,
+                                          List<SolutionValidator.ValidationConflict> issues) {
+        Map<String, List<SchedulingRequirement>> grouped = requirements.stream()
+                .filter(r -> r.getConsecutivePeriods() > 1)
+                .collect(java.util.stream.Collectors.groupingBy(
+                        r -> r.getUnitId() + "|" + r.getAcademicGroupSubjectMappingId(),
+                        LinkedHashMap::new, java.util.stream.Collectors.toList()));
+        int reserved = 0;
+        for (List<SchedulingRequirement> group : grouped.values()) {
+            group.sort(Comparator.comparingInt(SchedulingRequirement::getPeriodIndex));
+            SchedulingRequirement first = group.get(0);
+            int block = Math.max(1, first.getConsecutivePeriods());
+            List<SchedulingRequirement> pending = new ArrayList<>(group);
+            while (pending.size() >= block) {
+                ScheduledBlock found = findBlock(source, data, previousBlockRequirements(pending, block),
+                        reservations, first);
+                if (found == null) break;
+                for (int i = 0; i < block; i++) {
+                    SchedulingRequirement req = pending.get(i);
+                    TimetablePeriod period = found.slots().get(i);
+                    CandidateSlot slot = new CandidateSlot(found.day(), req.getUnitId(), req.getSectionId(),
+                            req.getAcademicGroupId(), period.getTimetablePeriodId(), period.getPeriodNumber(),
+                            period.getStartTime(), period.getEndTime(), found.startIndex() + i,
+                            req.getPrimaryStaffId(), req.getDefaultResourceId());
+                    reservations.add(new Placement(req, slot));
+                }
+                pending.subList(0, block).clear();
+                reserved += block;
+            }
+            if (pending.size() >= block) {
+                issues.add(new SolutionValidator.ValidationConflict(
+                        TimetableConflictType.PERIOD_CAPACITY_CONFLICT,
+                        first.getSubjectName() + " for " + first.getSectionName() + " requires "
+                                + block + " consecutive period(s), but no free block was available. "
+                                + "Add capacity or reduce the consecutive-period requirement.",
+                        first.getSectionId(), first.getSubjectId(), first.getPrimaryStaffId(), null, null));
+            }
+            requirements.removeIf(r -> group.stream().anyMatch(g -> g.getRequirementId()
+                    .equals(r.getRequirementId()) && !pending.contains(g)));
+        }
+        return reserved;
+    }
+
+    private List<SchedulingRequirement> previousBlockRequirements(List<SchedulingRequirement> pending, int block) {
+        return pending.subList(0, block);
+    }
+
+    private record ScheduledBlock(DayOfWeek day, int startIndex, List<TimetablePeriod> slots) {}
+
+    private ScheduledBlock findBlock(SchedulingSourceData source, TimetablePlanningData data, List<SchedulingRequirement> reqs,
+                                     List<Placement> reservations, SchedulingRequirement sample) {
+        int block = reqs.size();
+        for (DayOfWeek day : data.getWorkingDays()) {
+            List<TimetablePeriod> slots = data.slotsFor(sample.getUnitId(), day);
+            for (int start = 0; start + block <= slots.size(); start++) {
+                boolean free = true;
+                for (int i = 0; i < block && free; i++) {
+                    TimetablePeriod period = slots.get(start + i);
+                    SchedulingRequirement req = reqs.get(i);
+                    free = reservations.stream()
+                            .filter(p -> Objects.equals(p.getStaffId(), req.getPrimaryStaffId())).count()
+                            + block <= source.getMaxTeacherWeeklyPeriods()
+                            && reservations.stream().noneMatch(p ->
+                            p.getDayOfWeek() == day
+                                    && Objects.equals(p.getPeriodId(), period.getTimetablePeriodId())
+                                    && (Objects.equals(p.getUnitId(), req.getUnitId())
+                                    || (req.getPrimaryStaffId() != null
+                                    && Objects.equals(p.getStaffId(), req.getPrimaryStaffId()))
+                                    || (req.getDefaultResourceId() != null
+                                    && Objects.equals(p.getResourceId(), req.getDefaultResourceId()))));
+                }
+                if (free) return new ScheduledBlock(day, start, slots.subList(start, start + block));
+            }
+        }
+        return null;
     }
 
     private static boolean overlaps(TimetablePeriod slot, FixedActivity activity) {

@@ -47,6 +47,13 @@ public class Subject extends Auditable {
     @Column(name = "description", length = 500)
     private String description;
 
+    @Column(name = "default_lesson_duration_min")
+    private Short defaultLessonDurationMin;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "default_timetable_preference", length = 30)
+    private com.thinkerscave.academics.enums.SubjectTimetablePreference defaultTimetablePreference;
+
     @NotNull
     @Column(name = "is_active", nullable = false)
     private Boolean active = true;

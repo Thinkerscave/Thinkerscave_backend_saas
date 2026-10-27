@@ -31,4 +31,8 @@ public interface AcademicYearService {
     AcademicYearResponse reject(Long id, RejectAcademicYearRequest request);
 
     AcademicYearResponse activate(Long id);
+
+    AcademicYearResponse complete(Long id);
+
+    AcademicYearResponse archive(Long id);
 }

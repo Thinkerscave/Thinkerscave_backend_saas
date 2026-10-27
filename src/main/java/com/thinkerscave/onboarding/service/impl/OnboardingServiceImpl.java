@@ -51,7 +51,7 @@ public class OnboardingServiceImpl implements OnboardingService {
                 "/app/academics/academic-year");
         SetupSubtaskResponse classesSections = subtask("classesSections", "Classes and Sections",
                 "Create classes. Sections are optional and can be added later.", true,
-                statusFor(count("SELECT COUNT(*) FROM academic_class WHERE is_active = true") > 0, false),
+                statusFor(count("SELECT COUNT(*) FROM academic_group WHERE is_active = true") > 0, false),
                 "/app/academics/classes-sections");
         SetupSubtaskResponse subjects = subtask("subjects", "Subjects",
                 "Create the subjects taught in your school.", true,
