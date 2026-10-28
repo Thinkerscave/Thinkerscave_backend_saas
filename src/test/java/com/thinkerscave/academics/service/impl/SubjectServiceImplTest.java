@@ -6,7 +6,6 @@ import com.thinkerscave.academics.entity.Subject;
 import com.thinkerscave.academics.enums.SubjectType;
 import com.thinkerscave.academics.repository.AcademicGroupSubjectMappingRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
-import com.thinkerscave.academics.repository.AcademicGroupSubjectMappingSectionRepository;
 import com.thinkerscave.academics.repository.SubjectRepository;
 import com.thinkerscave.academics.security.AcademicsAccessGuard;
 import com.thinkerscave.shared.dto.PageResponse;
@@ -42,8 +41,7 @@ class SubjectServiceImplTest {
     void setUp() {
         subjectRepo = mock(SubjectRepository.class);
         mappingRepo = mock(AcademicGroupSubjectMappingRepository.class);
-        SubjectMappingCoverageLoader coverage = new SubjectMappingCoverageLoader(
-                mock(SectionRepository.class), mock(AcademicGroupSubjectMappingSectionRepository.class));
+        SubjectMappingCoverageLoader coverage = new SubjectMappingCoverageLoader(mock(SectionRepository.class));
         service = new SubjectServiceImpl(subjectRepo, mappingRepo, coverage, mock(AcademicsAccessGuard.class));
         when(subjectRepo.saveAndFlush(any(Subject.class))).thenAnswer(inv -> {
             Subject subject = inv.getArgument(0);

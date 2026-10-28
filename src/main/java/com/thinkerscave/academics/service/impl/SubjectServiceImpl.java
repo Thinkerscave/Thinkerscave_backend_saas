@@ -70,7 +70,6 @@ public class SubjectServiceImpl implements SubjectService {
         subject.setCode(code);
         subject.setSubjectType(requireType(request.getSubjectType()));
         subject.setDescription(SubjectInputRules.cleanDescription(request.getDescription()));
-        subject.setDefaultLessonDurationMin(request.getDefaultLessonDurationMin());
         subject.setDefaultTimetablePreference(request.getDefaultTimetablePreference());
         subject.setActive(true);
         return toResponse(saveWithUniqueGuard(subject), UsageSummary.NONE);
@@ -90,7 +89,6 @@ public class SubjectServiceImpl implements SubjectService {
         subject.setCode(code);
         subject.setSubjectType(requireType(request.getSubjectType()));
         subject.setDescription(SubjectInputRules.cleanDescription(request.getDescription()));
-        subject.setDefaultLessonDurationMin(request.getDefaultLessonDurationMin());
         subject.setDefaultTimetablePreference(request.getDefaultTimetablePreference());
         return toResponse(saveWithUniqueGuard(subject), usageOf(subjectId));
     }
@@ -124,12 +122,11 @@ public class SubjectServiceImpl implements SubjectService {
         List<AcademicGroupSubjectMapping> mappings = result.getContent();
         Map<Long, Integer> activeSections = coverageLoader.activeSectionCounts(mappings.stream()
                 .map(m -> m.getAcademicGroup().getAcademicGroupId()).distinct().toList());
-        Map<Long, Integer> selectedSections = coverageLoader.selectedSectionCounts(mappings.stream()
-                .map(AcademicGroupSubjectMapping::getAcademicGroupSubjectMappingId).toList());
 
         return PageResponse.of(result, mapping -> {
             var group = mapping.getAcademicGroup();
             var year = group.getAcademicYear();
+            int sectionCount = activeSections.getOrDefault(group.getAcademicGroupId(), 0);
             return SubjectUsageResponse.builder()
                     .mappingId(mapping.getAcademicGroupSubjectMappingId())
                     .academicGroupId(group.getAcademicGroupId())
@@ -141,9 +138,8 @@ public class SubjectServiceImpl implements SubjectService {
                     .requirement(mapping.getRequirement())
                     .weeklyPeriods(mapping.getWeeklyPeriods())
                     .timetablePreference(mapping.getTimetablePreference())
-                    .scope(mapping.getScope())
-                    .sectionCount(coverageLoader.coveredSectionCount(mapping, activeSections, selectedSections))
-                    .totalSectionCount(activeSections.getOrDefault(group.getAcademicGroupId(), 0))
+                    .sectionCount(sectionCount)
+                    .totalSectionCount(sectionCount)
                     .active(mapping.isActive())
                     .build();
         });
@@ -181,12 +177,10 @@ public class SubjectServiceImpl implements SubjectService {
         List<AcademicGroupSubjectMapping> mappings = mappingRepository.findActiveWithGroupBySubjectIds(subjectIds);
         Map<Long, Integer> activeSections = coverageLoader.activeSectionCounts(mappings.stream()
                 .map(m -> m.getAcademicGroup().getAcademicGroupId()).distinct().toList());
-        Map<Long, Integer> selectedSections = coverageLoader.selectedSectionCounts(mappings.stream()
-                .map(AcademicGroupSubjectMapping::getAcademicGroupSubjectMappingId).toList());
 
         Map<Long, UsageSummary> summaries = new HashMap<>();
         for (AcademicGroupSubjectMapping mapping : mappings) {
-            int covered = coverageLoader.coveredSectionCount(mapping, activeSections, selectedSections);
+            int covered = activeSections.getOrDefault(mapping.getAcademicGroup().getAcademicGroupId(), 0);
             summaries.merge(mapping.getSubject().getSubjectId(), new UsageSummary(1, covered),
                     (a, b) -> new UsageSummary(a.groups() + b.groups(), a.sections() + b.sections()));
         }
@@ -204,7 +198,6 @@ public class SubjectServiceImpl implements SubjectService {
                 .code(subject.getCode())
                 .subjectType(subject.getSubjectType())
                 .description(subject.getDescription())
-                .defaultLessonDurationMin(subject.getDefaultLessonDurationMin())
                 .defaultTimetablePreference(subject.getDefaultTimetablePreference())
                 .active(subject.getActive())
                 .mappedAcademicGroupCount(usage.groups())

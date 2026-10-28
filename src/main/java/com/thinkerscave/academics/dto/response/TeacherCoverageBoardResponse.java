@@ -1,7 +1,6 @@
 package com.thinkerscave.academics.dto.response;
 
 import com.thinkerscave.academics.enums.AcademicYearStatus;
-import com.thinkerscave.academics.enums.SubjectMappingScope;
 import com.thinkerscave.academics.enums.SubjectRequirement;
 import com.thinkerscave.academics.enums.SubjectType;
 import lombok.Builder;
@@ -80,7 +79,6 @@ public class TeacherCoverageBoardResponse {
         private SubjectType subjectType;
         private Short weeklyPeriods;
         private SubjectRequirement requirement;
-        private SubjectMappingScope scope;
         private int sectionsTotal;
         private int sectionsAssigned;
         private TeacherRef groupTeacher;

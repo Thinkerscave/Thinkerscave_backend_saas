@@ -4,7 +4,6 @@ import com.thinkerscave.academics.dto.request.AcademicYearTransitionRequest;
 import com.thinkerscave.academics.dto.response.AcademicYearTransitionResponse;
 import com.thinkerscave.academics.entity.*;
 import com.thinkerscave.academics.enums.AcademicTransitionStatus;
-import com.thinkerscave.academics.enums.SubjectMappingScope;
 import com.thinkerscave.academics.repository.*;
 import com.thinkerscave.academics.security.AcademicsAccessGuard;
 import com.thinkerscave.academics.service.AcademicYearTransitionService;
@@ -16,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -32,7 +30,6 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
     private final AcademicGroupRepository academicGroupRepo;
     private final SectionRepository sectionRepo;
     private final AcademicGroupSubjectMappingRepository mappingRepo;
-    private final AcademicGroupSubjectMappingSectionRepository mappingSectionRepo;
     private final TeacherAllocationRepository allocationRepo;
     private final TeacherAllocationTeacherRepository tatRepo;
 
@@ -224,28 +221,8 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
                 targetMapping.setWeeklyPeriods(srcMapping.getWeeklyPeriods());
                 targetMapping.setTimetablePreference(srcMapping.getTimetablePreference());
                 targetMapping.setRequirement(srcMapping.getRequirement());
-                targetMapping.setScope(srcMapping.getScope());
                 targetMapping.setActive(true);
-                if (srcMapping.getScope() == SubjectMappingScope.SELECTED_SECTIONS) {
-                    List<AcademicSection> targetSections = mappingSectionRepo
-                            .findByMapping_AcademicGroupSubjectMappingId(srcMapping.getAcademicGroupSubjectMappingId())
-                            .stream()
-                            .map(AcademicGroupSubjectMappingSection::getSection)
-                            .map(sourceSection -> sectionRepo.findByAcademicGroup_AcademicGroupIdAndCodeIgnoreCase(
-                                    targetClass.getAcademicGroupId(), sourceSection.getCode()).orElse(null))
-                            .filter(Objects::nonNull)
-                            .toList();
-                    if (targetSections.isEmpty()) continue;
-                    targetMapping = mappingRepo.save(targetMapping);
-                    for (AcademicSection targetSection : targetSections) {
-                        AcademicGroupSubjectMappingSection mappingSection = new AcademicGroupSubjectMappingSection();
-                        mappingSection.setMapping(targetMapping);
-                        mappingSection.setSection(targetSection);
-                        mappingSectionRepo.save(mappingSection);
-                    }
-                } else {
-                    mappingRepo.save(targetMapping);
-                }
+                mappingRepo.save(targetMapping);
             }
         }
     }

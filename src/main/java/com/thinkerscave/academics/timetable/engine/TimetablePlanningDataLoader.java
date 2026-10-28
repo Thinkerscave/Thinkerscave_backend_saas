@@ -250,7 +250,6 @@ public class TimetablePlanningDataLoader {
                     lessons.add(new TimetablePlanningData.Lesson(unit, mapping, null, staff));
                     continue;
                 }
-                if (!mapping.appliesToSection(unit.sectionId())) continue;
                 TeacherAllocation allocation = allocationByKey.get(
                         key(unit.sectionId(), mapping.getAcademicGroupSubjectMappingId()));
                 if (allocation == null) {

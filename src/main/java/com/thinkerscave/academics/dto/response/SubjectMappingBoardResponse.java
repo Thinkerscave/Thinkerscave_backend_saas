@@ -18,21 +18,10 @@ public class SubjectMappingBoardResponse {
     private String academicYearName;
     private AcademicYearStatus academicYearStatus;
     private boolean yearReadOnly;
-    private boolean hasSections;
-    private List<SectionOption> sections;
     private List<SubjectMappingRowResponse> mappings;
     private long mappedCount;
     private long compulsoryCount;
     private long optionalCount;
     private long teacherPendingCount;
 
-    @Getter
-    @Setter
-    @Builder
-    public static class SectionOption {
-        private Long sectionId;
-        private String name;
-        private String code;
-        private boolean active;
-    }
 }

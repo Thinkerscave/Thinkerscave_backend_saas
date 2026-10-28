@@ -8,23 +8,16 @@ import com.thinkerscave.academics.dto.response.SubjectMappingImpactResponse;
 import com.thinkerscave.academics.dto.response.SubjectMappingRowResponse;
 import com.thinkerscave.academics.entity.AcademicGroup;
 import com.thinkerscave.academics.entity.AcademicGroupSubjectMapping;
-import com.thinkerscave.academics.entity.AcademicGroupSubjectMappingSection;
-import com.thinkerscave.academics.entity.AcademicSection;
 import com.thinkerscave.academics.entity.AcademicYear;
 import com.thinkerscave.academics.entity.Subject;
-import com.thinkerscave.academics.entity.TeacherAllocation;
 import com.thinkerscave.academics.enums.AcademicYearStatus;
-import com.thinkerscave.academics.enums.SubjectMappingScope;
 import com.thinkerscave.academics.enums.SubjectRequirement;
 import com.thinkerscave.academics.enums.SubjectTimetablePreference;
 import com.thinkerscave.academics.enums.SubjectType;
 import com.thinkerscave.academics.repository.AcademicGroupRepository;
 import com.thinkerscave.academics.repository.AcademicGroupSubjectMappingRepository;
-import com.thinkerscave.academics.repository.AcademicGroupSubjectMappingSectionRepository;
 import com.thinkerscave.academics.repository.IdCount;
-import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.academics.repository.SubjectRepository;
-import com.thinkerscave.academics.repository.TeacherAllocationRepository;
 import com.thinkerscave.academics.security.AcademicsAccessGuard;
 import com.thinkerscave.academics.service.SubjectMappingService;
 import com.thinkerscave.shared.dto.PageResponse;
@@ -68,12 +61,8 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
     private static final int DEFAULT_PAGE_SIZE = 10;
 
     private final AcademicGroupRepository academicGroupRepository;
-    private final SectionRepository sectionRepository;
     private final SubjectRepository subjectRepository;
     private final AcademicGroupSubjectMappingRepository mappingRepository;
-    private final AcademicGroupSubjectMappingSectionRepository mappingSectionRepository;
-    private final TeacherAllocationRepository teacherAllocationRepository;
-    private final SubjectMappingCoverageLoader coverageLoader;
     private final AcademicsAccessGuard accessGuard;
 
     @Override
@@ -81,9 +70,8 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
     public SubjectMappingBoardResponse getBoard(Long academicGroupId) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_SUBJECTS);
         AcademicGroup group = requireGroup(academicGroupId);
-        List<AcademicSection> sections = activeSections(academicGroupId);
         List<AcademicGroupSubjectMapping> mappings = mappingRepository.findActiveWithSubjectByAcademicGroupId(academicGroupId);
-        return buildBoard(group, sections, mappings);
+        return buildBoard(group, mappings);
     }
 
     @Override
@@ -125,6 +113,7 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                     .subjectName(subject.getName())
                     .subjectCode(subject.getCode())
                     .subjectType(subject.getSubjectType())
+                    .defaultTimetablePreference(subject.getDefaultTimetablePreference())
                     .subjectActive(subject.isActive())
                     .mapped(mapping != null)
                     .mappingId(mapping == null ? null : mapping.getAcademicGroupSubjectMappingId())
@@ -177,9 +166,6 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
             }
         }
 
-        List<AcademicSection> activeSections = activeSections(academicGroupId);
-        Map<Long, AcademicSection> activeById = activeSections.stream()
-                .collect(Collectors.toMap(AcademicSection::getSectionId, s -> s));
         Map<Long, AcademicGroupSubjectMapping> existingBySubject = mappingRepository
                 .findByAcademicGroup_AcademicGroupId(academicGroupId).stream()
                 .collect(Collectors.toMap(m -> m.getSubject().getSubjectId(), m -> m, (a, b) -> a));
@@ -219,8 +205,6 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                     ? SubjectRequirement.COMPULSORY : entry.getRequirement();
             SubjectTimetablePreference preference = entry.getTimetablePreference() == null
                     ? SubjectTimetablePreference.ANY : entry.getTimetablePreference();
-            SubjectMappingScope scope = entry.getScope() == null
-                    ? SubjectMappingScope.ALL_SECTIONS : entry.getScope();
             String choiceGroup = entry.getChoiceGroup() == null ? null : entry.getChoiceGroup().trim();
             if (choiceGroup != null && choiceGroup.isEmpty()) choiceGroup = null;
             if (choiceGroup != null && requirement != SubjectRequirement.OPTIONAL) {
@@ -230,31 +214,8 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
             if (consecutivePeriods < 1 || consecutivePeriods > 10) {
                 throw new BusinessException("Consecutive periods must be between 1 and 10.");
             }
-            List<AcademicSection> covered = resolveCoverage(scope, entry.getSectionIds(), activeSections, activeById, subject.getName());
-
             if (existingActive) {
-                Set<Long> previousCoverage = currentCoverageIds(existing, activeSections);
-                Set<Long> newCoverage = covered.stream().map(AcademicSection::getSectionId).collect(Collectors.toSet());
-                Set<Long> uncovered = new HashSet<>(previousCoverage);
-                uncovered.removeAll(newCoverage);
-                if (!uncovered.isEmpty()) {
-                    List<String> blockedSections = teacherAllocationRepository
-                            .findByAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(existing.getAcademicGroupSubjectMappingId())
-                            .stream()
-                            .filter(a -> Boolean.TRUE.equals(a.getActive()))
-                            .map(TeacherAllocation::getSection)
-                            .filter(s -> uncovered.contains(s.getSectionId()))
-                            .map(AcademicSection::getName)
-                            .distinct()
-                            .toList();
-                    if (!blockedSections.isEmpty()) {
-                        throw new BusinessException("Remove teacher assignments for " + String.join(", ", blockedSections)
-                                + " before excluding those sections from '" + subject.getName() + "'.");
-                    }
-                }
-
-                boolean scheduleChanged = !previousCoverage.equals(newCoverage)
-                        || !Objects.equals(existing.getWeeklyPeriods(), weeklyPeriods)
+                boolean scheduleChanged = !Objects.equals(existing.getWeeklyPeriods(), weeklyPeriods)
                         || existing.getRequirement() != requirement
                         || existing.getTimetablePreference() != preference
                         || !Objects.equals(existing.getChoiceGroup(), choiceGroup)
@@ -268,8 +229,8 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                 }
             }
 
-            planned.add(new PlannedUpsert(subject, existing, requirement, weeklyPeriods, preference, scope,
-                    choiceGroup, consecutivePeriods, covered));
+            planned.add(new PlannedUpsert(subject, existing, requirement, weeklyPeriods, preference,
+                    choiceGroup, consecutivePeriods));
         }
 
         List<PlannedRemoval> removals = new ArrayList<>();
@@ -298,13 +259,11 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                     ? upsert.existing() : newMapping(plan.group(), upsert.subject());
             mapping.setRequirement(upsert.requirement());
             mapping.setWeeklyPeriods(upsert.weeklyPeriods());
-          mapping.setTimetablePreference(upsert.preference());
-          mapping.setScope(upsert.scope());
-          mapping.setChoiceGroup(upsert.choiceGroup());
-          mapping.setConsecutivePeriods(upsert.consecutivePeriods());
+            mapping.setTimetablePreference(upsert.preference());
+            mapping.setChoiceGroup(upsert.choiceGroup());
+            mapping.setConsecutivePeriods(upsert.consecutivePeriods());
             mapping.setActive(true);
-            mapping = mappingRepository.save(mapping);
-            syncSections(mapping, upsert.scope(), upsert.covered());
+            mappingRepository.save(mapping);
         }
         for (PlannedRemoval removal : plan.removals()) {
             removal.existing().setActive(false);
@@ -312,72 +271,11 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
         }
     }
 
-    private void syncSections(AcademicGroupSubjectMapping mapping, SubjectMappingScope scope, List<AcademicSection> covered) {
-        List<AcademicGroupSubjectMappingSection> current = mappingSectionRepository
-                .findByMapping_AcademicGroupSubjectMappingId(mapping.getAcademicGroupSubjectMappingId());
-        if (scope == SubjectMappingScope.ALL_SECTIONS) {
-            if (!current.isEmpty()) mappingSectionRepository.deleteAll(current);
-            return;
-        }
-        Set<Long> desired = covered.stream().map(AcademicSection::getSectionId).collect(Collectors.toSet());
-        List<AcademicGroupSubjectMappingSection> stale = current.stream()
-                .filter(ms -> !desired.contains(ms.getSection().getSectionId()))
-                .toList();
-        if (!stale.isEmpty()) mappingSectionRepository.deleteAll(stale);
-
-        Set<Long> present = current.stream()
-                .map(ms -> ms.getSection().getSectionId())
-                .filter(desired::contains)
-                .collect(Collectors.toSet());
-        List<AcademicGroupSubjectMappingSection> additions = covered.stream()
-                .filter(section -> !present.contains(section.getSectionId()))
-                .map(section -> {
-                    AcademicGroupSubjectMappingSection row = new AcademicGroupSubjectMappingSection();
-                    row.setMapping(mapping);
-                    row.setSection(section);
-                    return row;
-                })
-                .toList();
-        mappingSectionRepository.saveAll(additions);
-    }
-
     private AcademicGroupSubjectMapping newMapping(AcademicGroup group, Subject subject) {
         AcademicGroupSubjectMapping mapping = new AcademicGroupSubjectMapping();
         mapping.setAcademicGroup(group);
         mapping.setSubject(subject);
         return mapping;
-    }
-
-    private List<AcademicSection> resolveCoverage(SubjectMappingScope scope, List<Long> sectionIds,
-                                                  List<AcademicSection> activeSections,
-                                                  Map<Long, AcademicSection> activeById, String subjectName) {
-        if (scope == SubjectMappingScope.ALL_SECTIONS) {
-            return activeSections;
-        }
-        List<Long> ids = sectionIds == null ? List.of()
-                : sectionIds.stream().filter(Objects::nonNull).distinct().toList();
-        if (ids.isEmpty()) {
-            throw new BusinessException("Select at least one section for '" + subjectName + "'.");
-        }
-        List<AcademicSection> covered = new ArrayList<>();
-        for (Long id : ids) {
-            AcademicSection section = activeById.get(id);
-            if (section == null) {
-                throw new BusinessException("Selected sections must be active sections of this academic group.");
-            }
-            covered.add(section);
-        }
-        return covered;
-    }
-
-    private Set<Long> currentCoverageIds(AcademicGroupSubjectMapping mapping, List<AcademicSection> activeSections) {
-        if (mapping.getScope() != SubjectMappingScope.SELECTED_SECTIONS) {
-            return activeSections.stream().map(AcademicSection::getSectionId).collect(Collectors.toSet());
-        }
-        return mappingSectionRepository.findByMapping_AcademicGroupSubjectMappingId(mapping.getAcademicGroupSubjectMappingId())
-                .stream()
-                .map(ms -> ms.getSection().getSectionId())
-                .collect(Collectors.toSet());
     }
 
     private short validateWeeklyPeriods(Short value, String subjectName) {
@@ -391,14 +289,8 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
         return value;
     }
 
-    private SubjectMappingBoardResponse buildBoard(AcademicGroup group, List<AcademicSection> sections,
-                                                   List<AcademicGroupSubjectMapping> mappings) {
+    private SubjectMappingBoardResponse buildBoard(AcademicGroup group, List<AcademicGroupSubjectMapping> mappings) {
         List<Long> mappingIds = mappings.stream().map(AcademicGroupSubjectMapping::getAcademicGroupSubjectMappingId).toList();
-        Map<Long, List<AcademicSection>> selectedByMapping = mappingSectionRepository
-                .findWithSectionByMappingIds(mappingIds).stream()
-                .collect(Collectors.groupingBy(
-                        ms -> ms.getMapping().getAcademicGroupSubjectMappingId(),
-                        Collectors.mapping(AcademicGroupSubjectMappingSection::getSection, Collectors.toList())));
         Map<Long, Long> allocationCounts = countsOf(mappingRepository.countActiveAllocationsByMappingIds(mappingIds));
         Map<Long, Long> entryCounts = countsOf(mappingRepository.countTimetableEntriesByMappingIds(mappingIds));
 
@@ -407,9 +299,6 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                         String.CASE_INSENSITIVE_ORDER))
                 .map(mapping -> {
                     Long id = mapping.getAcademicGroupSubjectMappingId();
-                    List<AcademicSection> covered = mapping.getScope() == SubjectMappingScope.SELECTED_SECTIONS
-                            ? SubjectMappingCoverageLoader.sortedByDisplayOrder(selectedByMapping.getOrDefault(id, List.of()))
-                            : sections;
                     Subject subject = mapping.getSubject();
                     return SubjectMappingRowResponse.builder()
                             .mappingId(id)
@@ -421,12 +310,8 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                             .requirement(mapping.getRequirement())
                             .weeklyPeriods(mapping.getWeeklyPeriods())
                             .timetablePreference(mapping.getTimetablePreference())
-                            .scope(mapping.getScope())
-                          .choiceGroup(mapping.getChoiceGroup())
-                          .consecutivePeriods(mapping.getConsecutivePeriods())
-                            .sectionIds(covered.stream().map(AcademicSection::getSectionId).toList())
-                            .sectionNames(covered.stream().map(AcademicSection::getName).toList())
-                            .totalSectionCount(sections.size())
+                            .choiceGroup(mapping.getChoiceGroup())
+                            .consecutivePeriods(mapping.getConsecutivePeriods())
                             .teacherAllocationCount(allocationCounts.getOrDefault(id, 0L))
                             .timetableEntryCount(entryCounts.getOrDefault(id, 0L))
                             .build();
@@ -442,13 +327,6 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                 .academicYearName(year.getName())
                 .academicYearStatus(year.getStatus())
                 .yearReadOnly(isYearReadOnly(year))
-                .hasSections(!sections.isEmpty())
-                .sections(sections.stream().map(s -> SubjectMappingBoardResponse.SectionOption.builder()
-                        .sectionId(s.getSectionId())
-                        .name(s.getName())
-                        .code(s.getCode())
-                        .active(s.isActive())
-                        .build()).toList())
                 .mappings(rows)
                 .mappedCount(rows.size())
                 .compulsoryCount(rows.stream().filter(r -> r.getRequirement() == SubjectRequirement.COMPULSORY).count())
@@ -485,10 +363,6 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
         return counts;
     }
 
-    private List<AcademicSection> activeSections(Long academicGroupId) {
-        return sectionRepository.findByAcademicGroup_AcademicGroupIdAndActiveTrueOrderByDisplayOrderAsc(academicGroupId);
-    }
-
     private AcademicGroup requireGroup(Long academicGroupId) {
         return academicGroupRepository.findByIdWithYear(academicGroupId)
                 .orElseThrow(() -> new ResourceNotFoundException("Academic Group not found: " + academicGroupId));
@@ -514,9 +388,8 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
 
     private record PlannedUpsert(Subject subject, AcademicGroupSubjectMapping existing,
                                  SubjectRequirement requirement, short weeklyPeriods,
-                                 SubjectTimetablePreference preference, SubjectMappingScope scope,
-                                 String choiceGroup, short consecutivePeriods,
-                                 List<AcademicSection> covered) {
+                                 SubjectTimetablePreference preference, String choiceGroup,
+                                 short consecutivePeriods) {
     }
 
     private record PlannedRemoval(Subject subject, AcademicGroupSubjectMapping existing) {

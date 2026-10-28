@@ -1,7 +1,6 @@
 package com.thinkerscave.academics.dto.response;
 
 import com.thinkerscave.academics.enums.AcademicYearStatus;
-import com.thinkerscave.academics.enums.SubjectMappingScope;
 import com.thinkerscave.academics.enums.SubjectRequirement;
 import com.thinkerscave.academics.enums.SubjectTimetablePreference;
 import com.thinkerscave.academics.enums.SubjectType;
@@ -25,7 +24,6 @@ public class SubjectUsageResponse {
     private SubjectRequirement requirement;
     private Short weeklyPeriods;
     private SubjectTimetablePreference timetablePreference;
-    private SubjectMappingScope scope;
     private int sectionCount;
     private int totalSectionCount;
     private boolean active;

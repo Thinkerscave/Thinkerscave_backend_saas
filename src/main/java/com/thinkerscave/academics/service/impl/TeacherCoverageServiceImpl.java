@@ -22,7 +22,6 @@ import com.thinkerscave.academics.entity.TeacherAllocation;
 import com.thinkerscave.academics.entity.TeacherAllocationTeacher;
 import com.thinkerscave.academics.entity.TeacherGroupAllocation;
 import com.thinkerscave.academics.enums.AcademicYearStatus;
-import com.thinkerscave.academics.enums.SubjectMappingScope;
 import com.thinkerscave.academics.enums.TeacherAllocationStatus;
 import com.thinkerscave.academics.enums.TeacherAllocationTeacherRole;
 import com.thinkerscave.academics.repository.AcademicGroupRepository;
@@ -106,7 +105,7 @@ public class TeacherCoverageServiceImpl implements TeacherCoverageService {
         if (sectionId != null) {
             scope = scope.stream().filter(s -> s.section().getSectionId().equals(sectionId)).toList();
             if (scope.isEmpty()) {
-                throw new BusinessException("This section is not part of the selected subject's scope.");
+                throw new BusinessException("This section is not part of the selected academic group.");
             }
         }
         int weekly = weeklyOf(mapping);
@@ -409,10 +408,8 @@ public class TeacherCoverageServiceImpl implements TeacherCoverageService {
                 .findByAcademicGroup_AcademicGroupIdAndActiveTrue(academicGroupId)) {
             ctx.mappings.put(mapping.getAcademicGroupSubjectMappingId(), mapping);
             for (AcademicSection section : ctx.sections) {
-                if (mapping.appliesToSection(section.getSectionId())) {
-                    Slot slot = new Slot(section, mapping);
-                    ctx.slots.put(slot.key(), slot);
-                }
+                Slot slot = new Slot(section, mapping);
+                ctx.slots.put(slot.key(), slot);
             }
         }
 
@@ -554,7 +551,6 @@ public class TeacherCoverageServiceImpl implements TeacherCoverageService {
                 .subjectType(mapping.getSubject().getSubjectType())
                 .weeklyPeriods(mapping.getWeeklyPeriods())
                 .requirement(mapping.getRequirement())
-                .scope(mapping.getScope())
                 .sectionsTotal(scope.size())
                 .sectionsAssigned(assigned)
                 .groupTeacher(group == null ? null : teacherRef(group))
@@ -577,7 +573,6 @@ public class TeacherCoverageServiceImpl implements TeacherCoverageService {
                 .subjectType(mapping.getSubject().getSubjectType())
                 .weeklyPeriods(mapping.getWeeklyPeriods())
                 .requirement(mapping.getRequirement())
-                .scope(mapping.getScope())
                 .sectionsTotal(1)
                 .sectionsAssigned(group == null ? 0 : 1)
                 .groupTeacher(group == null ? null : teacherRef(group))
@@ -621,7 +616,7 @@ public class TeacherCoverageServiceImpl implements TeacherCoverageService {
     private Slot requireSlot(Context ctx, Long mappingId, Long sectionId) {
         Slot slot = ctx.slots.get(key(sectionId, mappingId));
         if (slot == null) {
-            throw new BusinessException("The selected section is not part of this subject's section scope.");
+            throw new BusinessException("The selected section is not part of this academic group.");
         }
         return slot;
     }

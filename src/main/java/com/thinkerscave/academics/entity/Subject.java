@@ -12,7 +12,7 @@ import lombok.Setter;
 
 /**
  * Reusable catalog subject: organization-scoped (the tenant schema is the boundary), not tied to an academic year.
- * Curriculum details (weekly periods, requirement, section coverage) live on {@link AcademicGroupSubjectMapping}.
+ * Curriculum details (weekly periods, requirement, and timetable preference) live on {@link AcademicGroupSubjectMapping}.
  * Name and code are unique organization-wide, case-insensitive, enforced by the database.
  */
 @Entity
@@ -46,9 +46,6 @@ public class Subject extends Auditable {
     @Size(max = 500)
     @Column(name = "description", length = 500)
     private String description;
-
-    @Column(name = "default_lesson_duration_min")
-    private Short defaultLessonDurationMin;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "default_timetable_preference", length = 30)

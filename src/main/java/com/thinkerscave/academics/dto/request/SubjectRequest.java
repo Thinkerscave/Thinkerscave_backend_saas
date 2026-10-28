@@ -24,9 +24,5 @@ public class SubjectRequest {
     @Size(max = 300, message = "Description cannot exceed 300 characters")
     private String description;
 
-    @jakarta.validation.constraints.Min(value = 1, message = "Default lesson duration must be at least 1 minute")
-    @jakarta.validation.constraints.Max(value = 240, message = "Default lesson duration cannot exceed 240 minutes")
-    private Short defaultLessonDurationMin;
-
     private com.thinkerscave.academics.enums.SubjectTimetablePreference defaultTimetablePreference;
 }
