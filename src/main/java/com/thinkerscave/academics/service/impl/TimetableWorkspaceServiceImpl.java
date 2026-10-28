@@ -498,7 +498,7 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                         "This academic group is not an active scheduling unit"));
         TimetablePeriod period = requireAllowedSlot(data, unit, request.getDayOfWeek(), request.getPeriodId());
 
-        assertNoClashes(versionId, unit, request.getDayOfWeek(), period, staff.getStaffId(), null);
+        assertNoClashes(versionId, unit, request.getDayOfWeek(), period, staff.getStaffId(), null, mapping);
 
         TimetableEntry entry = new TimetableEntry();
         entry.setTimetableVersion(version);
@@ -508,6 +508,7 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
         entry.setAcademicGroup(group);
         entry.setSubject(mapping.getSubject());
         entry.setTeacherAllocation(allocation);
+        entry.setAcademicGroupChoiceMapping(mapping.getAcademicGroupChoiceMapping());
         entry.setStaff(staff);
         entry.setEntryType(TimetableEntryType.SUBJECT);
         entry.setSubjectNameSnapshot(mapping.getSubject().getName());
@@ -560,11 +561,17 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
         }
         if (staff == null) throw new BusinessException("This lesson has no teacher");
 
-        assertNoClashes(version.getTimetableVersionId(), unit, day, period, staff.getStaffId(), entryId);
+        AcademicGroupSubjectMapping entryMapping = entry.getTeacherAllocation() == null
+                ? null : entry.getTeacherAllocation().getAcademicGroupSubjectMapping();
+        assertNoClashes(version.getTimetableVersionId(), unit, day, period, staff.getStaffId(), entryId, entryMapping);
 
         entry.setDayOfWeek(day);
         entry.setTimetablePeriod(period);
         entry.setStaff(staff);
+        if (entryMapping != null) {
+            entry.setSubject(entryMapping.getSubject());
+            entry.setAcademicGroupChoiceMapping(entryMapping.getAcademicGroupChoiceMapping());
+        }
         if (request.getLocked() != null) entry.setLocked(request.getLocked());
         entry = entryRepository.save(entry);
         recordEvent(version, "MANUAL_EDIT", version.getStatus().name(), version.getStatus().name(),
@@ -598,7 +605,8 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
     }
 
     private void assertNoClashes(Long versionId, TimetablePlanningData.Unit unit, DayOfWeek day,
-                                 TimetablePeriod period, Long staffId, Long excludeEntryId) {
+                                 TimetablePeriod period, Long staffId, Long excludeEntryId,
+                                 AcademicGroupSubjectMapping candidateMapping) {
         List<TimetableEntry> entries = entryRepository.findByTimetableVersion_TimetableVersionId(versionId);
         LocalTime start = period.getStartTime();
         LocalTime end = period.getEndTime();
@@ -615,7 +623,20 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                             && unit.sectionId().equals(other.getSection().getSectionId()))
                     || (unit.sectionId() == null && other.getAcademicGroup() != null
                             && unit.academicGroupId().equals(other.getAcademicGroup().getAcademicGroupId())));
-            if (sameUnit) {
+            AcademicGroupSubjectMapping otherMapping = other.getTeacherAllocation() == null
+                    ? null : other.getTeacherAllocation().getAcademicGroupSubjectMapping();
+            AcademicGroupChoiceMapping otherChoiceMapping = other.getAcademicGroupChoiceMapping() != null
+                    ? other.getAcademicGroupChoiceMapping()
+                    : otherMapping == null ? null : otherMapping.getAcademicGroupChoiceMapping();
+            boolean sameChoiceSlot = candidateMapping != null
+                    && candidateMapping.getAcademicGroupChoiceMapping() != null
+                    && otherChoiceMapping != null
+                    && Objects.equals(candidateMapping.getAcademicGroupChoiceMapping()
+                    .getAcademicGroupChoiceMappingId(), otherChoiceMapping.getAcademicGroupChoiceMappingId())
+                    && otherMapping != null
+                    && !Objects.equals(candidateMapping.getAcademicGroupSubjectMappingId(),
+                    otherMapping.getAcademicGroupSubjectMappingId());
+            if (sameUnit && !sameChoiceSlot) {
                 throw new BusinessException("This group/section already has a lesson at "
                         + start + "–" + end + " (" + other.getSubjectNameSnapshot() + ")");
             }
@@ -790,6 +811,10 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                 .academicGroupSubjectMappingId(entry.getTeacherAllocation() == null ? null
                         : entry.getTeacherAllocation().getAcademicGroupSubjectMapping()
                         .getAcademicGroupSubjectMappingId())
+                .academicGroupChoiceMappingId(entry.getAcademicGroupChoiceMapping() == null ? null
+                        : entry.getAcademicGroupChoiceMapping().getAcademicGroupChoiceMappingId())
+                .choiceGroupName(entry.getAcademicGroupChoiceMapping() == null ? null
+                        : entry.getAcademicGroupChoiceMapping().getChoiceGroup().getName())
                 .staffId(teacher == null ? null : teacher.getStaffId())
                 .staffName(teacher == null ? null : TimetablePlanningData.staffName(teacher))
                 .teacherAllocationId(entry.getTeacherAllocation() == null ? null

@@ -16,6 +16,8 @@ public class Placement {
     private Long sectionId;
     private Long academicGroupId;
     private Long academicGroupSubjectMappingId;
+    private Long choiceMappingId;
+    private int periodIndex;
     private Long subjectId;
     private Long teacherAllocationId;
     private Long staffId;
@@ -40,6 +42,8 @@ public class Placement {
         this.sectionId = req.getSectionId();
         this.academicGroupId = req.getAcademicGroupId();
         this.academicGroupSubjectMappingId = req.getAcademicGroupSubjectMappingId();
+        this.choiceMappingId = req.getChoiceMappingId();
+        this.periodIndex = req.getPeriodIndex();
         this.subjectId = req.getSubjectId();
         this.teacherAllocationId = req.getTeacherAllocationId();
         this.staffId = slot.getStaffId();

@@ -1,6 +1,7 @@
 package com.thinkerscave.academics.service;
 
 import com.thinkerscave.academics.dto.request.SubjectMappingSaveRequest;
+import com.thinkerscave.academics.dto.request.SubjectChoiceMappingSaveRequest;
 import com.thinkerscave.academics.dto.response.AvailableSubjectResponse;
 import com.thinkerscave.academics.dto.response.SubjectMappingBoardResponse;
 import com.thinkerscave.academics.dto.response.SubjectMappingImpactResponse;
@@ -18,4 +19,7 @@ public interface SubjectMappingService {
     SubjectMappingImpactResponse preview(Long academicGroupId, SubjectMappingSaveRequest request);
 
     SubjectMappingBoardResponse save(Long academicGroupId, SubjectMappingSaveRequest request);
+
+    SubjectMappingBoardResponse saveChoiceMappings(
+            Long academicGroupId, SubjectChoiceMappingSaveRequest request);
 }

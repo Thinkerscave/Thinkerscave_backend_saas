@@ -93,6 +93,41 @@ public class SchedulingSolution {
         return overlapsAny(unitDay.get(key(unitId, day)), start, end);
     }
 
+    public boolean isSectionOccupiedFor(SchedulingRequirement requirement, DayOfWeek day,
+                                        LocalTime start, LocalTime end) {
+        List<Placement> list = unitDay.get(key(requirement.getUnitId(), day));
+        if (list == null) return false;
+        return list.stream().anyMatch(placement -> overlaps(placement, start, end)
+                && !canShareChoiceSlot(placement, requirement));
+    }
+
+    public Placement placementAtSectionBlocking(SchedulingRequirement requirement, DayOfWeek day,
+                                                Long periodId) {
+        List<Placement> list = unitDay.get(key(requirement.getUnitId(), day));
+        if (list == null) return null;
+        return list.stream()
+                .filter(placement -> Objects.equals(placement.getPeriodId(), periodId))
+                .filter(placement -> !canShareChoiceSlot(placement, requirement))
+                .findFirst().orElse(null);
+    }
+
+    public boolean choicePartnerAtDifferentSlot(SchedulingRequirement requirement, DayOfWeek day, Long periodId) {
+        if (requirement.getChoiceMappingId() == null) return false;
+        return unitDay.getOrDefault(key(requirement.getUnitId(), day), List.of()).stream()
+                .anyMatch(placement -> Objects.equals(placement.getChoiceMappingId(), requirement.getChoiceMappingId())
+                        && placement.getPeriodIndex() == requirement.getPeriodIndex()
+                        && !Objects.equals(placement.getPeriodId(), periodId));
+    }
+
+    private boolean canShareChoiceSlot(Placement placement, SchedulingRequirement requirement) {
+        return requirement.getChoiceMappingId() != null
+                && Objects.equals(placement.getChoiceMappingId(), requirement.getChoiceMappingId())
+                && placement.getPeriodIndex() == requirement.getPeriodIndex()
+                && !Objects.equals(placement.getAcademicGroupSubjectMappingId(),
+                requirement.getAcademicGroupSubjectMappingId())
+                && !Objects.equals(placement.getSubjectId(), requirement.getSubjectId());
+    }
+
     public boolean isTeacherOccupied(Long staffId, DayOfWeek day, LocalTime start, LocalTime end) {
         return overlapsAny(teacherDay.get(key(staffId, day)), start, end);
     }

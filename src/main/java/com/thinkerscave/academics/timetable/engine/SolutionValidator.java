@@ -31,6 +31,7 @@ public class SolutionValidator {
         validateCompleteness(solution, result);
         validateSlotsExist(solution, source, reqMap, result);
         validateUniqueness(solution, reqMap, result);
+        validateChoiceGroupAlignment(solution, requirements, result);
         validateWorkload(solution, source, reqMap, result);
         validatePreferences(solution, reqMap, source, result);
 
@@ -81,7 +82,7 @@ public class SolutionValidator {
 
         for (Placement p : solution.getPlacements()) {
             String unitKey = p.getUnitId() + ":" + p.getDayOfWeek();
-            if (overlaps(unitSlots.computeIfAbsent(unitKey, k -> new ArrayList<>()), p)) {
+            if (overlapsUnit(unitSlots.computeIfAbsent(unitKey, k -> new ArrayList<>()), p)) {
                 result.addBlocking(new ValidationConflict(
                         TimetableConflictType.SECTION_CONFLICT,
                         "Academic group clash: " + label(p, reqMap) + " overlaps another lesson on " + slotLabel(p),
@@ -118,6 +119,61 @@ public class SolutionValidator {
     private static boolean overlaps(List<Placement> list, Placement candidate) {
         return list.stream().anyMatch(p -> p.startMinute() < candidate.endMinute()
                 && candidate.startMinute() < p.endMinute());
+    }
+
+    private static boolean overlapsUnit(List<Placement> list, Placement candidate) {
+        return list.stream().anyMatch(existing ->
+                existing.startMinute() < candidate.endMinute()
+                        && candidate.startMinute() < existing.endMinute()
+                        && !sameChoiceAlternativeSlot(existing, candidate));
+    }
+
+    private static boolean sameChoiceAlternativeSlot(Placement first, Placement second) {
+        return first.getChoiceMappingId() != null
+                && Objects.equals(first.getChoiceMappingId(), second.getChoiceMappingId())
+                && first.getPeriodIndex() == second.getPeriodIndex()
+                && first.getDayOfWeek() == second.getDayOfWeek()
+                && Objects.equals(first.getPeriodId(), second.getPeriodId())
+                && !Objects.equals(first.getAcademicGroupSubjectMappingId(),
+                second.getAcademicGroupSubjectMappingId())
+                && !Objects.equals(first.getSubjectId(), second.getSubjectId());
+    }
+
+    private void validateChoiceGroupAlignment(SchedulingSolution solution,
+                                              List<SchedulingRequirement> requirements,
+                                              ValidationResult result) {
+        Map<String, List<SchedulingRequirement>> alternativesBySlot = new LinkedHashMap<>();
+        for (SchedulingRequirement requirement : requirements) {
+            if (requirement.getChoiceMappingId() == null) continue;
+            String key = requirement.getUnitId() + "|" + requirement.getChoiceMappingId()
+                    + "|" + requirement.getPeriodIndex();
+            alternativesBySlot.computeIfAbsent(key, ignored -> new ArrayList<>()).add(requirement);
+        }
+        Map<String, Placement> placementsByRequirement = solution.getPlacements().stream()
+                .collect(java.util.stream.Collectors.toMap(Placement::getRequirementId, p -> p, (first, ignored) -> first));
+        for (List<SchedulingRequirement> alternatives : alternativesBySlot.values()) {
+            if (alternatives.stream().map(SchedulingRequirement::getAcademicGroupSubjectMappingId)
+                    .distinct().count() < 2) continue;
+            List<Placement> placed = alternatives.stream()
+                    .map(SchedulingRequirement::getRequirementId)
+                    .map(placementsByRequirement::get)
+                    .filter(Objects::nonNull)
+                    .toList();
+            if (placed.size() < 2) continue;
+            Placement first = placed.get(0);
+            boolean aligned = placed.stream().allMatch(placement ->
+                    placement.getDayOfWeek() == first.getDayOfWeek()
+                            && Objects.equals(placement.getPeriodId(), first.getPeriodId()));
+            if (!aligned) {
+                SchedulingRequirement requirement = alternatives.get(0);
+                result.addBlocking(new ValidationConflict(
+                        TimetableConflictType.CHOICE_GROUP_CONFLICT,
+                        "Alternative subjects for " + requirement.getSectionName()
+                                + " are not scheduled in the same choice-group period.",
+                        requirement.getSectionId(), requirement.getTeacherAllocationId(), null,
+                        first.getDayOfWeek(), first.getPeriodId()));
+            }
+        }
     }
 
     private void validateWorkload(SchedulingSolution solution, SchedulingSourceData source,

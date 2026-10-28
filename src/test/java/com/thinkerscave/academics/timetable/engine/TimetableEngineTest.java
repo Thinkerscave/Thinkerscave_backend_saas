@@ -68,6 +68,37 @@ class TimetableEngineTest {
                 LocalTime.of(7, 30), LocalTime.of(8, 30))).isTrue();
     }
 
+    @Test
+    void choiceAlternativesShareOnlyTheirMatchingGroupPeriodSlot() {
+        SchedulingSolution solution = new SchedulingSolution();
+        Placement hindi = placement(10L, 1L, LocalTime.of(7, 0), LocalTime.of(8, 0));
+        hindi.setAcademicGroupSubjectMappingId(101L);
+        hindi.setChoiceMappingId(7L);
+        hindi.setPeriodIndex(1);
+        hindi.setSubjectId(201L);
+        solution.place(hindi);
+
+        SchedulingRequirement sanskrit = requirement(10L, DayOfWeek.MONDAY);
+        sanskrit.setChoiceMappingId(7L);
+        sanskrit.setPeriodIndex(1);
+        sanskrit.setAcademicGroupSubjectMappingId(102L);
+        sanskrit.setSubjectId(202L);
+        assertThat(solution.isSectionOccupiedFor(sanskrit, DayOfWeek.MONDAY,
+                LocalTime.of(7, 0), LocalTime.of(8, 0))).isFalse();
+
+        SchedulingRequirement unrelatedSubject = requirement(10L, DayOfWeek.MONDAY);
+        assertThat(solution.isSectionOccupiedFor(unrelatedSubject, DayOfWeek.MONDAY,
+                LocalTime.of(7, 0), LocalTime.of(8, 0))).isTrue();
+
+        SchedulingRequirement differentChoicePeriod = requirement(10L, DayOfWeek.MONDAY);
+        differentChoicePeriod.setChoiceMappingId(7L);
+        differentChoicePeriod.setPeriodIndex(2);
+        differentChoicePeriod.setAcademicGroupSubjectMappingId(102L);
+        differentChoicePeriod.setSubjectId(202L);
+        assertThat(solution.isSectionOccupiedFor(differentChoicePeriod, DayOfWeek.MONDAY,
+                LocalTime.of(7, 0), LocalTime.of(8, 0))).isTrue();
+    }
+
     private static TimetablePeriod period(long id, String name, LocalTime start, LocalTime end) {
         TimetablePeriod period = new TimetablePeriod();
         period.setTimetablePeriodId(id);

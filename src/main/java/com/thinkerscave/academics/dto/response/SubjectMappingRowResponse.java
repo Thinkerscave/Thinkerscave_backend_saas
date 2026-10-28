@@ -12,6 +12,7 @@ import lombok.Setter;
 @Builder
 public class SubjectMappingRowResponse {
     private Long mappingId;
+    private Long choiceMappingId;
     private Long subjectId;
     private String subjectName;
     private String subjectCode;

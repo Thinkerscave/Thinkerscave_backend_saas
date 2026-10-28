@@ -45,6 +45,9 @@ public class RequirementExpander {
                 req.setAcademicGroupId(unit.academicGroupId());
                 req.setAcademicGroupName(unit.academicGroupName());
                 req.setAcademicGroupSubjectMappingId(mapping.getAcademicGroupSubjectMappingId());
+                req.setChoiceMappingId(mapping.getAcademicGroupChoiceMapping() == null
+                        || !mapping.getAcademicGroupChoiceMapping().isActive() ? null
+                        : mapping.getAcademicGroupChoiceMapping().getAcademicGroupChoiceMappingId());
                 req.setSubjectId(mapping.getSubject().getSubjectId());
                 req.setSubjectName(mapping.getSubject().getName());
                 req.setWeeklyPeriods(weeklyPeriods);

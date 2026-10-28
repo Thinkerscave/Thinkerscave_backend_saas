@@ -65,9 +65,15 @@ public class TimetableReadinessEvaluator {
 
         Set<Long> teacherIds = new HashSet<>();
         int requirementCount = 0;
+        Set<Long> countedChoiceMappings = new HashSet<>();
         for (Lesson lesson : data.getLessons()) {
             teacherIds.add(lesson.teacher().getStaffId());
-            requirementCount += lesson.weeklyPeriods();
+            AcademicGroupChoiceMapping choiceMapping = lesson.mapping().getAcademicGroupChoiceMapping();
+            if (choiceMapping == null) {
+                requirementCount += lesson.weeklyPeriods();
+            } else if (countedChoiceMappings.add(choiceMapping.getAcademicGroupChoiceMappingId())) {
+                requirementCount += choiceMapping.getWeeklyPeriods();
+            }
         }
         int schedulableMappings = data.getMappings().size() - data.getZeroPeriodMappings().size();
         ReadinessSummary summary = new ReadinessSummary(
@@ -265,8 +271,19 @@ public class TimetableReadinessEvaluator {
 
     private void checkUnitCapacity(TimetablePlanningData data, List<ReadinessCheck> checks) {
         Map<Long, Integer> requiredByGroup = new HashMap<>();
+        Map<Long, Set<Long>> countedChoiceMappings = new HashMap<>();
         for (AcademicGroupSubjectMapping m : data.getMappings()) {
             if (m.getWeeklyPeriods() != null && m.getWeeklyPeriods() > 0) {
+                AcademicGroupChoiceMapping choiceMapping = m.getAcademicGroupChoiceMapping();
+                if (choiceMapping != null) {
+                    if (!countedChoiceMappings.computeIfAbsent(m.getAcademicGroup().getAcademicGroupId(),
+                            ignored -> new HashSet<>()).add(choiceMapping.getAcademicGroupChoiceMappingId())) {
+                        continue;
+                    }
+                    requiredByGroup.merge(m.getAcademicGroup().getAcademicGroupId(),
+                            (int) choiceMapping.getWeeklyPeriods(), Integer::sum);
+                    continue;
+                }
                 requiredByGroup.merge(m.getAcademicGroup().getAcademicGroupId(),
                         (int) m.getWeeklyPeriods(), Integer::sum);
             }
@@ -350,19 +367,27 @@ public class TimetableReadinessEvaluator {
         Map<String, List<AcademicGroupSubjectMapping>> choiceGroups = new HashMap<>();
         for (AcademicGroupSubjectMapping m : data.getMappings()) {
             if (m.getRequirement() != SubjectRequirement.OPTIONAL) continue;
-            optionalByGroup.computeIfAbsent(m.getAcademicGroup().getAcademicGroupId(),
-                    k -> new ArrayList<>()).add(m);
-            if (m.getChoiceGroup() != null && !m.getChoiceGroup().isBlank()) {
-                choiceGroups.computeIfAbsent(m.getAcademicGroup().getAcademicGroupId()
-                        + "|" + m.getChoiceGroup().trim().toLowerCase(Locale.ROOT),
+            AcademicGroupChoiceMapping normalized = m.getAcademicGroupChoiceMapping();
+            if (normalized != null && normalized.isActive()) {
+                choiceGroups.computeIfAbsent("mapping|" + normalized.getAcademicGroupChoiceMappingId(),
+                        ignored -> new ArrayList<>()).add(m);
+            } else {
+                optionalByGroup.computeIfAbsent(m.getAcademicGroup().getAcademicGroupId(),
                         k -> new ArrayList<>()).add(m);
+                if (m.getChoiceGroup() != null && !m.getChoiceGroup().isBlank()) {
+                    choiceGroups.computeIfAbsent(m.getAcademicGroup().getAcademicGroupId()
+                            + "|" + m.getChoiceGroup().trim().toLowerCase(Locale.ROOT),
+                            k -> new ArrayList<>()).add(m);
+                }
             }
         }
         List<String> configured = choiceGroups.entrySet().stream()
                 .filter(e -> e.getValue().size() > 1)
                 .map(e -> {
                     AcademicGroupSubjectMapping first = e.getValue().get(0);
-                    return first.getAcademicGroup().getName() + " / " + first.getChoiceGroup() + ": "
+                    String groupName = first.getAcademicGroupChoiceMapping() == null
+                            ? first.getChoiceGroup() : first.getAcademicGroupChoiceMapping().getChoiceGroup().getName();
+                    return first.getAcademicGroup().getName() + " / " + groupName + ": "
                             + e.getValue().stream().map(m -> m.getSubject().getName())
                             .sorted().reduce((a, b) -> a + ", " + b).orElse("");
                 }).sorted().toList();

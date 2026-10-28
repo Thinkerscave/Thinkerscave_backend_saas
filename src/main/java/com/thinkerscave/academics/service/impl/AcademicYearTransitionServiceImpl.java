@@ -4,6 +4,7 @@ import com.thinkerscave.academics.dto.request.AcademicYearTransitionRequest;
 import com.thinkerscave.academics.dto.response.AcademicYearTransitionResponse;
 import com.thinkerscave.academics.entity.*;
 import com.thinkerscave.academics.enums.AcademicTransitionStatus;
+import com.thinkerscave.academics.enums.SubjectRequirement;
 import com.thinkerscave.academics.repository.*;
 import com.thinkerscave.academics.security.AcademicsAccessGuard;
 import com.thinkerscave.academics.service.AcademicYearTransitionService;
@@ -15,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -30,6 +32,7 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
     private final AcademicGroupRepository academicGroupRepo;
     private final SectionRepository sectionRepo;
     private final AcademicGroupSubjectMappingRepository mappingRepo;
+    private final AcademicGroupChoiceMappingRepository choiceMappingRepo;
     private final TeacherAllocationRepository allocationRepo;
     private final TeacherAllocationTeacherRepository tatRepo;
 
@@ -206,14 +209,50 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
             List<AcademicGroupSubjectMapping> srcMappings = mappingRepo
                     .findByAcademicGroup_AcademicGroupIdAndActiveTrue(srcClass.getAcademicGroupId());
 
+            Map<Long, AcademicGroupChoiceMapping> targetChoiceMappings = new java.util.HashMap<>();
+            for (AcademicGroupChoiceMapping sourceChoiceMapping : choiceMappingRepo
+                    .findByAcademicGroup_AcademicGroupIdAndActiveTrueOrderByChoiceGroup_NameAsc(
+                            srcClass.getAcademicGroupId())) {
+                if (!sourceChoiceMapping.getChoiceGroup().isActive()) continue;
+                Long reusableGroupId = sourceChoiceMapping.getChoiceGroup().getSubjectChoiceGroupId();
+                AcademicGroupChoiceMapping targetChoiceMapping = choiceMappingRepo
+                        .findByAcademicGroup_AcademicGroupIdAndChoiceGroup_SubjectChoiceGroupId(
+                                targetClass.getAcademicGroupId(), reusableGroupId)
+                        .orElseGet(() -> {
+                            AcademicGroupChoiceMapping copy = new AcademicGroupChoiceMapping();
+                            copy.setAcademicGroup(targetClass);
+                            copy.setChoiceGroup(sourceChoiceMapping.getChoiceGroup());
+                            copy.setWeeklyPeriods(sourceChoiceMapping.getWeeklyPeriods());
+                            copy.setTimetablePreference(sourceChoiceMapping.getTimetablePreference());
+                            copy.setActive(true);
+                            return choiceMappingRepo.save(copy);
+                        });
+                targetChoiceMappings.put(sourceChoiceMapping.getAcademicGroupChoiceMappingId(), targetChoiceMapping);
+            }
+
             for (AcademicGroupSubjectMapping srcMapping : srcMappings) {
                 Subject sharedSubject = srcMapping.getSubject();
                 if (!sharedSubject.isActive()) continue;
+                AcademicGroupChoiceMapping sourceChoiceMapping = srcMapping.getAcademicGroupChoiceMapping();
+                if (sourceChoiceMapping != null
+                        && !targetChoiceMappings.containsKey(sourceChoiceMapping.getAcademicGroupChoiceMappingId())) {
+                    continue;
+                }
 
                 Optional<AcademicGroupSubjectMapping> existing = mappingRepo
                         .findByAcademicGroup_AcademicGroupIdAndSubject_SubjectId(
                         targetClass.getAcademicGroupId(), sharedSubject.getSubjectId());
-                if (existing.isPresent()) continue;
+                if (existing.isPresent()) {
+                    if (sourceChoiceMapping != null) {
+                        AcademicGroupSubjectMapping targetMapping = existing.get();
+                        targetMapping.setAcademicGroupChoiceMapping(
+                                targetChoiceMappings.get(sourceChoiceMapping.getAcademicGroupChoiceMappingId()));
+                        targetMapping.setRequirement(SubjectRequirement.OPTIONAL);
+                        targetMapping.setChoiceGroup(null);
+                        mappingRepo.save(targetMapping);
+                    }
+                    continue;
+                }
 
                 AcademicGroupSubjectMapping targetMapping = new AcademicGroupSubjectMapping();
                 targetMapping.setAcademicGroup(targetClass);
@@ -221,6 +260,14 @@ public class AcademicYearTransitionServiceImpl implements AcademicYearTransition
                 targetMapping.setWeeklyPeriods(srcMapping.getWeeklyPeriods());
                 targetMapping.setTimetablePreference(srcMapping.getTimetablePreference());
                 targetMapping.setRequirement(srcMapping.getRequirement());
+                targetMapping.setConsecutivePeriods(srcMapping.getConsecutivePeriods());
+                if (sourceChoiceMapping != null) {
+                    targetMapping.setAcademicGroupChoiceMapping(
+                            targetChoiceMappings.get(sourceChoiceMapping.getAcademicGroupChoiceMappingId()));
+                    targetMapping.setChoiceGroup(null);
+                } else {
+                    targetMapping.setChoiceGroup(srcMapping.getChoiceGroup());
+                }
                 targetMapping.setActive(true);
                 mappingRepo.save(targetMapping);
             }

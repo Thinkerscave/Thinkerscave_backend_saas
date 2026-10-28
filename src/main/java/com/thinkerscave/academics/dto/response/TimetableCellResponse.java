@@ -22,6 +22,8 @@ public class TimetableCellResponse {
     private Long subjectId;
     private String subjectName;
     private Long academicGroupSubjectMappingId;
+    private Long academicGroupChoiceMappingId;
+    private String choiceGroupName;
     private Long staffId;
     private String staffName;
     private Long teacherAllocationId;

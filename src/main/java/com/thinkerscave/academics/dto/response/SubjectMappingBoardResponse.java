@@ -19,6 +19,7 @@ public class SubjectMappingBoardResponse {
     private AcademicYearStatus academicYearStatus;
     private boolean yearReadOnly;
     private List<SubjectMappingRowResponse> mappings;
+    private List<SubjectChoiceMappingResponse> choiceMappings;
     private long mappedCount;
     private long compulsoryCount;
     private long optionalCount;

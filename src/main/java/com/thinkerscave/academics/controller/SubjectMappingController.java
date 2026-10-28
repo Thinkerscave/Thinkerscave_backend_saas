@@ -1,6 +1,7 @@
 package com.thinkerscave.academics.controller;
 
 import com.thinkerscave.academics.dto.request.SubjectMappingSaveRequest;
+import com.thinkerscave.academics.dto.request.SubjectChoiceMappingSaveRequest;
 import com.thinkerscave.academics.dto.response.AvailableSubjectResponse;
 import com.thinkerscave.academics.dto.response.SubjectMappingBoardResponse;
 import com.thinkerscave.academics.dto.response.SubjectMappingImpactResponse;
@@ -61,5 +62,14 @@ public class SubjectMappingController {
             @PathVariable Long academicGroupId, @Valid @RequestBody SubjectMappingSaveRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Subject mappings saved",
                 subjectMappingService.save(academicGroupId, request)));
+    }
+
+    @PutMapping("/subject-mappings/choice-groups")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @Operation(summary = "Map reusable choice groups and their subject alternatives to an academic group")
+    public ResponseEntity<ApiResponse<SubjectMappingBoardResponse>> saveChoiceMappings(
+            @PathVariable Long academicGroupId, @Valid @RequestBody SubjectChoiceMappingSaveRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Choice group mappings saved",
+                subjectMappingService.saveChoiceMappings(academicGroupId, request)));
     }
 }

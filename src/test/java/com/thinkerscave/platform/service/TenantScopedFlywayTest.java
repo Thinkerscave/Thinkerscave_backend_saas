@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import javax.sql.DataSource;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
@@ -35,5 +36,10 @@ class TenantScopedFlywayTest {
         assertThatThrownBy(() -> flyway.migrate(tenant, " "))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("target version");
+    }
+
+    @Test
+    void latestTargetIncludesSubjectChoiceGroupMigration() {
+        assertThat(TenantScopedFlyway.LATEST_VERSION).isEqualTo("46");
     }
 }

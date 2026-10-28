@@ -16,17 +16,6 @@ import lombok.Setter;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Table(
         name = "timetable_entry",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_timetable_entry_slot",
-                        columnNames = {
-                                "timetable_version_id",
-                                "section_id",
-                                "day_of_week",
-                                "timetable_period_id"
-                        }
-                )
-        },
         indexes = {
                 @Index(
                         name = "idx_timetable_entry_version_day_period",
@@ -85,6 +74,10 @@ public class TimetableEntry extends Auditable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subject_id")
     private Subject subject;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "academic_group_choice_mapping_id")
+    private AcademicGroupChoiceMapping academicGroupChoiceMapping;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "fixed_activity_id")

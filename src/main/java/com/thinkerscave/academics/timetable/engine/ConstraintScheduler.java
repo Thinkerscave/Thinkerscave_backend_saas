@@ -147,7 +147,8 @@ public class ConstraintScheduler {
         }
         int count = 0;
         for (CandidateSlot slot : req.getCandidates()) {
-            if (!isHardViolation(slot, req, solution, source)) count++;
+            if (!solution.choicePartnerAtDifferentSlot(req, slot.getDayOfWeek(), slot.getPeriodId())
+                    && !isHardViolation(slot, req, solution, source)) count++;
         }
         return count;
     }
@@ -157,6 +158,7 @@ public class ConstraintScheduler {
         CandidateSlot best = null;
         double bestScore = Double.NEGATIVE_INFINITY;
         for (CandidateSlot slot : req.getCandidates()) {
+            if (solution.choicePartnerAtDifferentSlot(req, slot.getDayOfWeek(), slot.getPeriodId())) continue;
             if (isHardViolation(slot, req, solution, source)) continue;
             double score = scorer.score(req, slot, solution, source, random);
             if (score > bestScore) {
@@ -196,7 +198,7 @@ public class ConstraintScheduler {
 
         for (CandidateSlot slot : slots) {
             Set<Placement> blockers = Collections.newSetFromMap(new IdentityHashMap<>());
-            addIfPresent(blockers, solution.placementAtSection(req.getUnitId(), slot.getDayOfWeek(), slot.getPeriodId()));
+            addIfPresent(blockers, solution.placementAtSectionBlocking(req, slot.getDayOfWeek(), slot.getPeriodId()));
             addIfPresent(blockers, solution.placementAtTeacher(slot.getStaffId(), slot.getDayOfWeek(), slot.getPeriodId()));
             addIfPresent(blockers, solution.placementAtResource(slot.getResourceId(), slot.getDayOfWeek(), slot.getPeriodId()));
             if (blockers.isEmpty() || blockers.size() > 2) continue;
@@ -240,7 +242,8 @@ public class ConstraintScheduler {
 
     static boolean isHardViolation(CandidateSlot slot, SchedulingRequirement req,
                                    SchedulingSolution solution, SchedulingSourceData source) {
-        if (solution.isSectionOccupied(req.getUnitId(), slot.getDayOfWeek(),
+        if (solution.choicePartnerAtDifferentSlot(req, slot.getDayOfWeek(), slot.getPeriodId())
+                || solution.isSectionOccupiedFor(req, slot.getDayOfWeek(),
                 slot.getStartTime(), slot.getEndTime())) return true;
         if (solution.isTeacherOccupied(slot.getStaffId(), slot.getDayOfWeek(),
                 slot.getStartTime(), slot.getEndTime())) return true;

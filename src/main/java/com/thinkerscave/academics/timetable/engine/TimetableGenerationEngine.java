@@ -267,11 +267,6 @@ public class TimetableGenerationEngine {
                         entry.getStaff() == null ? null : entry.getStaff().getStaffId(), entry.getDayOfWeek(), null));
                 continue;
             }
-            boolean slotTaken = reservations.stream().anyMatch(p ->
-                    Objects.equals(p.getUnitId(), unitId)
-                            && p.getDayOfWeek() == entry.getDayOfWeek()
-                            && Objects.equals(p.getPeriodId(), period.getTimetablePeriodId()));
-            if (slotTaken) continue;
             Long mappingId = entry.getTeacherAllocation() == null
                     || entry.getTeacherAllocation().getAcademicGroupSubjectMapping() == null ? null
                     : entry.getTeacherAllocation().getAcademicGroupSubjectMapping()
@@ -284,6 +279,16 @@ public class TimetableGenerationEngine {
                             : subjectId == null || Objects.equals(r.getSubjectId(), subjectId))
                     .findFirst().orElse(null);
             if (matched == null) continue;
+            boolean slotTaken = reservations.stream().anyMatch(p ->
+                    Objects.equals(p.getUnitId(), unitId)
+                            && p.getDayOfWeek() == entry.getDayOfWeek()
+                            && Objects.equals(p.getPeriodId(), period.getTimetablePeriodId())
+                            && !(matched.getChoiceMappingId() != null
+                            && Objects.equals(p.getChoiceMappingId(), matched.getChoiceMappingId())
+                            && p.getPeriodIndex() == matched.getPeriodIndex()
+                            && !Objects.equals(p.getAcademicGroupSubjectMappingId(),
+                            matched.getAcademicGroupSubjectMappingId())));
+            if (slotTaken) continue;
             requirements.remove(matched);
             Placement p = new Placement();
             p.setRequirementId(matched.getRequirementId());
@@ -291,6 +296,8 @@ public class TimetableGenerationEngine {
             p.setSectionId(entry.getSection() == null ? null : entry.getSection().getSectionId());
             p.setAcademicGroupId(unit.academicGroupId());
             p.setAcademicGroupSubjectMappingId(mappingId);
+            p.setChoiceMappingId(matched.getChoiceMappingId());
+            p.setPeriodIndex(matched.getPeriodIndex());
             p.setSubjectId(subjectId);
             p.setTeacherAllocationId(entry.getTeacherAllocation() == null ? null
                     : entry.getTeacherAllocation().getTeacherAllocationId());
@@ -505,8 +512,8 @@ public class TimetableGenerationEngine {
         String sql = "INSERT INTO timetable_entry (created_by, created_on, updated_by, updated_on, version, "
                 + "day_of_week, entry_type, resource_id, section_id, academic_group_id, subject_id, staff_id, "
                 + "fixed_activity_id, subject_name_snapshot, teacher_allocation_id, timetable_period_id, "
-                + "timetable_version_id, is_locked) "
-                + "VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                + "timetable_version_id, academic_group_choice_mapping_id, is_locked) "
+                + "VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         LocalDateTime now = LocalDateTime.now();
         entityManager.unwrap(Session.class).doWork(connection -> {
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
@@ -528,7 +535,8 @@ public class TimetableGenerationEngine {
                     setNullableLong(ps, 14, p.getTeacherAllocationId());
                     ps.setLong(15, p.getPeriodId());
                     ps.setLong(16, versionId);
-                    ps.setBoolean(17, p.isLocked());
+                    setNullableLong(ps, 17, p.getChoiceMappingId());
+                    ps.setBoolean(18, p.isLocked());
                     ps.addBatch();
                     if (++pending == INSERT_BATCH_SIZE) {
                         ps.executeBatch();

@@ -65,6 +65,10 @@ public class AcademicGroupSubjectMapping extends Auditable {
     @Column(name = "choice_group", length = 60)
     private String choiceGroup;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "academic_group_choice_mapping_id")
+    private AcademicGroupChoiceMapping academicGroupChoiceMapping;
+
     @NotNull
     @Column(name = "consecutive_periods", nullable = false)
     private Short consecutivePeriods = 1;

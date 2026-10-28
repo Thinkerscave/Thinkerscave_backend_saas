@@ -2,20 +2,29 @@ package com.thinkerscave.academics.service.impl;
 
 import com.thinkerscave.academics.dto.request.SubjectMappingEntryRequest;
 import com.thinkerscave.academics.dto.request.SubjectMappingSaveRequest;
+import com.thinkerscave.academics.dto.request.SubjectChoiceMappingSaveRequest;
+import com.thinkerscave.academics.dto.request.SubjectChoiceMappingUpsertRequest;
 import com.thinkerscave.academics.dto.response.AvailableSubjectResponse;
 import com.thinkerscave.academics.dto.response.SubjectMappingBoardResponse;
 import com.thinkerscave.academics.dto.response.SubjectMappingImpactResponse;
 import com.thinkerscave.academics.dto.response.SubjectMappingRowResponse;
+import com.thinkerscave.academics.dto.response.SubjectChoiceMappingResponse;
 import com.thinkerscave.academics.entity.AcademicGroup;
+import com.thinkerscave.academics.entity.AcademicGroupChoiceMapping;
 import com.thinkerscave.academics.entity.AcademicGroupSubjectMapping;
 import com.thinkerscave.academics.entity.AcademicYear;
 import com.thinkerscave.academics.entity.Subject;
+import com.thinkerscave.academics.entity.SubjectChoiceGroup;
+import com.thinkerscave.academics.entity.SubjectChoiceGroupMember;
 import com.thinkerscave.academics.enums.AcademicYearStatus;
 import com.thinkerscave.academics.enums.SubjectRequirement;
 import com.thinkerscave.academics.enums.SubjectTimetablePreference;
 import com.thinkerscave.academics.enums.SubjectType;
 import com.thinkerscave.academics.repository.AcademicGroupRepository;
 import com.thinkerscave.academics.repository.AcademicGroupSubjectMappingRepository;
+import com.thinkerscave.academics.repository.AcademicGroupChoiceMappingRepository;
+import com.thinkerscave.academics.repository.SubjectChoiceGroupMemberRepository;
+import com.thinkerscave.academics.repository.SubjectChoiceGroupRepository;
 import com.thinkerscave.academics.repository.IdCount;
 import com.thinkerscave.academics.repository.SubjectRepository;
 import com.thinkerscave.academics.security.AcademicsAccessGuard;
@@ -63,6 +72,9 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
     private final AcademicGroupRepository academicGroupRepository;
     private final SubjectRepository subjectRepository;
     private final AcademicGroupSubjectMappingRepository mappingRepository;
+    private final AcademicGroupChoiceMappingRepository choiceMappingRepository;
+    private final SubjectChoiceGroupRepository choiceGroupRepository;
+    private final SubjectChoiceGroupMemberRepository choiceGroupMemberRepository;
     private final AcademicsAccessGuard accessGuard;
 
     @Override
@@ -135,6 +147,216 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                     + "Review the impact and confirm to continue.");
         }
         apply(plan);
+        if ((request.getChoiceGroupUpserts() != null && !request.getChoiceGroupUpserts().isEmpty())
+                || (request.getRemovedChoiceGroupIds() != null && !request.getRemovedChoiceGroupIds().isEmpty())) {
+            SubjectChoiceMappingSaveRequest choiceRequest = new SubjectChoiceMappingSaveRequest();
+            choiceRequest.setUpserts(request.getChoiceGroupUpserts());
+            choiceRequest.setRemovedChoiceGroupIds(request.getRemovedChoiceGroupIds());
+            choiceRequest.setConfirmImpact(request.isConfirmImpact());
+            saveChoiceMappings(academicGroupId, choiceRequest);
+        }
+        return getBoard(academicGroupId);
+    }
+
+    @Override
+    public SubjectMappingBoardResponse saveChoiceMappings(
+            Long academicGroupId, SubjectChoiceMappingSaveRequest request) {
+        accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_SUBJECTS);
+        AcademicGroup academicGroup = requireGroup(academicGroupId);
+        assertYearMutable(academicGroup.getAcademicYear());
+
+        List<SubjectChoiceMappingUpsertRequest> upserts =
+                request.getUpserts() == null ? List.of() : request.getUpserts();
+        List<Long> removedGroupIds = request.getRemovedChoiceGroupIds() == null ? List.of()
+                : request.getRemovedChoiceGroupIds().stream().filter(Objects::nonNull).distinct().toList();
+        if (upserts.isEmpty() && removedGroupIds.isEmpty()) {
+            throw new BusinessException("There are no choice group mapping changes to save.");
+        }
+
+        Map<Long, AcademicGroupChoiceMapping> existingParents = choiceMappingRepository
+                .findByAcademicGroup_AcademicGroupId(academicGroupId).stream()
+                .collect(Collectors.toMap(
+                        mapping -> mapping.getChoiceGroup().getSubjectChoiceGroupId(),
+                        mapping -> mapping,
+                        (first, ignored) -> first));
+        Set<Long> upsertGroupIds = new HashSet<>();
+        Set<Long> mappedSubjectIds = new HashSet<>();
+        List<PreparedChoiceMapping> prepared = new ArrayList<>();
+        for (SubjectChoiceMappingUpsertRequest input : upserts) {
+            Long groupId = input.getChoiceGroupId();
+            if (groupId == null || !upsertGroupIds.add(groupId)) {
+                throw new BusinessException("Each choice group can appear only once in a save.");
+            }
+            if (removedGroupIds.contains(groupId)) {
+                throw new BusinessException("A choice group cannot be added and removed in the same save.");
+            }
+            SubjectChoiceGroup choiceGroup = choiceGroupRepository.findById(groupId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Subject choice group not found: " + groupId));
+            if (!choiceGroup.isActive()) {
+                throw new BusinessException("'" + choiceGroup.getName()
+                        + "' is inactive and cannot be added to a new curriculum mapping.");
+            }
+            short sharedPeriods = validateWeeklyPeriods(input.getWeeklyPeriods(), choiceGroup.getName());
+            SubjectTimetablePreference preference = input.getTimetablePreference() == null
+                    ? SubjectTimetablePreference.ANY : input.getTimetablePreference();
+            List<SubjectChoiceGroupMember> members =
+                    choiceGroupMemberRepository.findByChoiceGroup_SubjectChoiceGroupId(groupId);
+            if (members.size() < 2) {
+                throw new BusinessException("Choice group '" + choiceGroup.getName()
+                        + "' must contain at least two subjects.");
+            }
+
+            Map<Long, Short> effectivePeriods = new LinkedHashMap<>();
+            for (SubjectChoiceGroupMember member : members) {
+                Subject subject = member.getSubject();
+                if (!subject.isActive() || subject.getSubjectType() != choiceGroup.getSubjectType()) {
+                    throw new BusinessException("Choice group '" + choiceGroup.getName()
+                            + "' contains an inactive subject or a subject with a different type.");
+                }
+                if (!mappedSubjectIds.add(subject.getSubjectId())) {
+                    throw new BusinessException("A subject cannot be mapped in more than one choice group "
+                            + "for the same academic group.");
+                }
+                Short configured = input.getSubjectPeriods() == null
+                        ? null : input.getSubjectPeriods().get(subject.getSubjectId());
+                short periods = configured == null ? sharedPeriods : configured;
+                if (periods < MIN_WEEKLY_PERIODS || periods > sharedPeriods) {
+                    throw new BusinessException("Weekly periods for '" + subject.getName()
+                            + "' must be between 1 and the shared choice-group workload (" + sharedPeriods + ").");
+                }
+                effectivePeriods.put(subject.getSubjectId(), periods);
+            }
+            if (input.getSubjectPeriods() != null
+                    && !members.stream().map(member -> member.getSubject().getSubjectId())
+                    .collect(Collectors.toSet()).containsAll(input.getSubjectPeriods().keySet())) {
+                throw new BusinessException("Subject period overrides may only be set for members of this choice group.");
+            }
+            prepared.add(new PreparedChoiceMapping(choiceGroup, existingParents.get(groupId),
+                    sharedPeriods, preference, members, effectivePeriods));
+        }
+
+        for (Long removedId : removedGroupIds) {
+            if (upsertGroupIds.contains(removedId)) {
+                throw new BusinessException("A choice group cannot be added and removed in the same save.");
+            }
+            AcademicGroupChoiceMapping existing = existingParents.get(removedId);
+            if (existing == null || !existing.isActive()) {
+                throw new BusinessException("Choice group is not mapped to this academic group.");
+            }
+        }
+
+        Map<Long, AcademicGroupSubjectMapping> existingSubjects = mappingRepository
+                .findByAcademicGroup_AcademicGroupId(academicGroupId).stream()
+                .collect(Collectors.toMap(mapping -> mapping.getSubject().getSubjectId(), mapping -> mapping,
+                        (first, ignored) -> first));
+        Set<Long> affectedSubjectIds = new HashSet<>(mappedSubjectIds);
+        for (Long removedGroupId : removedGroupIds) {
+            choiceGroupMemberRepository.findByChoiceGroup_SubjectChoiceGroupId(removedGroupId)
+                    .forEach(member -> affectedSubjectIds.add(member.getSubject().getSubjectId()));
+        }
+
+        List<Long> affectedMappingIds = affectedSubjectIds.stream()
+                .map(existingSubjects::get)
+                .filter(Objects::nonNull)
+                .filter(AcademicGroupSubjectMapping::isActive)
+                .map(AcademicGroupSubjectMapping::getAcademicGroupSubjectMappingId)
+                .toList();
+        Map<Long, Long> allocationCounts = countsOf(mappingRepository.countActiveAllocationsByMappingIds(affectedMappingIds));
+        Map<Long, Long> entryCounts = countsOf(mappingRepository.countTimetableEntriesByMappingIds(affectedMappingIds));
+        List<String> dependencyChanges = new ArrayList<>();
+
+        for (PreparedChoiceMapping item : prepared) {
+            for (SubjectChoiceGroupMember member : item.members()) {
+                Subject subject = member.getSubject();
+                AcademicGroupSubjectMapping mapping = existingSubjects.get(subject.getSubjectId());
+                if (mapping != null && mapping.isActive() && mapping.getAcademicGroupChoiceMapping() != null
+                        && (item.existing() == null || !Objects.equals(
+                        mapping.getAcademicGroupChoiceMapping().getAcademicGroupChoiceMappingId(),
+                        item.existing().getAcademicGroupChoiceMappingId()))) {
+                    throw new ConflictException("'" + subject.getName()
+                            + "' is already part of another active choice group mapping.");
+                }
+                AcademicGroupChoiceMapping existingParent = item.existing();
+                boolean scheduleChanged = mapping == null || !mapping.isActive()
+                        || mapping.getAcademicGroupChoiceMapping() == null
+                        || existingParent == null
+                        || !Objects.equals(mapping.getAcademicGroupChoiceMapping().getAcademicGroupChoiceMappingId(),
+                        existingParent.getAcademicGroupChoiceMappingId())
+                        || !Objects.equals(mapping.getWeeklyPeriods(), item.subjectPeriods().get(subject.getSubjectId()))
+                        || mapping.getTimetablePreference() != item.preference()
+                        || mapping.getRequirement() != SubjectRequirement.OPTIONAL;
+                if (scheduleChanged && mapping != null && mapping.isActive()) {
+                    Long id = mapping.getAcademicGroupSubjectMappingId();
+                    long allocations = allocationCounts.getOrDefault(id, 0L);
+                    long entries = entryCounts.getOrDefault(id, 0L);
+                    if (allocations > 0 || entries > 0) {
+                        dependencyChanges.add(subject.getName() + " (" + allocations
+                                + " teacher allocation(s), " + entries + " timetable entry(s))");
+                    }
+                }
+            }
+        }
+        for (Long removedGroupId : removedGroupIds) {
+            for (SubjectChoiceGroupMember member : choiceGroupMemberRepository
+                    .findByChoiceGroup_SubjectChoiceGroupId(removedGroupId)) {
+                AcademicGroupSubjectMapping mapping = existingSubjects.get(member.getSubject().getSubjectId());
+                if (mapping != null && mapping.isActive()) {
+                    long allocations = allocationCounts.getOrDefault(mapping.getAcademicGroupSubjectMappingId(), 0L);
+                    long entries = entryCounts.getOrDefault(mapping.getAcademicGroupSubjectMappingId(), 0L);
+                    if (allocations > 0 || entries > 0) {
+                        dependencyChanges.add(member.getSubject().getName() + " (" + allocations
+                                + " teacher allocation(s), " + entries + " timetable entry(s))");
+                    }
+                }
+            }
+        }
+        if (!dependencyChanges.isEmpty() && !request.isConfirmImpact()) {
+            throw new ConflictException("The choice-group change affects existing subject allocations or timetable "
+                    + "entries for: " + String.join(", ", dependencyChanges)
+                    + ". Confirm the change only after reviewing and revalidating the timetable.");
+        }
+
+        for (PreparedChoiceMapping item : prepared) {
+            AcademicGroupChoiceMapping parent = item.existing() == null
+                    ? new AcademicGroupChoiceMapping() : item.existing();
+            parent.setAcademicGroup(academicGroup);
+            parent.setChoiceGroup(item.group());
+            parent.setWeeklyPeriods(item.sharedPeriods());
+            parent.setTimetablePreference(item.preference());
+            parent.setActive(true);
+            parent = choiceMappingRepository.save(parent);
+            for (SubjectChoiceGroupMember member : item.members()) {
+                Subject subject = member.getSubject();
+                AcademicGroupSubjectMapping mapping = existingSubjects.get(subject.getSubjectId());
+                if (mapping == null) {
+                    mapping = newMapping(academicGroup, subject);
+                    existingSubjects.put(subject.getSubjectId(), mapping);
+                }
+                mapping.setWeeklyPeriods(item.subjectPeriods().get(subject.getSubjectId()));
+                mapping.setRequirement(SubjectRequirement.OPTIONAL);
+                mapping.setTimetablePreference(item.preference());
+                mapping.setChoiceGroup(null);
+                mapping.setAcademicGroupChoiceMapping(parent);
+                mapping.setActive(true);
+                mappingRepository.save(mapping);
+            }
+        }
+        for (Long removedGroupId : removedGroupIds) {
+            AcademicGroupChoiceMapping parent = existingParents.get(removedGroupId);
+            parent.setActive(false);
+            choiceMappingRepository.save(parent);
+            for (SubjectChoiceGroupMember member : choiceGroupMemberRepository
+                    .findByChoiceGroup_SubjectChoiceGroupId(removedGroupId)) {
+                AcademicGroupSubjectMapping mapping = existingSubjects.get(member.getSubject().getSubjectId());
+                if (mapping != null && mapping.isActive()
+                        && mapping.getAcademicGroupChoiceMapping() != null
+                        && Objects.equals(mapping.getAcademicGroupChoiceMapping().getAcademicGroupChoiceMappingId(),
+                        parent.getAcademicGroupChoiceMappingId())) {
+                    mapping.setActive(false);
+                    mappingRepository.save(mapping);
+                }
+            }
+        }
         return getBoard(academicGroupId);
     }
 
@@ -150,7 +372,9 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
         List<SubjectMappingEntryRequest> upserts = request.getUpserts() == null ? List.of() : request.getUpserts();
         List<Long> removedIds = request.getRemovedSubjectIds() == null ? List.of()
                 : request.getRemovedSubjectIds().stream().filter(Objects::nonNull).distinct().toList();
-        if (upserts.isEmpty() && removedIds.isEmpty()) {
+        if (upserts.isEmpty() && removedIds.isEmpty()
+                && (request.getChoiceGroupUpserts() == null || request.getChoiceGroupUpserts().isEmpty())
+                && (request.getRemovedChoiceGroupIds() == null || request.getRemovedChoiceGroupIds().isEmpty())) {
             throw new BusinessException("There are no subject mapping changes to save.");
         }
 
@@ -215,6 +439,10 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                 throw new BusinessException("Consecutive periods must be between 1 and 10.");
             }
             if (existingActive) {
+                if (existing.getAcademicGroupChoiceMapping() != null) {
+                    throw new BusinessException("'" + subject.getName()
+                            + "' is part of a choice group. Edit its shared curriculum mapping instead.");
+                }
                 boolean scheduleChanged = !Objects.equals(existing.getWeeklyPeriods(), weeklyPeriods)
                         || existing.getRequirement() != requirement
                         || existing.getTimetablePreference() != preference
@@ -239,6 +467,10 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
             AcademicGroupSubjectMapping existing = existingBySubject.get(subjectId);
             if (existing == null || !existing.isActive()) {
                 throw new BusinessException("'" + subject.getName() + "' is not mapped to this academic group.");
+            }
+            if (existing.getAcademicGroupChoiceMapping() != null) {
+                throw new BusinessException("'" + subject.getName()
+                        + "' is part of a choice group. Remove the choice group mapping instead.");
             }
             long allocations = allocationCounts.getOrDefault(existing.getAcademicGroupSubjectMappingId(), 0L);
             long entries = entryCounts.getOrDefault(existing.getAcademicGroupSubjectMappingId(), 0L);
@@ -302,6 +534,8 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                     Subject subject = mapping.getSubject();
                     return SubjectMappingRowResponse.builder()
                             .mappingId(id)
+                                    .choiceMappingId(mapping.getAcademicGroupChoiceMapping() == null ? null
+                                            : mapping.getAcademicGroupChoiceMapping().getAcademicGroupChoiceMappingId())
                             .subjectId(subject.getSubjectId())
                             .subjectName(subject.getName())
                             .subjectCode(subject.getCode())
@@ -319,6 +553,32 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                 .toList();
 
         AcademicYear year = group.getAcademicYear();
+        List<AcademicGroupChoiceMapping> choiceMappings = choiceMappingRepository
+                .findByAcademicGroup_AcademicGroupIdAndActiveTrueOrderByChoiceGroup_NameAsc(group.getAcademicGroupId());
+        List<SubjectChoiceMappingResponse> choiceMappingResponses = choiceMappings.stream()
+                .map(choiceMapping -> SubjectChoiceMappingResponse.builder()
+                        .academicGroupChoiceMappingId(choiceMapping.getAcademicGroupChoiceMappingId())
+                        .choiceGroupId(choiceMapping.getChoiceGroup().getSubjectChoiceGroupId())
+                        .name(choiceMapping.getChoiceGroup().getName())
+                        .subjectType(choiceMapping.getChoiceGroup().getSubjectType())
+                        .weeklyPeriods(choiceMapping.getWeeklyPeriods())
+                        .timetablePreference(choiceMapping.getTimetablePreference())
+                        .active(choiceMapping.isActive())
+                        .subjects(rows.stream()
+                                .filter(row -> Objects.equals(row.getChoiceMappingId(),
+                                        choiceMapping.getAcademicGroupChoiceMappingId()))
+                                .toList())
+                        .build())
+                .toList();
+        long standaloneCount = rows.stream().filter(row -> row.getChoiceMappingId() == null).count();
+        long standaloneCompulsoryCount = rows.stream()
+                .filter(row -> row.getChoiceMappingId() == null
+                        && row.getRequirement() == SubjectRequirement.COMPULSORY)
+                .count();
+        long standaloneOptionalCount = rows.stream()
+                .filter(row -> row.getChoiceMappingId() == null
+                        && row.getRequirement() == SubjectRequirement.OPTIONAL)
+                .count();
         return SubjectMappingBoardResponse.builder()
                 .academicGroupId(group.getAcademicGroupId())
                 .academicGroupName(group.getName())
@@ -328,9 +588,10 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
                 .academicYearStatus(year.getStatus())
                 .yearReadOnly(isYearReadOnly(year))
                 .mappings(rows)
-                .mappedCount(rows.size())
-                .compulsoryCount(rows.stream().filter(r -> r.getRequirement() == SubjectRequirement.COMPULSORY).count())
-                .optionalCount(rows.stream().filter(r -> r.getRequirement() == SubjectRequirement.OPTIONAL).count())
+                .choiceMappings(choiceMappingResponses)
+                .mappedCount(standaloneCount + choiceMappingResponses.size())
+                .compulsoryCount(standaloneCompulsoryCount + choiceMappingResponses.size())
+                .optionalCount(standaloneOptionalCount)
                 .teacherPendingCount(rows.stream().filter(r -> r.getTeacherAllocationCount() == 0).count())
                 .build();
     }
@@ -393,6 +654,12 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
     }
 
     private record PlannedRemoval(Subject subject, AcademicGroupSubjectMapping existing) {
+    }
+
+    private record PreparedChoiceMapping(SubjectChoiceGroup group, AcademicGroupChoiceMapping existing,
+                                         short sharedPeriods, SubjectTimetablePreference preference,
+                                         List<SubjectChoiceGroupMember> members,
+                                         Map<Long, Short> subjectPeriods) {
     }
 
     private record Plan(AcademicGroup group, List<PlannedUpsert> upserts, List<PlannedRemoval> removals,

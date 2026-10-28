@@ -12,9 +12,12 @@ import com.thinkerscave.academics.enums.AcademicYearStatus;
 import com.thinkerscave.academics.enums.SubjectRequirement;
 import com.thinkerscave.academics.enums.SubjectTimetablePreference;
 import com.thinkerscave.academics.enums.SubjectType;
+import com.thinkerscave.academics.repository.AcademicGroupChoiceMappingRepository;
 import com.thinkerscave.academics.repository.AcademicGroupRepository;
 import com.thinkerscave.academics.repository.AcademicGroupSubjectMappingRepository;
 import com.thinkerscave.academics.repository.IdCount;
+import com.thinkerscave.academics.repository.SubjectChoiceGroupMemberRepository;
+import com.thinkerscave.academics.repository.SubjectChoiceGroupRepository;
 import com.thinkerscave.academics.repository.SubjectRepository;
 import com.thinkerscave.academics.security.AcademicsAccessGuard;
 import com.thinkerscave.shared.exceptions.BusinessException;
@@ -58,7 +61,11 @@ class SubjectMappingServiceImplTest {
         groupRepo = mock(AcademicGroupRepository.class);
         subjectRepo = mock(SubjectRepository.class);
         mappingRepo = mock(AcademicGroupSubjectMappingRepository.class);
-        service = new SubjectMappingServiceImpl(groupRepo, subjectRepo, mappingRepo, mock(AcademicsAccessGuard.class));
+        service = new SubjectMappingServiceImpl(groupRepo, subjectRepo, mappingRepo,
+                mock(AcademicGroupChoiceMappingRepository.class),
+                mock(SubjectChoiceGroupRepository.class),
+                mock(SubjectChoiceGroupMemberRepository.class),
+                mock(AcademicsAccessGuard.class));
 
         AcademicYear year = new AcademicYear();
         year.setAcademicYearId(YEAR_ID);

@@ -60,6 +60,7 @@ public class SoftConstraintOptimizer {
                 Placement pB = placements.get(b);
                 if (pA.getEntryType() == com.thinkerscave.academics.enums.TimetableEntryType.ACTIVITY
                         || pB.getEntryType() == com.thinkerscave.academics.enums.TimetableEntryType.ACTIVITY) continue;
+                if (pA.getChoiceMappingId() != null || pB.getChoiceMappingId() != null) continue;
                 if (pA.getAcademicGroupSubjectMappingId() == null
                         || Objects.equals(pA.getAcademicGroupSubjectMappingId(),
                         pB.getAcademicGroupSubjectMappingId())) continue;
