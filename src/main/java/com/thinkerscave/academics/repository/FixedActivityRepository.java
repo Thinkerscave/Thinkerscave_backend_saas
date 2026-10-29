@@ -18,6 +18,10 @@ public interface FixedActivityRepository extends JpaRepository<FixedActivity, Lo
             LEFT JOIN FETCH a.groups g
             LEFT JOIN FETCH g.academicGroup
             LEFT JOIN FETCH g.section
+            LEFT JOIN FETCH a.periods p
+            LEFT JOIN FETCH p.academicGroup
+            LEFT JOIN FETCH p.section
+            LEFT JOIN FETCH p.timetablePeriod
             WHERE a.academicYear.academicYearId = :yearId
             ORDER BY a.name ASC
             """)
@@ -29,6 +33,10 @@ public interface FixedActivityRepository extends JpaRepository<FixedActivity, Lo
             LEFT JOIN FETCH a.groups g
             LEFT JOIN FETCH g.academicGroup
             LEFT JOIN FETCH g.section
+            LEFT JOIN FETCH a.periods p
+            LEFT JOIN FETCH p.academicGroup
+            LEFT JOIN FETCH p.section
+            LEFT JOIN FETCH p.timetablePeriod
             WHERE a.fixedActivityId = :id
             """)
     Optional<FixedActivity> findDetailedById(@Param("id") Long id);

@@ -343,7 +343,7 @@ public class AcademicsOverviewServiceImpl implements AcademicsOverviewService {
         return mappingRepo.findActiveForTimetableByYear(yearId).stream()
                 .map(m -> m.getSubject())
                 .distinct()
-                .sorted(java.util.Comparator.comparing(Subject::getName))
+                .sorted(SubjectOrdering.SUBJECTS)
                 .limit(6)
                 .map(s -> {
                     long mappedAcademicGroups = mappingRepo.countBySubject_SubjectIdAndActiveTrue(s.getSubjectId());

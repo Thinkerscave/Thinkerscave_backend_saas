@@ -28,6 +28,8 @@ public interface TimetableEntryRepository extends JpaRepository<TimetableEntry, 
 
     long countByTeacherAllocation_TeacherAllocationId(Long teacherAllocationId);
 
+    boolean existsByFixedActivity_FixedActivityId(Long fixedActivityId);
+
     @Query("""
             SELECT e FROM TimetableEntry e
             JOIN FETCH e.timetablePeriod p

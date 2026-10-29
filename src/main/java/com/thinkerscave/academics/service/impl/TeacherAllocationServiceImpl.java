@@ -96,6 +96,7 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
                     Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER))
                 .thenComparing(TeacherAllocationRowResponse::getSectionName,
                     Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER))
+                .thenComparing(TeacherAllocationRowResponse::getSubjectType, SubjectOrdering.types())
                 .thenComparing(TeacherAllocationRowResponse::getSubjectName,
                     Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
@@ -105,10 +106,11 @@ public class TeacherAllocationServiceImpl implements TeacherAllocationService {
         long conflict = filteredRows.stream().filter(r -> r.getStatus() == TeacherAllocationStatus.CONFLICT).count();
         AllocationPage allocationPage = paginateRows(filteredRows, page, size);
         List<TeacherAllocationDashboardResponse.FilterOption> subjectOptions = filteredRows.stream()
+            .sorted(SubjectOrdering.byType(
+                TeacherAllocationRowResponse::getSubjectType,
+                TeacherAllocationRowResponse::getSubjectName))
             .map(row -> new TeacherAllocationDashboardResponse.FilterOption(row.getSubjectId(), row.getSubjectName()))
             .distinct()
-            .sorted(Comparator.comparing(TeacherAllocationDashboardResponse.FilterOption::name,
-                Comparator.nullsFirst(String.CASE_INSENSITIVE_ORDER)))
             .toList();
 
         return TeacherAllocationDashboardResponse.builder()

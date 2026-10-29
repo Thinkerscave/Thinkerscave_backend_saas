@@ -56,6 +56,7 @@ public class AcademicsLookupServiceImpl implements AcademicsLookupService {
     @Override
     public List<LookupDTO> getActiveSubjects() {
         return subjectRepository.findByActiveTrueOrderByNameAsc().stream()
+                .sorted(SubjectOrdering.SUBJECTS)
                 .map(s -> new LookupDTO(s.getSubjectId(), s.getName()))
                 .toList();
     }

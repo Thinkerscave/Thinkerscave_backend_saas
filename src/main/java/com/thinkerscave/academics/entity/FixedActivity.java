@@ -2,6 +2,7 @@ package com.thinkerscave.academics.entity;
 
 import com.thinkerscave.academics.enums.DayOfWeek;
 import com.thinkerscave.shared.entity.Auditable;
+import com.thinkerscave.staff.entity.Staff;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -40,9 +41,24 @@ public class FixedActivity extends Auditable {
     private AcademicYear academicYear;
 
     @NotBlank
-    @Size(max = 120)
-    @Column(name = "name", nullable = false, length = 120)
+    @Size(max = 150)
+    @Column(name = "name", nullable = false, length = 150)
     private String name;
+
+    /** Reusable Activity-type subject selected for this reservation. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subject_id")
+    private Subject subject;
+
+    /** Optional teacher taken from the existing subject-to-group/section allocation. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "staff_id")
+    private Staff staff;
+
+    /** Logical period label selected by the user (resolved per schedule pattern). */
+    @Size(max = 50)
+    @Column(name = "period_name", length = 50)
+    private String periodName;
 
     @Size(max = 500)
     @Column(name = "description", length = 500)
@@ -89,6 +105,10 @@ public class FixedActivity extends Auditable {
             fetch = FetchType.EAGER)
     private Set<FixedActivityGroup> groups = new LinkedHashSet<>();
 
+    @OneToMany(mappedBy = "fixedActivity", cascade = CascadeType.ALL, orphanRemoval = true,
+            fetch = FetchType.EAGER)
+    private Set<FixedActivityPeriod> periods = new LinkedHashSet<>();
+
     public boolean isActive() {
         return Boolean.TRUE.equals(active);
     }
@@ -97,5 +117,14 @@ public class FixedActivity extends Auditable {
         if (date == null) return true;
         if (effectiveFrom != null && date.isBefore(effectiveFrom)) return false;
         return effectiveTo == null || !date.isAfter(effectiveTo);
+    }
+
+    public FixedActivityPeriod periodFor(Long groupId, Long sectionId, DayOfWeek day) {
+        if (periods == null) return null;
+        return periods.stream()
+                .filter(p -> p.getDayOfWeek() == day)
+                .filter(p -> p.appliesTo(groupId, sectionId))
+                .findFirst()
+                .orElse(null);
     }
 }

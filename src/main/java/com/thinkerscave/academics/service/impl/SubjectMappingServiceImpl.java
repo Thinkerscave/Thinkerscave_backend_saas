@@ -35,9 +35,6 @@ import com.thinkerscave.shared.exceptions.ConflictException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -116,9 +113,12 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
             return cb.and(predicates.toArray(Predicate[]::new));
         };
 
-        Page<Subject> result = subjectRepository.findAll(spec, PageRequest.of(
-                Math.max(page, 0), clampSize(size), Sort.by("name").ascending().and(Sort.by("subjectId"))));
-        return PageResponse.of(result, subject -> {
+        int safePage = Math.max(page, 0);
+        int safeSize = clampSize(size);
+        List<Subject> matching = new ArrayList<>(subjectRepository.findAll(spec));
+        matching.sort(SubjectOrdering.SUBJECTS);
+        List<Subject> pageRows = SubjectOrdering.slice(matching, safePage, safeSize);
+        return SubjectOrdering.page(pageRows, matching.size(), safePage, safeSize, subject -> {
             AcademicGroupSubjectMapping mapping = mappedBySubject.get(subject.getSubjectId());
             return AvailableSubjectResponse.builder()
                     .subjectId(subject.getSubjectId())
@@ -527,8 +527,7 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
         Map<Long, Long> entryCounts = countsOf(mappingRepository.countTimetableEntriesByMappingIds(mappingIds));
 
         List<SubjectMappingRowResponse> rows = mappings.stream()
-                .sorted(Comparator.comparing((AcademicGroupSubjectMapping m) -> m.getSubject().getName(),
-                        String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing(AcademicGroupSubjectMapping::getSubject, SubjectOrdering.SUBJECTS))
                 .map(mapping -> {
                     Long id = mapping.getAcademicGroupSubjectMappingId();
                     Subject subject = mapping.getSubject();

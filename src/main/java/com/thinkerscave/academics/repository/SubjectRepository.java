@@ -1,6 +1,7 @@
 package com.thinkerscave.academics.repository;
 
 import com.thinkerscave.academics.entity.Subject;
+import com.thinkerscave.academics.enums.SubjectType;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -22,6 +23,8 @@ public interface SubjectRepository extends JpaRepository<Subject, Long>, JpaSpec
     Optional<Subject> findFirstByCodeIgnoreCase(String code);
 
     List<Subject> findByActiveTrueOrderByNameAsc();
+
+    List<Subject> findByActiveTrueAndSubjectTypeOrderByNameAsc(SubjectType subjectType);
 
     long countByActiveTrue();
 }

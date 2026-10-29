@@ -202,17 +202,37 @@ public class TimetableReadinessEvaluator {
         for (FixedActivity activity : data.getFixedActivities()) {
             if (!activity.isActive()) continue;
             active++;
-            if (activity.getStartTime() == null || activity.getEndTime() == null
-                    || !activity.getStartTime().isBefore(activity.getEndTime())) {
-                problems.add(activity.getName() + " has invalid times");
-                continue;
+            String label = activity.getSubject() != null ? activity.getSubject().getName() : activity.getName();
+            if (activity.getSubject() == null) {
+                problems.add(label + " has no activity subject selected");
+            }
+            if (activity.getDays() == null || activity.getDays().isEmpty()) {
+                problems.add(label + " has no day selected");
+            }
+            if (!Boolean.TRUE.equals(activity.getAppliesToAllGroups())
+                    && (activity.getGroups() == null || activity.getGroups().isEmpty())) {
+                problems.add(label + " has no academic group or section selected");
+            }
+            if (activity.getPeriods() == null || activity.getPeriods().isEmpty()) {
+                // Legacy rows keep a time window instead of resolved periods.
+                if (activity.getStartTime() == null || activity.getEndTime() == null
+                        || !activity.getStartTime().isBefore(activity.getEndTime())) {
+                    problems.add(label + " has no configured period or valid time");
+                }
+            } else {
+                boolean unresolved = activity.getPeriods().stream()
+                        .anyMatch(period -> period.getTimetablePeriod() == null);
+                if (unresolved) {
+                    problems.add(label + " has a period that is no longer configured");
+                }
             }
             if (activity.getEffectiveFrom() != null && activity.getEffectiveTo() != null
                     && activity.getEffectiveTo().isBefore(activity.getEffectiveFrom())) {
-                problems.add(activity.getName() + " has an invalid effective date range");
+                problems.add(label + " has an invalid effective date range");
             }
-            if (activity.getDays() == null || activity.getDays().isEmpty()) {
-                problems.add(activity.getName() + " has no day selected");
+            if (activity.getSubject() != null
+                    && isAcademicSubject(activity.getSubject().getSubjectType())) {
+                problems.addAll(academicFixedActivityProblems(data, activity, label));
             }
         }
         if (active == 0) {
@@ -226,6 +246,49 @@ public class TimetableReadinessEvaluator {
             checks.add(pass("FIXED_ACTIVITIES_VALID", "Fixed activities",
                     active + " fixed activity(ies) will be reserved first"));
         }
+    }
+
+    /**
+     * An academic fixed lesson consumes part of the subject's mapped weekly frequency, so it
+     * needs an active mapping, a resolved teacher and enough weekly periods to cover every day.
+     */
+    private List<String> academicFixedActivityProblems(TimetablePlanningData data, FixedActivity activity,
+                                                       String label) {
+        List<String> problems = new ArrayList<>();
+        Long subjectId = activity.getSubject().getSubjectId();
+        if (activity.getStaff() == null) {
+            problems.add(label + " has no teacher allocated for the fixed academic lesson");
+        }
+        for (Unit unit : data.getUnits()) {
+            if (!data.fixedActivitiesFor(unit).contains(activity)) continue;
+            AcademicGroupSubjectMapping mapping = data.getMappings().stream()
+                    .filter(candidate -> candidate.getAcademicGroup().getAcademicGroupId()
+                            .equals(unit.academicGroupId()))
+                    .filter(candidate -> candidate.getSubject().getSubjectId().equals(subjectId))
+                    .filter(candidate -> Boolean.TRUE.equals(candidate.getActive()))
+                    .filter(candidate -> candidate.getWeeklyPeriods() != null
+                            && candidate.getWeeklyPeriods() > 0)
+                    .findFirst().orElse(null);
+            if (mapping == null) {
+                problems.add(label + " is not mapped with weekly periods for " + unit.label());
+                continue;
+            }
+            int fixedSessions = data.fixedActivitiesFor(unit).stream()
+                    .filter(FixedActivity::isActive)
+                    .filter(other -> other.getSubject() != null
+                            && subjectId.equals(other.getSubject().getSubjectId()))
+                    .mapToInt(other -> other.getDays() == null ? 0 : other.getDays().size())
+                    .sum();
+            if (fixedSessions > mapping.getWeeklyPeriods()) {
+                problems.add(label + " reserves " + fixedSessions + " period(s)/week for " + unit.label()
+                        + " but the weekly workload is " + mapping.getWeeklyPeriods());
+            }
+        }
+        return problems;
+    }
+
+    private static boolean isAcademicSubject(SubjectType type) {
+        return type == SubjectType.ACADEMIC_SUBJECT || type == SubjectType.PRACTICAL_LAB;
     }
 
     private void checkSectionsAndSubjects(TimetablePlanningData data, List<ReadinessCheck> checks) {
@@ -337,7 +400,6 @@ public class TimetableReadinessEvaluator {
         TimetableConfiguration config = data.getConfiguration();
         int maxAllowed = config == null || config.getMaxTeacherWeeklyPeriods() == null
                 ? 30 : config.getMaxTeacherWeeklyPeriods();
-        if (data.getLessons().isEmpty()) return;
 
         Map<Long, Integer> load = new LinkedHashMap<>();
         Map<Long, Staff> staffById = new HashMap<>();
@@ -345,6 +407,22 @@ public class TimetableReadinessEvaluator {
             load.merge(lesson.teacher().getStaffId(), lesson.weeklyPeriods(), Integer::sum);
             staffById.put(lesson.teacher().getStaffId(), lesson.teacher());
         }
+        // Academic fixed lessons are already included in the lesson weekly periods. Only
+        // activity-type fixed staff add load that is not otherwise counted.
+        for (FixedActivity activity : data.getFixedActivities()) {
+            if (!activity.isActive() || activity.getStaff() == null || activity.getSubject() == null) continue;
+            if (isAcademicSubject(activity.getSubject().getSubjectType())) continue;
+            int days = activity.getDays() == null ? 0 : activity.getDays().size();
+            if (days == 0) continue;
+            long units = data.getUnits().stream()
+                    .filter(unit -> data.fixedActivitiesFor(unit).contains(activity))
+                    .count();
+            if (units == 0) continue;
+            Long staffId = activity.getStaff().getStaffId();
+            load.merge(staffId, (int) (days * units), Integer::sum);
+            staffById.putIfAbsent(staffId, activity.getStaff());
+        }
+        if (load.isEmpty()) return;
         List<String> over = new ArrayList<>();
         load.entrySet().stream()
                 .sorted(Map.Entry.<Long, Integer>comparingByValue().reversed())

@@ -30,6 +30,17 @@ public class FixedActivityResponse {
     private Set<DayOfWeek> days;
     private List<Group> groups;
 
+    private Long subjectId;
+    private String subjectName;
+    private String subjectCode;
+    /** ACADEMIC_SUBJECT, PRACTICAL_LAB or ACTIVITY. */
+    private String subjectType;
+    private String periodName;
+    private Long staffId;
+    private String staffName;
+    /** Resolved configured period for every applicable group/section/day. */
+    private List<Period> periods;
+
     @Getter
     @Setter
     @Builder
@@ -38,5 +49,21 @@ public class FixedActivityResponse {
         private String academicGroupName;
         private Long sectionId;
         private String sectionName;
+    }
+
+    @Getter
+    @Setter
+    @Builder
+    public static class Period {
+        private Long timetablePeriodId;
+        private Long academicGroupId;
+        private Long sectionId;
+        private DayOfWeek dayOfWeek;
+        private String periodName;
+        private Integer periodNumber;
+        private LocalTime startTime;
+        private LocalTime endTime;
+        private Long schedulePatternId;
+        private String schedulePatternName;
     }
 }

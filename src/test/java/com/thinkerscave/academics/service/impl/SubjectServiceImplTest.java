@@ -13,9 +13,6 @@ import com.thinkerscave.shared.exceptions.AlreadyExistsException;
 import com.thinkerscave.shared.exceptions.BusinessException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
@@ -107,16 +104,15 @@ class SubjectServiceImplTest {
 
     @Test
     void directoryClampsPageSizeAndAppliesFilters() {
-        when(subjectRepo.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(subject(1L, "Music", "MUS", true))));
+        when(subjectRepo.findAll(any(Specification.class)))
+                .thenReturn(List.of(subject(1L, "Music", "MUS", true)));
 
         PageResponse<SubjectResponse> page = service.getDirectory("mu", SubjectType.ACTIVITY, true, -3, 500);
 
         assertEquals(1, page.getContent().size());
-        ArgumentCaptor<Pageable> pageable = ArgumentCaptor.forClass(Pageable.class);
-        verify(subjectRepo).findAll(any(Specification.class), pageable.capture());
-        assertEquals(0, pageable.getValue().getPageNumber());
-        assertEquals(100, pageable.getValue().getPageSize());
+        assertEquals(0, page.getPage());
+        assertEquals(100, page.getSize());
+        verify(subjectRepo).findAll(any(Specification.class));
     }
 
     @Test

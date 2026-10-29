@@ -181,6 +181,9 @@ public class TimetableGenerationEngine {
         int fixedCount = reserveFixedActivities(data, fixedReservations, fixedIssues);
         fixedCount += carryLockedLessons(version, data, requirements, fixedReservations, fixedIssues);
         fixedCount += reserveConsecutiveLessons(source, data, requirements, fixedReservations, fixedIssues);
+        // A fixed academic lesson occupies one of the subject's weekly periods, so its
+        // requirement must not be scheduled a second time.
+        applyFixedAcademicWorkload(data, fixedReservations, requirements);
 
         return new Prepared(source, requirements, fixedIssues, fixedReservations, unscheduled,
                 data.getUnits().size(), fixedCount);
@@ -192,20 +195,22 @@ public class TimetableGenerationEngine {
         for (Unit unit : data.getUnits()) {
             List<FixedActivity> activities = data.fixedActivitiesFor(unit);
             for (FixedActivity activity : activities) {
+                String subjectLabel = activity.getSubject() != null
+                        ? activity.getSubject().getName() : activity.getName();
+                Long subjectId = activity.getSubject() == null
+                        ? null : activity.getSubject().getSubjectId();
+                Long staffId = activity.getStaff() == null ? null : activity.getStaff().getStaffId();
                 for (DayOfWeek day : activity.getDays()) {
                     if (!data.getScheduleByUnit().getOrDefault(unit.unitId(), Map.of()).containsKey(day)) continue;
                     List<TimetablePeriod> slots = data.slotsFor(unit.unitId(), day);
-                    TimetablePeriod match = slots.stream()
-                            .filter(slot -> overlaps(slot, activity))
-                            .findFirst().orElse(null);
+                    TimetablePeriod match = resolveFixedActivityPeriod(activity, unit, day, slots);
                     if (match == null) {
                         issues.add(new SolutionValidator.ValidationConflict(
                                 TimetableConflictType.FIXED_ACTIVITY_CONFLICT,
-                                "'" + activity.getName() + "' for " + unit.label() + " on " + day
-                                        + " (" + activity.getStartTime() + "–" + activity.getEndTime()
-                                        + ") does not fit any teaching slot in the assigned schedule. "
-                                        + "Adjust the activity time or the group's schedule pattern.",
-                                unit.sectionId(), null, null, day, null));
+                                "'" + subjectLabel + "' for " + unit.label() + " on " + day
+                                        + " is not configured in the assigned schedule. "
+                                        + "Choose a period available on that day or update the fixed activity.",
+                                unit.sectionId(), subjectId, null, day, null));
                         continue;
                     }
                     boolean already = reservations.stream().anyMatch(p ->
@@ -213,6 +218,21 @@ public class TimetableGenerationEngine {
                                     && p.getDayOfWeek() == day
                                     && Objects.equals(p.getPeriodId(), match.getTimetablePeriodId()));
                     if (already) continue;
+                    if (staffId != null) {
+                        boolean teacherBusy = reservations.stream().anyMatch(p ->
+                                p.getDayOfWeek() == day
+                                        && Objects.equals(p.getStaffId(), staffId)
+                                        && Objects.equals(p.getPeriodId(), match.getTimetablePeriodId()));
+                        if (teacherBusy) {
+                            issues.add(new SolutionValidator.ValidationConflict(
+                                    TimetableConflictType.TEACHER_CONFLICT,
+                                    "'" + subjectLabel + "' for " + unit.label() + " on " + day + " ("
+                                            + match.getName() + ") needs the assigned teacher, who is already "
+                                            + "reserved at that time. Choose another period, day or teacher.",
+                                    unit.sectionId(), subjectId, staffId, day, null));
+                            continue;
+                        }
+                    }
                     Placement p = new Placement();
                     p.setUnitId(unit.unitId());
                     p.setSectionId(unit.sectionId());
@@ -225,8 +245,9 @@ public class TimetableGenerationEngine {
                     p.setEndTime(match.getEndTime());
                     p.setTeachingIndex(slots.indexOf(match));
                     p.setEntryType(TimetableEntryType.ACTIVITY);
-                    p.setSubjectNameSnapshot(activity.getName());
-                    p.setStaffId(null);
+                    p.setSubjectId(subjectId);
+                    p.setSubjectNameSnapshot(subjectLabel);
+                    p.setStaffId(staffId);
                     p.setTeacherAllocationId(null);
                     reservations.add(p);
                     count++;
@@ -234,6 +255,78 @@ public class TimetableGenerationEngine {
             }
         }
         return count;
+    }
+
+    /**
+     * Fixed academic lessons are real teaching periods for the mapped subject. The requirement
+     * list still contains the full weekly frequency, so drop one requirement per reserved fixed
+     * lesson instead of scheduling the same subject twice.
+     */
+    private void applyFixedAcademicWorkload(TimetablePlanningData data, List<Placement> reservations,
+                                            List<SchedulingRequirement> requirements) {
+        if (reservations.isEmpty() || requirements.isEmpty()) return;
+        Map<Long, FixedActivity> activitiesById = new HashMap<>();
+        for (FixedActivity activity : data.getFixedActivities()) {
+            if (activity.getFixedActivityId() != null) {
+                activitiesById.put(activity.getFixedActivityId(), activity);
+            }
+        }
+        Map<String, Integer> reserved = new HashMap<>();
+        for (Placement placement : reservations) {
+            if (placement.getFixedActivityId() == null || placement.getUnitId() == null) continue;
+            // Locked lessons carried from the source version already removed their requirement.
+            if (placement.isLocked()) continue;
+            FixedActivity activity = activitiesById.get(placement.getFixedActivityId());
+            if (activity == null || activity.getSubject() == null) continue;
+            SubjectType type = activity.getSubject().getSubjectType();
+            if (type != SubjectType.ACADEMIC_SUBJECT && type != SubjectType.PRACTICAL_LAB) continue;
+            reserved.merge(requirementKey(placement.getUnitId(),
+                    activity.getSubject().getSubjectId()), 1, Integer::sum);
+        }
+        if (reserved.isEmpty()) return;
+        for (int index = requirements.size() - 1; index >= 0; index--) {
+            SchedulingRequirement requirement = requirements.get(index);
+            String key = requirementKey(requirement.getUnitId(), requirement.getSubjectId());
+            Integer remaining = reserved.get(key);
+            if (remaining == null || remaining <= 0) continue;
+            requirements.remove(index);
+            reserved.put(key, remaining - 1);
+        }
+    }
+
+    private static String requirementKey(Long unitId, Long subjectId) {
+        return unitId + "|" + subjectId;
+    }
+
+    /**
+     * Prefers the resolved {@code fixed_activity_period} row for this exact group/section/day,
+     * then the configured period label, then the legacy time window. The chosen period must be
+     * part of the unit's current schedule, so a changed pattern produces a visible conflict
+     * instead of silently moving the activity.
+     */
+    private static TimetablePeriod resolveFixedActivityPeriod(FixedActivity activity, Unit unit,
+                                                              DayOfWeek day, List<TimetablePeriod> slots) {
+        FixedActivityPeriod resolved = activity.periodFor(
+                unit.group().getAcademicGroupId(), unit.sectionId(), day);
+        if (resolved != null && resolved.getTimetablePeriod() != null) {
+            Long periodId = resolved.getTimetablePeriod().getTimetablePeriodId();
+            return slots.stream()
+                    .filter(slot -> slot.getSlotKind() == TimetableSlotKind.TEACHING)
+                    .filter(slot -> Objects.equals(slot.getTimetablePeriodId(), periodId))
+                    .findFirst().orElse(null);
+        }
+        if (activity.getPeriodName() != null) {
+            TimetablePeriod byName = slots.stream()
+                    .filter(slot -> slot.getSlotKind() == TimetableSlotKind.TEACHING)
+                    .filter(slot -> slot.getName() != null
+                            && slot.getName().equalsIgnoreCase(activity.getPeriodName()))
+                    .findFirst().orElse(null);
+            if (byName != null) return byName;
+        }
+        return slots.stream()
+                .filter(slot -> slot.getSlotKind() == TimetableSlotKind.TEACHING)
+                .filter(slot -> overlaps(slot, activity))
+                .findFirst().orElse(null);
     }
 
     /**

@@ -25,8 +25,6 @@ import com.thinkerscave.shared.exceptions.ConflictException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.util.List;
@@ -126,8 +124,8 @@ class SubjectMappingServiceImplTest {
     void availableSubjectsIncludeCatalogPreferredTime() {
         maths.setDefaultTimetablePreference(SubjectTimetablePreference.FIRST_HALF);
         when(mappingRepo.findByAcademicGroup_AcademicGroupIdAndActiveTrue(GROUP_ID)).thenReturn(List.of());
-        when(subjectRepo.findAll(any(Specification.class), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(maths)));
+        when(subjectRepo.findAll(any(Specification.class)))
+                .thenReturn(List.of(maths));
 
         var available = service.getAvailableSubjects(GROUP_ID, null, null, 0, 10);
 

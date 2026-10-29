@@ -475,7 +475,7 @@ public class TeacherCoverageServiceImpl implements TeacherCoverageService {
 
     private TeacherCoverageBoardResponse buildBoard(Context ctx) {
         List<Row> rows = ctx.mappings.values().stream()
-                .sorted(Comparator.comparing(m -> m.getSubject().getName(), String.CASE_INSENSITIVE_ORDER))
+                .sorted(Comparator.comparing(AcademicGroupSubjectMapping::getSubject, SubjectOrdering.SUBJECTS))
                 .map(mapping -> buildRow(ctx, mapping))
                 .toList();
 

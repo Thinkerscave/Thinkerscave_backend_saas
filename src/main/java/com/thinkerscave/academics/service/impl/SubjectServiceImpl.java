@@ -19,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,10 +48,13 @@ public class SubjectServiceImpl implements SubjectService {
     @Transactional(readOnly = true)
     public PageResponse<SubjectResponse> getDirectory(String q, SubjectType subjectType, Boolean active, int page, int size) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_SUBJECTS);
-        Page<Subject> result = subjectRepository.findAll(
-                directoryFilter(q, subjectType, active), pageRequest(page, size));
-        Map<Long, UsageSummary> usage = usageSummaries(result.getContent().stream().map(Subject::getSubjectId).toList());
-        return PageResponse.of(result, subject ->
+        int safePage = clampPage(page);
+        int safeSize = clampSize(size);
+        List<Subject> matching = new ArrayList<>(subjectRepository.findAll(directoryFilter(q, subjectType, active)));
+        matching.sort(SubjectOrdering.SUBJECTS);
+        List<Subject> pageRows = SubjectOrdering.slice(matching, safePage, safeSize);
+        Map<Long, UsageSummary> usage = usageSummaries(pageRows.stream().map(Subject::getSubjectId).toList());
+        return SubjectOrdering.page(pageRows, matching.size(), safePage, safeSize, subject ->
                 toResponse(subject, usage.getOrDefault(subject.getSubjectId(), UsageSummary.NONE)));
     }
 
@@ -251,11 +253,6 @@ public class SubjectServiceImpl implements SubjectService {
     private Subject requireSubject(Long subjectId) {
         return subjectRepository.findById(subjectId)
                 .orElseThrow(() -> new ResourceNotFoundException("Subject not found: " + subjectId));
-    }
-
-    private PageRequest pageRequest(int page, int size) {
-        return PageRequest.of(clampPage(page), clampSize(size),
-                Sort.by("name").ascending().and(Sort.by("subjectId")));
     }
 
     private int clampPage(int page) {

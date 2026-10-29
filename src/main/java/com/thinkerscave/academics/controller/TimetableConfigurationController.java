@@ -1,9 +1,12 @@
 package com.thinkerscave.academics.controller;
 
 import com.thinkerscave.academics.dto.request.FixedActivityRequest;
+import com.thinkerscave.academics.dto.request.FixedActivityResolveRequest;
 import com.thinkerscave.academics.dto.request.GroupScheduleAssignmentRequest;
 import com.thinkerscave.academics.dto.request.SchedulePatternRequest;
+import com.thinkerscave.academics.dto.response.FixedActivityOptionsResponse;
 import com.thinkerscave.academics.dto.response.FixedActivityResponse;
+import com.thinkerscave.academics.dto.response.FixedActivityScheduleResponse;
 import com.thinkerscave.academics.dto.response.GroupAssignmentMatrixResponse;
 import com.thinkerscave.academics.dto.response.GroupScheduleAssignmentResponse;
 import com.thinkerscave.academics.dto.response.SchedulePatternResponse;
@@ -117,6 +120,23 @@ public class TimetableConfigurationController {
     public ResponseEntity<ApiResponse<Void>> deleteAssignment(@PathVariable Long assignmentId) {
         service.deleteAssignment(assignmentId);
         return ResponseEntity.ok(ApiResponse.success("Schedule assignment removed", null));
+    }
+
+    @GetMapping("/years/{yearId}/timetable/fixed-activities/options")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @Operation(summary = "Activity subjects and eligible groups/sections for fixed activities")
+    public ResponseEntity<ApiResponse<FixedActivityOptionsResponse>> fixedActivityOptions(@PathVariable Long yearId) {
+        return ResponseEntity.ok(ApiResponse.success("Fixed activity options",
+                service.getFixedActivityOptions(yearId)));
+    }
+
+    @PostMapping("/years/{yearId}/timetable/fixed-activities/resolve")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    @Operation(summary = "Resolve schedule patterns, periods and teacher options for the selected units/days")
+    public ResponseEntity<ApiResponse<FixedActivityScheduleResponse>> resolveFixedActivity(
+            @PathVariable Long yearId, @RequestBody FixedActivityResolveRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Fixed activity schedule",
+                service.resolveFixedActivitySchedule(yearId, request)));
     }
 
     @GetMapping("/years/{yearId}/timetable/fixed-activities")

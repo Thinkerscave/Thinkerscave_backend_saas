@@ -49,10 +49,8 @@ JWT_SECRET=your_generated_jwt_secret_key
 JWT_EXPIRATION=900000
 
 # Email Configuration
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=your_email@gmail.com
-MAIL_PASSWORD=your_gmail_app_password
+# SMTP is pre-configured in src/main/resources/application*.properties.
+# No MAIL_* environment variables are required for outbound mail.
 
 # CORS Configuration
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:4200,https://yourdomain.com

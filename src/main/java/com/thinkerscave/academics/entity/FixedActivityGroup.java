@@ -28,10 +28,12 @@ public class FixedActivityGroup extends Auditable {
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "academic_group_id", nullable = false)
+    @EqualsAndHashCode.Include
     private AcademicGroup academicGroup;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "section_id")
+    @EqualsAndHashCode.Include
     private AcademicSection section;
 
     public boolean appliesTo(Long groupId, Long sectionId) {

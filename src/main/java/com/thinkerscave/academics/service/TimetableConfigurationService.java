@@ -1,9 +1,12 @@
 package com.thinkerscave.academics.service;
 
 import com.thinkerscave.academics.dto.request.FixedActivityRequest;
+import com.thinkerscave.academics.dto.request.FixedActivityResolveRequest;
 import com.thinkerscave.academics.dto.request.GroupScheduleAssignmentRequest;
 import com.thinkerscave.academics.dto.request.SchedulePatternRequest;
+import com.thinkerscave.academics.dto.response.FixedActivityOptionsResponse;
 import com.thinkerscave.academics.dto.response.FixedActivityResponse;
+import com.thinkerscave.academics.dto.response.FixedActivityScheduleResponse;
 import com.thinkerscave.academics.dto.response.GroupAssignmentMatrixResponse;
 import com.thinkerscave.academics.dto.response.GroupScheduleAssignmentResponse;
 import com.thinkerscave.academics.dto.response.SchedulePatternResponse;
@@ -35,6 +38,10 @@ public interface TimetableConfigurationService {
     void deleteAssignment(Long assignmentId);
 
     List<FixedActivityResponse> listFixedActivities(Long yearId);
+
+    FixedActivityOptionsResponse getFixedActivityOptions(Long yearId);
+
+    FixedActivityScheduleResponse resolveFixedActivitySchedule(Long yearId, FixedActivityResolveRequest request);
 
     FixedActivityResponse createFixedActivity(Long yearId, FixedActivityRequest request);
 
