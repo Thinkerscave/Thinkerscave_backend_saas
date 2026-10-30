@@ -8,6 +8,7 @@ import com.thinkerscave.academics.entity.AcademicGroupSubjectMapping;
 import com.thinkerscave.academics.entity.AcademicSection;
 import com.thinkerscave.academics.entity.AcademicYear;
 import com.thinkerscave.academics.entity.FixedActivity;
+import com.thinkerscave.academics.entity.FixedActivityPeriod;
 import com.thinkerscave.academics.entity.Subject;
 import com.thinkerscave.academics.entity.SubjectChoiceGroup;
 import com.thinkerscave.academics.entity.TimetablePeriod;
@@ -202,6 +203,31 @@ class TeacherWorkloadServiceImplTest {
     }
 
     @Test
+    void choiceGroupTeacherWorkloadUsesEffectiveAlternativePeriods() {
+        AcademicGroup group = group(11L, "Grade 6");
+        Unit sectionA = unit(101L, group, section(101L, "A"));
+        AcademicGroupChoiceMapping choice = choice(401L, 3, "Science options");
+        AcademicGroupSubjectMapping physics = mapping(201L, group, subject(301L, "Physics"), 1, choice);
+        AcademicGroupSubjectMapping chemistry = mapping(202L, group, subject(302L, "Chemistry"), 2, choice);
+
+        TimetablePlanningData data = data(
+                List.of(sectionA),
+                Map.of(101L, week(5, 8)),
+                List.of(physics, chemistry),
+                List.of(new Lesson(sectionA, physics, null, staff1),
+                        new Lesson(sectionA, chemistry, null, staff1)),
+                List.of(),
+                List.of());
+        when(planningDataLoader.load(7L)).thenReturn(data);
+
+        Row row = rowFor(service.getDashboard(7L), staff1);
+
+        assertEquals(2, row.getAssignedPeriods());
+        assertEquals(2, row.getBreakdown().get(0).getWeeklyPeriods());
+        assertEquals("Physics / Chemistry", row.getBreakdown().get(0).getSubjectName());
+    }
+
+    @Test
     void totalsReconcileWithBreakdownAndFixedActivities() {
         AcademicGroup group = group(11L, "Grade 6");
         Unit sectionA = unit(101L, group, section(101L, "A"));
@@ -241,6 +267,65 @@ class TeacherWorkloadServiceImplTest {
         assertEquals(3, response.getSummary().getTotalTeachers());
         assertEquals(3, response.getSummary().getBelowTarget());
         assertEquals(0, response.getSummary().getOverloaded());
+    }
+
+    @Test
+    void doesNotDoubleCountFixedActivityAlreadyIncludedInAllocation() {
+        AcademicGroup group = group(11L, "Grade 6");
+        Unit sectionA = unit(101L, group, section(101L, "A"));
+        Subject assemblySubject = subject(303L, "Assembly");
+        assemblySubject.setSubjectType(SubjectType.ACTIVITY);
+        AcademicGroupSubjectMapping assemblyMapping =
+                mapping(201L, group, assemblySubject, 2, null);
+
+        FixedActivity assembly = fixedActivity(501L, assemblySubject, staff2,
+                Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY), group, sectionA.section());
+
+        TimetablePlanningData data = data(
+                List.of(sectionA),
+                Map.of(101L, week(5, 8)),
+                List.of(assemblyMapping),
+                List.of(new Lesson(sectionA, assemblyMapping, null, staff2)),
+                List.of(),
+                List.of(assembly));
+        when(planningDataLoader.load(7L)).thenReturn(data);
+
+        Row row = rowFor(service.getDashboard(7L), staff2);
+
+        assertEquals(2, row.getAssignedPeriods());
+        assertEquals(1, row.getBreakdown().size());
+        assertEquals("ALLOCATION", row.getBreakdown().get(0).getSource());
+    }
+
+    @Test
+    void countsWholeSchoolFixedActivityOnceAcrossUnits() {
+        AcademicGroup group = group(11L, "Grade 6");
+        Unit sectionA = unit(101L, group, section(101L, "A"));
+        Unit sectionB = unit(102L, group, section(102L, "B"));
+        Subject assemblySubject = subject(303L, "Assembly");
+        assemblySubject.setSubjectType(SubjectType.ACTIVITY);
+
+        FixedActivity assembly = fixedActivity(501L, assemblySubject, staff2,
+                Set.of(DayOfWeek.MONDAY), group, sectionA.section());
+        assembly.getPeriods().add(fixedPeriod(assembly, group, sectionA.section(),
+                period(1, TimetableSlotKind.TEACHING)));
+        assembly.getPeriods().add(fixedPeriod(assembly, group, sectionB.section(),
+                period(1, TimetableSlotKind.TEACHING)));
+
+        TimetablePlanningData data = data(
+                List.of(sectionA, sectionB),
+                Map.of(101L, week(5, 8), 102L, week(5, 8)),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(assembly));
+        when(planningDataLoader.load(7L)).thenReturn(data);
+
+        Row row = rowFor(service.getDashboard(7L), staff2);
+
+        assertEquals(1, row.getAssignedPeriods());
+        assertEquals(1, row.getBreakdown().stream()
+                .mapToInt(b -> b.getWeeklyPeriods()).sum());
     }
 
     @Test
@@ -387,6 +472,31 @@ class TeacherWorkloadServiceImplTest {
         choice.setChoiceGroup(group);
         choice.setActive(true);
         return choice;
+    }
+
+    private FixedActivity fixedActivity(long id, Subject subject, Staff staff,
+                                        Set<DayOfWeek> days, AcademicGroup group,
+                                        AcademicSection section) {
+        FixedActivity activity = new FixedActivity();
+        activity.setFixedActivityId(id);
+        activity.setName(subject.getName());
+        activity.setSubject(subject);
+        activity.setStaff(staff);
+        activity.setAppliesToAllGroups(true);
+        activity.setActive(true);
+        activity.setDays(days);
+        return activity;
+    }
+
+    private FixedActivityPeriod fixedPeriod(FixedActivity activity, AcademicGroup group,
+                                            AcademicSection section, TimetablePeriod period) {
+        FixedActivityPeriod fixedPeriod = new FixedActivityPeriod();
+        fixedPeriod.setFixedActivity(activity);
+        fixedPeriod.setAcademicGroup(group);
+        fixedPeriod.setSection(section);
+        fixedPeriod.setDayOfWeek(DayOfWeek.MONDAY);
+        fixedPeriod.setTimetablePeriod(period);
+        return fixedPeriod;
     }
 
     private Map<DayOfWeek, List<TimetablePeriod>> week(int days, int periodsPerDay) {

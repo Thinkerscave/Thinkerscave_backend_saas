@@ -113,10 +113,11 @@ public class SchedulingSolution {
 
     public boolean choicePartnerAtDifferentSlot(SchedulingRequirement requirement, DayOfWeek day, Long periodId) {
         if (requirement.getChoiceMappingId() == null) return false;
-        return unitDay.getOrDefault(key(requirement.getUnitId(), day), List.of()).stream()
+        return placements.stream()
+                .filter(placement -> Objects.equals(placement.getUnitId(), requirement.getUnitId()))
                 .anyMatch(placement -> Objects.equals(placement.getChoiceMappingId(), requirement.getChoiceMappingId())
                         && placement.getPeriodIndex() == requirement.getPeriodIndex()
-                        && !Objects.equals(placement.getPeriodId(), periodId));
+                        && (placement.getDayOfWeek() != day || !Objects.equals(placement.getPeriodId(), periodId)));
     }
 
     private boolean canShareChoiceSlot(Placement placement, SchedulingRequirement requirement) {

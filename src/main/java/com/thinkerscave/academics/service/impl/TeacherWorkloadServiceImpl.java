@@ -101,7 +101,7 @@ public class TeacherWorkloadServiceImpl implements TeacherWorkloadService {
         Set<String> countedLessons = new HashSet<>();
 
         accumulateAllocationLessons(data, staffById, workload, countedLessons);
-        accumulateFixedActivities(data, staffById, workload);
+        accumulateFixedActivities(data, staffById, workload, allocatedSubjectKeys(data));
 
         List<UnassignedSubject> unassignedSubjects = unassignedSubjects(data, countedLessons);
         Set<Long> unassignedSubjectIds = new HashSet<>();
@@ -215,14 +215,12 @@ public class TeacherWorkloadServiceImpl implements TeacherWorkloadService {
             AcademicGroupSubjectMapping mapping = lesson.mapping();
             AcademicGroupChoiceMapping choice = mapping.getAcademicGroupChoiceMapping();
             String dedupeKey = lessonKey(teacher.getStaffId(), lesson.unit().unitId(), mapping, choice);
-            int periods = choice != null && choice.getWeeklyPeriods() != null
-                    ? choice.getWeeklyPeriods()
-                    : lesson.weeklyPeriods();
+            int periods = lesson.weeklyPeriods();
 
             StaffAccumulator accumulator = workload.computeIfAbsent(
                     teacher.getStaffId(), ignored -> new StaffAccumulator());
             if (!countedLessons.add(dedupeKey)) {
-                accumulator.mergeChoiceSubject(dedupeKey, mapping.getSubject().getName());
+                accumulator.mergeChoiceSubject(dedupeKey, mapping.getSubject().getName(), periods);
                 continue;
             }
             accumulator.add(Breakdown.builder()
@@ -242,13 +240,16 @@ public class TeacherWorkloadServiceImpl implements TeacherWorkloadService {
     }
 
     /**
-     * Academic fixed lessons are already represented by the mapped subject's weekly periods.
-     * Only activity-type fixed staff add load that is not otherwise counted.
+     * Activity-type fixed lessons add load only when the teacher has no allocation for that
+     * subject in the unit. When an allocation exists it already contains the fixed lesson, so
+     * counting both would report the same period twice. Slots shared by several units (a
+     * whole-school assembly) are counted once, because they are one teaching period.
      */
     private void accumulateFixedActivities(
             TimetablePlanningData data,
             Map<Long, Staff> staffById,
-            Map<Long, StaffAccumulator> workload) {
+            Map<Long, StaffAccumulator> workload,
+            Set<String> allocatedSubjectKeys) {
         for (FixedActivity activity : data.getFixedActivities()) {
             if (!activity.isActive() || activity.getStaff() == null || activity.getSubject() == null) {
                 continue;
@@ -256,17 +257,35 @@ public class TeacherWorkloadServiceImpl implements TeacherWorkloadService {
             if (isAcademicSubject(activity.getSubject().getSubjectType())) {
                 continue;
             }
-            int days = activity.getDays() == null ? 0 : activity.getDays().size();
-            if (days == 0) {
+            if (activity.getDays() == null || activity.getDays().isEmpty()) {
                 continue;
             }
             Staff teacher = activity.getStaff();
             staffById.putIfAbsent(teacher.getStaffId(), teacher);
             StaffAccumulator accumulator = workload.computeIfAbsent(
                     teacher.getStaffId(), ignored -> new StaffAccumulator());
+            Set<String> countedSlots = new HashSet<>();
 
             for (Unit unit : data.getUnits()) {
                 if (!data.fixedActivitiesFor(unit).contains(activity)) {
+                    continue;
+                }
+                String allocationKey = teacher.getStaffId() + "|" + unit.unitId() + "|"
+                        + activity.getSubject().getSubjectId();
+                if (allocatedSubjectKeys.contains(allocationKey)) {
+                    continue;
+                }
+                int uniqueSlots = 0;
+                for (DayOfWeek day : activity.getDays()) {
+                    var resolved = activity.periodFor(
+                            unit.group().getAcademicGroupId(), unit.sectionId(), day);
+                    String slot = day + "|" + (resolved == null || resolved.getTimetablePeriod() == null
+                            ? "unresolved" : resolved.getTimetablePeriod().getTimetablePeriodId());
+                    if (countedSlots.add(slot)) {
+                        uniqueSlots++;
+                    }
+                }
+                if (uniqueSlots == 0) {
                     continue;
                 }
                 String key = "FIXED|" + teacher.getStaffId() + "|" + unit.unitId() + "|"
@@ -279,11 +298,21 @@ public class TeacherWorkloadServiceImpl implements TeacherWorkloadService {
                         .academicGroupName(unit.academicGroupName())
                         .sectionId(unit.sectionId())
                         .sectionName(unit.sectionName())
-                        .weeklyPeriods(days)
+                        .weeklyPeriods(uniqueSlots)
                         .source("FIXED_ACTIVITY")
                         .build(), key);
             }
         }
+    }
+
+    private static Set<String> allocatedSubjectKeys(TimetablePlanningData data) {
+        Set<String> keys = new HashSet<>();
+        for (Lesson lesson : data.getLessons()) {
+            if (lesson.teacher() == null || lesson.teacher().getStaffId() == null) continue;
+            keys.add(lesson.teacher().getStaffId() + "|" + lesson.unit().unitId() + "|"
+                    + lesson.mapping().getSubject().getSubjectId());
+        }
+        return keys;
     }
 
     private static String lessonKey(
@@ -543,10 +572,14 @@ public class TeacherWorkloadServiceImpl implements TeacherWorkloadService {
             }
         }
 
-        void mergeChoiceSubject(String key, String subjectName) {
+        void mergeChoiceSubject(String key, String subjectName, int weeklyPeriods) {
             Breakdown existing = rowsByKey.get(key);
             if (existing == null || !StringUtils.hasText(subjectName)) {
                 return;
+            }
+            if (weeklyPeriods > existing.getWeeklyPeriods()) {
+                totalPeriods += weeklyPeriods - existing.getWeeklyPeriods();
+                existing.setWeeklyPeriods(weeklyPeriods);
             }
             String current = existing.getSubjectName();
             if (current == null) {

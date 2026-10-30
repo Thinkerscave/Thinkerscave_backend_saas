@@ -20,7 +20,8 @@ public class CandidateScorer {
     public double score(SchedulingRequirement req, CandidateSlot slot,
                         SchedulingSolution solution, SchedulingSourceData source, Random random) {
         double score = 0.0;
-        score += scorePreference(req.getPreference(), slot.getTeachingIndex(), source.getHalfIndex());
+        score += scorePreference(req.getPreference(), slot.getTeachingIndex(),
+                source.halfIndex(slot.getDayOfWeek()));
         score += scoreSpread(req, slot, solution, source);
         score += scoreConsecutive(req, slot, solution, source);
         score += scoreTeacherBalance(slot, solution, source);

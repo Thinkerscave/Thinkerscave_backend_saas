@@ -403,23 +403,36 @@ public class TimetableReadinessEvaluator {
 
         Map<Long, Integer> load = new LinkedHashMap<>();
         Map<Long, Staff> staffById = new HashMap<>();
+        Set<String> allocatedSubjectKeys = new HashSet<>();
         for (Lesson lesson : data.getLessons()) {
             load.merge(lesson.teacher().getStaffId(), lesson.weeklyPeriods(), Integer::sum);
             staffById.put(lesson.teacher().getStaffId(), lesson.teacher());
+            allocatedSubjectKeys.add(lesson.teacher().getStaffId() + "|" + lesson.unit().unitId()
+                    + "|" + lesson.mapping().getSubject().getSubjectId());
         }
-        // Academic fixed lessons are already included in the lesson weekly periods. Only
-        // activity-type fixed staff add load that is not otherwise counted.
+        // Activity fixed lessons only add load that the allocation does not already contain.
+        // A whole-school activity is one teaching period, not one per unit.
         for (FixedActivity activity : data.getFixedActivities()) {
             if (!activity.isActive() || activity.getStaff() == null || activity.getSubject() == null) continue;
             if (isAcademicSubject(activity.getSubject().getSubjectType())) continue;
-            int days = activity.getDays() == null ? 0 : activity.getDays().size();
-            if (days == 0) continue;
-            long units = data.getUnits().stream()
-                    .filter(unit -> data.fixedActivitiesFor(unit).contains(activity))
-                    .count();
-            if (units == 0) continue;
+            if (activity.getDays() == null || activity.getDays().isEmpty()) continue;
             Long staffId = activity.getStaff().getStaffId();
-            load.merge(staffId, (int) (days * units), Integer::sum);
+            Set<String> countedSlots = new HashSet<>();
+            int extraPeriods = 0;
+            for (Unit unit : data.getUnits()) {
+                if (!data.fixedActivitiesFor(unit).contains(activity)) continue;
+                if (allocatedSubjectKeys.contains(staffId + "|" + unit.unitId()
+                        + "|" + activity.getSubject().getSubjectId())) continue;
+                for (DayOfWeek day : activity.getDays()) {
+                    var resolved = activity.periodFor(
+                            unit.group().getAcademicGroupId(), unit.sectionId(), day);
+                    String slot = day + "|" + (resolved == null || resolved.getTimetablePeriod() == null
+                            ? "unresolved" : resolved.getTimetablePeriod().getTimetablePeriodId());
+                    if (countedSlots.add(slot)) extraPeriods++;
+                }
+            }
+            if (extraPeriods == 0) continue;
+            load.merge(staffId, extraPeriods, Integer::sum);
             staffById.putIfAbsent(staffId, activity.getStaff());
         }
         if (load.isEmpty()) return;
@@ -440,7 +453,25 @@ public class TimetableReadinessEvaluator {
                 "Rebalance allocation", ROUTE_TEACHER_ALLOCATION));
     }
 
-    private void checkChoiceGroups(TimetablePlanningData data, List<ReadinessCheck> checks) {
+    void checkChoiceGroups(TimetablePlanningData data, List<ReadinessCheck> checks) {
+        ChoiceGroupMappingValidator.StandaloneChoiceGroupResult standalone =
+                ChoiceGroupMappingValidator.findStandaloneMembers(
+                        data.getMappings(), data.getActiveChoiceGroupMembers());
+        if (standalone.hasBlocking()) {
+            checks.add(fail("CHOICE_GROUP_MEMBERS_MAPPED_INDIVIDUALLY", "Choice group mapping",
+                    standalone.blocking().size()
+                            + " subject mapping(s) bypass a choice group that other alternatives use.",
+                    standalone.blocking(), "Map the choice group", ROUTE_SUBJECTS));
+        }
+        if (!standalone.warnings().isEmpty()) {
+            // A group that maps every alternative individually is a valid setup: each subject is
+            // a normal lesson. Warn so the mapping can be reviewed, but do not block generation.
+            checks.add(warn("CHOICE_GROUP_MAPPED_INDIVIDUALLY", "Choice group mapping",
+                    standalone.warnings().size()
+                            + " subject mapping(s) belong to a choice group but are mapped individually.",
+                    standalone.warnings(), "Review mapping", ROUTE_SUBJECTS));
+        }
+
         Map<Long, List<AcademicGroupSubjectMapping>> optionalByGroup = new HashMap<>();
         Map<String, List<AcademicGroupSubjectMapping>> choiceGroups = new HashMap<>();
         for (AcademicGroupSubjectMapping m : data.getMappings()) {

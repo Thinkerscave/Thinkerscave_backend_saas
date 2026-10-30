@@ -92,14 +92,19 @@ public class SolutionValidator {
 
             if (p.getStaffId() != null) {
                 String teacherKey = p.getStaffId() + ":" + p.getDayOfWeek();
-                if (overlaps(teacherSlots.computeIfAbsent(teacherKey, k -> new ArrayList<>()), p)) {
+                List<Placement> sameTeacher = teacherSlots.computeIfAbsent(teacherKey, k -> new ArrayList<>());
+                boolean clash = sameTeacher.stream().anyMatch(existing ->
+                        existing.startMinute() < p.endMinute() && p.startMinute() < existing.endMinute()
+                                && !sameChoiceAlternativeSlot(existing, p)
+                                && !sameWholeSchoolActivity(existing, p));
+                if (clash) {
                     result.addBlocking(new ValidationConflict(
                             TimetableConflictType.TEACHER_CONFLICT,
                             "Teacher clash: " + teacherName(p, reqMap) + " is booked for " + label(p, reqMap)
                                     + " in overlapping time on " + slotLabel(p),
                             p.getSectionId(), p.getTeacherAllocationId(), null, p.getDayOfWeek(), p.getPeriodId()));
                 }
-                teacherSlots.get(teacherKey).add(p);
+                sameTeacher.add(p);
             }
 
             if (p.getResourceId() != null) {
@@ -137,6 +142,14 @@ public class SolutionValidator {
                 && !Objects.equals(first.getAcademicGroupSubjectMappingId(),
                 second.getAcademicGroupSubjectMappingId())
                 && !Objects.equals(first.getSubjectId(), second.getSubjectId());
+    }
+
+    /** The same whole-school fixed activity booked for several units at the same time is one event. */
+    private static boolean sameWholeSchoolActivity(Placement first, Placement second) {
+        return first.getFixedActivityId() != null
+                && Objects.equals(first.getFixedActivityId(), second.getFixedActivityId())
+                && first.getDayOfWeek() == second.getDayOfWeek()
+                && Objects.equals(first.getPeriodId(), second.getPeriodId());
     }
 
     private void validateChoiceGroupAlignment(SchedulingSolution solution,
@@ -180,8 +193,14 @@ public class SolutionValidator {
                                   Map<String, SchedulingRequirement> reqMap, ValidationResult result) {
         Map<Long, Integer> weeklyLoad = new HashMap<>();
         Map<Long, String> names = new HashMap<>();
+        Set<String> wholeSchoolSlots = new HashSet<>();
         for (Placement p : solution.getPlacements()) {
             if (p.getStaffId() == null) continue;
+            // Count a whole-school activity once per teacher, not once per unit.
+            if (p.getFixedActivityId() != null) {
+                String slotKey = p.getStaffId() + "|" + p.getDayOfWeek() + "|" + p.getPeriodId();
+                if (!wholeSchoolSlots.add(slotKey)) continue;
+            }
             weeklyLoad.merge(p.getStaffId(), 1, Integer::sum);
             names.putIfAbsent(p.getStaffId(), teacherName(p, reqMap));
         }
@@ -202,7 +221,6 @@ public class SolutionValidator {
                                      Map<String, SchedulingRequirement> reqMap,
                                      SchedulingSourceData source,
                                      ValidationResult result) {
-        int halfIndex = source.getHalfIndex();
         Map<String, int[]> missesByLesson = new LinkedHashMap<>();
         Map<String, SchedulingRequirement> lessonReq = new HashMap<>();
 
@@ -211,7 +229,7 @@ public class SolutionValidator {
             if (req == null || req.getPreference() == null || req.getPreference() == SubjectTimetablePreference.ANY) {
                 continue;
             }
-            boolean firstHalf = p.getTeachingIndex() < halfIndex;
+            boolean firstHalf = p.getTeachingIndex() < source.halfIndex(p.getDayOfWeek());
             boolean missed = req.getPreference() == SubjectTimetablePreference.FIRST_HALF ? !firstHalf : firstHalf;
             if (missed) {
                 String key = req.getUnitId() + ":" + req.getAcademicGroupSubjectMappingId();

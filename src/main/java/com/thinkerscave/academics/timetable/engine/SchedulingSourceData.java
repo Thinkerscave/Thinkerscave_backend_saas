@@ -5,6 +5,7 @@ import com.thinkerscave.academics.enums.DayOfWeek;
 import lombok.Builder;
 import lombok.Getter;
 
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
@@ -18,11 +19,23 @@ public class SchedulingSourceData {
     private final List<TimetablePeriod> allPeriods;
     private final Map<Long, Map<DayOfWeek, List<TimetablePeriod>>> schedulesByUnit;
     private final int maxTeacherWeeklyPeriods;
-    /** Number of teaching periods that belong to the first half of the day. */
+    /** Number of teaching periods that belong to the first half of the day (fallback). */
     private final int halfIndex;
+    /**
+     * First-half teaching-period count for each day's own pattern. A weekday pattern and a
+     * Saturday pattern have different lunch positions, so one global value misclassifies them.
+     */
+    @Builder.Default
+    private final Map<DayOfWeek, Integer> halfIndexByDay = new EnumMap<>(DayOfWeek.class);
 
     public int workingDayCount() {
         return Math.max(workingDays.size(), 1);
+    }
+
+    /** Number of teaching periods before lunch on this day. */
+    public int halfIndex(DayOfWeek day) {
+        Integer value = halfIndexByDay == null ? null : halfIndexByDay.get(day);
+        return value == null || value <= 0 ? halfIndex : value;
     }
 
     public List<TimetablePeriod> slotsForUnitOnDay(Long unitId, DayOfWeek day) {

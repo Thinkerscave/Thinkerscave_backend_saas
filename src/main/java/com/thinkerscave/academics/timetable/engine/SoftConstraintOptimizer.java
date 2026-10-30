@@ -1,22 +1,28 @@
 package com.thinkerscave.academics.timetable.engine;
 
+import com.thinkerscave.academics.entity.TimetablePeriod;
 import com.thinkerscave.academics.enums.DayOfWeek;
 import com.thinkerscave.academics.enums.SubjectTimetablePreference;
+import com.thinkerscave.academics.enums.TimetableEntryType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalTime;
 import java.util.*;
 
 /**
- * Swaps pairs of lessons within the same section when that improves subject spread and
- * first/second-half preferences without introducing any hard clash.
+ * Improves subject spread and first/second-half preferences by relocating lessons to empty
+ * slots and swapping pairs of lessons within the same section. Every move is verified against
+ * section, teacher and resource occupancy, so hard constraints never regress.
  */
 @Component
 public class SoftConstraintOptimizer {
 
     private static final Logger log = LoggerFactory.getLogger(SoftConstraintOptimizer.class);
-    private static final int MAX_OPTIMIZATION_PASSES = 3;
+    /** Enough passes to converge after the greedy scheduler; usually stops much earlier. */
+    private static final int MAX_OPTIMIZATION_PASSES = 20;
+    private static final long SHUFFLE_SEED = 20261030L;
 
     public SchedulingSolution optimize(SchedulingSolution solution,
                                        SchedulingSourceData source,
@@ -36,19 +42,73 @@ public class SoftConstraintOptimizer {
         }
 
         int improvementCount = 0;
+        List<Long> unitIds = new ArrayList<>(byUnit.keySet());
         for (int pass = 0; pass < MAX_OPTIMIZATION_PASSES; pass++) {
             if (progress.isCancelRequested()) break;
             int passImprovements = 0;
-            for (List<Placement> sectionPlacements : byUnit.values()) {
-                passImprovements += runSwapPass(sectionPlacements, solution, source, requirementsById);
+            // Different orders reach different local optima; shuffling makes the search escape
+            // the order imposed by the greedy scheduler while staying reproducible.
+            Collections.shuffle(unitIds, new Random(SHUFFLE_SEED + pass));
+            for (Long unitId : unitIds) {
+                List<Placement> sectionPlacements = new ArrayList<>(byUnit.get(unitId));
+                Collections.shuffle(sectionPlacements,
+                        new Random(SHUFFLE_SEED + pass * 97L + unitId));
+                passImprovements += runEmptySlotPass(
+                        sectionPlacements, solution, source, requirementsById);
+                passImprovements += runSwapPass(
+                        sectionPlacements, solution, source, requirementsById);
             }
             improvementCount += passImprovements;
             if (passImprovements == 0) break;
         }
 
         progress.advanceTo(GenerationPhase.OPTIMIZING, 80);
-        log.info("Optimization complete: {} swaps applied", improvementCount);
+        log.info("Optimization complete: {} moves applied, {} preference misses remain",
+                improvementCount, countPreferenceMisses(solution, source, requirementsById));
         return solution;
+    }
+
+    /**
+     * Moves a lesson into an unused slot of the same section when that improves the soft score.
+     * This is what recovers free periods created by uneven weekly loads.
+     */
+    private int runEmptySlotPass(List<Placement> placements, SchedulingSolution solution,
+                                 SchedulingSourceData source,
+                                 Map<String, SchedulingRequirement> requirementsById) {
+        int improvements = 0;
+        for (Placement placement : placements) {
+            if (isLocked(placement)) continue;
+            double before = evaluate(placement, solution, source, requirementsById);
+            boolean moved = false;
+            for (DayOfWeek day : source.getWorkingDays()) {
+                for (TimetablePeriod slot : source.slotsForUnitOnDay(placement.getUnitId(), day)) {
+                    if (solution.isSectionOccupied(placement.getUnitId(), day,
+                            slot.getTimetablePeriodId())) continue;
+                    if (placement.getStaffId() != null
+                            && solution.isTeacherOccupied(placement.getStaffId(), day,
+                            slot.getStartTime(), slot.getEndTime())) continue;
+                    if (placement.getResourceId() != null
+                            && solution.isResourceOccupied(placement.getResourceId(), day,
+                            slot.getStartTime(), slot.getEndTime())) continue;
+
+                    PlacementSnapshot original = PlacementSnapshot.of(placement);
+                    solution.unplace(placement);
+                    applySlot(placement, day, slot, source);
+                    solution.place(placement);
+                    double after = evaluate(placement, solution, source, requirementsById);
+                    if (after > before + 0.001) {
+                        improvements++;
+                        moved = true;
+                        break;
+                    }
+                    solution.unplace(placement);
+                    original.restore(placement);
+                    solution.place(placement);
+                }
+                if (moved) break;
+            }
+        }
+        return improvements;
     }
 
     private int runSwapPass(List<Placement> placements, SchedulingSolution solution,
@@ -58,9 +118,7 @@ public class SoftConstraintOptimizer {
             for (int b = a + 1; b < placements.size(); b++) {
                 Placement pA = placements.get(a);
                 Placement pB = placements.get(b);
-                if (pA.getEntryType() == com.thinkerscave.academics.enums.TimetableEntryType.ACTIVITY
-                        || pB.getEntryType() == com.thinkerscave.academics.enums.TimetableEntryType.ACTIVITY) continue;
-                if (pA.getChoiceMappingId() != null || pB.getChoiceMappingId() != null) continue;
+                if (isLocked(pA) || isLocked(pB)) continue;
                 if (pA.getAcademicGroupSubjectMappingId() == null
                         || Objects.equals(pA.getAcademicGroupSubjectMappingId(),
                         pB.getAcademicGroupSubjectMappingId())) continue;
@@ -146,13 +204,80 @@ public class SoftConstraintOptimizer {
         int cap = CandidateScorer.dailyCap(weekly, source.workingDayCount());
         int sameDay = solution.countPlacementsForSubjectInDay(
                 p.getUnitId(), p.getAcademicGroupSubjectMappingId(), p.getDayOfWeek());
-        double score = sameDay > cap ? -40.0 * (sameDay - cap) : 0;
+        double score;
+        if (sameDay > cap) {
+            score = -120.0 * (sameDay - cap);
+        } else {
+            score = sameDay == 1 ? 30.0 : 5.0;
+        }
 
         if (req != null && req.getPreference() != null && req.getPreference() != SubjectTimetablePreference.ANY) {
-            boolean firstHalf = p.getTeachingIndex() < source.getHalfIndex();
+            boolean firstHalf = p.getTeachingIndex() < source.halfIndex(p.getDayOfWeek());
             boolean wantsFirst = req.getPreference() == SubjectTimetablePreference.FIRST_HALF;
-            score += firstHalf == wantsFirst ? 10.0 : -10.0;
+            score += firstHalf == wantsFirst ? 20.0 : -20.0;
+        }
+
+        if (solution.hasConsecutiveSubject(p.getUnitId(), p.getAcademicGroupSubjectMappingId(),
+                p.getDayOfWeek(), p.getPeriodNumber())) {
+            score += weekly > source.workingDayCount() ? -5.0 : -20.0;
         }
         return score;
+    }
+
+    private static boolean isLocked(Placement placement) {
+        return placement.getEntryType() == TimetableEntryType.ACTIVITY
+                || placement.getChoiceMappingId() != null;
+    }
+
+    private static void applySlot(Placement placement, DayOfWeek day, TimetablePeriod slot,
+                                  SchedulingSourceData source) {
+        List<TimetablePeriod> daySlots = source.slotsForUnitOnDay(placement.getUnitId(), day);
+        int teachingIndex = 0;
+        for (int i = 0; i < daySlots.size(); i++) {
+            if (Objects.equals(daySlots.get(i).getTimetablePeriodId(),
+                    slot.getTimetablePeriodId())) {
+                teachingIndex = i;
+                break;
+            }
+        }
+        placement.setDayOfWeek(day);
+        placement.setPeriodId(slot.getTimetablePeriodId());
+        placement.setPeriodNumber(slot.getPeriodNumber());
+        placement.setTeachingIndex(teachingIndex);
+        placement.setStartTime(slot.getStartTime());
+        placement.setEndTime(slot.getEndTime());
+    }
+
+    private static int countPreferenceMisses(SchedulingSolution solution, SchedulingSourceData source,
+                                             Map<String, SchedulingRequirement> requirementsById) {
+        int misses = 0;
+        for (Placement placement : solution.getPlacements()) {
+            SchedulingRequirement req = requirementsById.get(placement.getRequirementId());
+            if (req == null || req.getPreference() == null
+                    || req.getPreference() == SubjectTimetablePreference.ANY) continue;
+            boolean firstHalf = placement.getTeachingIndex() < source.halfIndex(placement.getDayOfWeek());
+            boolean wantsFirst = req.getPreference() == SubjectTimetablePreference.FIRST_HALF;
+            if (firstHalf != wantsFirst) misses++;
+        }
+        return misses;
+    }
+
+    private record PlacementSnapshot(DayOfWeek day, Long periodId, short periodNumber,
+                                     int teachingIndex, LocalTime start, LocalTime end) {
+
+        static PlacementSnapshot of(Placement placement) {
+            return new PlacementSnapshot(placement.getDayOfWeek(), placement.getPeriodId(),
+                    placement.getPeriodNumber(), placement.getTeachingIndex(),
+                    placement.getStartTime(), placement.getEndTime());
+        }
+
+        void restore(Placement placement) {
+            placement.setDayOfWeek(day);
+            placement.setPeriodId(periodId);
+            placement.setPeriodNumber(periodNumber);
+            placement.setTeachingIndex(teachingIndex);
+            placement.setStartTime(start);
+            placement.setEndTime(end);
+        }
     }
 }

@@ -30,6 +30,7 @@ public class TimetablePlanningDataLoader {
     private final AcademicGroupRepository academicGroupRepository;
     private final SectionRepository sectionRepository;
     private final AcademicGroupSubjectMappingRepository mappingRepository;
+    private final SubjectChoiceGroupMemberRepository choiceGroupMemberRepository;
     private final TeacherAllocationRepository allocationRepository;
     private final TeacherAllocationTeacherRepository allocationTeacherRepository;
     private final TeacherGroupAllocationRepository groupAllocationRepository;
@@ -195,6 +196,12 @@ public class TimetablePlanningDataLoader {
                                 Comparator.nullsLast(Comparator.naturalOrder()))
                         .thenComparing(m -> m.getSubject().getName()))
                 .toList();
+        Set<Long> mappedSubjectIds = mappings.stream()
+                .map(mapping -> mapping.getSubject().getSubjectId())
+                .collect(Collectors.toSet());
+        List<SubjectChoiceGroupMember> activeChoiceGroupMembers = mappedSubjectIds.isEmpty()
+                ? List.of()
+                : choiceGroupMemberRepository.findActiveMembersBySubjectIds(mappedSubjectIds);
 
         Map<String, TeacherAllocation> allocationByKey = new HashMap<>();
         for (TeacherAllocation a : allocationRepository.findActiveWithDetailsByYear(yearId)) {
@@ -298,6 +305,7 @@ public class TimetablePlanningDataLoader {
                 .teachingPeriods(teachingPeriods)
                 .sections(sections)
                 .mappings(mappings)
+                .activeChoiceGroupMembers(activeChoiceGroupMembers)
                 .lessons(lessons)
                 .missingTeachers(missing)
                 .zeroPeriodMappings(zeroPeriodMappings)

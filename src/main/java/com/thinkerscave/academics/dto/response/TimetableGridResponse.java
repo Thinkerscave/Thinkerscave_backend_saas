@@ -15,6 +15,12 @@ public class TimetableGridResponse {
     private Long timetableVersionId;
     private String view;
     private List<TimetablePeriodResponse> periods;
+    /**
+     * Periods that actually belong to each working day. Different days may follow different
+     * schedule patterns (for example a Saturday morning pattern), so the grid must not merge
+     * them into a single column set.
+     */
+    private java.util.Map<DayOfWeek, List<TimetablePeriodResponse>> periodsByDay;
     private List<DayOfWeek> workingDays;
     private List<TimetableCellResponse> cells;
     private Long academicGroupId;

@@ -48,6 +48,7 @@ public class ConstraintScheduler {
         }
 
         SchedulingSolution best = null;
+        int bestMisses = Integer.MAX_VALUE;
         int attempts = 0;
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
             if (progress.isCancelRequested()) break;
@@ -55,13 +56,21 @@ public class ConstraintScheduler {
             Random random = new Random(seed + attempt * 7919L);
             SchedulingSolution candidate = runAttempt(requirements, byId, teacherDemand, source, random,
                     progress, attempt == 0, reservations);
-            if (best == null
-                    || candidate.getUnplacedRequirements().size() < best.getUnplacedRequirements().size()) {
+            int candidateMisses = preferenceMisses(candidate, byId, source);
+            boolean better = best == null
+                    || candidate.getUnplacedRequirements().size() < best.getUnplacedRequirements().size()
+                    || (candidate.getUnplacedRequirements().size()
+                    == best.getUnplacedRequirements().size() && candidateMisses < bestMisses);
+            if (better) {
                 best = candidate;
+                bestMisses = candidateMisses;
             }
-            log.info("Scheduling attempt {}: {} placed, {} unplaced", attempt + 1,
-                    candidate.getPlacements().size(), candidate.getUnplacedRequirements().size());
-            if (best.isComplete()) break;
+            log.info("Scheduling attempt {}: {} placed, {} unplaced, {} preference misses",
+                    attempt + 1, candidate.getPlacements().size(),
+                    candidate.getUnplacedRequirements().size(), candidateMisses);
+            // A complete schedule that satisfies every configured half-day preference is ideal;
+            // otherwise keep trying different orders and keep the best-scoring complete attempt.
+            if (best.isComplete() && bestMisses == 0) break;
             progress.advanceTo(GenerationPhase.SCHEDULING, Math.min(70, 55 + attempt));
         }
 
@@ -88,6 +97,14 @@ public class ConstraintScheduler {
         Collections.shuffle(remaining, random);
         int total = requirements.size();
 
+        // Alternatives of one choice group must always occupy the same slot. Schedule each
+        // (unit, choice group, period index) bundle atomically so they cannot drift apart.
+        Map<String, List<SchedulingRequirement>> choiceBundles = new LinkedHashMap<>();
+        for (SchedulingRequirement r : requirements) {
+            if (r.getChoiceMappingId() == null) continue;
+            choiceBundles.computeIfAbsent(choiceKey(r), k -> new ArrayList<>()).add(r);
+        }
+
         while (!remaining.isEmpty()) {
             if (progress.isCancelRequested()) {
                 solution.getUnplacedRequirements().addAll(remaining);
@@ -96,6 +113,22 @@ public class ConstraintScheduler {
 
             int pick = pickMostConstrained(remaining, solution, source, teacherDemand);
             SchedulingRequirement req = remaining.remove(pick);
+
+            if (req.getChoiceMappingId() != null) {
+                List<SchedulingRequirement> bundle = choiceBundles.get(choiceKey(req));
+                if (bundle != null) {
+                    remaining.removeAll(bundle);
+                    CandidateSlot slot = bestBundleSlot(bundle, solution, source, random);
+                    if (slot != null) {
+                        for (SchedulingRequirement member : bundle) {
+                            solution.place(new Placement(member, memberSlot(member, slot)));
+                        }
+                    } else {
+                        solution.getUnplacedRequirements().addAll(bundle);
+                    }
+                    continue;
+                }
+            }
 
             CandidateSlot slot = bestSlot(req, solution, source, random);
             if (slot != null) {
@@ -122,7 +155,9 @@ public class ConstraintScheduler {
         int bestCount = Integer.MAX_VALUE;
         for (int i = 0; i < remaining.size(); i++) {
             SchedulingRequirement r = remaining.get(i);
-            String owner = r.getUnitId() + "|" + r.getPrimaryStaffId() + "|" + r.getDefaultResourceId();
+            String owner = r.getUnitId() + "|" + r.getPrimaryStaffId() + "|" + r.getDefaultResourceId()
+                    + "|" + r.getAcademicGroupSubjectMappingId() + "|" + r.getPreference()
+                    + "|" + r.getPeriodIndex();
             int count = feasibleByOwner.computeIfAbsent(owner, k -> countFeasible(r, solution, source));
             if (count < bestCount || (count == bestCount && isTighter(r, remaining.get(bestIdx), teacherDemand))) {
                 bestCount = count;
@@ -138,19 +173,54 @@ public class ConstraintScheduler {
         if (demandA != demandB) return demandA > demandB;
         boolean prefA = a.getPreference() != null && a.getPreference() != SubjectTimetablePreference.ANY;
         boolean prefB = b.getPreference() != null && b.getPreference() != SubjectTimetablePreference.ANY;
-        return prefA && !prefB;
+        if (prefA != prefB) return prefA;
+        // The second half has fewer slots, so it needs to be reserved first.
+        return a.getPreference() == SubjectTimetablePreference.SECOND_HALF
+                && b.getPreference() != SubjectTimetablePreference.SECOND_HALF;
+    }
+
+    private static int preferenceMisses(SchedulingSolution solution,
+                                        Map<String, SchedulingRequirement> byId,
+                                        SchedulingSourceData source) {
+        int misses = 0;
+        for (Placement placement : solution.getPlacements()) {
+            SchedulingRequirement requirement = byId.get(placement.getRequirementId());
+            if (requirement == null || requirement.getPreference() == null
+                    || requirement.getPreference() == SubjectTimetablePreference.ANY) continue;
+            boolean firstHalf = placement.getTeachingIndex()
+                    < source.halfIndex(placement.getDayOfWeek());
+            boolean wantsFirst = requirement.getPreference() == SubjectTimetablePreference.FIRST_HALF;
+            if (firstHalf != wantsFirst) misses++;
+        }
+        return misses;
     }
 
     private int countFeasible(SchedulingRequirement req, SchedulingSolution solution, SchedulingSourceData source) {
         if (solution.getTeacherWeeklyLoad(req.getPrimaryStaffId()) >= source.getMaxTeacherWeeklyPeriods()) {
             return 0;
         }
-        int count = 0;
+        int total = 0;
+        int preferred = 0;
         for (CandidateSlot slot : req.getCandidates()) {
-            if (!solution.choicePartnerAtDifferentSlot(req, slot.getDayOfWeek(), slot.getPeriodId())
-                    && !isHardViolation(slot, req, solution, source)) count++;
+            if (solution.choicePartnerAtDifferentSlot(req, slot.getDayOfWeek(), slot.getPeriodId())
+                    || isHardViolation(slot, req, solution, source)) continue;
+            total++;
+            if (matchesPreference(req.getPreference(), slot.getTeachingIndex(),
+                    source.halfIndex(slot.getDayOfWeek()))) {
+                preferred++;
+            }
         }
-        return count;
+        // Schedule requirements with the fewest slots left in their preferred half first. Second-half
+        // subjects are the scarcest (12 slots vs 23), so they must be placed before ANY/FIRST lessons
+        // consume those slots.
+        return preferred > 0 ? preferred : total;
+    }
+
+    private static boolean matchesPreference(SubjectTimetablePreference preference,
+                                             int teachingIndex, int halfIndex) {
+        if (preference == null || preference == SubjectTimetablePreference.ANY) return true;
+        boolean firstHalf = teachingIndex < halfIndex;
+        return preference == SubjectTimetablePreference.FIRST_HALF ? firstHalf : !firstHalf;
     }
 
     private CandidateSlot bestSlot(SchedulingRequirement req, SchedulingSolution solution,
@@ -162,6 +232,54 @@ public class ConstraintScheduler {
             if (isHardViolation(slot, req, solution, source)) continue;
             double score = scorer.score(req, slot, solution, source, random);
             if (score > bestScore) {
+                bestScore = score;
+                best = slot;
+            }
+        }
+        return best;
+    }
+
+    private static String choiceKey(SchedulingRequirement req) {
+        return req.getUnitId() + "|" + req.getChoiceMappingId() + "|" + req.getPeriodIndex();
+    }
+
+    private static CandidateSlot memberSlot(SchedulingRequirement member, CandidateSlot slot) {
+        return new CandidateSlot(slot.getDayOfWeek(), slot.getUnitId(), slot.getSectionId(),
+                slot.getAcademicGroupId(), slot.getPeriodId(), slot.getPeriodNumber(),
+                slot.getStartTime(), slot.getEndTime(), slot.getTeachingIndex(),
+                member.getPrimaryStaffId(), member.getDefaultResourceId());
+    }
+
+    /**
+     * Finds one slot that every alternative in the bundle can occupy. The alternatives share the
+     * group's slot, so only their teachers and resources must be independently free.
+     */
+    private CandidateSlot bestBundleSlot(List<SchedulingRequirement> bundle, SchedulingSolution solution,
+                                         SchedulingSourceData source, Random random) {
+        if (bundle.isEmpty()) return null;
+        SchedulingRequirement lead = bundle.get(0);
+        CandidateSlot best = null;
+        double bestScore = Double.NEGATIVE_INFINITY;
+        for (CandidateSlot slot : lead.getCandidates()) {
+            boolean feasible = true;
+            double score = 0;
+            for (SchedulingRequirement member : bundle) {
+                if (member.getPrimaryStaffId() == null
+                        || solution.isSectionOccupiedFor(member, slot.getDayOfWeek(),
+                        slot.getStartTime(), slot.getEndTime())
+                        || solution.isTeacherOccupied(member.getPrimaryStaffId(), slot.getDayOfWeek(),
+                        slot.getStartTime(), slot.getEndTime())
+                        || (member.getDefaultResourceId() != null
+                        && solution.isResourceOccupied(member.getDefaultResourceId(), slot.getDayOfWeek(),
+                        slot.getStartTime(), slot.getEndTime()))
+                        || solution.getTeacherWeeklyLoad(member.getPrimaryStaffId())
+                        >= source.getMaxTeacherWeeklyPeriods()) {
+                    feasible = false;
+                    break;
+                }
+                score += scorer.score(member, memberSlot(member, slot), solution, source, random);
+            }
+            if (feasible && score > bestScore) {
                 bestScore = score;
                 best = slot;
             }

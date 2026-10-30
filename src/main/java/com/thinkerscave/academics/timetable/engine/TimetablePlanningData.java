@@ -38,6 +38,7 @@ public class TimetablePlanningData {
     private final List<TimetablePeriod> teachingPeriods;
     private final List<AcademicSection> sections;
     private final List<AcademicGroupSubjectMapping> mappings;
+    private final List<SubjectChoiceGroupMember> activeChoiceGroupMembers;
     private final List<Lesson> lessons;
     private final List<MissingTeacher> missingTeachers;
     private final List<AcademicGroupSubjectMapping> zeroPeriodMappings;

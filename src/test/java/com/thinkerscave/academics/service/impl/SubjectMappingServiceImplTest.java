@@ -2,12 +2,16 @@ package com.thinkerscave.academics.service.impl;
 
 import com.thinkerscave.academics.dto.request.SubjectMappingEntryRequest;
 import com.thinkerscave.academics.dto.request.SubjectMappingSaveRequest;
+import com.thinkerscave.academics.dto.request.SubjectChoiceMappingUpsertRequest;
+import com.thinkerscave.academics.dto.request.SubjectChoiceMappingSaveRequest;
 import com.thinkerscave.academics.dto.response.SubjectMappingBoardResponse;
 import com.thinkerscave.academics.dto.response.SubjectMappingImpactResponse;
 import com.thinkerscave.academics.entity.AcademicGroup;
 import com.thinkerscave.academics.entity.AcademicGroupSubjectMapping;
 import com.thinkerscave.academics.entity.AcademicYear;
 import com.thinkerscave.academics.entity.Subject;
+import com.thinkerscave.academics.entity.SubjectChoiceGroup;
+import com.thinkerscave.academics.entity.SubjectChoiceGroupMember;
 import com.thinkerscave.academics.enums.AcademicYearStatus;
 import com.thinkerscave.academics.enums.SubjectRequirement;
 import com.thinkerscave.academics.enums.SubjectTimetablePreference;
@@ -49,6 +53,8 @@ class SubjectMappingServiceImplTest {
     private AcademicGroupRepository groupRepo;
     private SubjectRepository subjectRepo;
     private AcademicGroupSubjectMappingRepository mappingRepo;
+    private SubjectChoiceGroupMemberRepository choiceGroupMemberRepo;
+    private SubjectChoiceGroupRepository choiceGroupRepo;
     private SubjectMappingServiceImpl service;
 
     private AcademicGroup group;
@@ -59,10 +65,12 @@ class SubjectMappingServiceImplTest {
         groupRepo = mock(AcademicGroupRepository.class);
         subjectRepo = mock(SubjectRepository.class);
         mappingRepo = mock(AcademicGroupSubjectMappingRepository.class);
+        choiceGroupMemberRepo = mock(SubjectChoiceGroupMemberRepository.class);
+        choiceGroupRepo = mock(SubjectChoiceGroupRepository.class);
         service = new SubjectMappingServiceImpl(groupRepo, subjectRepo, mappingRepo,
                 mock(AcademicGroupChoiceMappingRepository.class),
-                mock(SubjectChoiceGroupRepository.class),
-                mock(SubjectChoiceGroupMemberRepository.class),
+                choiceGroupRepo,
+                choiceGroupMemberRepo,
                 mock(AcademicsAccessGuard.class));
 
         AcademicYear year = new AcademicYear();
@@ -149,6 +157,54 @@ class SubjectMappingServiceImplTest {
     }
 
     @Test
+    void rejectsIndividualMappingForActiveChoiceGroupMember() {
+        when(choiceGroupMemberRepo.findActiveMembersBySubjectIds(anyCollection()))
+                .thenReturn(List.of(choiceGroupMember("Language Choice")));
+
+        assertThrows(BusinessException.class, () -> service.save(GROUP_ID, request(entry(10L, 4))));
+        verify(mappingRepo, never()).save(any());
+    }
+
+    @Test
+    void allowsChoiceGroupMemberUpsertWhenTheSameChoiceGroupIsMapped() {
+        SubjectChoiceGroupMember member = choiceGroupMember("Language Choice");
+        when(choiceGroupMemberRepo.findActiveMembersBySubjectIds(anyCollection())).thenReturn(List.of(member));
+        when(choiceGroupMemberRepo.findDetailedByGroupIds(anyCollection())).thenReturn(List.of(member));
+        SubjectMappingSaveRequest request = request(entry(10L, 4));
+        request.setChoiceGroupUpserts(List.of(choiceUpsert(30L, 4)));
+
+        assertTrue(service.preview(GROUP_ID, request).isValid());
+    }
+
+    @Test
+    void rejectsChoiceAlternativeFrequencyAboveSharedWorkload() {
+        SubjectChoiceGroup choiceGroup = new SubjectChoiceGroup();
+        choiceGroup.setSubjectChoiceGroupId(30L);
+        choiceGroup.setName("Language Choice");
+        choiceGroup.setSubjectType(SubjectType.ACADEMIC_SUBJECT);
+        choiceGroup.setActive(true);
+        when(choiceGroupRepo.findById(30L)).thenReturn(Optional.of(choiceGroup));
+        Subject secondSubject = new Subject();
+        secondSubject.setSubjectId(11L);
+        secondSubject.setName("English");
+        secondSubject.setSubjectType(SubjectType.ACADEMIC_SUBJECT);
+        secondSubject.setActive(true);
+        SubjectChoiceGroupMember firstMember = choiceGroupMember("Language Choice");
+        SubjectChoiceGroupMember secondMember = new SubjectChoiceGroupMember();
+        secondMember.setChoiceGroup(choiceGroup);
+        secondMember.setSubject(secondSubject);
+        when(choiceGroupMemberRepo.findByChoiceGroup_SubjectChoiceGroupId(30L))
+                .thenReturn(List.of(firstMember, secondMember));
+
+        SubjectChoiceMappingUpsertRequest upsert = choiceUpsert(30L, 3);
+        upsert.setSubjectPeriods(java.util.Map.of(10L, (short) 4));
+        SubjectChoiceMappingSaveRequest request = new SubjectChoiceMappingSaveRequest();
+        request.setUpserts(List.of(upsert));
+
+        assertThrows(BusinessException.class, () -> service.saveChoiceMappings(GROUP_ID, request));
+    }
+
+    @Test
     void removalWithTimetableDependencyRequiresConfirmationThenDeactivatesOnly() {
         AcademicGroupSubjectMapping existing = existingMapping();
         when(mappingRepo.findByAcademicGroup_AcademicGroupId(GROUP_ID)).thenReturn(List.of(existing));
@@ -212,6 +268,25 @@ class SubjectMappingServiceImplTest {
         mapping.setTimetablePreference(com.thinkerscave.academics.enums.SubjectTimetablePreference.ANY);
         mapping.setActive(true);
         return mapping;
+    }
+
+    private SubjectChoiceGroupMember choiceGroupMember(String name) {
+        SubjectChoiceGroup choiceGroup = new SubjectChoiceGroup();
+        choiceGroup.setSubjectChoiceGroupId(30L);
+        choiceGroup.setName(name);
+        choiceGroup.setSubjectType(SubjectType.ACADEMIC_SUBJECT);
+        choiceGroup.setActive(true);
+        SubjectChoiceGroupMember member = new SubjectChoiceGroupMember();
+        member.setChoiceGroup(choiceGroup);
+        member.setSubject(maths);
+        return member;
+    }
+
+    private static SubjectChoiceMappingUpsertRequest choiceUpsert(long choiceGroupId, int weeklyPeriods) {
+        SubjectChoiceMappingUpsertRequest request = new SubjectChoiceMappingUpsertRequest();
+        request.setChoiceGroupId(choiceGroupId);
+        request.setWeeklyPeriods((short) weeklyPeriods);
+        return request;
     }
 
     private SubjectMappingSaveRequest removalRequest(long subjectId, boolean confirm) {

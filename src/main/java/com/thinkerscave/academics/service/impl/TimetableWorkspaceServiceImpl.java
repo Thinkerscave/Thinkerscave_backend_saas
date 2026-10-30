@@ -369,6 +369,33 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
         }
         List<DayOfWeek> workingDays = new ArrayList<>(days);
 
+        // Keep each day's own period set. Merging different patterns into one list made the
+        // UI render two "Period 1..N" blocks (a weekday pattern plus a Saturday pattern).
+        Map<DayOfWeek, List<TimetablePeriodResponse>> periodsByDay = new LinkedHashMap<>();
+        for (DayOfWeek day : workingDays) {
+            List<TimetablePeriod> dayPeriods;
+            if (targetUnit != null) {
+                dayPeriods = new ArrayList<>(data.getScheduleByUnit()
+                        .getOrDefault(targetUnit.unitId(), Map.of())
+                        .getOrDefault(day, List.of()));
+            } else {
+                dayPeriods = new ArrayList<>(entries.stream()
+                        .filter(e -> e.getDayOfWeek() == day)
+                        .map(TimetableEntry::getTimetablePeriod)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toMap(TimetablePeriod::getTimetablePeriodId, p -> p,
+                                (a, b) -> a, LinkedHashMap::new))
+                        .values());
+            }
+            if (dayPeriods.isEmpty()) {
+                dayPeriods = new ArrayList<>(periods);
+            }
+            dayPeriods.sort(Comparator.comparing(TimetablePeriod::getStartTime,
+                            Comparator.nullsLast(LocalTime::compareTo))
+                    .thenComparing(TimetablePeriod::getPeriodNumber));
+            periodsByDay.put(day, dayPeriods.stream().map(this::toPeriodResponse).toList());
+        }
+
         Map<Long, Staff> teacherByAllocation = activeStaff;
         List<TimetableCellResponse> cells = entries.stream()
                 .map(e -> toCellResponse(e, teacherByAllocation, staffById))
@@ -380,6 +407,7 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                 .timetableVersionId(versionId)
                 .view(view)
                 .periods(periods.stream().map(this::toPeriodResponse).toList())
+                .periodsByDay(periodsByDay)
                 .workingDays(workingDays)
                 .cells(cells)
                 .academicGroupId(targetUnit == null ? academicGroupId : targetUnit.academicGroupId())
@@ -665,6 +693,11 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
     public List<TimetableConflictResponse> validateVersion(Long versionId) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_TIMETABLE);
         TimetableVersion version = requireEditableVersion(versionId);
+        // Rebuild section/teacher clashes from the current entries instead of appending to the
+        // previous validation run. Other conflict types (preference, capacity, choice) are
+        // produced by generation and are preserved.
+        conflictRepository.deleteByVersionAndTypes(versionId,
+                List.of(TimetableConflictType.SECTION_CONFLICT, TimetableConflictType.TEACHER_CONFLICT));
         List<TimetableEntry> entries = entryRepository.findGridEntries(versionId);
         List<TimetableConflict> created = new ArrayList<>();
         Map<String, List<TimetableEntry>> unitDay = new HashMap<>();
@@ -713,6 +746,11 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                 LocalTime bE = b.getTimetablePeriod().getEndTime();
                 if (aS == null || aE == null || bS == null || bE == null) continue;
                 if (aS.isBefore(bE) && bS.isBefore(aE)) {
+                    // Alternative subjects of one choice group intentionally share a slot.
+                    if (sameChoiceGroupSlot(a, b)) continue;
+                    // A whole-school activity uses the same teacher across every unit at once;
+                    // that is one event, not a teacher clash.
+                    if (teacher && sameWholeSchoolActivity(a, b)) continue;
                     messages.add((teacher ? "Teacher clash: " + TimetablePlanningData.staffName(a.getStaff())
                             + " is booked for " : "Academic group clash: ")
                             + a.getSubjectNameSnapshot() + " and " + b.getSubjectNameSnapshot()
@@ -721,6 +759,60 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
             }
         }
         return messages;
+    }
+
+    private static boolean sameChoiceGroupSlot(TimetableEntry a, TimetableEntry b) {
+        Long unitA = entryUnitId(a);
+        Long unitB = entryUnitId(b);
+        if (unitA == null || !Objects.equals(unitA, unitB)) return false;
+        Long choiceA = entryChoiceMappingId(a);
+        Long choiceB = entryChoiceMappingId(b);
+        if (choiceA == null || !Objects.equals(choiceA, choiceB)) return false;
+        Long mappingA = entrySubjectMappingId(a);
+        Long mappingB = entrySubjectMappingId(b);
+        if (mappingA != null && mappingB != null) {
+            return !Objects.equals(mappingA, mappingB);
+        }
+        // Choice-group entries may not carry a teacher allocation, so fall back to the subject
+        // that was actually scheduled. Different subjects in one choice slot are alternatives.
+        Long subjectA = a.getSubject() == null ? null : a.getSubject().getSubjectId();
+        Long subjectB = b.getSubject() == null ? null : b.getSubject().getSubjectId();
+        if (subjectA != null && subjectB != null) {
+            return !Objects.equals(subjectA, subjectB);
+        }
+        return a.getSubjectNameSnapshot() != null && b.getSubjectNameSnapshot() != null
+                && !Objects.equals(a.getSubjectNameSnapshot(), b.getSubjectNameSnapshot());
+    }
+
+    private static boolean sameWholeSchoolActivity(TimetableEntry a, TimetableEntry b) {
+        if (a.getFixedActivity() == null || b.getFixedActivity() == null) return false;
+        return Objects.equals(a.getFixedActivity().getFixedActivityId(),
+                b.getFixedActivity().getFixedActivityId())
+                && a.getDayOfWeek() == b.getDayOfWeek()
+                && a.getTimetablePeriod() != null && b.getTimetablePeriod() != null
+                && Objects.equals(a.getTimetablePeriod().getTimetablePeriodId(),
+                b.getTimetablePeriod().getTimetablePeriodId());
+    }
+
+    private static Long entryUnitId(TimetableEntry entry) {
+        if (entry.getSection() != null) return entry.getSection().getSectionId();
+        return entry.getAcademicGroup() == null ? null : -entry.getAcademicGroup().getAcademicGroupId();
+    }
+
+    private static Long entryChoiceMappingId(TimetableEntry entry) {
+        if (entry.getAcademicGroupChoiceMapping() != null) {
+            return entry.getAcademicGroupChoiceMapping().getAcademicGroupChoiceMappingId();
+        }
+        AcademicGroupSubjectMapping mapping = entry.getTeacherAllocation() == null
+                ? null : entry.getTeacherAllocation().getAcademicGroupSubjectMapping();
+        return mapping == null || mapping.getAcademicGroupChoiceMapping() == null ? null
+                : mapping.getAcademicGroupChoiceMapping().getAcademicGroupChoiceMappingId();
+    }
+
+    private static Long entrySubjectMappingId(TimetableEntry entry) {
+        AcademicGroupSubjectMapping mapping = entry.getTeacherAllocation() == null
+                ? null : entry.getTeacherAllocation().getAcademicGroupSubjectMapping();
+        return mapping == null ? null : mapping.getAcademicGroupSubjectMappingId();
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────

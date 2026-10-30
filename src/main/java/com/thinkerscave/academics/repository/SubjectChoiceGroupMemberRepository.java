@@ -23,4 +23,12 @@ public interface SubjectChoiceGroupMemberRepository extends JpaRepository<Subjec
     List<SubjectChoiceGroupMember> findByChoiceGroup_SubjectChoiceGroupId(Long groupId);
 
     boolean existsBySubject_SubjectIdAndChoiceGroup_ActiveTrue(Long subjectId);
+
+    @Query("""
+            SELECT m FROM SubjectChoiceGroupMember m
+            JOIN FETCH m.subject s
+            JOIN FETCH m.choiceGroup g
+            WHERE s.subjectId IN :subjectIds AND g.active = true
+            """)
+    List<SubjectChoiceGroupMember> findActiveMembersBySubjectIds(@Param("subjectIds") Collection<Long> subjectIds);
 }

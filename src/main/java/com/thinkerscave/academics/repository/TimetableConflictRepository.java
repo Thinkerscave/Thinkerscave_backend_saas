@@ -2,6 +2,7 @@ package com.thinkerscave.academics.repository;
 
 import com.thinkerscave.academics.entity.TimetableConflict;
 import com.thinkerscave.academics.enums.TimetableConflictStatus;
+import com.thinkerscave.academics.enums.TimetableConflictType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -46,4 +47,14 @@ public interface TimetableConflictRepository extends JpaRepository<TimetableConf
     @Modifying
     @Query("DELETE FROM TimetableConflict A WHERE A.timetableVersion.timetableVersionId IN :versionIds")
     int deleteByVersionIds(@Param("versionIds") Collection<Long> versionIds);
+
+    /** Manual validation recomputes section and teacher clashes, so stale rows must be replaced. */
+    @Modifying
+    @Query("""
+            DELETE FROM TimetableConflict A
+            WHERE A.timetableVersion.timetableVersionId = :versionId
+              AND A.conflictType IN :types
+            """)
+    int deleteByVersionAndTypes(@Param("versionId") Long versionId,
+                                @Param("types") Collection<TimetableConflictType> types);
 }

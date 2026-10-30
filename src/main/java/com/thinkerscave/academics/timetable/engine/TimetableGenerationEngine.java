@@ -159,6 +159,7 @@ public class TimetableGenerationEngine {
                 .maxTeacherWeeklyPeriods(config == null || config.getMaxTeacherWeeklyPeriods() == null
                         ? 30 : config.getMaxTeacherWeeklyPeriods())
                 .halfIndex(firstHalfTeachingCount(data.getAllPeriods(), data.getTeachingPeriods().size()))
+                .halfIndexByDay(halfIndexByDay(data))
                 .build();
 
         progress.advanceTo(GenerationPhase.BUILDING_REQUIREMENTS, 20);
@@ -219,10 +220,14 @@ public class TimetableGenerationEngine {
                                     && Objects.equals(p.getPeriodId(), match.getTimetablePeriodId()));
                     if (already) continue;
                     if (staffId != null) {
+                        // A whole-school activity reserves the same teacher for every unit at the
+                        // same time. Those are one event, not competing bookings.
                         boolean teacherBusy = reservations.stream().anyMatch(p ->
                                 p.getDayOfWeek() == day
                                         && Objects.equals(p.getStaffId(), staffId)
-                                        && Objects.equals(p.getPeriodId(), match.getTimetablePeriodId()));
+                                        && Objects.equals(p.getPeriodId(), match.getTimetablePeriodId())
+                                        && !(activity.getFixedActivityId() != null
+                                        && Objects.equals(p.getFixedActivityId(), activity.getFixedActivityId())));
                         if (teacherBusy) {
                             issues.add(new SolutionValidator.ValidationConflict(
                                     TimetableConflictType.TEACHER_CONFLICT,
@@ -278,8 +283,9 @@ public class TimetableGenerationEngine {
             if (placement.isLocked()) continue;
             FixedActivity activity = activitiesById.get(placement.getFixedActivityId());
             if (activity == null || activity.getSubject() == null) continue;
-            SubjectType type = activity.getSubject().getSubjectType();
-            if (type != SubjectType.ACADEMIC_SUBJECT && type != SubjectType.PRACTICAL_LAB) continue;
+            // Every fixed lesson with a subject consumes one of that subject's weekly periods,
+            // including ACTIVITY-type subjects such as assembly or exercise. Otherwise the
+            // generator schedules the same lesson a second time.
             reserved.merge(requirementKey(placement.getUnitId(),
                     activity.getSubject().getSubjectId()), 1, Integer::sum);
         }
@@ -501,6 +507,58 @@ public class TimetableGenerationEngine {
         if (slot.getStartTime() == null || slot.getEndTime() == null) return false;
         return slot.getStartTime().isBefore(activity.getEndTime())
                 && activity.getStartTime().isBefore(slot.getEndTime());
+    }
+
+    /**
+     * Computes the number of teaching periods before lunch for every working day using that
+     * day's own schedule pattern. A single global value is wrong when, for example, weekdays
+     * follow a 6-period pattern and Saturday follows a 5-period morning pattern.
+     */
+    static Map<DayOfWeek, Integer> halfIndexByDay(TimetablePlanningData data) {
+        Map<DayOfWeek, Integer> result = new EnumMap<>(DayOfWeek.class);
+        for (DayOfWeek day : data.getWorkingDays()) {
+            TimetablePeriod sample = null;
+            for (Map<DayOfWeek, List<TimetablePeriod>> byDay : data.getScheduleByUnit().values()) {
+                List<TimetablePeriod> slots = byDay.get(day);
+                if (slots == null) continue;
+                sample = slots.stream()
+                        .filter(s -> s.getSlotKind() == TimetableSlotKind.TEACHING)
+                        .findFirst().orElse(null);
+                if (sample != null) break;
+            }
+            if (sample == null) continue;
+
+            Long patternId = patternIdOf(sample);
+            if (patternId == null) continue;
+            List<TimetablePeriod> patternPeriods = data.getAllPeriods().stream()
+                    .filter(p -> Objects.equals(patternIdOf(p), patternId))
+                    .sorted(Comparator.comparing(TimetablePeriod::getStartTime,
+                            Comparator.nullsLast(Comparator.naturalOrder())))
+                    .toList();
+            TimetablePeriod longestBreak = null;
+            long longest = -1;
+            for (TimetablePeriod p : patternPeriods) {
+                if (p.getSlotKind() != TimetableSlotKind.BREAK
+                        || p.getStartTime() == null || p.getEndTime() == null) continue;
+                long minutes = Duration.between(p.getStartTime(), p.getEndTime()).toMinutes();
+                if (minutes > longest) {
+                    longest = minutes;
+                    longestBreak = p;
+                }
+            }
+            int before = 0;
+            for (TimetablePeriod p : patternPeriods) {
+                if (p == longestBreak) break;
+                if (p.getSlotKind() == TimetableSlotKind.TEACHING) before++;
+            }
+            if (before > 0) result.put(day, before);
+        }
+        return result;
+    }
+
+    private static Long patternIdOf(TimetablePeriod period) {
+        return period.getSchedulePattern() == null ? null
+                : period.getSchedulePattern().getSchedulePatternId();
     }
 
     static int firstHalfTeachingCount(List<TimetablePeriod> allPeriods, int teachingCount) {

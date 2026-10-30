@@ -404,6 +404,25 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
             }
         }
 
+        Set<Long> choiceGroupUpsertIds = request.getChoiceGroupUpserts() == null
+                ? Set.of()
+                : request.getChoiceGroupUpserts().stream()
+                .map(SubjectChoiceMappingUpsertRequest::getChoiceGroupId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Set<Long> subjectsMappedThroughChoiceGroups = choiceGroupUpsertIds.isEmpty()
+                ? Set.of()
+                : choiceGroupMemberRepository.findDetailedByGroupIds(choiceGroupUpsertIds).stream()
+                .map(member -> member.getSubject().getSubjectId())
+                .collect(Collectors.toSet());
+        Map<Long, String> activeChoiceGroupNamesBySubject = allSubjectIds.isEmpty()
+                ? Map.of()
+                : choiceGroupMemberRepository.findActiveMembersBySubjectIds(allSubjectIds).stream()
+                .collect(Collectors.toMap(
+                        member -> member.getSubject().getSubjectId(),
+                        member -> member.getChoiceGroup().getName(),
+                        (first, ignored) -> first));
+
         List<Long> existingMappingIds = allSubjectIds.stream()
                 .map(existingBySubject::get)
                 .filter(Objects::nonNull)
@@ -422,6 +441,12 @@ public class SubjectMappingServiceImpl implements SubjectMappingService {
             if (!subject.isActive() && !existingActive) {
                 throw new BusinessException("'" + subject.getName()
                         + "' is inactive. Reactivate it in Subjects before adding it to a curriculum.");
+            }
+            String choiceGroupName = activeChoiceGroupNamesBySubject.get(subject.getSubjectId());
+            if (choiceGroupName != null
+                    && !subjectsMappedThroughChoiceGroups.contains(subject.getSubjectId())) {
+                throw new BusinessException("'" + subject.getName() + "' belongs to the active choice group '"
+                        + choiceGroupName + "'. Map that choice group instead of mapping the subject individually.");
             }
 
             short weeklyPeriods = validateWeeklyPeriods(entry.getWeeklyPeriods(), subject.getName());
