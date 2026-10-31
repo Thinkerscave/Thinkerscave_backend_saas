@@ -49,6 +49,8 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
     private final TimetableConflictRepository conflictRepository;
     private final TimetablePeriodRepository periodRepository;
     private final TimetableVersionEventRepository eventRepository;
+    private final TimetableGenerationRunRepository generationRunRepository;
+    private final TeacherArrangementRepository teacherArrangementRepository;
     private final StaffRepository staffRepository;
     private final TimetablePlanningDataLoader planningDataLoader;
     private final TimetableReadinessEvaluator readinessEvaluator;
@@ -419,7 +421,59 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                 .editable(editable)
                 .weekStartDate(weekStart)
                 .weekDates(buildWeekDates(weekStart, workingDays))
+                .subjectOptions(targetUnit == null ? List.of() : buildSubjectOptions(data, targetUnit))
                 .build();
+    }
+
+    /**
+     * Subjects that can be placed in a unit. A subject is available only when it is mapped to the
+     * group and a primary teacher is allocated for the section (or group, for section-less units).
+     */
+    private List<TimetableGridResponse.SubjectOption> buildSubjectOptions(
+            TimetablePlanningData data, TimetablePlanningData.Unit unit) {
+        Map<Long, TimetableGridResponse.SubjectOption> options = new LinkedHashMap<>();
+        for (TimetablePlanningData.Lesson lesson : data.getLessons()) {
+            if (!Objects.equals(lesson.unit().unitId(), unit.unitId())) continue;
+            AcademicGroupSubjectMapping mapping = lesson.mapping();
+            Staff teacher = lesson.teacher();
+            options.putIfAbsent(mapping.getAcademicGroupSubjectMappingId(),
+                    TimetableGridResponse.SubjectOption.builder()
+                            .mappingId(mapping.getAcademicGroupSubjectMappingId())
+                            .subjectId(mapping.getSubject() == null ? null
+                                    : mapping.getSubject().getSubjectId())
+                            .subjectName(mapping.getSubject() == null ? null
+                                    : mapping.getSubject().getName())
+                            .staffId(teacher == null ? null : teacher.getStaffId())
+                            .teacherName(teacher == null ? null : TimetablePlanningData.staffName(teacher))
+                            .teacherAllocationId(lesson.allocation() == null ? null
+                                    : lesson.allocation().getTeacherAllocationId())
+                            .choiceGroupName(mapping.getAcademicGroupChoiceMapping() == null ? null
+                                    : mapping.getAcademicGroupChoiceMapping().getChoiceGroup().getName())
+                            .weeklyPeriods(mapping.getWeeklyPeriods())
+                            .available(teacher != null)
+                            .unavailableReason(teacher == null ? "No teacher allocated" : null)
+                            .build());
+        }
+        for (TimetablePlanningData.MissingTeacher missing : data.getMissingTeachers()) {
+            if (!Objects.equals(missing.unit().unitId(), unit.unitId())) continue;
+            AcademicGroupSubjectMapping mapping = missing.mapping();
+            options.putIfAbsent(mapping.getAcademicGroupSubjectMappingId(),
+                    TimetableGridResponse.SubjectOption.builder()
+                            .mappingId(mapping.getAcademicGroupSubjectMappingId())
+                            .subjectId(mapping.getSubject() == null ? null
+                                    : mapping.getSubject().getSubjectId())
+                            .subjectName(mapping.getSubject() == null ? null
+                                    : mapping.getSubject().getName())
+                            .choiceGroupName(mapping.getAcademicGroupChoiceMapping() == null ? null
+                                    : mapping.getAcademicGroupChoiceMapping().getChoiceGroup().getName())
+                            .weeklyPeriods(mapping.getWeeklyPeriods())
+                            .available(false)
+                            .unavailableReason("Teacher not allocated")
+                            .build());
+        }
+        return options.values().stream()
+                .sorted(Comparator.comparing(o -> Objects.toString(o.getSubjectName(), "")))
+                .toList();
     }
 
     private static String conflictLabel(TimetableConflictType type) {
@@ -469,6 +523,70 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
     // ─── Manual editing ───────────────────────────────────────────────────
 
     @Override
+    public TimetableVersionResponse createManualDraft(Long yearId) {
+        accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_TIMETABLE);
+        AcademicYear year = requireYear(yearId);
+        if (year.getStatus() == AcademicYearStatus.COMPLETED
+                || year.getStatus() == AcademicYearStatus.ARCHIVED) {
+            throw new BusinessException("Historical academic years are read-only");
+        }
+        List<TimetableVersion> versions = versionRepository
+                .findByAcademicYear_AcademicYearIdOrderByVersionNumberDesc(yearId);
+        for (TimetableVersion existing : versions) {
+            if (!EDITABLE_STATUSES.contains(existing.getStatus())) continue;
+            if (existing.getGenerationStatus() == TimetableGenerationStatus.GENERATING) {
+                throw new BusinessException("A timetable is still being generated. Wait for it to finish first.");
+            }
+            // Reuse the open draft instead of stacking a second editable version.
+            return toVersionResponse(existing, true);
+        }
+
+        TimetableConfiguration configuration = planningDataLoader.resolveActiveConfiguration(yearId);
+        if (configuration == null) {
+            throw new BusinessException("Configure the weekly schedule before entering lessons manually.");
+        }
+        TimetablePlanningData data = planningDataLoader.load(yearId, configuration, null);
+        boolean hasSchedule = data.getScheduleByUnit().values().stream()
+                .anyMatch(byDay -> byDay.values().stream().anyMatch(list -> !list.isEmpty()));
+        if (!hasSchedule) {
+            throw new BusinessException(
+                    "Assign a schedule pattern to at least one class before entering lessons manually.");
+        }
+
+        int nextVersion = versions.isEmpty() ? 1 : versions.get(0).getVersionNumber() + 1;
+        TimetableVersion version = new TimetableVersion();
+        version.setAcademicYear(year);
+        version.setTimetableConfiguration(configuration);
+        version.setVersionNumber(nextVersion);
+        version.setGenerationStatus(TimetableGenerationStatus.MANUAL);
+        version.setStatus(TimetableStatus.DRAFT);
+        version = versionRepository.save(version);
+        recordEvent(version, "MANUAL_DRAFT_CREATED", null, TimetableStatus.DRAFT.name(),
+                "Manual timetable draft created");
+        return toVersionResponse(version, true);
+    }
+
+    @Override
+    public void discardVersion(Long versionId) {
+        accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_TIMETABLE);
+        TimetableVersion version = requireEditableVersion(versionId);
+        if (version.getGenerationStatus() == TimetableGenerationStatus.GENERATING) {
+            throw new BusinessException("This timetable is still being generated. Cancel generation first.");
+        }
+        if (teacherArrangementRepository.existsByTimetableVersion_TimetableVersionId(versionId)) {
+            throw new BusinessException(
+                    "Teacher arrangements reference this draft. Remove them before deleting the timetable.");
+        }
+        List<Long> ids = List.of(versionId);
+        conflictRepository.deleteByVersionIds(ids);
+        entryRepository.deleteByVersionIds(ids);
+        generationRunRepository.deleteByVersionIds(ids);
+        eventRepository.deleteByVersionIds(ids);
+        versionRepository.delete(version);
+        versionRepository.flush();
+    }
+
+    @Override
     public TimetableCellResponse addEntry(Long versionId, TimetableEntryRequest request) {
         accessGuard.requireManage(AcademicsAccessGuard.RESOURCE_TIMETABLE);
         TimetableVersion version = requireEditableVersion(versionId);
@@ -491,30 +609,17 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
         if (!mapping.getAcademicGroup().getAcademicGroupId().equals(group.getAcademicGroupId())) {
             throw new BusinessException("The selected subject does not belong to the selected group");
         }
-
-        TeacherAllocation allocation = null;
-        Staff staff;
-        if (section != null) {
-            allocation = allocationRepository
-                    .findBySection_SectionIdAndAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(
-                            section.getSectionId(), mapping.getAcademicGroupSubjectMappingId())
-                    .orElse(null);
-            staff = request.getStaffId() != null ? staffById(request.getStaffId())
-                    : (allocation == null ? null : primaryTeacher(allocation));
-            if (staff == null) {
-                throw new BusinessException("Assign a teacher to this subject before placing it");
-            }
-        } else {
-            TeacherGroupAllocation groupAllocation = groupAllocationRepository
-                    .findByMapping_AcademicGroupSubjectMappingId(mapping.getAcademicGroupSubjectMappingId())
-                    .filter(TeacherGroupAllocation::isActive)
-                    .orElse(null);
-            staff = request.getStaffId() != null ? staffById(request.getStaffId())
-                    : (groupAllocation == null ? null : groupAllocation.getStaff());
-            if (staff == null) {
-                throw new BusinessException("Assign a group teacher to this subject before placing it");
-            }
+        if (!Boolean.TRUE.equals(mapping.getActive())) {
+            throw new BusinessException("This subject is inactive. Enable it in Subject Mapping first.");
         }
+        String unitLabel = section != null
+                ? group.getName() + " - " + section.getName() : group.getName();
+        String subjectLabel = mapping.getSubject() == null ? "This subject" : mapping.getSubject().getName();
+
+        // The teacher always comes from the allocation. The UI never asks the user to choose one.
+        ResolvedTeacher resolved = resolveAllocation(section, group, mapping);
+        TeacherAllocation allocation = resolved.allocation();
+        Staff staff = resolved.staff();
 
         TimetablePlanningData data = planningDataLoader.load(version.getAcademicYear().getAcademicYearId(),
                 version.getTimetableConfiguration(), null);
@@ -553,6 +658,10 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
         TimetableEntry entry = entryRepository.findById(entryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Timetable entry not found: " + entryId));
         TimetableVersion version = requireEditableVersion(entry.getTimetableVersion().getTimetableVersionId());
+        if (entry.getEntryType() == TimetableEntryType.ACTIVITY) {
+            throw new BusinessException(
+                    "Fixed activities are managed from Timetable Configuration. They cannot be changed here.");
+        }
         if (Boolean.TRUE.equals(entry.getLocked()) && request.getLocked() == null) {
             throw new BusinessException("This lesson is locked. Unlock it before moving or changing it.");
         }
@@ -576,21 +685,50 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
             period = periodRepository.findById(periodId)
                     .orElseThrow(() -> new ResourceNotFoundException("Slot not found"));
         }
+        AcademicGroupSubjectMapping entryMapping = entry.getTeacherAllocation() == null
+                ? null : entry.getTeacherAllocation().getAcademicGroupSubjectMapping();
         Staff staff = entry.getStaff();
-        if (request.getStaffId() != null) {
-            staff = staffById(request.getStaffId());
-            if (staff == null) throw new BusinessException("Choose an active teacher");
-        }
-        if (request.getTeacherAllocationId() != null) {
-            TeacherAllocation allocation = allocationRepository.findById(request.getTeacherAllocationId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Teacher allocation not found"));
-            entry.setTeacherAllocation(allocation);
-            if (request.getStaffId() == null) staff = primaryTeacher(allocation);
+
+        Long requestedMappingId = request.getAcademicGroupSubjectMappingId();
+        boolean subjectChanged = requestedMappingId != null
+                && (entryMapping == null || !Objects.equals(requestedMappingId,
+                entryMapping.getAcademicGroupSubjectMappingId()));
+        if (subjectChanged) {
+            AcademicGroupSubjectMapping mapping = mappingRepository.findById(requestedMappingId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Subject mapping not found"));
+            AcademicSection section = entry.getSection();
+            AcademicGroup group = entry.getAcademicGroup() != null ? entry.getAcademicGroup()
+                    : section == null ? null : section.getAcademicGroup();
+            if (group == null || !mapping.getAcademicGroup().getAcademicGroupId()
+                    .equals(group.getAcademicGroupId())) {
+                throw new BusinessException("The selected subject does not belong to this class");
+            }
+            if (!Boolean.TRUE.equals(mapping.getActive())) {
+                throw new BusinessException("This subject is inactive. Enable it in Subject Mapping first.");
+            }
+            ResolvedTeacher resolved = resolveAllocation(section, group, mapping);
+            entryMapping = mapping;
+            entry.setTeacherAllocation(resolved.allocation());
+            staff = resolved.staff();
+            entry.setSubject(mapping.getSubject());
+            entry.setSubjectNameSnapshot(mapping.getSubject() == null ? null : mapping.getSubject().getName());
+            entry.setAcademicGroupChoiceMapping(mapping.getAcademicGroupChoiceMapping());
+        } else {
+            // Legacy substitution support. The manual-entry UI always leaves the teacher to the allocation.
+            if (request.getTeacherAllocationId() != null) {
+                TeacherAllocation allocation = allocationRepository.findById(request.getTeacherAllocationId())
+                        .orElseThrow(() -> new ResourceNotFoundException("Teacher allocation not found"));
+                entry.setTeacherAllocation(allocation);
+                entryMapping = allocation.getAcademicGroupSubjectMapping();
+                if (request.getStaffId() == null) staff = primaryTeacher(allocation);
+            }
+            if (request.getStaffId() != null) {
+                staff = staffById(request.getStaffId());
+                if (staff == null) throw new BusinessException("Choose an active teacher");
+            }
         }
         if (staff == null) throw new BusinessException("This lesson has no teacher");
 
-        AcademicGroupSubjectMapping entryMapping = entry.getTeacherAllocation() == null
-                ? null : entry.getTeacherAllocation().getAcademicGroupSubjectMapping();
         assertNoClashes(version.getTimetableVersionId(), unit, day, period, staff.getStaffId(), entryId, entryMapping);
 
         entry.setDayOfWeek(day);
@@ -603,7 +741,7 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
         if (request.getLocked() != null) entry.setLocked(request.getLocked());
         entry = entryRepository.save(entry);
         recordEvent(version, "MANUAL_EDIT", version.getStatus().name(), version.getStatus().name(),
-                "Updated a lesson slot");
+                subjectChanged ? "Changed the subject of a lesson" : "Updated a lesson slot");
         return toCellResponse(entry, Map.of(), Map.of(staff.getStaffId(), staff));
     }
 
@@ -613,6 +751,10 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
         TimetableEntry entry = entryRepository.findById(entryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Timetable entry not found: " + entryId));
         TimetableVersion version = requireEditableVersion(entry.getTimetableVersion().getTimetableVersionId());
+        if (entry.getEntryType() == TimetableEntryType.ACTIVITY) {
+            throw new BusinessException(
+                    "Fixed activities are managed from Timetable Configuration. They cannot be removed here.");
+        }
         if (Boolean.TRUE.equals(entry.getLocked())) {
             throw new BusinessException("Unlock this lesson before removing it");
         }
@@ -834,6 +976,46 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
             throw new BusinessException("Historical academic years are read-only");
         }
         return version;
+    }
+
+    private record ResolvedTeacher(TeacherAllocation allocation, Staff staff) {
+    }
+
+    /**
+     * Resolve the teacher for a subject from Teacher Allocation. Manual entry never takes a
+     * teacher from the client; the primary allocation teacher is authoritative.
+     */
+    private ResolvedTeacher resolveAllocation(AcademicSection section, AcademicGroup group,
+                                              AcademicGroupSubjectMapping mapping) {
+        String unitLabel = section != null
+                ? group.getName() + " - " + section.getName() : group.getName();
+        String subjectLabel = mapping.getSubject() == null ? "This subject" : mapping.getSubject().getName();
+        if (section != null) {
+            TeacherAllocation allocation = allocationRepository
+                    .findBySection_SectionIdAndAcademicGroupSubjectMapping_AcademicGroupSubjectMappingId(
+                            section.getSectionId(), mapping.getAcademicGroupSubjectMappingId())
+                    .orElse(null);
+            if (allocation == null || allocation.getStatus() != TeacherAllocationStatus.ASSIGNED) {
+                throw new BusinessException("Allocate a teacher for " + subjectLabel + " in "
+                        + unitLabel + " before placing it.");
+            }
+            Staff staff = primaryTeacher(allocation);
+            if (staff == null) {
+                throw new BusinessException(subjectLabel + " has no active primary teacher in "
+                        + unitLabel + ". Update Teacher Allocation first.");
+            }
+            return new ResolvedTeacher(allocation, staff);
+        }
+        TeacherGroupAllocation groupAllocation = groupAllocationRepository
+                .findByMapping_AcademicGroupSubjectMappingId(mapping.getAcademicGroupSubjectMappingId())
+                .filter(TeacherGroupAllocation::isActive)
+                .orElse(null);
+        Staff staff = groupAllocation == null ? null : groupAllocation.getStaff();
+        if (staff == null) {
+            throw new BusinessException("Allocate a group teacher for " + subjectLabel + " in "
+                    + unitLabel + " before placing it.");
+        }
+        return new ResolvedTeacher(null, staff);
     }
 
     private Staff primaryTeacher(TeacherAllocation allocation) {

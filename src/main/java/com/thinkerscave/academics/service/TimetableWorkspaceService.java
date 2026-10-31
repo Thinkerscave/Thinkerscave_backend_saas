@@ -4,6 +4,7 @@ import com.thinkerscave.academics.dto.request.TimetableEntryRequest;
 import com.thinkerscave.academics.dto.response.TimetableCellResponse;
 import com.thinkerscave.academics.dto.response.TimetableConflictResponse;
 import com.thinkerscave.academics.dto.response.TimetableGridResponse;
+import com.thinkerscave.academics.dto.response.TimetableVersionResponse;
 import com.thinkerscave.academics.dto.response.TimetableWorkspaceResponse;
 
 import java.time.LocalDate;
@@ -15,6 +16,12 @@ public interface TimetableWorkspaceService {
 
     TimetableGridResponse getView(Long versionId, String view, Long academicGroupId, Long sectionId,
                                   Long staffId, Long resourceId, LocalDate weekStartDate);
+
+    /** Create an empty editable draft so lessons can be entered by hand, without running the generator. */
+    TimetableVersionResponse createManualDraft(Long yearId);
+
+    /** Delete an editable draft and all of its entries, conflicts, runs and events. */
+    void discardVersion(Long versionId);
 
     TimetableCellResponse addEntry(Long versionId, TimetableEntryRequest request);
 

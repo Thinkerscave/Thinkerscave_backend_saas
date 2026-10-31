@@ -5,5 +5,7 @@ public enum TimetableGenerationStatus {
     GENERATING,
     GENERATED,
     GENERATED_WITH_CONFLICTS,
+    /** Draft created for manual entry without running the automatic generator. */
+    MANUAL,
     FAILED
 }

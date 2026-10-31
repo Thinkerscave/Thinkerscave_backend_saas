@@ -32,6 +32,27 @@ public class TimetableGridResponse {
     private Boolean editable;
     private java.time.LocalDate weekStartDate;
     private java.util.List<DayDate> weekDates;
+    /**
+     * Subjects that can be placed in the currently viewed class, resolved from subject mapping
+     * and teacher allocation. Empty in teacher view.
+     */
+    private List<SubjectOption> subjectOptions;
+
+    @Getter
+    @Setter
+    @Builder
+    public static class SubjectOption {
+        private Long mappingId;
+        private Long subjectId;
+        private String subjectName;
+        private Long staffId;
+        private String teacherName;
+        private Long teacherAllocationId;
+        private String choiceGroupName;
+        private Short weeklyPeriods;
+        private boolean available;
+        private String unavailableReason;
+    }
 
     @Getter
     @Setter

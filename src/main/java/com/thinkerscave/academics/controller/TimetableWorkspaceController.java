@@ -4,6 +4,7 @@ import com.thinkerscave.academics.dto.request.TimetableEntryRequest;
 import com.thinkerscave.academics.dto.response.TimetableCellResponse;
 import com.thinkerscave.academics.dto.response.TimetableConflictResponse;
 import com.thinkerscave.academics.dto.response.TimetableGridResponse;
+import com.thinkerscave.academics.dto.response.TimetableVersionResponse;
 import com.thinkerscave.academics.dto.response.TimetableWorkspaceResponse;
 import com.thinkerscave.academics.service.TimetableWorkspaceService;
 import com.thinkerscave.shared.dto.ApiResponse;
@@ -50,6 +51,23 @@ public class TimetableWorkspaceController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStartDate) {
         return ResponseEntity.ok(ApiResponse.success("Timetable view",
                 service.getView(versionId, view, academicGroupId, sectionId, staffId, resourceId, weekStartDate)));
+    }
+
+    @PostMapping("/years/{yearId}/timetable/manual-draft")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @Operation(summary = "Create an empty draft for manual lesson entry")
+    public ResponseEntity<ApiResponse<TimetableVersionResponse>> createManualDraft(
+            @PathVariable Long yearId) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.created(
+                "Manual timetable draft created", service.createManualDraft(yearId)));
+    }
+
+    @DeleteMapping("/timetable/versions/{versionId}")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
+    @Operation(summary = "Discard an editable draft timetable")
+    public ResponseEntity<ApiResponse<Void>> discardVersion(@PathVariable Long versionId) {
+        service.discardVersion(versionId);
+        return ResponseEntity.ok(ApiResponse.success("Timetable draft discarded", null));
     }
 
     @PostMapping("/timetable/versions/{versionId}/entries")
