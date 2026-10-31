@@ -33,6 +33,9 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
     private static final Set<TimetableStatus> EDITABLE_STATUSES = EnumSet.of(
             TimetableStatus.DRAFT, TimetableStatus.READY_FOR_REVIEW
     );
+    private static final Set<TimetableStatus> APPROVAL_STATUSES = EnumSet.of(
+            TimetableStatus.PENDING_APPROVAL, TimetableStatus.APPROVED
+    );
     private static final Set<TimetableStatus> PUBLISHED_OR_LATER = EnumSet.of(
             TimetableStatus.PUBLISHED, TimetableStatus.SUPERSEDED, TimetableStatus.ARCHIVED
     );
@@ -71,13 +74,14 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                 .findFirst().orElse(null);
         TimetableVersion latest = versions.isEmpty() ? null : versions.get(0);
         TimetableVersion working = versions.stream()
+                .filter(v -> APPROVAL_STATUSES.contains(v.getStatus()))
+                .findFirst()
+                .orElseGet(() -> versions.stream()
                 .filter(v -> EDITABLE_STATUSES.contains(v.getStatus()))
-                .findFirst().orElse(published);
+                .findFirst().orElse(null));
 
         String state;
-        if (working != null && EDITABLE_STATUSES.contains(working.getStatus())
-                && (published == null || !Objects.equals(working.getTimetableVersionId(),
-                published.getTimetableVersionId()))) {
+        if (working != null) {
             state = "DRAFT";
         } else if (published != null) {
             state = "PUBLISHED";
@@ -89,9 +93,18 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                 || year.getStatus() == AcademicYearStatus.ARCHIVED;
         String blocked = null;
         if (readOnly) blocked = "This academic year is read-only.";
+        else if (working != null && working.getStatus() == TimetableStatus.PENDING_APPROVAL) {
+            blocked = "Approve or reject the pending timetable before generating another version.";
+        } else if (working != null && working.getStatus() == TimetableStatus.APPROVED) {
+            blocked = "Publish the approved timetable before generating another version.";
+        } else if (!year.isActive()) {
+            blocked = "Activate this academic year before generating a timetable or creating a manual draft.";
+        }
         else if (!readiness.isReady()) {
             blocked = "Resolve the " + readiness.getBlockingIssues().size() + " blocking issue(s) first.";
         }
+        boolean canGenerate = readiness.isReady() && !readOnly && year.isActive()
+                && (working == null || !APPROVAL_STATUSES.contains(working.getStatus()));
 
         List<TimetableWorkspaceResponse.SetupItem> setup = buildSetup(data, readiness);
         List<TimetableWorkspaceResponse.Issue> issues = buildIssues(data, readiness);
@@ -134,10 +147,11 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                 .academicYearId(year.getAcademicYearId())
                 .academicYearName(year.getName())
                 .academicYearStatus(year.getStatus())
+                .yearActive(year.isActive())
                 .yearReadOnly(readOnly)
                 .state(state)
                 .overallStatus(readiness.isReady() && blocking == 0 ? "READY" : "BLOCKED")
-                .canGenerate(readiness.isReady() && !readOnly)
+                .canGenerate(canGenerate)
                 .generateBlockedReason(blocked)
                 .readiness(readiness)
                 .filters(buildFilters(data))
@@ -339,6 +353,23 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                     .toList();
         }
 
+        Map<DayOfWeek, Map<Long, TimetablePeriod>> teacherScheduleByDay = new LinkedHashMap<>();
+        if (teacherView && !entries.isEmpty()) {
+            List<TimetableEntry> teacherEntries = entries;
+            for (TimetablePlanningData.Unit unit : data.getUnits()) {
+                boolean assignedToUnit = teacherEntries.stream()
+                        .anyMatch(entry -> belongsToUnit(entry, unit));
+                if (!assignedToUnit) continue;
+                data.getScheduleByUnit().getOrDefault(unit.unitId(), Map.of())
+                        .forEach((day, slots) -> {
+                            Map<Long, TimetablePeriod> dayPeriods =
+                                    teacherScheduleByDay.computeIfAbsent(day, ignored -> new LinkedHashMap<>());
+                            slots.forEach(period -> dayPeriods.putIfAbsent(
+                                    period.getTimetablePeriodId(), period));
+                        });
+            }
+        }
+
         List<TimetablePeriod> periods = new ArrayList<>();
         Set<Long> seenPeriods = new HashSet<>();
         if (targetUnit != null) {
@@ -346,6 +377,10 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                     targetUnit.unitId(), Map.of());
             byDay.values().forEach(list -> list.forEach(p -> {
                 if (seenPeriods.add(p.getTimetablePeriodId())) periods.add(p);
+            }));
+        } else if (teacherView && !teacherScheduleByDay.isEmpty()) {
+            teacherScheduleByDay.values().forEach(dayPeriods -> dayPeriods.values().forEach(period -> {
+                if (seenPeriods.add(period.getTimetablePeriodId())) periods.add(period);
             }));
         } else {
             entries.stream().map(TimetableEntry::getTimetablePeriod).filter(Objects::nonNull)
@@ -365,6 +400,8 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
         Set<DayOfWeek> days = new TreeSet<>();
         if (targetUnit != null) {
             days.addAll(data.getScheduleByUnit().getOrDefault(targetUnit.unitId(), Map.of()).keySet());
+        } else if (teacherView && !teacherScheduleByDay.isEmpty()) {
+            days.addAll(teacherScheduleByDay.keySet());
         } else {
             entries.forEach(e -> days.add(e.getDayOfWeek()));
             if (days.isEmpty()) days.addAll(data.getWorkingDays());
@@ -380,6 +417,8 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                 dayPeriods = new ArrayList<>(data.getScheduleByUnit()
                         .getOrDefault(targetUnit.unitId(), Map.of())
                         .getOrDefault(day, List.of()));
+            } else if (teacherView && teacherScheduleByDay.containsKey(day)) {
+                dayPeriods = new ArrayList<>(teacherScheduleByDay.get(day).values());
             } else {
                 dayPeriods = new ArrayList<>(entries.stream()
                         .filter(e -> e.getDayOfWeek() == day)
@@ -423,6 +462,16 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                 .weekDates(buildWeekDates(weekStart, workingDays))
                 .subjectOptions(targetUnit == null ? List.of() : buildSubjectOptions(data, targetUnit))
                 .build();
+    }
+
+    private boolean belongsToUnit(TimetableEntry entry, TimetablePlanningData.Unit unit) {
+        if (unit.sectionId() != null) {
+            return entry.getSection() != null
+                    && Objects.equals(entry.getSection().getSectionId(), unit.sectionId());
+        }
+        return entry.getSection() == null
+                && entry.getAcademicGroup() != null
+                && Objects.equals(entry.getAcademicGroup().getAcademicGroupId(), unit.academicGroupId());
     }
 
     /**
@@ -530,8 +579,18 @@ public class TimetableWorkspaceServiceImpl implements TimetableWorkspaceService 
                 || year.getStatus() == AcademicYearStatus.ARCHIVED) {
             throw new BusinessException("Historical academic years are read-only");
         }
+        if (!year.isActive()) {
+            throw new BusinessException("Cannot modify timetable for an inactive academic year");
+        }
         List<TimetableVersion> versions = versionRepository
                 .findByAcademicYear_AcademicYearIdOrderByVersionNumberDesc(yearId);
+        for (TimetableVersion existing : versions) {
+            if (APPROVAL_STATUSES.contains(existing.getStatus())) {
+                throw new BusinessException("Cannot create another timetable draft while version "
+                        + existing.getVersionNumber() + " is " + existing.getStatus()
+                        + ". Complete the current approval workflow first.");
+            }
+        }
         for (TimetableVersion existing : versions) {
             if (!EDITABLE_STATUSES.contains(existing.getStatus())) continue;
             if (existing.getGenerationStatus() == TimetableGenerationStatus.GENERATING) {

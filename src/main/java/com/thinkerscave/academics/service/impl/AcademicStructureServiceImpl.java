@@ -19,6 +19,7 @@ import com.thinkerscave.academics.repository.AcademicResourceRepository;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
 import com.thinkerscave.academics.repository.AcademicGroupRepository;
 import com.thinkerscave.academics.repository.AcademicGroupSubjectMappingRepository;
+import com.thinkerscave.academics.repository.IdCount;
 import com.thinkerscave.academics.repository.SectionTeacherAssignmentRepository;
 import com.thinkerscave.academics.repository.TeacherAllocationTeacherRepository;
 import com.thinkerscave.academics.repository.TimetableVersionRepository;
@@ -97,11 +98,23 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
         for (Object[] row : studentEnrollmentRepository.countActiveByAcademicGroupForYear(academicYearId)) {
             studentsByAcademicGroup.put((Long) row[0], (Long) row[1]);
         }
+        Map<Long, Long> subjectsByAcademicGroup = new HashMap<>();
+        for (IdCount row : academicGroupSubjectMappingRepository.countActiveByAcademicGroupForYear(academicYearId)) {
+            subjectsByAcademicGroup.put(row.getId(), row.getTotal());
+        }
+        Map<Long, Long> teachersByAcademicGroup = new HashMap<>();
+        for (IdCount row : TeacherAllocationTeacherRepository.countDistinctPrimaryTeachersByAcademicYear(academicYearId)) {
+            teachersByAcademicGroup.put(row.getId(), row.getTotal());
+        }
+        String timetableStatus = resolveTimetableStatus(academicYearId);
         List<AcademicGroupResponse> academicGroupResponses = academicGroups.stream()
                 .map(A -> {
                     long[] counts = sectionCountsByAcademicGroup.getOrDefault(A.getAcademicGroupId(), new long[2]);
                     return toDirectoryResponse(A, counts[0], counts[1],
-                            studentsByAcademicGroup.getOrDefault(A.getAcademicGroupId(), 0L));
+                            studentsByAcademicGroup.getOrDefault(A.getAcademicGroupId(), 0L),
+                            subjectsByAcademicGroup.getOrDefault(A.getAcademicGroupId(), 0L),
+                            teachersByAcademicGroup.getOrDefault(A.getAcademicGroupId(), 0L),
+                            timetableStatus);
                 })
                 .toList();
 
@@ -391,8 +404,15 @@ public class AcademicStructureServiceImpl implements AcademicStructureService {
     }
 
     private AcademicGroupResponse toDirectoryResponse(AcademicGroup entity, long sectionCount,
-                                                      long sectionsActive, long studentCount) {
-        return buildAcademicGroupResponse(entity, sectionCount, sectionsActive, studentCount, null);
+                                                      long sectionsActive, long studentCount,
+                                                      long subjectCount, long teacherCount,
+                                                      String timetableStatus) {
+        AcademicGroupResponse response = buildAcademicGroupResponse(
+                entity, sectionCount, sectionsActive, studentCount, null);
+        response.setSubjectCount(subjectCount);
+        response.setTeacherCount(teacherCount);
+        response.setTimetableStatus(timetableStatus);
+        return response;
     }
 
     private AcademicGroupResponse buildAcademicGroupResponse(AcademicGroup entity, long sectionCount, long sectionsActive,

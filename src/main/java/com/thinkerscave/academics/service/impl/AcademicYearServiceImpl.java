@@ -325,7 +325,7 @@ public class AcademicYearServiceImpl implements AcademicYearService {
 
         if (includeDetails) {
             builder.structureStats(buildStructureStats(year.getAcademicYearId()));
-            List<AcademicYearResponse.ReadinessStep> steps = buildReadinessSteps(year.getAcademicYearId());
+            List<AcademicYearResponse.ReadinessStep> steps = buildReadinessSteps(year);
             long completed = steps.stream().filter(s -> "COMPLETE".equals(s.getState())).count();
             builder.readinessSteps(steps)
                     .readinessCompletedSteps((int) completed)
@@ -382,7 +382,8 @@ public class AcademicYearServiceImpl implements AcademicYearService {
                 .build();
     }
 
-    private List<AcademicYearResponse.ReadinessStep> buildReadinessSteps(Long yearId) {
+    private List<AcademicYearResponse.ReadinessStep> buildReadinessSteps(AcademicYear year) {
+        Long yearId = year.getAcademicYearId();
         List<AcademicYearResponse.ReadinessStep> steps = new ArrayList<>();
 
         steps.add(step("YEAR_CREATED", "Academic Year Created", "COMPLETE", null));
@@ -415,16 +416,33 @@ public class AcademicYearServiceImpl implements AcademicYearService {
 
         boolean hasConfig = !TimetableConfigurationRepository.findByAcademicYear_AcademicYearId(yearId).isEmpty();
         steps.add(step("TIMETABLE_CONFIG", "Timetable Configuration",
-                hasConfig ? "IN_PROGRESS" : "NOT_STARTED", null));
+                hasConfig ? "COMPLETE" : "NOT_STARTED",
+                hasConfig ? null : "Configure timetable patterns and slots"));
 
         boolean hasVersion = !timetableVersionRepository
                 .findByAcademicYear_AcademicYearIdOrderByVersionNumberDesc(yearId).isEmpty();
         steps.add(step("TIMETABLE_GENERATION", "Timetable Generation",
                 hasVersion ? "COMPLETE" : "NOT_STARTED", null));
 
-        steps.add(step("STUDENT_PROMOTION", "Student Promotion Plan", "NOT_STARTED", null));
-        steps.add(step("FINAL_APPROVAL", "Final Approval", "NOT_STARTED", null));
-        steps.add(step("ACTIVATION", "Activation", "NOT_STARTED", null));
+        boolean isApproved = year.getStatus() == AcademicYearStatus.APPROVED
+                || year.getStatus() == AcademicYearStatus.CURRENT
+                || year.getStatus() == AcademicYearStatus.COMPLETED
+                || year.getStatus() == AcademicYearStatus.ARCHIVED;
+        boolean isPendingApproval = year.getStatus() == AcademicYearStatus.PENDING_APPROVAL;
+        boolean isReadyForApproval = year.getStatus() == AcademicYearStatus.READY_FOR_APPROVAL;
+
+        String approvalState = isApproved ? "COMPLETE"
+                : (isPendingApproval ? "IN_PROGRESS" : (isReadyForApproval ? "PENDING" : "NOT_STARTED"));
+        String approvalDetail = isApproved ? "Academic year approved"
+                : (isPendingApproval ? "Pending approval" : null);
+        steps.add(step("FINAL_APPROVAL", "Final Approval", approvalState, approvalDetail));
+
+        boolean isActivated = year.getStatus() == AcademicYearStatus.CURRENT || Boolean.TRUE.equals(year.getActive());
+        String activationState = isActivated ? "COMPLETE"
+                : (isApproved ? "PENDING" : "NOT_STARTED");
+        String activationDetail = isActivated ? "Academic year active"
+                : (isApproved ? "Ready for activation" : null);
+        steps.add(step("ACTIVATION", "Activation", activationState, activationDetail));
         return steps;
     }
 

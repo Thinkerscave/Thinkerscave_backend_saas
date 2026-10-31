@@ -127,5 +127,14 @@ public interface AcademicGroupSubjectMappingRepository extends JpaRepository<Aca
             @Param("subjectId") Long subjectId, @Param("pattern") String pattern, Pageable pageable);
 
     long countByAcademicGroup_AcademicGroupIdAndActiveTrue(Long academicGroupId);
-}
 
+    @Query("""
+            SELECT m.academicGroup.academicGroupId AS id, COUNT(m) AS total
+            FROM AcademicGroupSubjectMapping m
+            WHERE m.active = true
+              AND m.academicGroup.academicYear.academicYearId = :yearId
+            GROUP BY m.academicGroup.academicGroupId
+            """)
+    List<IdCount> countActiveByAcademicGroupForYear(@Param("yearId") Long yearId);
+
+}

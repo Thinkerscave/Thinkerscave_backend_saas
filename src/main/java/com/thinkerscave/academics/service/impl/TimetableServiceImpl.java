@@ -51,6 +51,9 @@ public class TimetableServiceImpl implements TimetableService {
             AcademicYearStatus.COMPLETED,
             AcademicYearStatus.ARCHIVED
     );
+    private static final Set<TimetableStatus> APPROVAL_STATUSES = EnumSet.of(
+            TimetableStatus.PENDING_APPROVAL, TimetableStatus.APPROVED
+    );
 
     private final AcademicYearRepository academicYearRepository;
     private final TeacherAllocationTeacherRepository allocationTeacherRepository;
@@ -406,6 +409,13 @@ public class TimetableServiceImpl implements TimetableService {
 
         List<TimetableVersion> existing = versionRepository
                 .findByAcademicYear_AcademicYearIdOrderByVersionNumberDesc(yearId);
+        for (TimetableVersion version : existing) {
+            if (APPROVAL_STATUSES.contains(version.getStatus())) {
+                throw new BusinessException("Cannot generate another timetable while version "
+                        + version.getVersionNumber() + " is " + version.getStatus()
+                        + ". Complete the current approval workflow first.");
+            }
+        }
         for (TimetableVersion v : existing) {
             if (v.getGenerationStatus() != TimetableGenerationStatus.GENERATING) continue;
             if (progressTracker.hasActive(v.getTimetableVersionId())) {
@@ -763,10 +773,9 @@ public class TimetableServiceImpl implements TimetableService {
         if (version.getStatus() == TimetableStatus.PENDING_APPROVAL) {
             throw new BusinessException("This version is awaiting approval. Approve it before publishing.");
         }
-        if (version.getStatus() != TimetableStatus.APPROVED
-                && version.getStatus() != TimetableStatus.READY_FOR_REVIEW
-                && version.getStatus() != TimetableStatus.DRAFT) {
-            throw new BusinessException("Cannot publish version in status: " + version.getStatus());
+        if (version.getStatus() != TimetableStatus.APPROVED) {
+            throw new BusinessException(
+                    "Only an approved timetable version can be published. Current status: " + version.getStatus());
         }
         assertGenerated(version, "publish");
         assertNoOpenBlocking(versionId, "publish");

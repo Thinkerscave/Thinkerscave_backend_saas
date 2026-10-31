@@ -65,4 +65,19 @@ public interface TeacherAllocationTeacherRepository extends JpaRepository<Teache
               AND a.active = true
             """)
     long countDistinctPrimaryTeachersByAcademicGroup(@Param("academicGroupId") Long academicGroupId);
+
+    @Query("""
+            SELECT s.academicGroup.academicGroupId AS id, COUNT(DISTINCT t.staff.staffId) AS total
+            FROM TeacherAllocationTeacher t
+            JOIN t.teacherAllocation a
+            JOIN a.section s
+            JOIN s.academicGroup g
+            WHERE g.academicYear.academicYearId = :yearId
+              AND t.role = com.thinkerscave.academics.enums.TeacherAllocationTeacherRole.PRIMARY
+              AND t.active = true
+              AND t.effectiveTo IS NULL
+              AND a.active = true
+            GROUP BY s.academicGroup.academicGroupId
+            """)
+    List<IdCount> countDistinctPrimaryTeachersByAcademicYear(@Param("yearId") Long yearId);
 }

@@ -17,6 +17,7 @@ public class TimetableWorkspaceResponse {
     private Long academicYearId;
     private String academicYearName;
     private AcademicYearStatus academicYearStatus;
+    private boolean yearActive;
     private boolean yearReadOnly;
     /** NOT_GENERATED | DRAFT | PUBLISHED */
     private String state;
