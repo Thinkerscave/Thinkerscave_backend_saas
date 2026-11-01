@@ -1,6 +1,7 @@
 package com.thinkerscave.admission.dto.request;
 
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -12,6 +13,13 @@ public class PublicAdmissionInquiryRequest {
 
     @Size(max = 100, message = "Student name is too long")
     private String studentName;
+
+    @Size(max = 100, message = "Parent name is too long")
+    private String parentName;
+
+    @Email(message = "Enter a valid email")
+    @Size(max = 150)
+    private String email;
 
     @NotBlank(message = "Mobile number is required")
     @Pattern(regexp = "^[6-9]\\d{9}$", message = "Enter a valid 10-digit mobile number")

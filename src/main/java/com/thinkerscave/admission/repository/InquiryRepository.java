@@ -2,6 +2,7 @@ package com.thinkerscave.admission.repository;
 
 import com.thinkerscave.admission.entity.Inquiry;
 import com.thinkerscave.admission.enums.InquiryStatus;
+import com.thinkerscave.admission.enums.LeadSource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,6 +12,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -70,4 +72,7 @@ public interface InquiryRepository extends JpaRepository<Inquiry, Long>, JpaSpec
             ORDER BY i.createdOn DESC
             """)
     Page<Inquiry> search(@Param("keyword") String keyword, Pageable pageable);
+
+    long countByInquirySourceAndCreatedOnBetweenAndDeletedFalse(
+            LeadSource inquirySource, LocalDateTime from, LocalDateTime to);
 }

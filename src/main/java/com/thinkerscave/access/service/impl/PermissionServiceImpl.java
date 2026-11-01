@@ -9,11 +9,8 @@ import com.thinkerscave.access.repository.*;
 import com.thinkerscave.access.service.PermissionService;
 import com.thinkerscave.platform.entity.Organization;
 import com.thinkerscave.security.service.impl.PublicSchemaUserLookupService;
-import com.thinkerscave.security.dto.LoginContext;
 import com.thinkerscave.shared.context.TenantContext;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
-import com.thinkerscave.access.entity.ResponsibilityAssignment;
-import com.thinkerscave.access.repository.ResponsibilityAssignmentRepository;
 import com.thinkerscave.staff.repository.StaffRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -39,7 +36,6 @@ public class PermissionServiceImpl implements PermissionService {
     private final ResponsibilityAssignmentRepository responsibilityAssignmentRepository;
     private final ResponsibilityPermissionRepository responsibilityPermissionRepository;
     private final PublicSchemaUserLookupService publicSchemaUserLookupService;
-    private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -75,8 +71,7 @@ public class PermissionServiceImpl implements PermissionService {
         // Elevated organization roles need a usable initial workspace even when a new
         // tenant has no role matrix yet. The baseline remains constrained to entitlements;
         // explicit user overrides below remain authoritative.
-        applyElevatedTenantAdministratorBaseline(
-                merged, entitledMenus, isElevatedTenantAdministrator(activeRoles));
+        applyElevatedTenantAdministratorBaseline(merged, entitledMenus, isElevatedTenantAdministrator());
 
         // 3. User-level overrides are authoritative and applied last, but still
         // constrained by organization feature entitlement.
@@ -94,13 +89,12 @@ public class PermissionServiceImpl implements PermissionService {
         return new ArrayList<>(merged.values());
     }
 
-    private boolean isElevatedTenantAdministrator(List<UserRole> activeRoles) {
-        return activeRoles.stream()
-                .map(UserRole::getRole)
-                .filter(Objects::nonNull)
-                .map(Role::getRoleType)
-                .anyMatch(roleType -> roleType == RoleType.ORGANIZATION_ADMIN
-                        || roleType == RoleType.ORGANIZATION_OWNER);
+    private boolean isElevatedTenantAdministrator() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> RoleType.ORGANIZATION_ADMIN.name().equals(authority)
+                        || RoleType.ORGANIZATION_OWNER.name().equals(authority));
     }
 
     void applyElevatedTenantAdministratorBaseline(
@@ -130,12 +124,6 @@ public class PermissionServiceImpl implements PermissionService {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getAuthorities().stream()
                 .noneMatch(authority -> RoleType.ORGANIZATION_OWNER.name().equals(authority.getAuthority()))) {
-            return List.of();
-        }
-        Optional<User> tenantUser = userRepository.findById(requestedUserId);
-        if (tenantUser.isPresent()
-                && (!Objects.equals(tenantUser.get().getUsername(), authentication.getName())
-                || !Objects.equals(tenantUser.get().getOrganizationId(), organizationId))) {
             return List.of();
         }
 
@@ -176,10 +164,6 @@ public class PermissionServiceImpl implements PermissionService {
                                                 Long userId,
                                                 Long organizationId,
                                                 Set<Long> entitledMenuIds) {
-        // Platform (public schema) users have no tenant staff profile, so skip the tenant-scoped staff lookup.
-        if (LoginContext.PLATFORM_TENANT.equals(TenantContext.getTenant())) {
-            return;
-        }
         staffRepository.findByUser_Id(userId).ifPresent(staff -> {
             LocalDate today = LocalDate.now();
             List<ResponsibilityAssignment> assignments = responsibilityAssignmentRepository

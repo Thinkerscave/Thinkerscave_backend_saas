@@ -6,6 +6,7 @@ import com.thinkerscave.admission.enums.LeadSource;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 public class LeadSearchRequest {
@@ -14,6 +15,8 @@ public class LeadSearchRequest {
     private InquiryStatus status;
     @JsonAlias({"inquirySource", "source"})
     private LeadSource source;
+    /** When set, matches any of these sources. Used by the front-desk online inquiry page. */
+    private List<LeadSource> sources;
     @JsonAlias({"classInterested", "classInterestedIn"})
     private String classInterestedIn;
     private Long academicYearId;

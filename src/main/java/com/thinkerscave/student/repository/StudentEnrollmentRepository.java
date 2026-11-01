@@ -142,6 +142,23 @@ public interface StudentEnrollmentRepository extends JpaRepository<StudentEnroll
 
 	long countByAcademicYearAcademicYearIdAndActiveTrue(Long academicYearId);
 
+	@Query("""
+			SELECT e FROM StudentEnrollment e
+			JOIN FETCH e.student s
+			LEFT JOIN FETCH e.classEntity c
+			LEFT JOIN FETCH e.section sec
+			WHERE e.active = true
+			  AND (:classId IS NULL OR c.classId = :classId)
+			  AND (:keyword IS NULL OR LOWER(s.firstName) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
+			       OR LOWER(s.lastName) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
+			       OR LOWER(COALESCE(s.rollNumber, '')) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%'))
+			       OR LOWER(s.admissionNumber) LIKE LOWER(CONCAT('%', CAST(:keyword AS string), '%')))
+			""")
+	List<StudentEnrollment> searchFrontDeskDirectory(
+			@Param("classId") Long classId,
+			@Param("keyword") String keyword,
+			org.springframework.data.domain.Pageable pageable);
+
 	/** One query for all group student counts in a year: rows of [academicGroupId, count]. */
 	@Query("""
 			SELECT e.academicGroupEntity.academicGroupId, Count(e) FROM StudentEnrollment e

@@ -1,6 +1,7 @@
 package com.thinkerscave.platform.controller;
 
 import com.thinkerscave.platform.dto.response.TenantRegistryResponse;
+import com.thinkerscave.platform.enums.OperationStatus;
 import com.thinkerscave.platform.enums.ProvisionStatus;
 import com.thinkerscave.platform.service.TenantService;
 import com.thinkerscave.platform.service.TenantMigrationService;
@@ -12,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -68,8 +70,12 @@ public class TenantRegistryController {
     @PostMapping("/{id}/migrate")
     @PreAuthorize("hasAuthority('SUPER_ADMIN')")
     @Operation(summary = "Trigger tenant migration")
-    public ResponseEntity<ApiResponse<Void>> triggerMigration(@PathVariable Long id) {
-        tenantMigrationService.executeTenant(id, TenantScopedFlyway.LATEST_VERSION);
-        return ResponseEntity.ok(ApiResponse.noContent("Migration triggered"));
+    public ResponseEntity<ApiResponse<?>> triggerMigration(@PathVariable Long id) {
+        var result = tenantMigrationService.executeTenant(id, TenantScopedFlyway.LATEST_VERSION);
+        if (result.status() == OperationStatus.FAILED) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Tenant migration failed. Review the tenant migration history for details."));
+        }
+        return ResponseEntity.ok(ApiResponse.success("Tenant migration completed", result));
     }
 }

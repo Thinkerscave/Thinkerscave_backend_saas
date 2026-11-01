@@ -26,7 +26,9 @@ public final class InquirySpecification {
                 predicates.add(cb.equal(root.get("status"), request.getStatus()));
             }
 
-            if (request.getSource() != null) {
+            if (request.getSources() != null && !request.getSources().isEmpty()) {
+                predicates.add(root.get("inquirySource").in(request.getSources()));
+            } else if (request.getSource() != null) {
                 predicates.add(cb.equal(root.get("inquirySource"), request.getSource()));
             }
 
