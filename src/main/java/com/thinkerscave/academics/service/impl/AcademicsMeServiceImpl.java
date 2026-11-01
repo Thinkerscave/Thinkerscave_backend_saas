@@ -19,6 +19,7 @@ import com.thinkerscave.student.entity.StudentEnrollment;
 import com.thinkerscave.student.repository.StudentEnrollmentRepository;
 import com.thinkerscave.student.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -141,13 +142,10 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
     @Override
     public MyTimetableResponse getMyTimetable(Long academicYearId) {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_MY_TIMETABLE);
-        Long yearId = resolveYearId(academicYearId);
-
         if (isStaffRole()) {
-            return buildTeacherTimetable(yearId);
-        } else {
-            return buildStudentTimetable(yearId);
+            return buildTeacherTimetable(resolveYearId(academicYearId));
         }
+        return buildStudentTimetable(academicYearId);
     }
 
     private MyTimetableResponse buildTeacherTimetable(Long yearId) {
@@ -178,11 +176,19 @@ public class AcademicsMeServiceImpl implements AcademicsMeService {
                 .build();
     }
 
-    private MyTimetableResponse buildStudentTimetable(Long yearId) {
+    private MyTimetableResponse buildStudentTimetable(Long requestedYearId) {
         Student student = resolveStudent();
         StudentEnrollment enrollment = enrollmentRepo
                 .findActiveWithAcademicGroupByStudentId(student.getStudentId())
                 .orElseThrow(() -> new BusinessException("No active enrollment found"));
+        Long yearId = enrollment.getAcademicYear() != null
+                ? enrollment.getAcademicYear().getAcademicYearId() : null;
+        if (yearId == null) {
+            throw new BusinessException("No academic year is assigned to your active enrollment");
+        }
+        if (requestedYearId != null && !requestedYearId.equals(yearId)) {
+            throw new AccessDeniedException("Students can only view the timetable for their active enrollment year");
+        }
 
         Long sectionId = enrollment.getSection() != null
                 ? enrollment.getSection().getSectionId() : null;

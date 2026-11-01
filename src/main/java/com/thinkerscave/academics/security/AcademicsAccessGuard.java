@@ -119,6 +119,10 @@ public class AcademicsAccessGuard {
         if (auth == null || auth.getName() == null) {
             throw new AccessDeniedException("Authentication required");
         }
+        if ("VIEW".equals(privilege)
+                && isStudentSelfServiceResource(auth, resource)) {
+            return;
+        }
         Long orgId = OrganizationContext.getOrganizationId();
         User user = userRepository.findByUsername(auth.getName()).orElse(null);
         if (user == null || orgId == null) {
@@ -127,5 +131,13 @@ public class AcademicsAccessGuard {
         if (!permissionService.hasPermission(user.getId(), orgId, resource, privilege)) {
             throw new AccessDeniedException(resource + ":" + privilege + " required");
         }
+    }
+
+    private boolean isStudentSelfServiceResource(Authentication auth, String resource) {
+        boolean student = auth.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("STUDENT"::equals);
+        return student && (RESOURCE_MY_TIMETABLE.equals(resource)
+                || RESOURCE_MY_ACADEMICS.equals(resource));
     }
 }
