@@ -229,14 +229,14 @@ public class TimetableController {
     @Operation(summary = "Get timetable grid for a version")
     public ResponseEntity<ApiResponse<TimetableGridResponse>> getGrid(
             @PathVariable Long versionId,
-            @RequestParam(defaultValue = "CLASS") String view,
-            @RequestParam(required = false) Long classId,
+            @RequestParam(defaultValue = "ACADEMIC_GROUP") String view,
+            @RequestParam(required = false) Long academicGroupId,
             @RequestParam(required = false) Long sectionId,
             @RequestParam(required = false) Long staffId,
             @RequestParam(required = false) Long resourceId) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Timetable grid",
-                timetableService.getGrid(versionId, view, classId, sectionId, staffId, resourceId)));
+                timetableService.getGrid(versionId, view, academicGroupId, sectionId, staffId, resourceId)));
     }
 
     // ─── Conflicts ────────────────────────────────────────────────────────

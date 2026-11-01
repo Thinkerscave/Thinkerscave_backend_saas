@@ -5,7 +5,7 @@ import java.util.List;
 
 public record TeacherArrangementEligibleSlotResponse(
         Long timetableEntryId,
-        String className,
+        String academicGroupName,
         String sectionName,
         String subjectName,
         Short periodNumber,

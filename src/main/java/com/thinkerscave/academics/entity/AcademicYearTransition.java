@@ -51,8 +51,8 @@ public class AcademicYearTransition extends Auditable {
     private AcademicTransitionStatus status = AcademicTransitionStatus.NOT_STARTED;
 
     @NotNull
-    @Column(name = "copy_classes", nullable = false)
-    private Boolean copyClasses = false;
+    @Column(name = "copy_academic_groups", nullable = false)
+    private Boolean copyAcademicGroups = false;
 
     @NotNull
     @Column(name = "copy_sections", nullable = false)

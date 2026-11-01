@@ -19,12 +19,12 @@ import lombok.Setter;
         name = "academic_section",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "uk_academic_section_class_code",
-                        columnNames = {"class_id", "code"}
+                        name = "uk_academic_section_group_code",
+                        columnNames = {"academic_group_id", "code"}
                 )
         },
         indexes = {
-                @Index(name = "idx_academic_section_class_active", columnList = "class_id, is_active")
+                @Index(name = "idx_academic_section_group_active", columnList = "academic_group_id, is_active")
         }
 )
 public class AcademicSection extends Auditable {
@@ -37,8 +37,8 @@ public class AcademicSection extends Auditable {
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "class_id", nullable = false)
-    private AcademicClass academicClass;
+    @JoinColumn(name = "academic_group_id", nullable = false)
+    private AcademicGroup academicGroup;
 
     @NotBlank
     @Size(max = 50)
@@ -75,6 +75,24 @@ public class AcademicSection extends Auditable {
     /** Cross-module compatibility alias during Academics rebuild. */
     public String getSectionCode() {
         return code;
+    }
+
+    public AcademicGroup getAcademicClass() {
+        return academicGroup;
+    }
+
+    public void setAcademicClass(AcademicClass legacyClass) {
+        if (legacyClass == null) {
+            academicGroup = null;
+            return;
+        }
+        AcademicGroup group = new AcademicGroup();
+        group.setAcademicGroupId(legacyClass.getClassId());
+        group.setAcademicYear(legacyClass.getAcademicYear());
+        group.setName(legacyClass.getName());
+        group.setCode(legacyClass.getCode());
+        group.setStage(legacyClass.getStage());
+        academicGroup = group;
     }
 
     public boolean isActive() {

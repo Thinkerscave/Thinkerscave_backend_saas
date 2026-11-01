@@ -20,4 +20,6 @@ public interface TeacherArrangementRepository extends JpaRepository<TeacherArran
     boolean existsByAcademicYear_AcademicYearIdAndAbsentTeacher_StaffIdAndAbsenceDateAndStatusIn(
             Long academicYearId, Long absentTeacherId, LocalDate absenceDate,
             Collection<TeacherArrangementStatus> statuses);
+
+    boolean existsByTimetableVersion_TimetableVersionId(Long versionId);
 }

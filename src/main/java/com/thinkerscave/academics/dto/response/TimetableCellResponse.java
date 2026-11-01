@@ -18,10 +18,20 @@ public class TimetableCellResponse {
     private TimetableEntryType entryType;
     private Long sectionId;
     private String sectionName;
-    private String className;
+    private String academicGroupName;
+    private Long subjectId;
     private String subjectName;
+    private Long academicGroupSubjectMappingId;
+    private Long academicGroupChoiceMappingId;
+    private String choiceGroupName;
     private Long staffId;
     private String staffName;
+    private Long teacherAllocationId;
+    private Long fixedActivityId;
+    private String fixedActivityType;
     private Long resourceId;
     private String resourceName;
+    private Boolean locked;
+    private java.time.LocalTime startTime;
+    private java.time.LocalTime endTime;
 }

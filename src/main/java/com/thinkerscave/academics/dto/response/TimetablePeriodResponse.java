@@ -18,4 +18,7 @@ public class TimetablePeriodResponse {
     private LocalTime startTime;
     private LocalTime endTime;
     private TimetableSlotKind slotKind;
+    private Long schedulePatternId;
+    private String schedulePatternName;
+    private Integer durationMinutes;
 }

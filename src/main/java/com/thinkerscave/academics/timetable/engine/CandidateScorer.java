@@ -20,7 +20,8 @@ public class CandidateScorer {
     public double score(SchedulingRequirement req, CandidateSlot slot,
                         SchedulingSolution solution, SchedulingSourceData source, Random random) {
         double score = 0.0;
-        score += scorePreference(req.getPreference(), slot.getTeachingIndex(), source.getHalfIndex());
+        score += scorePreference(req.getPreference(), slot.getTeachingIndex(),
+                source.halfIndex(slot.getDayOfWeek()));
         score += scoreSpread(req, slot, solution, source);
         score += scoreConsecutive(req, slot, solution, source);
         score += scoreTeacherBalance(slot, solution, source);
@@ -48,7 +49,7 @@ public class CandidateScorer {
     private double scoreSpread(SchedulingRequirement req, CandidateSlot slot,
                                SchedulingSolution solution, SchedulingSourceData source) {
         int existing = solution.countPlacementsForSubjectInDay(
-                req.getSectionId(), req.getClassSubjectMappingId(), slot.getDayOfWeek());
+                req.getUnitId(), req.getAcademicGroupSubjectMappingId(), slot.getDayOfWeek());
         int cap = dailyCap(req.getWeeklyPeriods(), source.workingDayCount());
         if (existing == 0) return FIRST_OF_DAY_SCORE;
         if (existing < cap) return WITHIN_DAILY_CAP_SCORE;
@@ -57,7 +58,7 @@ public class CandidateScorer {
 
     private double scoreConsecutive(SchedulingRequirement req, CandidateSlot slot,
                                     SchedulingSolution solution, SchedulingSourceData source) {
-        if (!solution.hasConsecutiveSubject(req.getSectionId(), req.getClassSubjectMappingId(),
+        if (!solution.hasConsecutiveSubject(req.getUnitId(), req.getAcademicGroupSubjectMappingId(),
                 slot.getDayOfWeek(), slot.getPeriodNumber())) {
             return 0;
         }

@@ -1,6 +1,6 @@
 package com.thinkerscave.academics.dto.response;
 
-import com.thinkerscave.academics.enums.SubjectCategory;
+import com.thinkerscave.academics.enums.SubjectType;
 import com.thinkerscave.academics.enums.TeacherAllocationStatus;
 import lombok.Builder;
 import lombok.Getter;
@@ -12,16 +12,16 @@ import lombok.Setter;
 public class TeacherAllocationRowResponse {
     private Long teacherAllocationId;
     private Long academicYearId;
-    private Long classId;
-    private String className;
-    private String classCode;
+    private Long academicGroupId;
+    private String academicGroupName;
+    private String academicGroupCode;
     private Long sectionId;
     private String sectionName;
-    private Long classSubjectMappingId;
+    private Long academicGroupSubjectMappingId;
     private Long subjectId;
     private String subjectName;
     private String subjectCode;
-    private SubjectCategory subjectCategory;
+    private SubjectType subjectType;
     private Short weeklyPeriods;
 
     private Long primaryStaffId;

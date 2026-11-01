@@ -62,6 +62,10 @@ public class TimetableVersion extends Auditable {
     @Column(name = "status", nullable = false, length = 40)
     private TimetableStatus status = TimetableStatus.DRAFT;
 
+    /** Version whose locked lessons are carried into this generation. */
+    @Column(name = "source_version_id")
+    private Long sourceVersionId;
+
     @Column(name = "generated_at")
     private LocalDateTime generatedAt;
 

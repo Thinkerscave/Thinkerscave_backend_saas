@@ -5,19 +5,19 @@ import lombok.Getter;
 
 import java.util.List;
 
-/** Options for the timetable grid selectors: classes with their sections, teachers and rooms. */
+/** Options for the timetable grid selectors: academicGroups with their sections, teachers and rooms. */
 @Getter
 @AllArgsConstructor
 public class TimetableFiltersResponse {
 
-    private List<ClassOption> classes;
+    private List<AcademicGroupOption> academicGroups;
     private List<Option> teachers;
     private List<Option> rooms;
 
     @Getter
     @AllArgsConstructor
-    public static class ClassOption {
-        private Long classId;
+    public static class AcademicGroupOption {
+        private Long academicGroupId;
         private String name;
         private List<Option> sections;
     }

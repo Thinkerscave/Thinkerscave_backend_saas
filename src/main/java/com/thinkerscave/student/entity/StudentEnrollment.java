@@ -1,5 +1,6 @@
 package com.thinkerscave.student.entity;
 
+import com.thinkerscave.academics.entity.AcademicGroup;
 import com.thinkerscave.academics.entity.AcademicClass;
 import com.thinkerscave.academics.entity.AcademicSection;
 import com.thinkerscave.academics.entity.AcademicYear;
@@ -46,9 +47,14 @@ public class StudentEnrollment extends Auditable {
     private AcademicYear academicYear;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "class_id")
+        @JoinColumn(name = "class_id", insertable = false, updatable = false)
     @NotFound(action = NotFoundAction.IGNORE)
-    private AcademicClass classEntity;
+    private AcademicGroup academicGroupEntity;
+
+        @ManyToOne(fetch = FetchType.LAZY)
+        @JoinColumn(name = "class_id")
+        @NotFound(action = NotFoundAction.IGNORE)
+        private AcademicClass classEntity;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "section_id")

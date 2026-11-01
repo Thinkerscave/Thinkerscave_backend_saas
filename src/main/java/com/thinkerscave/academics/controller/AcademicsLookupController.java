@@ -27,16 +27,16 @@ public class AcademicsLookupController {
         return ResponseEntity.ok(ApiResponse.success("Academic years", lookupService.getActiveAcademicYears()));
     }
 
-    @GetMapping("/years/{yearId}/classes")
-    @Operation(summary = "Get classes for a year")
-    public ResponseEntity<ApiResponse<List<LookupDTO>>> getClasses(@PathVariable Long yearId) {
-        return ResponseEntity.ok(ApiResponse.success("Classes", lookupService.getClassesByYear(yearId)));
+    @GetMapping("/years/{yearId}/academic-groups")
+    @Operation(summary = "Get academicGroups for a year")
+    public ResponseEntity<ApiResponse<List<LookupDTO>>> getAcademicGroups(@PathVariable Long yearId) {
+        return ResponseEntity.ok(ApiResponse.success("AcademicGroups", lookupService.getAcademicGroupsByYear(yearId)));
     }
 
-    @GetMapping("/classes/{classId}/sections")
-    @Operation(summary = "Get sections for a class")
-    public ResponseEntity<ApiResponse<List<LookupDTO>>> getSections(@PathVariable Long classId) {
-        return ResponseEntity.ok(ApiResponse.success("Sections", lookupService.getSectionsByClass(classId)));
+    @GetMapping("/academic-groups/{academicGroupId}/sections")
+    @Operation(summary = "Get sections for an Academic Group")
+    public ResponseEntity<ApiResponse<List<LookupDTO>>> getSections(@PathVariable Long academicGroupId) {
+        return ResponseEntity.ok(ApiResponse.success("Sections", lookupService.getSectionsByAcademicGroup(academicGroupId)));
     }
 
     @GetMapping("/subjects")

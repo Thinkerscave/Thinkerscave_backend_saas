@@ -51,6 +51,9 @@ public class TimetableServiceImpl implements TimetableService {
             AcademicYearStatus.COMPLETED,
             AcademicYearStatus.ARCHIVED
     );
+    private static final Set<TimetableStatus> APPROVAL_STATUSES = EnumSet.of(
+            TimetableStatus.PENDING_APPROVAL, TimetableStatus.APPROVED
+    );
 
     private final AcademicYearRepository academicYearRepository;
     private final TeacherAllocationTeacherRepository allocationTeacherRepository;
@@ -60,6 +63,8 @@ public class TimetableServiceImpl implements TimetableService {
     private final TimetableVersionRepository versionRepository;
     private final TimetableEntryRepository entryRepository;
     private final TimetableConflictRepository conflictRepository;
+    private final TimetableGenerationRunRepository generationRunRepository;
+    private final TimetableVersionEventRepository versionEventRepository;
     private final AcademicResourceRepository resourceRepository;
     private final StaffRepository staffRepository;
     private final AcademicsAccessGuard accessGuard;
@@ -79,13 +84,13 @@ public class TimetableServiceImpl implements TimetableService {
         TimetablePlanningData data = planningDataLoader.load(yearId);
         TimetableReadinessResponse readiness = readinessEvaluator.evaluate(data);
         List<TimetableDashboardResponse.ReadinessItem> checks = readiness.getChecks().stream()
-                .map(c -> TimetableDashboardResponse.ReadinessItem.builder()
-                        .key(c.getCode())
-                        .label(c.getTitle() != null ? c.getTitle() : c.getCode())
-                        .status(c.getStatus() == TimetableReadinessResponse.ReadinessStatus.PASSED ? "PASS"
-                                : c.getStatus() == TimetableReadinessResponse.ReadinessStatus.WARNING ? "WARN" : "FAIL")
-                        .message(c.getMessage())
-                        .blocking(c.getSeverity() == TimetableReadinessResponse.ReadinessSeverity.BLOCKING)
+                .map(A -> TimetableDashboardResponse.ReadinessItem.builder()
+                        .key(A.getCode())
+                        .label(A.getTitle() != null ? A.getTitle() : A.getCode())
+                        .status(A.getStatus() == TimetableReadinessResponse.ReadinessStatus.PASSED ? "PASS"
+                                : A.getStatus() == TimetableReadinessResponse.ReadinessStatus.WARNING ? "WARN" : "FAIL")
+                        .message(A.getMessage())
+                        .blocking(A.getSeverity() == TimetableReadinessResponse.ReadinessSeverity.BLOCKING)
                         .build())
                 .toList();
 
@@ -128,20 +133,26 @@ public class TimetableServiceImpl implements TimetableService {
         Comparator<Integer> order = Comparator.nullsLast(Comparator.naturalOrder());
         List<AcademicSection> sections = data.getSections().stream()
                 .sorted(Comparator
-                        .comparing((AcademicSection s) -> s.getAcademicClass().getDisplayOrder(), order)
-                        .thenComparing(s -> Objects.toString(s.getAcademicClass().getName(), ""))
+                        .comparing((AcademicSection s) -> s.getAcademicGroup().getDisplayOrder(), order)
+                        .thenComparing(s -> Objects.toString(s.getAcademicGroup().getName(), ""))
                         .thenComparing(AcademicSection::getDisplayOrder, order)
                         .thenComparing(s -> Objects.toString(s.getName(), "")))
                 .toList();
 
-        Map<Long, TimetableFiltersResponse.ClassOption> classes = new LinkedHashMap<>();
+        Map<Long, TimetableFiltersResponse.AcademicGroupOption> academicGroups = new LinkedHashMap<>();
         for (AcademicSection s : sections) {
-            AcademicClass cls = s.getAcademicClass();
-            classes.computeIfAbsent(cls.getClassId(),
-                            id -> new TimetableFiltersResponse.ClassOption(id, cls.getName(), new ArrayList<>()))
+            AcademicGroup cls = s.getAcademicGroup();
+            academicGroups.computeIfAbsent(cls.getAcademicGroupId(),
+                            id -> new TimetableFiltersResponse.AcademicGroupOption(id, cls.getName(), new ArrayList<>()))
                     .getSections()
                     .add(new TimetableFiltersResponse.Option(s.getSectionId(), s.getName()));
         }
+        // Groups without sections are scheduled as one unit; they must still appear in the Class View selector.
+        data.getMappings().stream()
+                .map(m -> m.getAcademicGroup())
+                .sorted(Comparator.comparing((AcademicGroup g) -> g.getDisplayOrder(), order))
+                .forEach(g -> academicGroups.computeIfAbsent(g.getAcademicGroupId(),
+                        id -> new TimetableFiltersResponse.AcademicGroupOption(id, g.getName(), new ArrayList<>())));
 
         Map<Long, String> teachers = new HashMap<>();
         for (TimetablePlanningData.Lesson lesson : data.getLessons()) {
@@ -156,7 +167,7 @@ public class TimetableServiceImpl implements TimetableService {
                 .map(r -> new TimetableFiltersResponse.Option(r.getAcademicResourceId(), r.getName()))
                 .toList();
 
-        return new TimetableFiltersResponse(new ArrayList<>(classes.values()), teacherOptions, roomOptions);
+        return new TimetableFiltersResponse(new ArrayList<>(academicGroups.values()), teacherOptions, roomOptions);
     }
 
     // ─── Configuration ────────────────────────────────────────────────────
@@ -217,7 +228,7 @@ public class TimetableServiceImpl implements TimetableService {
         List<TimetableConfiguration> all = configurationRepository.findByAcademicYear_AcademicYearId(yearId);
         TimetableConfiguration active = TimetablePlanningDataLoader.selectActive(all);
         TimetableConfiguration config = all.stream()
-                .filter(c -> c.getShiftType() == shift)
+                .filter(A -> A.getShiftType() == shift)
                 .findFirst()
                 .orElse(null);
         if (config == null && active != null && !Boolean.TRUE.equals(active.getIsLocked())) {
@@ -398,6 +409,13 @@ public class TimetableServiceImpl implements TimetableService {
 
         List<TimetableVersion> existing = versionRepository
                 .findByAcademicYear_AcademicYearIdOrderByVersionNumberDesc(yearId);
+        for (TimetableVersion version : existing) {
+            if (APPROVAL_STATUSES.contains(version.getStatus())) {
+                throw new BusinessException("Cannot generate another timetable while version "
+                        + version.getVersionNumber() + " is " + version.getStatus()
+                        + ". Complete the current approval workflow first.");
+            }
+        }
         for (TimetableVersion v : existing) {
             if (v.getGenerationStatus() != TimetableGenerationStatus.GENERATING) continue;
             if (progressTracker.hasActive(v.getTimetableVersionId())) {
@@ -411,26 +429,42 @@ public class TimetableServiceImpl implements TimetableService {
             versionRepository.save(v);
         }
 
-        TimetablePlanningData data = planningDataLoader.load(yearId);
+        TimetableConfiguration config = ensureSettingsConfiguration(year);
+        java.util.Set<Long> requestedGroups = request == null || request.getAcademicGroupIds() == null
+                ? java.util.Set.of() : new java.util.LinkedHashSet<>(request.getAcademicGroupIds());
+        TimetablePlanningData data = planningDataLoader.load(yearId, config,
+                request == null ? null : request.getReferenceDate(), requestedGroups);
         TimetableReadinessResponse readiness = readinessEvaluator.evaluate(data);
         if (!readiness.isReady()) {
             throw new BusinessException("Cannot generate yet. Fix these first: " + describeBlocking(readiness));
         }
 
-        TimetableConfiguration config = data.getConfiguration();
-        if (config == null) {
-            throw new BusinessException("Set up the timetable configuration (working days and periods) first");
-        }
-
         int nextVersion = existing.isEmpty() ? 1 : existing.get(0).getVersionNumber() + 1;
+        TimetableVersion sourceVersion = existing.stream()
+                .filter(v -> v.getStatus() == TimetableStatus.DRAFT || v.getStatus() == TimetableStatus.READY_FOR_REVIEW)
+                .filter(v -> v.getGenerationStatus() == TimetableGenerationStatus.GENERATED
+                        || v.getGenerationStatus() == TimetableGenerationStatus.GENERATED_WITH_CONFLICTS)
+                .findFirst().orElse(null);
 
         TimetableVersion version = new TimetableVersion();
         version.setAcademicYear(year);
         version.setTimetableConfiguration(config);
         version.setVersionNumber(nextVersion);
+        version.setSourceVersionId(sourceVersion == null ? null : sourceVersion.getTimetableVersionId());
         version.setGenerationStatus(TimetableGenerationStatus.GENERATING);
         version.setStatus(TimetableStatus.DRAFT);
         version = versionRepository.save(version);
+
+        TimetableGenerationRun run = new TimetableGenerationRun();
+        run.setTimetableVersion(version);
+        run.setAcademicYear(year);
+        run.setStatus(TimetableGenerationRunStatus.RUNNING);
+        run.setStartedAt(LocalDateTime.now());
+        run.setRequestedByUserId(accessGuard.currentUserIdOrNull());
+        run.setRequestedGroupIds(request == null || request.getAcademicGroupIds() == null
+                ? null : request.getAcademicGroupIds().stream().map(String::valueOf)
+                .collect(Collectors.joining(",")));
+        run = generationRunRepository.save(run);
 
         Long generationId = version.getTimetableVersionId();
         progressTracker.init(generationId);
@@ -438,16 +472,21 @@ public class TimetableServiceImpl implements TimetableService {
         long seed = request != null && request.getSeed() != null
                 ? request.getSeed()
                 : Objects.hash(yearId, config.getTimetableConfigurationId(), nextVersion);
+        run.setSeed(seed);
+        generationRunRepository.save(run);
+        recordEvent(version, "GENERATION_STARTED", null, TimetableStatus.DRAFT.name(),
+                "Version " + nextVersion + " generation requested");
 
         String tenant = TenantContext.getTenant();
         Long orgId = OrganizationContext.getOrganizationId();
         Long userId = accessGuard.currentUserIdOrNull();
+        java.time.LocalDate referenceDate = request == null ? null : request.getReferenceDate();
 
         // Launch worker only after the GENERATING version row is committed.
         final Long committedGenerationId = generationId;
         final long committedSeed = seed;
         Runnable launch = () -> generationWorker.runGeneration(
-                committedGenerationId, committedSeed, committedGenerationId, tenant, orgId, userId);
+                committedGenerationId, committedSeed, committedGenerationId, tenant, orgId, userId, referenceDate);
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
@@ -550,7 +589,7 @@ public class TimetableServiceImpl implements TimetableService {
 
     @Override
     @Transactional(readOnly = true)
-    public TimetableGridResponse getGrid(Long versionId, String view, Long classId,
+    public TimetableGridResponse getGrid(Long versionId, String view, Long academicGroupId,
                                          Long sectionId, Long staffId, Long resourceId) {
         if ("TEACHER".equalsIgnoreCase(view) && !accessGuard.hasElevatedRole()) {
             accessGuard.requireView(AcademicsAccessGuard.RESOURCE_MY_TIMETABLE);
@@ -583,7 +622,8 @@ public class TimetableServiceImpl implements TimetableService {
         if ("TEACHER".equalsIgnoreCase(view)) {
             entries = staffId == null ? List.of() : entries.stream()
                     .filter(e -> {
-                        Staff teacher = e.getTeacherAllocation() == null ? null
+                        Staff teacher = e.getTeacherAllocation() == null
+                                ? e.getStaff()
                                 : teacherByAllocation.get(e.getTeacherAllocation().getTeacherAllocationId());
                         return teacher != null && Objects.equals(teacher.getStaffId(), staffId);
                     })
@@ -597,10 +637,13 @@ public class TimetableServiceImpl implements TimetableService {
             entries = entries.stream()
                     .filter(e -> e.getSection() != null && Objects.equals(e.getSection().getSectionId(), sectionId))
                     .toList();
-        } else if (classId != null) {
+        } else if (academicGroupId != null) {
             entries = entries.stream()
-                    .filter(e -> e.getSection() != null && e.getSection().getAcademicClass() != null
-                            && Objects.equals(e.getSection().getAcademicClass().getClassId(), classId))
+                    .filter(e -> e.getSection() != null
+                            ? e.getSection().getAcademicGroup() != null
+                                && Objects.equals(e.getSection().getAcademicGroup().getAcademicGroupId(), academicGroupId)
+                            : e.getAcademicGroup() != null
+                                && Objects.equals(e.getAcademicGroup().getAcademicGroupId(), academicGroupId))
                     .toList();
         }
 
@@ -625,7 +668,7 @@ public class TimetableServiceImpl implements TimetableService {
         accessGuard.requireView(AcademicsAccessGuard.RESOURCE_TIMETABLE);
         requireVersion(versionId);
         return conflictRepository.findDetailedByVersion(versionId).stream()
-                .map(c -> toConflictResponse(c, versionId))
+                .map(A -> toConflictResponse(A, versionId))
                 .toList();
     }
 
@@ -677,8 +720,12 @@ public class TimetableServiceImpl implements TimetableService {
         assertGenerated(version, "submit");
         assertNoOpenBlocking(versionId, "submit");
 
+        TimetableStatus from = version.getStatus();
         version.setStatus(TimetableStatus.PENDING_APPROVAL);
-        return toVersionResponse(versionRepository.save(version));
+        version = versionRepository.save(version);
+        recordEvent(version, "SUBMITTED", from.name(), version.getStatus().name(),
+                "Submitted for approval");
+        return toVersionResponse(version);
     }
 
     @Override
@@ -692,10 +739,13 @@ public class TimetableServiceImpl implements TimetableService {
         assertNoOpenBlocking(versionId, "approve");
         assertStillReady(version, "approve");
 
+        TimetableStatus from = version.getStatus();
         version.setStatus(TimetableStatus.APPROVED);
         version.setApprovedAt(LocalDateTime.now());
         version.setApprovedByUserId(accessGuard.currentUserIdOrNull());
-        return toVersionResponse(versionRepository.save(version));
+        version = versionRepository.save(version);
+        recordEvent(version, "APPROVED", from.name(), version.getStatus().name(), "Timetable approved");
+        return toVersionResponse(version);
     }
 
     @Override
@@ -707,8 +757,12 @@ public class TimetableServiceImpl implements TimetableService {
             throw new BusinessException("Cannot reject version in status: " + version.getStatus());
         }
 
+        TimetableStatus from = version.getStatus();
         version.setStatus(TimetableStatus.READY_FOR_REVIEW);
-        return toVersionResponse(versionRepository.save(version));
+        version = versionRepository.save(version);
+        recordEvent(version, "REJECTED", from.name(), version.getStatus().name(),
+                "Returned for review");
+        return toVersionResponse(version);
     }
 
     @Override
@@ -716,9 +770,14 @@ public class TimetableServiceImpl implements TimetableService {
         accessGuard.requireApprove(AcademicsAccessGuard.RESOURCE_TIMETABLE);
         TimetableVersion version = requireVersion(versionId);
 
-        if (version.getStatus() != TimetableStatus.APPROVED) {
-            throw new BusinessException("Cannot publish version in status: " + version.getStatus());
+        if (version.getStatus() == TimetableStatus.PENDING_APPROVAL) {
+            throw new BusinessException("This version is awaiting approval. Approve it before publishing.");
         }
+        if (version.getStatus() != TimetableStatus.APPROVED) {
+            throw new BusinessException(
+                    "Only an approved timetable version can be published. Current status: " + version.getStatus());
+        }
+        assertGenerated(version, "publish");
         assertNoOpenBlocking(versionId, "publish");
         assertStillReady(version, "publish");
 
@@ -730,14 +789,19 @@ public class TimetableServiceImpl implements TimetableService {
                     versionRepository.saveAndFlush(published);
                 });
 
+        TimetableStatus from = version.getStatus();
         version.setStatus(TimetableStatus.PUBLISHED);
         version.setPublishedAt(LocalDateTime.now());
         version.setPublishedByUserId(accessGuard.currentUserIdOrNull());
-        versionRepository.save(version);
+        version = versionRepository.save(version);
+        recordEvent(version, "PUBLISHED", from.name(), version.getStatus().name(),
+                "Published to the organization");
 
         TimetableConfiguration config = version.getTimetableConfiguration();
-        config.setIsLocked(true);
-        configurationRepository.save(config);
+        if (config != null) {
+            config.setIsLocked(true);
+            configurationRepository.save(config);
+        }
 
         return toVersionResponse(version);
     }
@@ -747,6 +811,39 @@ public class TimetableServiceImpl implements TimetableService {
     private AcademicYear requireYear(Long yearId) {
         return academicYearRepository.findById(yearId)
                 .orElseThrow(() -> new ResourceNotFoundException("Academic year not found: " + yearId));
+    }
+
+    /**
+     * Keeps a year-level settings row (maximum teacher workload, legacy attendance working
+     * days). Patterns and group assignments are the scheduling source of truth.
+     */
+    private TimetableConfiguration ensureSettingsConfiguration(AcademicYear year) {
+        List<TimetableConfiguration> existing = configurationRepository
+                .findByAcademicYear_AcademicYearId(year.getAcademicYearId());
+        TimetableConfiguration active = TimetablePlanningDataLoader.selectActive(existing);
+        if (active != null) return active;
+        TimetableConfiguration config = existing.isEmpty() ? new TimetableConfiguration() : existing.get(0);
+        config.setAcademicYear(year);
+        config.setName("Timetable settings");
+        config.setShiftType(TimetableShiftType.REGULAR);
+        config.setSchoolStartTime(LocalTime.of(8, 0));
+        config.setSchoolEndTime(LocalTime.of(14, 0));
+        config.setDefaultPeriodDurationMin((short) 40);
+        config.setMaxTeacherWeeklyPeriods((short) 30);
+        config.setStatus(TimetableConfigurationStatus.READY);
+        config.setActive(true);
+        return configurationRepository.save(config);
+    }
+
+    private void recordEvent(TimetableVersion version, String type, String from, String to, String note) {
+        TimetableVersionEvent event = new TimetableVersionEvent();
+        event.setTimetableVersion(version);
+        event.setEventType(type);
+        event.setFromStatus(from);
+        event.setToStatus(to);
+        event.setNote(note);
+        event.setActorUserId(accessGuard.currentUserIdOrNull());
+        versionEventRepository.save(event);
     }
 
     private TimetableVersion requireVersion(Long versionId) {
@@ -796,7 +893,7 @@ public class TimetableServiceImpl implements TimetableService {
 
     private static String describeBlocking(TimetableReadinessResponse readiness) {
         return readiness.getBlockingIssues().stream()
-                .map(c -> (c.getTitle() != null ? c.getTitle() : c.getCode()) + " — " + c.getMessage())
+                .map(A -> (A.getTitle() != null ? A.getTitle() : A.getCode()) + " — " + A.getMessage())
                 .collect(Collectors.joining("; "));
     }
 
@@ -1136,8 +1233,8 @@ public class TimetableServiceImpl implements TimetableService {
                 .entryType(entry.getEntryType())
                 .sectionId(section == null ? null : section.getSectionId())
                 .sectionName(section == null ? null : section.getName())
-                .className(section == null || section.getAcademicClass() == null
-                        ? null : section.getAcademicClass().getName())
+                .academicGroupName(section == null || section.getAcademicGroup() == null
+                        ? null : section.getAcademicGroup().getName())
                 .subjectName(entry.getSubjectNameSnapshot())
                 .staffId(teacher == null ? null : teacher.getStaffId())
                 .staffName(teacher == null ? null : TimetablePlanningData.staffName(teacher))
@@ -1146,30 +1243,30 @@ public class TimetableServiceImpl implements TimetableService {
                 .build();
     }
 
-    private TimetableConflictResponse toConflictResponse(TimetableConflict c, Long versionId) {
-        AcademicSection section = c.getSection();
+    private TimetableConflictResponse toConflictResponse(TimetableConflict A, Long versionId) {
+        AcademicSection section = A.getSection();
         return TimetableConflictResponse.builder()
-                .timetableConflictId(c.getTimetableConflictId())
+                .timetableConflictId(A.getTimetableConflictId())
                 .timetableVersionId(versionId)
-                .conflictType(c.getConflictType())
-                .blocking(c.getBlocking())
-                .status(c.getStatus())
-                .message(c.getMessage())
-                .entryId(c.getTimetableEntry() == null ? null : c.getTimetableEntry().getTimetableEntryId())
-                .relatedEntryId(c.getRelatedTimetableEntry() == null
-                        ? null : c.getRelatedTimetableEntry().getTimetableEntryId())
+                .conflictType(A.getConflictType())
+                .blocking(A.getBlocking())
+                .status(A.getStatus())
+                .message(A.getMessage())
+                .entryId(A.getTimetableEntry() == null ? null : A.getTimetableEntry().getTimetableEntryId())
+                .relatedEntryId(A.getRelatedTimetableEntry() == null
+                        ? null : A.getRelatedTimetableEntry().getTimetableEntryId())
                 .sectionId(section == null ? null : section.getSectionId())
                 .sectionName(section == null ? null : section.getName())
-                .className(section == null || section.getAcademicClass() == null
-                        ? null : section.getAcademicClass().getName())
-                .teacherAllocationId(c.getTeacherAllocation() == null
-                        ? null : c.getTeacherAllocation().getTeacherAllocationId())
-                .resourceId(c.getResource() == null ? null : c.getResource().getAcademicResourceId())
-                .dayOfWeek(c.getDayOfWeek())
-                .periodId(c.getTimetablePeriod() == null ? null : c.getTimetablePeriod().getTimetablePeriodId())
-                .periodName(c.getTimetablePeriod() == null ? null : c.getTimetablePeriod().getName())
-                .resolvedAt(c.getResolvedAt())
-                .resolvedByUserId(c.getResolvedByUserId())
+                .academicGroupName(section == null || section.getAcademicGroup() == null
+                        ? null : section.getAcademicGroup().getName())
+                .teacherAllocationId(A.getTeacherAllocation() == null
+                        ? null : A.getTeacherAllocation().getTeacherAllocationId())
+                .resourceId(A.getResource() == null ? null : A.getResource().getAcademicResourceId())
+                .dayOfWeek(A.getDayOfWeek())
+                .periodId(A.getTimetablePeriod() == null ? null : A.getTimetablePeriod().getTimetablePeriodId())
+                .periodName(A.getTimetablePeriod() == null ? null : A.getTimetablePeriod().getName())
+                .resolvedAt(A.getResolvedAt())
+                .resolvedByUserId(A.getResolvedByUserId())
                 .build();
     }
 

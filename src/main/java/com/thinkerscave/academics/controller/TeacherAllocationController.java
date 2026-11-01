@@ -1,8 +1,8 @@
 package com.thinkerscave.academics.controller;
 
-import com.thinkerscave.academics.dto.request.ClassTeacherAssignmentRequest;
+import com.thinkerscave.academics.dto.request.SectionTeacherAssignmentRequest;
 import com.thinkerscave.academics.dto.request.TeacherAllocationAssignRequest;
-import com.thinkerscave.academics.dto.response.ClassTeacherAssignmentResponse;
+import com.thinkerscave.academics.dto.response.SectionTeacherAssignmentResponse;
 import com.thinkerscave.academics.dto.response.TeacherAllocationDashboardResponse;
 import com.thinkerscave.academics.dto.response.TeacherAllocationRowResponse;
 import com.thinkerscave.academics.dto.response.TeacherRecommendationResponse;
@@ -23,7 +23,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/academics")
 @RequiredArgsConstructor
-@Tag(name = "Teacher Allocation", description = "Assign teachers to class-section-subject slots")
+@Tag(name = "Teacher Allocation", description = "Assign teachers to Academic Group section-subject slots")
 public class TeacherAllocationController {
 
     private final TeacherAllocationService allocationService;
@@ -33,7 +33,7 @@ public class TeacherAllocationController {
     @Operation(summary = "Teacher Allocation dashboard")
     public ResponseEntity<ApiResponse<TeacherAllocationDashboardResponse>> dashboard(
             @PathVariable Long yearId,
-            @RequestParam(required = false) Long classId,
+            @RequestParam(required = false) Long academicGroupId,
             @RequestParam(required = false) Long sectionId,
             @RequestParam(required = false) Long subjectId,
             @RequestParam(required = false) TeacherAllocationStatus status,
@@ -41,7 +41,7 @@ public class TeacherAllocationController {
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Teacher allocation dashboard",
-                allocationService.getDashboard(yearId, classId, sectionId, subjectId, status, page, size)));
+                allocationService.getDashboard(yearId, academicGroupId, sectionId, subjectId, status, page, size)));
     }
 
     @PostMapping("/teacher-allocations/assign")
@@ -66,10 +66,10 @@ public class TeacherAllocationController {
     @Operation(summary = "Recommended teachers for a slot")
     public ResponseEntity<ApiResponse<List<TeacherRecommendationResponse>>> recommendations(
             @RequestParam Long sectionId,
-            @RequestParam Long classSubjectMappingId) {
+            @RequestParam Long academicGroupSubjectMappingId) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Recommendations",
-                allocationService.recommendations(sectionId, classSubjectMappingId)));
+                allocationService.recommendations(sectionId, academicGroupSubjectMappingId)));
     }
 
     @GetMapping("/years/{yearId}/teacher-workloads")
@@ -91,32 +91,32 @@ public class TeacherAllocationController {
                 allocationService.getTeacherWorkload(teacherId, academicYearId)));
     }
 
-    @PostMapping("/allocations/class-teachers")
+    @PostMapping("/allocations/section-teachers")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Assign class teacher")
-    public ResponseEntity<ApiResponse<ClassTeacherAssignmentResponse>> assignClassTeacher(
-            @Valid @RequestBody ClassTeacherAssignmentRequest request) {
+    @Operation(summary = "Assign section teacher")
+    public ResponseEntity<ApiResponse<SectionTeacherAssignmentResponse>> assignSectionTeacher(
+            @Valid @RequestBody SectionTeacherAssignmentRequest request) {
         return ResponseEntity.status(201).body(ApiResponse.success(
-                "Class teacher assigned", allocationService.assignClassTeacher(request)));
+                "Section teacher assigned", allocationService.assignSectionTeacher(request)));
     }
 
-    @GetMapping("/allocations/class-teachers")
+    @GetMapping("/allocations/section-teachers")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
-    @Operation(summary = "List class teacher assignments")
-    public ResponseEntity<ApiResponse<List<ClassTeacherAssignmentResponse>>> getClassTeachers(
+    @Operation(summary = "List section teacher assignments")
+    public ResponseEntity<ApiResponse<List<SectionTeacherAssignmentResponse>>> getSectionTeachers(
             @RequestParam Long yearId,
-            @RequestParam(required = false) Long classId,
+            @RequestParam(required = false) Long academicGroupId,
             @RequestParam(required = false) Long sectionId) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Assignments retrieved",
-                allocationService.getClassTeachers(yearId, classId, sectionId)));
+                allocationService.getSectionTeachers(yearId, academicGroupId, sectionId)));
     }
 
-    @DeleteMapping("/allocations/class-teachers/{assignmentId}")
+    @DeleteMapping("/allocations/section-teachers/{assignmentId}")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER')")
-    @Operation(summary = "Remove class teacher assignment")
-    public ResponseEntity<ApiResponse<Void>> removeClassTeacher(@PathVariable Long assignmentId) {
-        allocationService.removeClassTeacher(assignmentId);
-        return ResponseEntity.ok(ApiResponse.success("Class teacher assignment removed", null));
+    @Operation(summary = "Remove section teacher assignment")
+    public ResponseEntity<ApiResponse<Void>> removeSectionTeacher(@PathVariable Long assignmentId) {
+        allocationService.removeSectionTeacher(assignmentId);
+        return ResponseEntity.ok(ApiResponse.success("Section teacher assignment removed", null));
     }
 }

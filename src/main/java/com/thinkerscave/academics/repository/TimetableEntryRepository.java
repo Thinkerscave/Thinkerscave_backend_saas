@@ -16,6 +16,8 @@ public interface TimetableEntryRepository extends JpaRepository<TimetableEntry, 
 
     List<TimetableEntry> findByTimetableVersion_TimetableVersionId(Long versionId);
 
+    List<TimetableEntry> findByTimetableVersion_TimetableVersionIdAndLockedTrue(Long versionId);
+
     List<TimetableEntry> findByTimetableVersion_TimetableVersionIdAndSection_SectionId(
             Long versionId, Long sectionId);
 
@@ -24,16 +26,35 @@ public interface TimetableEntryRepository extends JpaRepository<TimetableEntry, 
 
     long countByTimetableVersion_TimetableVersionId(Long versionId);
 
+    long countByTeacherAllocation_TeacherAllocationId(Long teacherAllocationId);
+
+    boolean existsByFixedActivity_FixedActivityId(Long fixedActivityId);
+
     @Query("""
             SELECT e FROM TimetableEntry e
             JOIN FETCH e.timetablePeriod p
             LEFT JOIN FETCH e.section s
-            LEFT JOIN FETCH s.academicClass
+            LEFT JOIN FETCH s.academicGroup
             LEFT JOIN FETCH e.teacherAllocation
+            LEFT JOIN FETCH e.staff
+            LEFT JOIN FETCH e.subject
+            LEFT JOIN FETCH e.fixedActivity
             LEFT JOIN FETCH e.resource
             WHERE e.timetableVersion.timetableVersionId = :versionId
             """)
     List<TimetableEntry> findGridEntries(@Param("versionId") Long versionId);
+
+    List<TimetableEntry> findByTimetableVersion_TimetableVersionIdAndSection_SectionIdAndDayOfWeek(
+            Long versionId, Long sectionId, DayOfWeek dayOfWeek);
+
+    @Query("""
+            SELECT e FROM TimetableEntry e
+            JOIN FETCH e.timetablePeriod p
+            LEFT JOIN FETCH e.staff
+            WHERE e.timetableVersion.academicYear.academicYearId = :yearId
+              AND e.staff.staffId = :staffId
+            """)
+    List<TimetableEntry> findAllForStaffInYear(@Param("yearId") Long yearId, @Param("staffId") Long staffId);
 
     @Modifying
     @Query("DELETE FROM TimetableEntry e WHERE e.timetableVersion.timetableVersionId IN :versionIds")

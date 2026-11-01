@@ -1,19 +1,15 @@
 package com.thinkerscave.academics.service;
 
-import com.thinkerscave.academics.dto.request.ClassSubjectMappingRequest;
 import com.thinkerscave.academics.dto.request.SubjectRequest;
-import com.thinkerscave.academics.dto.response.ClassMappingBoardResponse;
-import com.thinkerscave.academics.dto.response.ClassSubjectMappingResponse;
 import com.thinkerscave.academics.dto.response.SubjectResponse;
-import com.thinkerscave.academics.dto.response.SubjectsMappingDashboardResponse;
-import com.thinkerscave.academics.enums.SubjectCategory;
+import com.thinkerscave.academics.dto.response.SubjectUsageResponse;
+import com.thinkerscave.academics.enums.SubjectType;
+import com.thinkerscave.shared.dto.PageResponse;
 
-import java.util.List;
-
+/** Reusable subject catalog: directory, lifecycle, and usage. Curriculum mapping lives in {@link SubjectMappingService}. */
 public interface SubjectService {
 
-    SubjectsMappingDashboardResponse getDashboard(
-            Long academicYearId, String q, SubjectCategory category, Boolean active);
+    PageResponse<SubjectResponse> getDirectory(String q, SubjectType subjectType, Boolean active, int page, int size);
 
     SubjectResponse create(SubjectRequest request);
 
@@ -21,13 +17,9 @@ public interface SubjectService {
 
     SubjectResponse getById(Long subjectId);
 
-    List<SubjectResponse> getByYear(Long academicYearId);
-
     SubjectResponse deactivate(Long subjectId);
 
     SubjectResponse activate(Long subjectId);
 
-    ClassMappingBoardResponse getClassMappingBoard(Long classId);
-
-    ClassSubjectMappingResponse upsertClassMapping(Long classId, ClassSubjectMappingRequest request);
+    PageResponse<SubjectUsageResponse> getUsages(Long subjectId, String q, int page, int size);
 }

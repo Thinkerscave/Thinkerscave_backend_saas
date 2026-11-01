@@ -4,7 +4,7 @@ import com.thinkerscave.academics.dto.response.*;
 
 public interface AcademicsMeService {
 
-    TeacherMyClassesResponse getTeacherMyClasses(Long academicYearId);
+    TeacherMyAcademicGroupsResponse getTeacherMyAcademicGroups(Long academicYearId);
 
     MyTimetableResponse getMyTimetable(Long academicYearId);
 

@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 @Builder
@@ -19,6 +21,10 @@ public class TimetableGenerateResultResponse {
     private String message;
     private String algorithmVersion;
     private ResultKind resultKind;
+    private Long generationRunId;
+    private int totalPlacements;
+    private List<String> unplacedLessons;
+    private List<String> warnings;
 
     public enum ResultKind {
         SUCCESS,

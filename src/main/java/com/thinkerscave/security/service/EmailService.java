@@ -5,8 +5,6 @@ import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.env.Environment;
-import org.springframework.core.env.Profiles;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -16,7 +14,8 @@ import org.springframework.web.util.HtmlUtils;
 
 /**
  * Transactional HTML email sender (OTP, welcome, provisioning).
- * Configure free Gmail SMTP via MAIL_* env vars — see .env.example.
+ * Gmail SMTP settings are hardcoded in {@code application*.properties} so mail does not
+ * depend on environment variables. Transient failures are retried automatically.
  */
 @Service
 @RequiredArgsConstructor
@@ -24,20 +23,37 @@ import org.springframework.web.util.HtmlUtils;
 public class EmailService {
 
     private final JavaMailSender mailSender;
-    private final Environment environment;
 
-    /** Non-empty in dev/test: all mail goes here. Must stay empty in prod. */
+    /** Non-empty: every environment delivers here; the real recipient is shown in the subject. */
     @Value("${app.mail.redirect-to:}")
     private String redirectTo;
 
     @Value("${spring.mail.username:}")
     private String mailUsername;
 
+    @Value("${spring.mail.password:}")
+    private String mailPassword;
+
+    @Value("${spring.mail.host:}")
+    private String mailHost;
+
+    @Value("${spring.mail.port:0}")
+    private int mailPort;
+
+    @Value("${spring.mail.properties.mail.smtp.auth:false}")
+    private boolean smtpAuth;
+
     @Value("${app.mail.from:${spring.mail.username:noreply@thinkerscave.com}}")
     private String fromEmail;
 
     @Value("${app.notification.email.enabled:true}")
     private boolean emailEnabled;
+
+    @Value("${app.mail.retry.max-attempts:3}")
+    private int maxSendAttempts;
+
+    @Value("${app.mail.retry.delay-ms:1000}")
+    private long retryDelayMs;
 
     /**
      * Async fire-and-forget send (non-critical paths).
@@ -49,6 +65,7 @@ public class EmailService {
 
     /**
      * Synchronous send with success flag — preferred for OTP / onboarding credentials.
+     * Retries transient SMTP failures so a temporary network hiccup does not lose the message.
      */
     public boolean sendHtmlEmailSync(String to, String subject, String htmlBody) {
         if (!emailEnabled) {
@@ -59,32 +76,95 @@ public class EmailService {
             log.warn("Email skipped: empty recipient. subject={}", subject);
             return false;
         }
-        try {
-            String from = resolveFrom();
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
-            helper.setFrom(from);
-            boolean redirected = StringUtils.hasText(redirectTo);
-            String deliveredTo = redirected ? redirectTo.trim() : to.trim();
-            String deliveredSubject = redirected ? "[To: " + to.trim() + "] " + subject : subject;
-            helper.setTo(deliveredTo);
-            helper.setSubject(deliveredSubject);
-            helper.setText(htmlBody, true);
-            mailSender.send(mimeMessage);
-            log.info("Email sent intendedTo={} deliveredTo={} from={} redirected={} subject={}",
-                    to, deliveredTo, from, redirected, deliveredSubject);
-            return true;
-        } catch (Exception e) {
-            log.error("Failed to send email to={} subject={} reason={}", to, subject, e.getMessage());
+        if (!isMailConfigured()) {
+            log.error("Email not sent: SMTP is not configured (host={} port={} username={} passwordPresent={}). "
+                            + "Set spring.mail.* in the application properties.",
+                    mailHost, mailPort, mailUsername, StringUtils.hasText(mailPassword));
             return false;
         }
+
+        String from = resolveFrom();
+        boolean redirected = StringUtils.hasText(redirectTo);
+        String deliveredTo = redirected ? redirectTo.trim() : to.trim();
+        String deliveredSubject = redirected ? "[To: " + to.trim() + "] " + subject : subject;
+        int attempts = Math.max(1, maxSendAttempts);
+
+        Exception lastFailure = null;
+        for (int attempt = 1; attempt <= attempts; attempt++) {
+            try {
+                MimeMessage mimeMessage = mailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
+                helper.setFrom(from);
+                helper.setTo(deliveredTo);
+                helper.setSubject(deliveredSubject);
+                helper.setText(htmlBody, true);
+                mailSender.send(mimeMessage);
+                log.info("Email sent intendedTo={} deliveredTo={} from={} redirected={} subject={} attempt={}",
+                        to, deliveredTo, from, redirected, deliveredSubject, attempt);
+                return true;
+            } catch (Exception e) {
+                lastFailure = e;
+                log.warn("Email send attempt {}/{} failed intendedTo={} subject={} reason={}",
+                        attempt, attempts, to, subject, rootMessage(e));
+                if (attempt < attempts) {
+                    sleepBeforeRetry(attempt);
+                    if (Thread.currentThread().isInterrupted()) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        log.error("Failed to send email after {} attempt(s) intendedTo={} subject={} reason={}",
+                attempts, to, subject, rootMessage(lastFailure));
+        return false;
     }
 
     @PostConstruct
-    void validateRedirectPolicy() {
-        if (StringUtils.hasText(redirectTo) && environment.acceptsProfiles(Profiles.of("prod"))) {
-            throw new IllegalStateException("app.mail.redirect-to must be empty under the prod profile");
+    void validateMailConfiguration() {
+        if (!emailEnabled) {
+            log.warn("Outbound email is DISABLED (app.notification.email.enabled=false)");
+            return;
         }
+        String summary = "host=" + mailHost
+                + " port=" + mailPort
+                + " username=" + mailUsername
+                + " passwordPresent=" + StringUtils.hasText(mailPassword)
+                + " from=" + resolveFrom()
+                + " redirectTo=" + (StringUtils.hasText(redirectTo) ? redirectTo.trim() : "(none)");
+        if (isMailConfigured()) {
+            log.info("Outbound email ready: {}", summary);
+        } else {
+            log.error("Outbound email is NOT configured correctly: {} — outbound mail will fail", summary);
+        }
+    }
+
+    private boolean isMailConfigured() {
+        boolean hostReady = StringUtils.hasText(mailHost)
+                && !"localhost".equalsIgnoreCase(mailHost.trim())
+                && mailPort > 0;
+        boolean credentialsReady = !smtpAuth
+                || (StringUtils.hasText(mailUsername) && StringUtils.hasText(mailPassword));
+        return hostReady && credentialsReady;
+    }
+
+    private void sleepBeforeRetry(int attempt) {
+        try {
+            Thread.sleep(Math.max(0L, retryDelayMs) * attempt);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private String rootMessage(Throwable failure) {
+        if (failure == null) {
+            return "unknown";
+        }
+        Throwable root = failure;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        return StringUtils.hasText(root.getMessage()) ? root.getMessage() : root.getClass().getSimpleName();
     }
 
     private String resolveFrom() {

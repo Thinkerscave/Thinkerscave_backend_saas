@@ -20,13 +20,13 @@ public class AcademicsMeController {
 
     // ─── Teacher endpoints ────────────────────────────────────────────────
 
-    @GetMapping("/classes")
+    @GetMapping("/academic-groups")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
-    @Operation(summary = "Get teacher's assigned classes and subjects")
-    public ResponseEntity<ApiResponse<TeacherMyClassesResponse>> myClasses(
+    @Operation(summary = "Get teacher's assigned academicGroups and subjects")
+    public ResponseEntity<ApiResponse<TeacherMyAcademicGroupsResponse>> myAcademicGroups(
             @RequestParam(required = false) Long academicYearId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Teacher classes retrieved", meService.getTeacherMyClasses(academicYearId)));
+                "Teacher academicGroups retrieved", meService.getTeacherMyAcademicGroups(academicYearId)));
     }
 
     @GetMapping("/structure")
@@ -42,7 +42,7 @@ public class AcademicsMeController {
 
     @GetMapping("/timetable")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF','STUDENT','PARENT')")
-    @Operation(summary = "Get personal timetable (teacher view for staff, class view for students)")
+        @Operation(summary = "Get personal timetable (teacher view for staff, Academic Group view for students)")
     public ResponseEntity<ApiResponse<MyTimetableResponse>> myTimetable(
             @RequestParam(required = false) Long academicYearId) {
         return ResponseEntity.ok(ApiResponse.success(
@@ -53,7 +53,7 @@ public class AcademicsMeController {
 
     @GetMapping("/academics")
     @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STUDENT','PARENT')")
-    @Operation(summary = "Get student academic profile, class, subjects and class teacher")
+        @Operation(summary = "Get student academic profile, Academic Group, subjects and section teacher")
     public ResponseEntity<ApiResponse<StudentMyAcademicsResponse>> myAcademics(
             @RequestParam(required = false) Long academicYearId) {
         return ResponseEntity.ok(ApiResponse.success(

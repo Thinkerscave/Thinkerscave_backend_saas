@@ -11,11 +11,15 @@ import java.util.List;
 public class SchedulingRequirement {
 
     private String requirementId;
+    /** Stable scheduling-unit id (section id, or negative group id for section-less groups). */
+    private Long unitId;
+    /** Real section id, null for a group-level unit. */
     private Long sectionId;
     private String sectionName;
-    private Long classId;
-    private String className;
-    private Long classSubjectMappingId;
+    private Long academicGroupId;
+    private String academicGroupName;
+    private Long academicGroupSubjectMappingId;
+    private Long choiceMappingId;
     private Long subjectId;
     private String subjectName;
     private int weeklyPeriods;
@@ -25,6 +29,8 @@ public class SchedulingRequirement {
     private String primaryStaffName;
     private Long defaultResourceId;
     private SubjectTimetablePreference preference;
+    private boolean optional;
+    private int consecutivePeriods = 1;
     private List<CandidateSlot> candidates;
     private int staticCandidateCount;
 }

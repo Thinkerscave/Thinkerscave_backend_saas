@@ -2,6 +2,7 @@ package com.thinkerscave.academics.repository;
 
 import com.thinkerscave.academics.entity.TimetableConflict;
 import com.thinkerscave.academics.enums.TimetableConflictStatus;
+import com.thinkerscave.academics.enums.TimetableConflictType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -30,17 +31,30 @@ public interface TimetableConflictRepository extends JpaRepository<TimetableConf
     long countByTimetableVersion_TimetableVersionIdAndBlockingFalseAndStatus(
             Long versionId, TimetableConflictStatus status);
 
+    long countByTimetableVersion_TimetableVersionIdAndBlockingTrueAndStatusAndSection_AcademicGroup_AcademicGroupId(
+            Long versionId, TimetableConflictStatus status, Long academicGroupId);
+
     @Query("""
-            SELECT c FROM TimetableConflict c
-            LEFT JOIN FETCH c.section s
-            LEFT JOIN FETCH s.academicClass
-            LEFT JOIN FETCH c.timetablePeriod
-            WHERE c.timetableVersion.timetableVersionId = :versionId
-            ORDER BY c.blocking DESC, c.timetableConflictId ASC
+            SELECT A FROM TimetableConflict A
+            LEFT JOIN FETCH A.section s
+            LEFT JOIN FETCH s.academicGroup
+            LEFT JOIN FETCH A.timetablePeriod
+            WHERE A.timetableVersion.timetableVersionId = :versionId
+            ORDER BY A.blocking DESC, A.timetableConflictId ASC
             """)
     List<TimetableConflict> findDetailedByVersion(@Param("versionId") Long versionId);
 
     @Modifying
-    @Query("DELETE FROM TimetableConflict c WHERE c.timetableVersion.timetableVersionId IN :versionIds")
+    @Query("DELETE FROM TimetableConflict A WHERE A.timetableVersion.timetableVersionId IN :versionIds")
     int deleteByVersionIds(@Param("versionIds") Collection<Long> versionIds);
+
+    /** Manual validation recomputes section and teacher clashes, so stale rows must be replaced. */
+    @Modifying
+    @Query("""
+            DELETE FROM TimetableConflict A
+            WHERE A.timetableVersion.timetableVersionId = :versionId
+              AND A.conflictType IN :types
+            """)
+    int deleteByVersionAndTypes(@Param("versionId") Long versionId,
+                                @Param("types") Collection<TimetableConflictType> types);
 }

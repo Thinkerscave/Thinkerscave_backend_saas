@@ -226,7 +226,7 @@ public class TeacherArrangementServiceImpl implements TeacherArrangementService 
             AcademicSection section = absentEntry.getSection();
             result.add(new TeacherArrangementEligibleSlotResponse(
                     absentEntry.getTimetableEntryId(),
-                    section == null || section.getAcademicClass() == null ? "" : section.getAcademicClass().getName(),
+                    section == null || section.getAcademicGroup() == null ? "" : section.getAcademicGroup().getName(),
                     section == null ? "" : section.getName(),
                     absentEntry.getSubjectNameSnapshot(),
                     absentEntry.getTimetablePeriod().getPeriodNumber(),
@@ -340,7 +340,7 @@ public class TeacherArrangementServiceImpl implements TeacherArrangementService 
                     AcademicSection section = entry.getSection();
                     return new TeacherArrangementResponse.Slot(
                             entry.getTimetableEntryId(),
-                            section == null || section.getAcademicClass() == null ? "" : section.getAcademicClass().getName(),
+                            section == null || section.getAcademicGroup() == null ? "" : section.getAcademicGroup().getName(),
                             section == null ? "" : section.getName(),
                             entry.getSubjectNameSnapshot(),
                             entry.getTimetablePeriod().getPeriodNumber(),

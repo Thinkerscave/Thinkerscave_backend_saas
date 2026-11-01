@@ -37,10 +37,15 @@ public class TimetablePeriod extends Auditable {
     @EqualsAndHashCode.Include
     private Long timetablePeriodId;
 
-    @NotNull
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "timetable_configuration_id", nullable = false)
+    /** Legacy school-day owner; null for slots that belong to a reusable schedule pattern. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "timetable_configuration_id")
     private TimetableConfiguration timetableConfiguration;
+
+    /** Reusable daily pattern that owns this ordered slot. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "schedule_pattern_id")
+    private SchedulePattern schedulePattern;
 
     @NotNull
     @Positive

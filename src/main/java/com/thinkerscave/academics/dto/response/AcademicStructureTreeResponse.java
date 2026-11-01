@@ -12,24 +12,24 @@ import java.util.List;
 @Builder
 public class AcademicStructureTreeResponse {
     private AcademicStage stage;
-    private List<ClassNode> classes;
+    private List<AcademicGroupNode> academicGroups;
 
     @Getter
     @Setter
     @Builder
-    public static class ClassNode {
-        private Long classId;
+    public static class AcademicGroupNode {
+        private Long academicGroupId;
         private String name;
         private String code;
         private Boolean active;
         private Integer displayOrder;
         private List<SectionNode> sections;
 
-        public String getClassName() {
+        public String getAcademicGroupName() {
             return name;
         }
 
-        public String getClassCode() {
+        public String getAcademicGroupCode() {
             return code;
         }
     }

@@ -11,7 +11,7 @@ public class AcademicYearTransitionRequest {
     @NotNull
     private Long targetAcademicYearId;
 
-    private boolean copyClasses = true;
+    private boolean copyAcademicGroups = true;
     private boolean copySections = true;
     private boolean copySubjects = true;
     private boolean copyMappings = true;

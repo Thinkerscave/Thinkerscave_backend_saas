@@ -93,8 +93,9 @@ public class StudentDashboardProvider extends AbstractDashboardWidgetProvider im
     private WidgetDTO<QuickActionsData> quickActions() {
         return safeWidget("quick-actions", WidgetType.QUICK_ACTIONS, "Quick links", 4, DataMode.LIVE, () ->
                 QuickActionsData.builder().items(List.of(
-                        QuickActionItem.builder().label("My Timetable").icon("pi-clock").route("/app/academics/timetable").tone("primary").build(),
-                        QuickActionItem.builder().label("My Attendance").icon("pi-calendar-plus").route("/app/attendance/students").tone("info").build(),
+                        QuickActionItem.builder().label("My Timetable").icon("pi-clock").route("/app/academics/my-timetable").tone("primary").build(),
+                                QuickActionItem.builder().label("My Academics").icon("pi-book").route("/app/academics/my-academics").tone("info").build(),
+                                QuickActionItem.builder().label("My Attendance").icon("pi-calendar-plus").route("/app/attendance/students").tone("info").build(),
                         QuickActionItem.builder().label("Notices").icon("pi-megaphone").route("/app/communication/notices").tone("warning").build(),
                         QuickActionItem.builder().label("Academic Calendar").icon("pi-calendar").route("/app/academics/academic-calendar").tone("success").build()
                 )).build());

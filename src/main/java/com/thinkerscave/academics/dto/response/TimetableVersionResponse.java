@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -28,4 +29,20 @@ public class TimetableVersionResponse {
     private long totalEntries;
     private long totalConflicts;
     private long openBlockingConflicts;
+    private long unplacedLessonCount;
+    private boolean editable;
+    private List<Event> events;
+
+    @Getter
+    @Setter
+    @Builder
+    public static class Event {
+        private Long eventId;
+        private String eventType;
+        private String fromStatus;
+        private String toStatus;
+        private String note;
+        private LocalDateTime at;
+        private Long actorUserId;
+    }
 }

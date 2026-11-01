@@ -11,9 +11,9 @@ import java.time.LocalDateTime;
 @Builder
 public class AcademicSectionResponse {
     private Long sectionId;
-    private Long classId;
-    private String className;
-    private String classCode;
+    private Long academicGroupId;
+    private String academicGroupName;
+    private String academicGroupCode;
 
     private String name;
     private String code;
@@ -23,8 +23,8 @@ public class AcademicSectionResponse {
     private Boolean active;
 
     private long studentCount;
-    private String classTeacherName;
-    private Long classTeacherStaffId;
+    private String sectionTeacherName;
+    private Long sectionTeacherStaffId;
 
     private String createdBy;
     private LocalDateTime createdOn;
