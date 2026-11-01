@@ -72,7 +72,11 @@ public class AdmissionsPublicController {
     private InquiryRequest toInquiryRequest(PublicAdmissionInquiryRequest request) {
         InquiryRequest mapped = new InquiryRequest();
         mapped.setName(StringUtils.hasText(request.getStudentName()) ? request.getStudentName().trim() : "");
-        mapped.setParentContactName(StringUtils.hasText(request.getStudentName()) ? request.getStudentName().trim() : "Website Enquiry");
+        String parent = StringUtils.hasText(request.getParentName())
+                ? request.getParentName().trim()
+                : (StringUtils.hasText(request.getStudentName()) ? request.getStudentName().trim() : "Website Enquiry");
+        mapped.setParentContactName(parent);
+        mapped.setEmail(StringUtils.hasText(request.getEmail()) ? request.getEmail().trim() : null);
         mapped.setMobileNumber(request.getMobileNumber().trim());
 
         String className = null;

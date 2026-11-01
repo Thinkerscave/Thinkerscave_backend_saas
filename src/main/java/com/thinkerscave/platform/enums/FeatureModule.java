@@ -12,6 +12,8 @@ public enum FeatureModule {
     TRANSPORT,
     HOSTEL,
     COMMUNICATION,
-    SETTINGS
+    SETTINGS,
+    FRONT_DESK,
+    DOCUMENTATION
 
 }
