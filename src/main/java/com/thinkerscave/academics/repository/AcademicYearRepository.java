@@ -21,10 +21,6 @@ public interface AcademicYearRepository extends JpaRepository<AcademicYear, Long
 
     boolean existsByNameIgnoreCaseAndAcademicYearIdNot(String name, Long id);
 
-    Optional<AcademicYear> findByNameIgnoreCase(String name);
-
-    Optional<AcademicYear> findByStatus(AcademicYearStatus status);
-
     Optional<AcademicYear> findByStatusAndActiveTrue(AcademicYearStatus status);
 
     List<AcademicYear> findByStatusInOrderByStartDateDesc(List<AcademicYearStatus> statuses);
