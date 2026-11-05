@@ -4,11 +4,15 @@
 -- IMPORTANT: This file is NEVER loaded by the Spring Boot application.
 --            Operators run it manually when preparing a database.
 --
--- Purpose : Platform master data so Super Admin can log in and see menus.
--- Assumes : All application tables already exist (empty or nearly empty).
--- Scope   : Master / platform data ONLY (roles, privileges, Super Admin,
---           menus/features baseline, code sequences, catalog seeds).
---           No students, subjects, attendance, demo schools, etc.
+-- Purpose : Bootstrap platform catalogs and the internal platform host required
+--           by the Super Admin account and its foreign keys.
+-- Assumes : Current application tables already exist.
+-- Scope   : Includes the platform host organization/account (id=1), platform
+--           roles and permissions, menus/features, plans and other catalogs.
+--           Does NOT seed customer institutions, tenant_registry rows, tenant
+--           schemas or institution admins; those require separate supplied data.
+-- Safety  : Fresh-platform bootstrap only. This is NOT a recovery script. It
+--           refreshes role_permissions for the seeded platform admin role.
 --
 -- Login (Thinkers Department / PLATFORM login — not institution login):
 --   Username : superadmin
@@ -153,6 +157,17 @@ UPDATE menus SET menu_name = 'Migration Center',        route = '/app/tenant-man
 UPDATE menus SET menu_name = 'Audit Center',            route = '/app/tenant-management/audit-center',          icon = 'pi pi-history',     menu_type = 'PAGE',   parent_menu_id = (SELECT id FROM menus WHERE menu_code = 'TENANT_MANAGEMENT'), display_order = 3, show_in_sidebar = TRUE, active = TRUE WHERE menu_code = 'AUDIT_CENTER';
 UPDATE menus SET menu_name = 'Platform Catalog',        route = NULL,                                           icon = 'pi pi-th-large',    menu_type = 'MODULE', parent_menu_id = NULL, display_order = 6, show_in_sidebar = TRUE, active = TRUE WHERE menu_code = 'PLATFORM_CATALOG';
 UPDATE menus SET menu_name = 'Feature Catalog',         route = '/app/tenant-management/feature-catalog',       icon = 'pi pi-box',         menu_type = 'PAGE',   parent_menu_id = (SELECT id FROM menus WHERE menu_code = 'PLATFORM_CATALOG'), display_order = 2, show_in_sidebar = TRUE, active = TRUE WHERE menu_code = 'FEATURE_CATALOG';
+
+-- Direct SQL does not apply the Java MenuScope default. These entries are all
+-- platform-admin routes, so mark them explicitly and leave subscription links empty.
+UPDATE menus
+SET menu_scope = 'PLATFORM', feature_id = NULL
+WHERE menu_code IN (
+    'DASHBOARD', 'CUSTOMERS', 'TM_ORGANIZATIONS',
+    'SUBSCRIPTION_MANAGEMENT', 'SUBSCRIPTION_PLANS', 'PROMOTIONS',
+    'TENANT_MANAGEMENT', 'TENANT_HEALTH', 'MIGRATION_CENTER', 'AUDIT_CENTER',
+    'PLATFORM_CATALOG', 'FEATURE_CATALOG'
+);
 
 -- Deactivate legacy duplicate roots if they still exist from older seeds
 UPDATE menus SET active = FALSE, show_in_sidebar = FALSE

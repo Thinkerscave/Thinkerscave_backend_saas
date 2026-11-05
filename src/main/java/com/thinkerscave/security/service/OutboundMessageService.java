@@ -3,6 +3,7 @@ package com.thinkerscave.security.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 import org.springframework.util.StringUtils;
 
 /**
@@ -128,6 +129,23 @@ public class OutboundMessageService {
                 + " Login: " + safe(loginUrl);
         boolean smsOk = trySms(mobile, sms);
         log.info("Institution user credentials dispatched emailOk={} smsOk={} email={}", mailOk, smsOk, email);
+    }
+
+    public boolean sendInstitutionUserSetupInvitation(
+            String email, String recipientName, String roleLabel, String organizationName, String loginUrl) {
+        String safeName = HtmlUtils.htmlEscape(safe(recipientName));
+        String safeRole = HtmlUtils.htmlEscape(safe(roleLabel));
+        String safeOrganization = HtmlUtils.htmlEscape(safe(organizationName));
+        String safeLoginUrl = HtmlUtils.htmlEscape(safe(loginUrl));
+        String subject = "Set up your " + safe(organizationName) + " account";
+        String html = "<p>Hello " + safeName + ",</p>"
+                + "<p>Your " + safeRole + " account for " + safeOrganization + " is ready.</p>"
+                + "<p>Open the sign-in page and choose <strong>Forgot password</strong> to receive a secure, "
+                + "single-use password setup code.</p>"
+                + "<p><a href=\"" + safeLoginUrl + "\">Open ThinkersCave</a></p>";
+        boolean sent = emailService.sendHtmlEmailSync(email, subject, html);
+        log.info("Institution account setup invitation dispatched emailOk={} email={}", sent, email);
+        return sent;
     }
 
     private boolean trySms(String mobile, String message) {

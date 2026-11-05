@@ -9,6 +9,7 @@ import java.io.IOException;
 import com.thinkerscave.student.enums.StudentStatus;
 
 import com.thinkerscave.student.dto.StudentCreateRequest;
+import com.thinkerscave.student.dto.StudentPersonalUpdateRequest;
 import com.thinkerscave.student.dto.StudentResponseDTO;
 import com.thinkerscave.student.dto.StudentProfileResponse;
 import com.thinkerscave.student.dto.MedicalDTO;
@@ -16,6 +17,8 @@ import com.thinkerscave.student.dto.TimelineDTO;
 import com.thinkerscave.student.dto.StudentSearchRequest;
 import com.thinkerscave.student.dto.StudentDocumentDTO;
 import com.thinkerscave.student.dto.ImportedStudentDocument;
+import com.thinkerscave.student.dto.ParentDTO;
+import com.thinkerscave.student.dto.StudentParentRequest;
 
 public interface StudentService {
 
@@ -28,8 +31,14 @@ public interface StudentService {
 	StudentResponseDTO getStudentById(Long studentId);
     
     StudentProfileResponse getProfile360(Long studentId);
+
+    ParentDTO addParent(Long studentId, StudentParentRequest request);
+
+    ParentDTO updateParent(Long studentId, Long parentId, StudentParentRequest request);
+
+    void removeParent(Long studentId, Long parentId);
     
-    StudentResponseDTO updatePersonal(Long studentId, StudentCreateRequest request);
+    StudentResponseDTO updatePersonal(Long studentId, StudentPersonalUpdateRequest request);
     
     StudentResponseDTO updateMedical(Long studentId, MedicalDTO request);
     
@@ -49,7 +58,11 @@ public interface StudentService {
     
     List<StudentDocumentDTO> getStudentDocuments(Long studentId);
 
-    StudentDocumentDTO uploadStudentDocument(Long studentId, MultipartFile file, String documentType) throws IOException;
+        StudentDocumentDTO uploadStudentDocument(Long studentId, MultipartFile file, String documentType,
+            String documentName, String remarks) throws IOException;
+
+        StudentDocumentDTO replaceStudentDocument(Long studentId, Long documentId, MultipartFile file,
+            String documentName, String remarks) throws IOException;
 
     StudentDocumentDTO updateDocumentStatus(Long documentId, String status, String remarks);
 

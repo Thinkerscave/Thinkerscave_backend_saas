@@ -8,6 +8,7 @@ import com.thinkerscave.academics.service.AcademicsLookupService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.thinkerscave.admission.dto.ApplicationProfileDetails;
+import com.thinkerscave.admission.dto.AdmissionGuardianDetails;
 import com.thinkerscave.admission.dto.request.ApplicationAdmissionRequest;
 import com.thinkerscave.admission.dto.request.ApplicationSearchRequest;
 import com.thinkerscave.admission.dto.request.EnrollApplicationRequest;
@@ -18,14 +19,15 @@ import com.thinkerscave.admission.dto.response.ApplicationDocumentResponse;
 import com.thinkerscave.admission.dto.response.ApplicationProgressResponse;
 import com.thinkerscave.admission.dto.response.EnrollmentResultResponse;
 import com.thinkerscave.admission.dto.response.FamilyMatchResponse;
-import com.thinkerscave.admission.entity.AdmissionApplicationDocument;
 import com.thinkerscave.admission.entity.ApplicationAdmission;
 import com.thinkerscave.admission.entity.Inquiry;
 import com.thinkerscave.admission.enums.ApplicationStatus;
 import com.thinkerscave.admission.enums.DocumentCheckStatus;
 import com.thinkerscave.admission.enums.FeePaymentStatus;
 import com.thinkerscave.admission.enums.InquiryStatus;
-import com.thinkerscave.admission.repository.AdmissionApplicationDocumentRepository;
+import com.thinkerscave.document.entity.Document;
+import com.thinkerscave.document.enums.DocumentOwnerType;
+import com.thinkerscave.document.repository.DocumentRepository;
 import com.thinkerscave.admission.repository.ApplicationAdmissionRepository;
 import com.thinkerscave.admission.repository.InquiryRepository;
 import com.thinkerscave.admission.service.AdmissionsSettingService;
@@ -41,6 +43,7 @@ import com.thinkerscave.shared.storage.LocalFileStorageService;
 import com.thinkerscave.staff.entity.Staff;
 import com.thinkerscave.staff.repository.StaffRepository;
 import com.thinkerscave.student.dto.ImportedStudentDocument;
+import com.thinkerscave.student.dto.StudentParentRequest;
 import com.thinkerscave.student.dto.StudentCreateRequest;
 import com.thinkerscave.student.dto.StudentResponseDTO;
 import com.thinkerscave.student.entity.Parent;
@@ -102,7 +105,7 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     private static final String RESOURCE_ADMISSIONS_APPLICATIONS = "ADMISSIONS_APPLICATIONS";
 
     private final ApplicationAdmissionRepository repository;
-    private final AdmissionApplicationDocumentRepository documentRepository;
+    private final DocumentRepository documentRepository;
     private final ObjectMapper objectMapper;
     private final InquiryRepository inquiryRepository;
     private final StudentService studentService;
@@ -498,15 +501,16 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         }
 
         List<ImportedStudentDocument> copiedDocs = documentRepository
-                .findByApplicationApplicationIdOrderByCreatedOnDesc(applicationId)
+            .findByOwnerTypeAndOwnerIdAndActiveTrueOrderByDocumentIdDesc(DocumentOwnerType.ADMISSION, applicationId)
                 .stream()
-                .filter(doc -> doc.getStoredPath() != null && !doc.getStoredPath().isBlank())
+            .filter(doc -> hasText(doc.getFilePath()))
                 .map(doc -> new ImportedStudentDocument(
                         doc.getDocumentType(),
-                        doc.getOriginalName(),
-                        doc.getStoredPath(),
-                        doc.getStatus(),
-                        doc.getDocumentId(),
+                doc.getFileName(),
+                doc.getFilePath(),
+                documentStatus(doc.getVerificationStatus()),
+                doc.getSourceApplicationDocumentId() != null
+                    ? doc.getSourceApplicationDocumentId() : doc.getDocumentId(),
                         doc.getRemarks()))
                 .collect(Collectors.toList());
         studentService.importStoredDocuments(student.getStudentId(), copiedDocs);
@@ -548,13 +552,20 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
             throw new BadRequestException("Documents cannot be uploaded for this application status");
         }
         try {
+            fileStorageService.validate(file);
             String path = fileStorageService.store(file, "adm_" + applicationId);
-            AdmissionApplicationDocument doc = new AdmissionApplicationDocument();
-            doc.setApplication(app);
+            Document doc = new Document();
+            doc.setOwnerType(DocumentOwnerType.ADMISSION);
+            doc.setOwnerId(applicationId);
             doc.setDocumentType(hasText(documentType) ? documentType.trim() : "OTHER");
-            doc.setOriginalName(file.getOriginalFilename());
-            doc.setStoredPath(path);
-            doc.setStatus(DocumentCheckStatus.PENDING);
+            doc.setDocumentName(doc.getDocumentType());
+            doc.setFileName(fileStorageService.sanitizeFilename(file.getOriginalFilename()));
+            doc.setFilePath(path);
+            doc.setMimeType(file.getContentType());
+            doc.setFileSize(file.getSize());
+            doc.setVerificationStatus(DocumentCheckStatus.PENDING.name());
+            doc.setUploadedOn(LocalDateTime.now());
+            doc.setCreatedBy(currentUsername());
             if (hasText(remarks)) {
                 doc.setRemarks(remarks.trim());
             }
@@ -571,7 +582,8 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     public List<ApplicationDocumentResponse> listDocuments(Long applicationId) {
         requireViewApplications();
         getApplication(applicationId);
-        return documentRepository.findByApplicationApplicationIdOrderByCreatedOnDesc(applicationId)
+        return documentRepository.findByOwnerTypeAndOwnerIdAndActiveTrueOrderByDocumentIdDesc(
+                DocumentOwnerType.ADMISSION, applicationId)
                 .stream()
                 .map(this::toDocumentResponse)
                 .collect(Collectors.toList());
@@ -581,9 +593,11 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     @Transactional
     public ApplicationDocumentResponse updateDocumentStatus(Long documentId, DocumentCheckStatus status, String remarks) {
         requireApproveApplications();
-        AdmissionApplicationDocument doc = documentRepository.findById(documentId)
+        Document doc = documentRepository.findById(documentId)
+            .filter(item -> item.getOwnerType() == DocumentOwnerType.ADMISSION
+                && Boolean.TRUE.equals(item.getActive()))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
-        doc.setStatus(status);
+        doc.setVerificationStatus(status.name());
         if (remarks != null && !remarks.isBlank()) {
             doc.setRemarks(remarks.trim());
         } else if (status == DocumentCheckStatus.REJECTED) {
@@ -592,7 +606,7 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         ApplicationDocumentResponse response = toDocumentResponse(documentRepository.save(doc));
         String event = status == DocumentCheckStatus.VERIFIED ? "DOCUMENT_VERIFIED" : "DOCUMENT_REJECTED";
         auditWriteService.record(AuditEventType.UPDATE, event, "APPLICATION",
-                String.valueOf(doc.getApplication().getApplicationId()),
+                String.valueOf(doc.getOwnerId()),
                 doc.getDocumentType() + (remarks != null ? ": " + remarks : ""));
         return response;
     }
@@ -601,25 +615,28 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
     @Transactional
     public void deleteDocument(Long documentId) {
         requireManageApplications();
-        AdmissionApplicationDocument doc = documentRepository.findById(documentId)
+        Document doc = documentRepository.findById(documentId)
+            .filter(item -> item.getOwnerType() == DocumentOwnerType.ADMISSION
+                && Boolean.TRUE.equals(item.getActive()))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
-        String storedPath = doc.getStoredPath();
-        documentRepository.delete(doc);
-        fileStorageService.deleteQuietly(storedPath);
+        doc.setActive(false);
+        documentRepository.save(doc);
     }
 
     @Override
     public ApplicationDocumentFile downloadDocument(Long documentId) {
         requireViewApplications();
-        AdmissionApplicationDocument doc = documentRepository.findById(documentId)
+        Document doc = documentRepository.findById(documentId)
+            .filter(item -> item.getOwnerType() == DocumentOwnerType.ADMISSION
+                && Boolean.TRUE.equals(item.getActive()))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
-        String originalName = StringUtils.hasText(doc.getOriginalName())
-                ? doc.getOriginalName()
+        String originalName = StringUtils.hasText(doc.getFileName())
+            ? doc.getFileName()
                 : "document-" + documentId;
         MediaType mediaType = MediaTypeFactory.getMediaType(originalName)
                 .orElse(MediaType.APPLICATION_OCTET_STREAM);
         return new ApplicationDocumentFile(
-                fileStorageService.loadAsResource(doc.getStoredPath()),
+                fileStorageService.loadAsResource(doc.getFilePath()),
                 originalName,
                 mediaType.toString()
         );
@@ -808,6 +825,33 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         request.setEnrollmentDate(LocalDate.now());
 
         if (profile != null) {
+            List<AdmissionGuardianDetails> admissionGuardians = profile.getGuardians();
+            if (admissionGuardians != null && !admissionGuardians.isEmpty()) {
+                List<StudentParentRequest> parents = new java.util.ArrayList<>();
+                for (AdmissionGuardianDetails guardian : admissionGuardians) {
+                    if (guardian == null || !hasText(guardian.fullName()) || !hasText(guardian.mobile())) {
+                        continue;
+                    }
+                    String[] names = splitName(guardian.fullName());
+                    StudentParentRequest parent = new StudentParentRequest();
+                    parent.setFirstName(names[0]);
+                    parent.setLastName(names[1]);
+                    parent.setRelationship(guardian.relationship());
+                    parent.setMobileNumber(digitsOnly(guardian.mobile()));
+                    parent.setEmail(guardian.email());
+                    parent.setOccupation(guardian.occupation());
+                    parent.setPrimaryContact(parents.isEmpty());
+                    parent.setReceiveSms(true);
+                    parent.setReceiveEmail(true);
+                    if (parents.isEmpty() && profile.getLinkedParentId() != null) {
+                        parent.setExistingParentId(profile.getLinkedParentId());
+                    }
+                    parents.add(parent);
+                }
+                if (!parents.isEmpty()) {
+                    request.setParents(parents);
+                }
+            }
             if (profile.getLinkedParentId() != null) {
                 request.setExistingParentId(profile.getLinkedParentId());
             }
@@ -815,7 +859,10 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
             if (hasText(profile.getReligion())) request.setReligion(profile.getReligion());
             if (hasText(profile.getNationality())) request.setNationality(profile.getNationality());
             if (hasText(profile.getMotherTongue())) request.setMotherTongue(profile.getMotherTongue());
-            if (hasText(profile.getCategory())) request.setCategory(profile.getCategory());
+            if (hasText(profile.getSocialCategory()) || hasText(profile.getCategory())) {
+                request.setSocialCategory(hasText(profile.getSocialCategory())
+                        ? profile.getSocialCategory() : profile.getCategory());
+            }
             if (hasText(profile.getPlaceOfBirth())) request.setPlaceOfBirth(profile.getPlaceOfBirth());
             if (hasText(profile.getIdentityDocumentType())) request.setIdentityDocumentType(profile.getIdentityDocumentType());
             if (hasText(profile.getIdentityDocumentNumber())) {
@@ -833,7 +880,9 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
             if (hasText(profile.getAddressLine1()) || hasText(profile.getCity()) || hasText(profile.getPinCode())) {
                 request.setCurrentAddressLine1(profile.getAddressLine1());
                 request.setCurrentAddressLine2(profile.getAddressLine2());
+                request.setCurrentLandmark(profile.getLandmark());
                 request.setCurrentCity(profile.getCity());
+                request.setCurrentDistrict(profile.getDistrict());
                 request.setCurrentState(profile.getState());
                 request.setCurrentCountry(profile.getCountry());
                 request.setCurrentPostalCode(profile.getPinCode());
@@ -847,7 +896,9 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
                     || hasText(profile.getPermanentPinCode()))) {
                 request.setPermanentAddressLine1(profile.getPermanentAddressLine1());
                 request.setPermanentAddressLine2(profile.getPermanentAddressLine2());
+                request.setPermanentLandmark(profile.getPermanentLandmark());
                 request.setPermanentCity(profile.getPermanentCity());
+                request.setPermanentDistrict(profile.getPermanentDistrict());
                 request.setPermanentState(profile.getPermanentState());
                 request.setPermanentCountry(profile.getPermanentCountry());
                 request.setPermanentPostalCode(profile.getPermanentPinCode());
@@ -925,7 +976,8 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
 
     private ApplicationAdmissionResponse toResponse(ApplicationAdmission a) {
         List<ApplicationDocumentResponse> docs = documentRepository
-                .findByApplicationApplicationIdOrderByCreatedOnDesc(a.getApplicationId())
+            .findByOwnerTypeAndOwnerIdAndActiveTrueOrderByDocumentIdDesc(
+                DocumentOwnerType.ADMISSION, a.getApplicationId())
                 .stream()
                 .map(this::toDocumentResponse)
                 .collect(Collectors.toList());
@@ -976,17 +1028,26 @@ public class ApplicationAdmissionServiceImpl implements ApplicationAdmissionServ
         }
     }
 
-    private ApplicationDocumentResponse toDocumentResponse(AdmissionApplicationDocument doc) {
+    private ApplicationDocumentResponse toDocumentResponse(Document doc) {
         return ApplicationDocumentResponse.builder()
                 .documentId(doc.getDocumentId())
-                .applicationId(doc.getApplication().getApplicationId())
+                .applicationId(doc.getOwnerId())
                 .documentType(doc.getDocumentType())
-                .originalName(doc.getOriginalName())
-                .status(doc.getStatus())
+                .originalName(doc.getFileName())
+                .status(documentStatus(doc.getVerificationStatus()))
                 .remarks(doc.getRemarks())
                 .createdOn(doc.getCreatedOn())
                 .createdBy(doc.getCreatedBy())
                 .build();
+    }
+
+    private static DocumentCheckStatus documentStatus(String status) {
+        try {
+            return hasText(status) ? DocumentCheckStatus.valueOf(status.trim().toUpperCase())
+                    : DocumentCheckStatus.PENDING;
+        } catch (IllegalArgumentException ex) {
+            return DocumentCheckStatus.PENDING;
+        }
     }
 
     private static String lookupName(List<LookupDTO> items, Long id) {

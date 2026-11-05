@@ -6,9 +6,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Collection;
 
 @Repository
 public interface DocumentRepository extends JpaRepository<Document, Long> {
 
     List<Document> findByOwnerTypeAndOwnerIdAndActiveTrue(DocumentOwnerType ownerType, Long ownerId);
+
+    List<Document> findByOwnerTypeAndOwnerIdAndActiveTrueOrderByDocumentIdDesc(DocumentOwnerType ownerType, Long ownerId);
+
+    List<Document> findByOwnerTypeAndOwnerIdInAndActiveTrue(DocumentOwnerType ownerType, Collection<Long> ownerIds);
 }

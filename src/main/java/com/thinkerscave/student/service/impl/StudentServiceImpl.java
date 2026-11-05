@@ -5,27 +5,42 @@ import com.thinkerscave.access.dto.UserCreationContext;
 import com.thinkerscave.access.dto.UserProvisioningResult;
 import com.thinkerscave.access.entity.Role;
 import com.thinkerscave.access.entity.User;
+import com.thinkerscave.access.entity.UserRole;
 import com.thinkerscave.access.repository.RoleRepository;
+import com.thinkerscave.access.repository.UserRepository;
+import com.thinkerscave.access.repository.UserRoleRepository;
 import com.thinkerscave.access.service.UserService;
 import com.thinkerscave.academics.repository.AcademicYearRepository;
+import com.thinkerscave.academics.entity.AcademicClass;
+import com.thinkerscave.academics.entity.AcademicSection;
+import com.thinkerscave.academics.entity.AcademicYear;
 import com.thinkerscave.academics.repository.ClassRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.admission.dto.ApplicationProfileDetails;
 import com.thinkerscave.admission.repository.ApplicationAdmissionRepository;
+import com.thinkerscave.document.entity.Document;
+import com.thinkerscave.document.enums.DocumentOwnerType;
+import com.thinkerscave.document.repository.DocumentRepository;
 import com.thinkerscave.audit.enums.AuditEventType;
 import com.thinkerscave.audit.service.AuditWriteService;
 import com.thinkerscave.admission.enums.DocumentCheckStatus;
 import com.thinkerscave.security.service.UserCredentialNotificationService;
 import com.thinkerscave.shared.entity.Address;
+import com.thinkerscave.shared.context.OrganizationContext;
+import com.thinkerscave.shared.dto.AddressDto;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.shared.service.AddressFactory;
 import com.thinkerscave.shared.storage.LocalFileStorageService;
 import com.thinkerscave.student.dto.EnrollmentDTO;
 import com.thinkerscave.student.dto.ImportedStudentDocument;
 import com.thinkerscave.student.dto.MedicalDTO;
 import com.thinkerscave.student.dto.ParentDTO;
+import com.thinkerscave.student.dto.StudentParentRequest;
 import com.thinkerscave.student.dto.PreviousSchoolingDTO;
 import com.thinkerscave.student.dto.StudentCreateRequest;
+import com.thinkerscave.student.dto.StudentPersonalUpdateRequest;
+import com.thinkerscave.student.dto.StudentParentRequest;
 import com.thinkerscave.student.dto.StudentDocumentDTO;
 import com.thinkerscave.student.dto.StudentProfileResponse;
 import com.thinkerscave.student.dto.StudentResponseDTO;
@@ -33,7 +48,6 @@ import com.thinkerscave.student.dto.StudentSearchRequest;
 import com.thinkerscave.student.dto.TimelineDTO;
 import com.thinkerscave.student.entity.Parent;
 import com.thinkerscave.student.entity.Student;
-import com.thinkerscave.student.entity.StudentDocument;
 import com.thinkerscave.student.entity.StudentEnrollment;
 import com.thinkerscave.student.entity.StudentMedical;
 import com.thinkerscave.student.entity.StudentParent;
@@ -43,7 +57,6 @@ import com.thinkerscave.student.enums.ParentRelationship;
 import com.thinkerscave.student.enums.StudentStatus;
 import com.thinkerscave.student.enums.StudentTimelineEventType;
 import com.thinkerscave.student.repository.ParentRepository;
-import com.thinkerscave.student.repository.StudentDocumentRepository;
 import com.thinkerscave.student.repository.StudentEnrollmentRepository;
 import com.thinkerscave.student.repository.StudentMedicalRepository;
 import com.thinkerscave.student.repository.StudentParentRepository;
@@ -64,6 +77,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.Period;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -87,6 +101,8 @@ public class StudentServiceImpl implements StudentService {
     private final LocalFileStorageService fileStorageService;
     private final UserService userService;
     private final RoleRepository roleRepository;
+    private final UserRepository userRepository;
+    private final UserRoleRepository userRoleRepository;
     private final ParentRepository parentRepository;
     private final StudentRepository studentRepository;
     private final ClassRepository classRepository;
@@ -96,7 +112,8 @@ public class StudentServiceImpl implements StudentService {
     private final StudentMedicalRepository studentMedicalRepository;
     private final StudentParentRepository studentParentRepository;
     private final StudentTimelineRepository studentTimelineRepository;
-    private final StudentDocumentRepository studentDocumentRepository;
+    private final DocumentRepository documentRepository;
+    private final AddressFactory addressFactory;
     private final AuditWriteService auditWriteService;
     private final ApplicationAdmissionRepository applicationAdmissionRepository;
     private final ObjectMapper objectMapper;
@@ -113,26 +130,29 @@ public class StudentServiceImpl implements StudentService {
     public StudentResponseDTO saveStudentWithDocuments(StudentCreateRequest dto, MultipartFile photo,
                                                        List<MultipartFile> documents, List<String> types) throws IOException {
 
-        Role studentRole = roleRepository.findByRoleCode(ROLE_STUDENT)
+        validateParentRequests(dto);
+        InitialPlacement initialPlacement = validateInitialPlacement(dto);
+        UserProvisioningResult studentProvisioning = null;
+        User studentUser = null;
+        if (hasText(dto.getEmail())) {
+            User existingUser = userRepository.findByEmailIgnoreCase(dto.getEmail().trim()).orElse(null);
+            if (existingUser != null && studentRepository.findByUser_Id(existingUser.getId()).isPresent()) {
+                throw new BadRequestException("This account is already linked to a student");
+            }
+            Role studentRole = roleRepository.findByRoleCode(ROLE_STUDENT)
                 .orElseThrow(() -> new IllegalStateException("Role STUDENT not found"));
-        Role parentRole = roleRepository.findByRoleCode(ROLE_PARENT)
-                .orElseThrow(() -> new IllegalStateException("Role PARENT not found"));
-
-        UserCreationContext studentContext = new UserCreationContext(
-                dto.getFirstName(), dto.getMiddleName(), dto.getLastName(),
-                dto.getEmail(), dto.getMobileNumber(), null, null, null, TYPE_STUDENT);
-        UserProvisioningResult studentProvisioning = userService.createUserWithTemporaryPassword(studentContext, studentRole);
-        User studentUser = studentProvisioning.getUser();
-
-        String studentCode = "STU" + System.currentTimeMillis();
-        String admissionNumber = hasText(dto.getAdmissionNumber())
-                ? dto.getAdmissionNumber().trim()
-                : generateAdmissionNumber();
-        if (studentRepository.existsByAdmissionNumber(admissionNumber)) {
-            throw new BadRequestException("Admission number already exists: " + admissionNumber);
+            AccountProvisioning account = provisionAccount(dto.getEmail(), new UserCreationContext(
+                    dto.getFirstName(), dto.getMiddleName(), dto.getLastName(),
+                    dto.getEmail(), dto.getMobileNumber(), null, null, null, TYPE_STUDENT), studentRole);
+            studentUser = account.user();
+            studentProvisioning = account.newAccount();
         }
 
-        Parent parent = resolveOrCreateParent(dto, parentRole);
+        String studentCode = "STU" + System.currentTimeMillis();
+        String admissionNumber = trimToNull(dto.getAdmissionNumber());
+        if (admissionNumber != null && studentRepository.existsByAdmissionNumber(admissionNumber)) {
+            throw new BadRequestException("Admission number already exists: " + admissionNumber);
+        }
 
         Student student = new Student();
         student.setStudentCode(studentCode);
@@ -146,7 +166,7 @@ public class StudentServiceImpl implements StudentService {
         student.setReligion(trimToNull(dto.getReligion()));
         student.setNationality(trimToNull(dto.getNationality()));
         student.setMotherTongue(trimToNull(dto.getMotherTongue()));
-        student.setCategory(trimToNull(dto.getCategory()));
+        student.setSocialCategory(trimToNull(dto.getSocialCategory() != null ? dto.getSocialCategory() : dto.getCategory()));
         student.setPlaceOfBirth(trimToNull(dto.getPlaceOfBirth()));
         student.setIdentityDocumentType(trimToNull(dto.getIdentityDocumentType()));
         student.setIdentityDocumentNumber(trimToNull(dto.getIdentityDocumentNumber()));
@@ -180,26 +200,17 @@ public class StudentServiceImpl implements StudentService {
         medical.setEmergencyNotes(trimToNull(dto.getEmergencyNotes()));
         studentMedicalRepository.save(medical);
 
-        StudentParent sp = new StudentParent();
-        sp.setStudent(student);
-        sp.setParent(parent);
-        sp.setRelationship(parseRelationship(dto.getParentRelationship(), ParentRelationship.FATHER));
-        sp.setPrimaryContact(true);
-        studentParentRepository.save(sp);
+        saveParentLinks(student, dto);
 
-        linkSecondaryParent(student, dto, parentRole);
-
-        if (dto.getAcademicYearId() != null && dto.getClassId() != null) {
+        if (initialPlacement != null) {
             StudentEnrollment enrollment = new StudentEnrollment();
             enrollment.setStudent(student);
             enrollment.setRollNumber(trimToNull(dto.getRollNumber()));
             enrollment.setStatus(parseEnrollmentStatus(dto.getEnrollmentStatus()));
             enrollment.setActive(true);
-            academicYearRepository.findById(dto.getAcademicYearId()).ifPresent(enrollment::setAcademicYear);
-            classRepository.findById(dto.getClassId()).ifPresent(enrollment::setClassEntity);
-            if (dto.getSectionId() != null) {
-                sectionRepository.findById(dto.getSectionId()).ifPresent(enrollment::setSection);
-            }
+            enrollment.setAcademicYear(initialPlacement.academicYear());
+            enrollment.setClassEntity(initialPlacement.classEntity());
+            enrollment.setSection(initialPlacement.section());
             studentEnrollmentRepository.save(enrollment);
         }
 
@@ -210,14 +221,20 @@ public class StudentServiceImpl implements StudentService {
                     continue;
                 }
                 String storedPath = fileStorageService.store(file, "doc_" + safeFileToken(studentCode));
-                StudentDocument document = new StudentDocument();
-                document.setStudent(student);
+                Document document = new Document();
+                document.setOwnerType(DocumentOwnerType.STUDENT);
+                document.setOwnerId(student.getStudentId());
                 document.setDocumentName(file.getOriginalFilename());
                 document.setDocumentType(types.get(i) == null || types.get(i).isBlank() ? "OTHER" : types.get(i));
-                document.setDocumentPath(storedPath);
-                document.setStatus(DocumentCheckStatus.PENDING);
+                document.setFilePath(storedPath);
+                document.setFileName(fileStorageService.sanitizeFilename(file.getOriginalFilename()));
+                document.setFileExtension(extensionOf(document.getFileName()));
+                document.setMimeType(file.getContentType());
+                document.setFileSize(file.getSize());
+                document.setVerificationStatus(DocumentCheckStatus.PENDING.name());
+                document.setUploadedOn(LocalDateTime.now());
                 document.setCreatedBy(getCurrentUsername());
-                studentDocumentRepository.save(document);
+                documentRepository.save(document);
             }
         }
 
@@ -230,8 +247,9 @@ public class StudentServiceImpl implements StudentService {
                 String.valueOf(student.getStudentId()),
                 "Student created: " + studentCode);
 
-        credentialNotificationService.sendInstitutionUserCredentials(
-                studentProvisioning, dto.getEmail(), dto.getMobileNumber(), "Student");
+        if (studentProvisioning != null) {
+            credentialNotificationService.sendInstitutionUserSetupInvitation(studentProvisioning.getUser(), "Student");
+        }
 
         return mapToResponseDTO(student);
     }
@@ -250,7 +268,7 @@ public class StudentServiceImpl implements StudentService {
         student.setReligion(dto.getReligion());
         student.setNationality(dto.getNationality());
         student.setMotherTongue(dto.getMotherTongue());
-        student.setCategory(trimToNull(dto.getCategory()));
+        student.setSocialCategory(trimToNull(dto.getSocialCategory() != null ? dto.getSocialCategory() : dto.getCategory()));
         student.setPlaceOfBirth(trimToNull(dto.getPlaceOfBirth()));
         student.setIdentityDocumentType(trimToNull(dto.getIdentityDocumentType()));
         student.setIdentityDocumentNumber(trimToNull(dto.getIdentityDocumentNumber()));
@@ -314,7 +332,7 @@ public class StudentServiceImpl implements StudentService {
             response.setMedical(dto);
         });
 
-        studentDocumentRepository.findByStudentStudentIdOrderByDocumentIdDesc(studentId).stream()
+        documentRepository.findByOwnerTypeAndOwnerIdAndActiveTrueOrderByDocumentIdDesc(DocumentOwnerType.STUDENT, studentId).stream()
                 .filter(doc -> "PHOTO".equalsIgnoreCase(doc.getDocumentType()))
                 .findFirst()
                 .ifPresent(photoDoc -> response.setPhotoDocumentId(photoDoc.getDocumentId()));
@@ -345,20 +363,215 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     @Transactional
-    public StudentResponseDTO updatePersonal(Long studentId, StudentCreateRequest dto) {
+    public ParentDTO addParent(Long studentId, StudentParentRequest request) {
         Student student = getStudent(studentId);
-        student.setFirstName(dto.getFirstName());
-        student.setMiddleName(dto.getMiddleName());
-        student.setLastName(dto.getLastName());
-        student.setGender(dto.getGender());
-        student.setDateOfBirth(dto.getDateOfBirth());
-        student.setMobileNumber(dto.getMobileNumber() != null ? Long.parseLong(dto.getMobileNumber()) : null);
-        student.setEmail(dto.getEmail());
+        if (request == null || !request.hasIdentity()) {
+            throw new BadRequestException("Parent first name and mobile are required");
+        }
+        List<StudentParent> current = studentParentRepository.findByStudentStudentId(studentId);
+        Parent parent = resolveOrCreateParent(request);
+        ParentRelationship relationship = parseRelationship(request.getRelationship(), ParentRelationship.GUARDIAN);
+        StudentParent duplicate = current.stream()
+                .filter(link -> link.getParent().getParentId().equals(parent.getParentId())
+                        && link.getRelationship() == relationship && Boolean.TRUE.equals(link.getActive()))
+                .findFirst().orElse(null);
+        if (duplicate != null) {
+            throw new BadRequestException("This parent is already linked to the student");
+        }
+
+        boolean makePrimary = Boolean.TRUE.equals(request.getPrimaryContact())
+                || current.stream().noneMatch(link -> Boolean.TRUE.equals(link.getPrimaryContact())
+                        && Boolean.TRUE.equals(link.getActive()));
+        if (makePrimary) {
+            current.forEach(link -> {
+                link.setPrimaryContact(false);
+                studentParentRepository.save(link);
+            });
+        }
+        StudentParent link = new StudentParent();
+        link.setStudent(student);
+        link.setParent(parent);
+        link.setRelationship(relationship);
+        link.setPrimaryContact(makePrimary);
+        link.setReceiveSms(request.getReceiveSms() == null || request.getReceiveSms());
+        link.setReceiveEmail(request.getReceiveEmail() == null || request.getReceiveEmail());
+        link.setPickupAuthorized(Boolean.TRUE.equals(request.getPickupAuthorized()));
+        link.setActive(true);
+        studentParentRepository.save(link);
+        addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED, "Guardian added",
+                "A parent or guardian was linked to the student.");
+        return mapParentLink(link);
+    }
+
+    @Override
+    @Transactional
+    public ParentDTO updateParent(Long studentId, Long parentId, StudentParentRequest request) {
+        Student student = getStudent(studentId);
+        StudentParent link = studentParentRepository.findByStudentStudentId(studentId).stream()
+                .filter(candidate -> candidate.getParent().getParentId().equals(parentId)
+                        && Boolean.TRUE.equals(candidate.getActive()))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Guardian link not found for student"));
+        Parent parent = link.getParent();
+        parent.setFirstName(request.getFirstName().trim());
+        parent.setMiddleName(trimToNull(request.getMiddleName()));
+        parent.setLastName(hasText(request.getLastName()) ? request.getLastName().trim() : "NA");
+        parent.setMobileNumber(request.getMobileNumber().trim());
+        parent.setOccupation(trimToNull(request.getOccupation()));
+        parent.setOrganizationName(trimToNull(request.getOrganizationName()));
+        parent.setQualification(trimToNull(request.getQualification()));
+        parent.setAnnualIncome(request.getAnnualIncome());
+        if (!java.util.Objects.equals(parent.getEmail(), trimToNull(request.getEmail()))) {
+            String nextEmail = trimToNull(request.getEmail());
+            if (nextEmail != null && userRepository.existsByEmail(nextEmail)) {
+                boolean sameLinkedAccount = parent.getUser() != null
+                        && parent.getUser().getEmail().equalsIgnoreCase(nextEmail);
+                if (!sameLinkedAccount) throw new BadRequestException("Email is already used by another account");
+            }
+            parent.setEmail(nextEmail);
+            if (parent.getUser() != null && nextEmail != null) {
+                parent.getUser().setEmail(nextEmail);
+                parent.getUser().setUsername(nextEmail);
+                parent.getUser().setEmailVerified(false);
+                userRepository.save(parent.getUser());
+                credentialNotificationService.sendInstitutionUserSetupInvitation(parent.getUser(), "Parent / Guardian");
+            }
+        }
+        parentRepository.save(parent);
+        link.setRelationship(parseRelationship(request.getRelationship(), link.getRelationship()));
+        if (Boolean.TRUE.equals(request.getPrimaryContact())) {
+            studentParentRepository.findByStudentStudentId(studentId).stream()
+                    .filter(candidate -> !candidate.getStudentParentId().equals(link.getStudentParentId()))
+                    .forEach(candidate -> {
+                        candidate.setPrimaryContact(false);
+                        studentParentRepository.save(candidate);
+                    });
+            link.setPrimaryContact(true);
+        }
+        if (request.getReceiveSms() != null) link.setReceiveSms(request.getReceiveSms());
+        if (request.getReceiveEmail() != null) link.setReceiveEmail(request.getReceiveEmail());
+        if (request.getPickupAuthorized() != null) link.setPickupAuthorized(request.getPickupAuthorized());
+        studentParentRepository.save(link);
+        addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED, "Guardian updated",
+                "A parent or guardian profile was updated.");
+        return mapParentLink(link);
+    }
+
+    @Override
+    @Transactional
+    public void removeParent(Long studentId, Long parentId) {
+        Student student = getStudent(studentId);
+        List<StudentParent> links = studentParentRepository.findByStudentStudentId(studentId).stream()
+                .filter(link -> Boolean.TRUE.equals(link.getActive())).toList();
+        StudentParent remove = links.stream()
+                .filter(link -> link.getParent().getParentId().equals(parentId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Guardian link not found for student"));
+        if (links.size() <= 1) {
+            throw new BadRequestException("A student must retain at least one linked parent or guardian");
+        }
+        boolean wasPrimary = Boolean.TRUE.equals(remove.getPrimaryContact());
+        remove.setActive(false);
+        remove.setPrimaryContact(false);
+        studentParentRepository.save(remove);
+        if (wasPrimary) {
+            links.stream().filter(link -> !link.getStudentParentId().equals(remove.getStudentParentId()))
+                    .findFirst().ifPresent(link -> {
+                        link.setPrimaryContact(true);
+                        studentParentRepository.save(link);
+                    });
+        }
+        addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED, "Guardian removed",
+                "A parent or guardian was unlinked from the student.");
+    }
+
+    @Override
+    @Transactional
+    public StudentResponseDTO updatePersonal(Long studentId, StudentPersonalUpdateRequest dto) {
+        Student student = getStudent(studentId);
+        student.setFirstName(dto.getFirstName().trim());
+        student.setLastName(dto.getLastName().trim());
+        if (dto.getGender() != null) student.setGender(trimToNull(dto.getGender()));
+        if (dto.getDateOfBirth() != null) student.setDateOfBirth(dto.getDateOfBirth());
+        if (dto.getMobile() != null) {
+            student.setMobileNumber(parseMobile(dto.getMobile()));
+        }
+        if (dto.getEmail() != null) student.setEmail(trimToNull(dto.getEmail()));
+        updatePersonalAddresses(student, dto);
         studentRepository.save(student);
         addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED,
                 "Profile Updated", "Personal information was updated.");
+        auditWriteService.record(
+                AuditEventType.UPDATE,
+                "STUDENT_PERSONAL_UPDATE",
+                "Student",
+                String.valueOf(student.getStudentId()),
+                "Student personal information updated: " + student.getStudentCode());
         return mapToResponseDTO(student);
     }
+
+    private void updatePersonalAddresses(Student student, StudentPersonalUpdateRequest request) {
+        updateAddress(student.getCurrentAddress(), request.getCurrentAddressLine1(), request.getCurrentAddressLine2(),
+                request.getCurrentLandmark(), request.getCurrentCity(), request.getCurrentDistrict(),
+                request.getCurrentState(), request.getCurrentCountry(), request.getCurrentPostalCode(),
+                student::setCurrentAddress);
+        if (request.getSameAddress() != null) student.setSameAddress(request.getSameAddress());
+        if (Boolean.TRUE.equals(request.getSameAddress())) {
+            student.setPermanentAddress(copyAddress(student.getCurrentAddress()));
+            return;
+        }
+        updateAddress(student.getPermanentAddress(), request.getPermanentAddressLine1(), request.getPermanentAddressLine2(),
+                request.getPermanentLandmark(), request.getPermanentCity(), request.getPermanentDistrict(),
+                request.getPermanentState(), request.getPermanentCountry(), request.getPermanentPostalCode(),
+                student::setPermanentAddress);
+    }
+
+    private void updateAddress(Address existing, String line1, String line2, String landmark, String city,
+                               String district, String state, String country, String postal,
+                               java.util.function.Consumer<Address> setter) {
+        if (existing == null) {
+            Address created = buildAddress(line1, line2, landmark, city, district, state, country, postal);
+            if (created != null) setter.accept(created);
+            return;
+        }
+        if (line1 != null && hasText(line1)) existing.setAddressLine1(line1.trim());
+        if (line2 != null) existing.setAddressLine2(trimToNull(line2));
+        if (landmark != null) existing.setLandmark(trimToNull(landmark));
+        if (city != null) existing.setCity(trimToNull(city));
+        if (district != null) existing.setDistrict(trimToNull(district));
+        if (state != null) existing.setState(trimToNull(state));
+        if (country != null) existing.setCountry(trimToNull(country));
+        if (postal != null) existing.setPostalCode(trimToNull(postal));
+    }
+
+    private InitialPlacement validateInitialPlacement(StudentCreateRequest request) {
+        if (request.getAcademicYearId() == null && request.getClassId() == null && request.getSectionId() == null) {
+            return null;
+        }
+        if (request.getAcademicYearId() == null || request.getClassId() == null) {
+            throw new BadRequestException("Academic year and class are both required for enrollment");
+        }
+        AcademicYear year = academicYearRepository.findById(request.getAcademicYearId())
+                .orElseThrow(() -> new ResourceNotFoundException("Academic year not found: " + request.getAcademicYearId()));
+        AcademicClass academicClass = classRepository.findById(request.getClassId())
+                .orElseThrow(() -> new ResourceNotFoundException("Class not found: " + request.getClassId()));
+        if (!academicClass.isActive()) {
+            throw new BadRequestException("Cannot enroll a student in an inactive class");
+        }
+        if (academicClass.getAcademicYear() == null
+                || !academicClass.getAcademicYear().getAcademicYearId().equals(year.getAcademicYearId())) {
+            throw new BadRequestException("Class does not belong to the selected academic year");
+        }
+        AcademicSection section = request.getSectionId() == null ? null : sectionRepository.findById(request.getSectionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Section not found: " + request.getSectionId()));
+        if (section != null && (section.getAcademicGroup() == null
+                || !section.getAcademicGroup().getAcademicGroupId().equals(academicClass.getClassId()))) {
+            throw new BadRequestException("Section does not belong to the selected class");
+        }
+        return new InitialPlacement(year, academicClass, section);
+    }
+
+    private record InitialPlacement(AcademicYear academicYear, AcademicClass classEntity, AcademicSection section) {}
 
     @Override
     @Transactional
@@ -400,41 +613,22 @@ public class StudentServiceImpl implements StudentService {
                 ? Pageable.ofSize(50)
                 : pageable;
 
-        Page<Student> page;
-        if (request != null && request.getStatus() != null
-                && (request.getKeyword() == null || request.getKeyword().isBlank())
-                && (request.getParentName() == null || request.getParentName().isBlank())
-                && request.getClassId() == null && request.getSectionId() == null) {
-            page = studentRepository.findByStatus(request.getStatus(), effectivePageable);
-        } else if (request != null && request.getKeyword() != null && !request.getKeyword().isBlank()
-                && request.getStatus() == null
-                && (request.getParentName() == null || request.getParentName().isBlank())
-                && request.getClassId() == null && request.getSectionId() == null) {
-            page = studentRepository.searchByKeyword(request.getKeyword().trim(), effectivePageable);
-        } else if (request == null
-                || ((request.getKeyword() == null || request.getKeyword().isBlank())
-                && request.getStatus() == null
-                && (request.getParentName() == null || request.getParentName().isBlank())
-                && request.getClassId() == null && request.getSectionId() == null)) {
-            page = studentRepository.findAll(effectivePageable);
-        } else {
-            // Complex filters: page in DB first (cap) then refine — avoids loading entire table
-            Page<Student> candidatePage = request.getStatus() != null
-                    ? studentRepository.findByStatus(request.getStatus(), Pageable.ofSize(500))
-                    : (request.getKeyword() != null && !request.getKeyword().isBlank()
-                    ? studentRepository.searchByKeyword(request.getKeyword().trim(), Pageable.ofSize(500))
-                    : studentRepository.findAll(Pageable.ofSize(500)));
-            List<StudentResponseDTO> filtered = candidatePage.getContent().stream()
-                    .map(this::mapToResponseDTO)
-                    .filter(dto -> matchesSearch(dto, request))
-                    .collect(Collectors.toList());
-            int start = (int) effectivePageable.getOffset();
-            int end = Math.min(start + effectivePageable.getPageSize(), filtered.size());
-            List<StudentResponseDTO> content = start >= filtered.size() ? List.of() : filtered.subList(start, end);
-            return new PageImpl<>(content, effectivePageable, filtered.size());
-        }
-
-        return page.map(this::mapToResponseDTO);
+        String keyword = request == null ? null : trimToNull(request.getKeyword());
+        String rollNumber = request == null ? null : trimToNull(request.getRollNumber());
+        String parentMobile = request == null ? null : trimToNull(request.getParentMobile());
+        String parentName = request == null ? null : trimToNull(request.getParentName());
+        return studentRepository.searchDirectory(
+                keyword,
+                rollNumber,
+                parentMobile,
+                parentName,
+                request == null ? null : request.getAcademicYearId(),
+                request == null ? null : request.getClassId(),
+                request == null ? null : request.getSectionId(),
+                request == null ? null : request.getAssigned(),
+                request == null ? null : request.getStatus(),
+                effectivePageable)
+            .map(this::mapToResponseDTO);
     }
 
     @Override
@@ -466,6 +660,12 @@ public class StudentServiceImpl implements StudentService {
     @Transactional
     public StudentResponseDTO updateStudentStatus(Long studentId, StudentStatus status) {
         Student student = getStudent(studentId);
+        if (status != StudentStatus.ACTIVE && status != StudentStatus.INACTIVE) {
+            throw new BadRequestException("Student status can only be toggled between ACTIVE and INACTIVE here");
+        }
+        if (student.getStatus() != StudentStatus.ACTIVE && student.getStatus() != StudentStatus.INACTIVE) {
+            throw new BadRequestException("Terminal student lifecycle status can only be changed by its workflow");
+        }
         student.setStatus(status);
         studentRepository.save(student);
 
@@ -502,7 +702,8 @@ public class StudentServiceImpl implements StudentService {
     @Override
     public List<StudentDocumentDTO> getStudentDocuments(Long studentId) {
         getStudent(studentId);
-        return studentDocumentRepository.findByStudentStudentIdOrderByDocumentIdDesc(studentId)
+        return documentRepository.findByOwnerTypeAndOwnerIdAndActiveTrueOrderByDocumentIdDesc(
+                DocumentOwnerType.STUDENT, studentId)
                 .stream()
                 .map(this::mapDocument)
                 .collect(Collectors.toList());
@@ -510,19 +711,29 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     @Transactional
-    public StudentDocumentDTO uploadStudentDocument(Long studentId, MultipartFile file, String documentType) throws IOException {
+    public StudentDocumentDTO uploadStudentDocument(Long studentId, MultipartFile file, String documentType,
+            String documentName, String remarks) throws IOException {
         Student student = getStudent(studentId);
+        fileStorageService.validate(file);
         String storedPath = fileStorageService.store(file, "doc_" + safeFileToken(student.getStudentCode()));
 
-        StudentDocument document = new StudentDocument();
-        document.setStudent(student);
-        document.setDocumentName(file.getOriginalFilename());
+        Document document = new Document();
+        document.setOwnerType(DocumentOwnerType.STUDENT);
+        document.setOwnerId(studentId);
+        document.setDocumentName(hasText(documentName) ? documentName.trim() : file.getOriginalFilename());
         document.setDocumentType(documentType == null || documentType.isBlank() ? "OTHER" : documentType);
-        document.setDocumentPath(storedPath);
-        document.setStatus(DocumentCheckStatus.PENDING);
+        document.setFilePath(storedPath);
+        document.setFileName(fileStorageService.sanitizeFilename(file.getOriginalFilename()));
+        document.setFileExtension(extensionOf(document.getFileName()));
+        document.setMimeType(file.getContentType());
+        document.setFileSize(file.getSize());
+        document.setRemarks(trimToNull(remarks));
+        document.setVerificationStatus(DocumentCheckStatus.PENDING.name());
+        document.setActive(true);
         document.setCreatedBy(getCurrentUsername());
+        document.setUploadedOn(LocalDateTime.now());
 
-        StudentDocument saved = studentDocumentRepository.save(document);
+        Document saved = documentRepository.save(document);
         addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED,
                 "Document Uploaded", "A student document was uploaded.");
         return mapDocument(saved);
@@ -530,21 +741,57 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     @Transactional
+    public StudentDocumentDTO replaceStudentDocument(Long studentId, Long documentId, MultipartFile file,
+            String documentName, String remarks) throws IOException {
+        Student student = getStudent(studentId);
+        fileStorageService.validate(file);
+        Document previous = documentRepository.findById(documentId)
+            .filter(document -> document.getOwnerType() == DocumentOwnerType.STUDENT
+                && document.getOwnerId().equals(studentId)
+                        && Boolean.TRUE.equals(document.getActive()))
+                .orElseThrow(() -> new ResourceNotFoundException("Document not found: " + documentId));
+        String path = fileStorageService.store(file, "doc_" + safeFileToken(student.getStudentCode()));
+        previous.setActive(false);
+        Document replacement = new Document();
+        replacement.setOwnerType(DocumentOwnerType.STUDENT);
+        replacement.setOwnerId(studentId);
+        replacement.setDocumentName(hasText(documentName) ? documentName.trim() : previous.getDocumentName());
+        replacement.setDocumentType(previous.getDocumentType());
+        replacement.setFilePath(path);
+        replacement.setFileName(fileStorageService.sanitizeFilename(file.getOriginalFilename()));
+        replacement.setFileExtension(extensionOf(replacement.getFileName()));
+        replacement.setMimeType(file.getContentType());
+        replacement.setFileSize(file.getSize());
+        replacement.setVerificationStatus(DocumentCheckStatus.PENDING.name());
+        replacement.setRemarks(trimToNull(remarks));
+        replacement.setSourceApplicationDocumentId(previous.getSourceApplicationDocumentId());
+        replacement.setReplacedDocumentId(previous.getDocumentId());
+        replacement.setActive(true);
+        replacement.setCreatedBy(getCurrentUsername());
+        replacement.setUploadedOn(LocalDateTime.now());
+        documentRepository.save(previous);
+        return mapDocument(documentRepository.save(replacement));
+    }
+
+    @Override
+    @Transactional
     public StudentDocumentDTO updateDocumentStatus(Long documentId, String status, String remarks) {
-        StudentDocument document = studentDocumentRepository.findById(documentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Document not found with id: " + documentId));
+        Document document = documentRepository.findById(documentId)
+            .filter(item -> item.getOwnerType() == DocumentOwnerType.STUDENT)
+            .orElseThrow(() -> new ResourceNotFoundException("Document not found with id: " + documentId));
         DocumentCheckStatus checkStatus;
         try {
             checkStatus = DocumentCheckStatus.valueOf(status.trim().toUpperCase(Locale.ROOT));
         } catch (Exception ex) {
             throw new BadRequestException("Invalid document status: " + status);
         }
-        document.setStatus(checkStatus);
+        document.setVerificationStatus(checkStatus.name());
         if (remarks != null && !remarks.isBlank()) {
             document.setRemarks(remarks.trim());
         }
-        StudentDocument saved = studentDocumentRepository.save(document);
-        addTimelineEvent(document.getStudent(), StudentTimelineEventType.STUDENT_UPDATED,
+        Document saved = documentRepository.save(document);
+        Student student = getStudent(document.getOwnerId());
+        addTimelineEvent(student, StudentTimelineEventType.STUDENT_UPDATED,
                 "Document " + checkStatus.name(),
                 "Document status updated to " + checkStatus.name() + ".");
         return mapDocument(saved);
@@ -561,16 +808,25 @@ public class StudentServiceImpl implements StudentService {
             if (item == null || item.storedPath() == null || item.storedPath().isBlank()) {
                 continue;
             }
-            StudentDocument document = new StudentDocument();
-            document.setStudent(student);
+            Document document = new Document();
+            document.setOwnerType(DocumentOwnerType.STUDENT);
+            document.setOwnerId(studentId);
             document.setDocumentName(hasText(item.documentName()) ? item.documentName() : "document");
             document.setDocumentType(hasText(item.documentType()) ? item.documentType() : "OTHER");
-            document.setDocumentPath(item.storedPath());
-            document.setStatus(item.status() != null ? item.status() : DocumentCheckStatus.PENDING);
+            document.setFilePath(item.storedPath());
+            document.setFileName(fileStorageService.sanitizeFilename(item.documentName()));
+            document.setFileExtension(extensionOf(document.getFileName()));
+            document.setVerificationStatus(item.status() != null ? item.status().name() : DocumentCheckStatus.PENDING.name());
             document.setSourceApplicationDocumentId(item.sourceApplicationDocumentId());
+            if (item.sourceApplicationDocumentId() != null) {
+                document.setSourceDocumentType("ADMISSION");
+                document.setSourceDocumentId(item.sourceApplicationDocumentId());
+            }
             document.setRemarks(trimToNull(item.remarks()));
             document.setCreatedBy(getCurrentUsername());
-            studentDocumentRepository.save(document);
+            document.setActive(true);
+            document.setUploadedOn(LocalDateTime.now());
+            documentRepository.save(document);
         }
         syncPhotoFromDocuments(studentId);
     }
@@ -582,11 +838,12 @@ public class StudentServiceImpl implements StudentService {
         if (hasText(student.getPhotoUrl())) {
             return;
         }
-        studentDocumentRepository.findByStudentStudentIdOrderByDocumentIdDesc(studentId).stream()
-                .filter(doc -> "PHOTO".equalsIgnoreCase(doc.getDocumentType()) && hasText(doc.getDocumentPath()))
+        documentRepository.findByOwnerTypeAndOwnerIdAndActiveTrueOrderByDocumentIdDesc(
+                DocumentOwnerType.STUDENT, studentId).stream()
+                .filter(doc -> "PHOTO".equalsIgnoreCase(doc.getDocumentType()) && hasText(doc.getFilePath()))
                 .findFirst()
                 .ifPresent(photoDoc -> {
-                    student.setPhotoUrl(photoDoc.getDocumentPath());
+                    student.setPhotoUrl(photoDoc.getFilePath());
                     studentRepository.save(student);
                 });
     }
@@ -594,16 +851,20 @@ public class StudentServiceImpl implements StudentService {
     @Override
     @Transactional
     public void deleteDocument(Long docId) {
-        StudentDocument document = studentDocumentRepository.findById(docId)
+        Document document = documentRepository.findById(docId)
+            .filter(item -> item.getOwnerType() == DocumentOwnerType.STUDENT)
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found with id: " + docId));
-        studentDocumentRepository.delete(document);
+        document.setActive(false);
+        documentRepository.save(document);
     }
 
     @Override
     public Resource downloadDocument(Long docId) {
-        StudentDocument document = studentDocumentRepository.findById(docId)
+        Document document = documentRepository.findById(docId)
+            .filter(item -> item.getOwnerType() == DocumentOwnerType.STUDENT
+                && Boolean.TRUE.equals(item.getActive()))
                 .orElseThrow(() -> new ResourceNotFoundException("Document not found with id: " + docId));
-        return fileStorageService.loadAsResource(document.getDocumentPath());
+        return fileStorageService.loadAsResource(document.getFilePath());
     }
 
     private void addTimelineEvent(Student student, StudentTimelineEventType type, String title, String description) {
@@ -613,58 +874,6 @@ public class StudentServiceImpl implements StudentService {
         timeline.setDescription(description);
         timeline.setEventType(type);
         studentTimelineRepository.save(timeline);
-    }
-
-    private boolean matchesSearch(StudentResponseDTO dto, StudentSearchRequest request) {
-        if (request == null) {
-            return true;
-        }
-
-        if (request.getKeyword() != null && !request.getKeyword().isBlank()) {
-            String keyword = request.getKeyword().toLowerCase(Locale.ROOT);
-            boolean keywordMatch = containsIgnoreCase(dto.getFullName(), keyword)
-                    || containsIgnoreCase(dto.getAdmissionNumber(), keyword)
-                    || containsIgnoreCase(dto.getStudentCode(), keyword)
-                    || containsIgnoreCase(dto.getMobileNumber(), keyword)
-                    || containsIgnoreCase(dto.getEmail(), keyword);
-            if (!keywordMatch) {
-                return false;
-            }
-        }
-
-        if (request.getStatus() != null && !Objects.equals(dto.getStatus(), request.getStatus().name())) {
-            return false;
-        }
-
-        if (request.getParentName() != null && !request.getParentName().isBlank()) {
-            return containsIgnoreCase(dto.getParentName(), request.getParentName().toLowerCase(Locale.ROOT));
-        }
-
-        if (request.getClassId() != null || request.getSectionId() != null) {
-            Student student = studentRepository.findById(dto.getStudentId()).orElse(null);
-            if (student == null) {
-                return false;
-            }
-            StudentEnrollment enrollment = studentEnrollmentRepository.findByStudentStudentIdAndActiveTrue(student.getStudentId())
-                    .orElse(null);
-            if (enrollment == null) {
-                return false;
-            }
-            if (request.getClassId() != null && (enrollment.getClassEntity() == null
-                    || !Objects.equals(enrollment.getClassEntity().getClassId(), request.getClassId()))) {
-                return false;
-            }
-            if (request.getSectionId() != null && (enrollment.getSection() == null
-                    || !Objects.equals(enrollment.getSection().getSectionId(), request.getSectionId()))) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private boolean containsIgnoreCase(String source, String valueLower) {
-        return source != null && source.toLowerCase(Locale.ROOT).contains(valueLower);
     }
 
     private Student getStudent(Long studentId) {
@@ -678,38 +887,78 @@ public class StudentServiceImpl implements StudentService {
                 .or(() -> links.stream().findFirst());
     }
 
-    private Parent resolveOrCreateParent(StudentCreateRequest dto, Role parentRole) {
-        if (dto.getExistingParentId() != null) {
-            return parentRepository.findById(dto.getExistingParentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Parent not found: " + dto.getExistingParentId()));
-        }
-        String mobile = dto.getParentMobileNumber() != null ? dto.getParentMobileNumber().trim() : null;
-        if (mobile != null && !mobile.isBlank()) {
-            java.util.Optional<Parent> existing = parentRepository.findByMobileNumber(mobile);
-            if (existing.isPresent()) {
-                return existing.get();
+    private Parent resolveOrCreateParent(StudentParentRequest request) {
+        Parent parent = null;
+        if (request.getExistingParentId() != null) {
+            parent = parentRepository.findById(request.getExistingParentId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Parent not found: " + request.getExistingParentId()));
+        } else {
+            String mobile = trimToNull(request.getMobileNumber());
+            if (mobile != null) {
+                parent = parentRepository.findByMobileNumber(mobile).orElse(null);
+            }
+            if (parent == null && hasText(request.getEmail())) {
+                parent = parentRepository.findFirstByEmailIgnoreCase(request.getEmail().trim()).orElse(null);
             }
         }
 
-        UserCreationContext guardianContext = new UserCreationContext(
-                dto.getParentFirstName(), dto.getParentMiddleName(), dto.getParentLastName(),
-                dto.getParentEmail(), dto.getParentMobileNumber(), null, null, null, TYPE_GUARDIAN);
-        User parentUser = userService.createUser(guardianContext, parentRole);
+        if (parent == null) {
+            parent = new Parent();
+            parent.setParentCode("PAR" + System.currentTimeMillis());
+            parent.setFirstName(request.getFirstName().trim());
+            parent.setMiddleName(trimToNull(request.getMiddleName()));
+            parent.setLastName(hasText(request.getLastName()) ? request.getLastName().trim() : "NA");
+            parent.setMobileNumber(trimToNull(request.getMobileNumber()));
+            parent.setEmail(trimToNull(request.getEmail()));
+            parent.setOccupation(trimToNull(request.getOccupation()));
+            parent.setOrganizationName(trimToNull(request.getOrganizationName()));
+            parent.setQualification(trimToNull(request.getQualification()));
+            parent.setAnnualIncome(request.getAnnualIncome());
+            parent = parentRepository.save(parent);
+        }
 
-        Parent parent = new Parent();
-        parent.setParentCode("PAR" + System.currentTimeMillis());
-        parent.setFirstName(dto.getParentFirstName());
-        parent.setMiddleName(dto.getParentMiddleName());
-        parent.setLastName(hasText(dto.getParentLastName()) ? dto.getParentLastName().trim() : "NA");
-        parent.setMobileNumber(dto.getParentMobileNumber());
-        parent.setEmail(dto.getParentEmail());
-        parent.setOccupation(dto.getParentOccupation());
-        parent.setOrganizationName(dto.getParentOrganizationName());
-        parent.setQualification(dto.getParentQualification());
-        parent.setAnnualIncome(dto.getAnnualIncome());
-        parent.setUser(parentUser);
-        return parentRepository.save(parent);
+        if (!hasText(request.getEmail()) || parent.getUser() != null) {
+            return parent;
+        }
+
+        Role parentRole = roleRepository.findByRoleCode(ROLE_PARENT)
+                .orElseThrow(() -> new IllegalStateException("Role PARENT not found"));
+        UserCreationContext guardianContext = new UserCreationContext(
+                parent.getFirstName(), parent.getMiddleName(), parent.getLastName(),
+                request.getEmail(), request.getMobileNumber(), null, null, null, TYPE_GUARDIAN);
+        AccountProvisioning account = provisionAccount(request.getEmail(), guardianContext, parentRole);
+        parent.setUser(account.user());
+        if (!hasText(parent.getEmail())) parent.setEmail(request.getEmail().trim());
+        Parent saved = parentRepository.save(parent);
+        if (account.newAccount() != null) {
+            credentialNotificationService.sendInstitutionUserSetupInvitation(
+                    account.newAccount().getUser(), "Parent / Guardian");
+        }
+        return saved;
     }
+
+    private AccountProvisioning provisionAccount(String email, UserCreationContext context, Role role) {
+        User existing = userRepository.findByEmailIgnoreCase(email.trim()).orElse(null);
+        if (existing == null) {
+            UserProvisioningResult created = userService.createUserWithTemporaryPassword(context, role);
+            return new AccountProvisioning(created.getUser(), created);
+        }
+        Long organizationId = OrganizationContext.getOrganizationId();
+        if (organizationId != null && !organizationId.equals(existing.getOrganizationId())) {
+            throw new BadRequestException("Account belongs to a different organization");
+        }
+        if (!userRoleRepository.existsByUser_IdAndRole_IdAndActiveTrue(existing.getId(), role.getId())) {
+            userRoleRepository.save(UserRole.builder()
+                    .user(existing)
+                    .role(role)
+                    .primaryRole(false)
+                    .active(true)
+                    .build());
+        }
+        return new AccountProvisioning(existing, null);
+    }
+
+    private record AccountProvisioning(User user, UserProvisioningResult newAccount) {}
 
     private String buildFullName(String firstName, String middleName, String lastName) {
         return java.util.stream.Stream.of(firstName, middleName, lastName)
@@ -728,12 +977,29 @@ public class StudentServiceImpl implements StudentService {
         return dto;
     }
 
-    private StudentDocumentDTO mapDocument(StudentDocument document) {
+    private StudentDocumentDTO mapDocument(Document document) {
         StudentDocumentDTO dto = new StudentDocumentDTO();
         dto.setDocumentId(document.getDocumentId());
         dto.setDocumentName(document.getDocumentName());
         dto.setDocumentType(document.getDocumentType());
-        dto.setStatus(document.getStatus() != null ? document.getStatus() : DocumentCheckStatus.PENDING);
+        dto.setFileName(document.getFileName());
+        dto.setFileExtension(document.getFileExtension());
+        dto.setMimeType(document.getMimeType());
+        dto.setFileSize(document.getFileSize());
+        var uploadedOn = document.getUploadedOn() != null ? document.getUploadedOn() : document.getCreatedOn();
+        dto.setUploadedOn(uploadedOn != null ? uploadedOn.toString() : null);
+        dto.setSourceApplicationDocumentId(document.getSourceApplicationDocumentId());
+        dto.setReplacedDocumentId(document.getReplacedDocumentId());
+        dto.setActive(document.getActive());
+        DocumentCheckStatus status = DocumentCheckStatus.PENDING;
+        try {
+            if (hasText(document.getVerificationStatus())) {
+                status = DocumentCheckStatus.valueOf(document.getVerificationStatus().trim().toUpperCase(Locale.ROOT));
+            }
+        } catch (IllegalArgumentException ignored) {
+            log.warn("Unknown document verification status for document {}", document.getDocumentId());
+        }
+        dto.setStatus(status);
         dto.setRemarks(document.getRemarks());
         dto.setDisplayLabel(resolveDocumentDisplayLabel(document.getDocumentType(), document.getRemarks()));
         return dto;
@@ -775,7 +1041,9 @@ public class StudentServiceImpl implements StudentService {
         Address current = buildAddress(
                 dto.getCurrentAddressLine1(),
                 dto.getCurrentAddressLine2(),
+            dto.getCurrentLandmark(),
                 dto.getCurrentCity(),
+            dto.getCurrentDistrict(),
                 dto.getCurrentState(),
                 dto.getCurrentCountry(),
                 dto.getCurrentPostalCode());
@@ -789,7 +1057,9 @@ public class StudentServiceImpl implements StudentService {
         Address permanent = buildAddress(
                 dto.getPermanentAddressLine1(),
                 dto.getPermanentAddressLine2(),
+            dto.getPermanentLandmark(),
                 dto.getPermanentCity(),
+            dto.getPermanentDistrict(),
                 dto.getPermanentState(),
                 dto.getPermanentCountry(),
                 dto.getPermanentPostalCode());
@@ -798,52 +1068,83 @@ public class StudentServiceImpl implements StudentService {
         }
     }
 
-    private Address buildAddress(String line1, String line2, String city, String state, String country, String postal) {
-        if (!hasText(line1) && !hasText(city) && !hasText(state) && !hasText(postal)) {
-            return null;
-        }
-        Address address = new Address();
-        address.setAddressLine1(hasText(line1) ? line1.trim() : "—");
-        address.setAddressLine2(trimToNull(line2));
-        address.setCity(trimToNull(city));
-        address.setState(trimToNull(state));
-        address.setCountry(hasText(country) ? country.trim() : "India");
-        address.setPostalCode(trimToNull(postal));
-        address.setActive(true);
-        return address;
+    private Address buildAddress(String line1, String line2, String landmark, String city, String district,
+                                 String state, String country, String postal) {
+        return addressFactory.build(AddressDto.builder()
+                .addressLine1(line1)
+                .addressLine2(line2)
+                .landmark(landmark)
+                .city(city)
+                .district(district)
+                .state(state)
+                .country(country)
+                .postalCode(postal)
+                .build());
     }
 
     private Address copyAddress(Address source) {
-        Address copy = new Address();
-        copy.setAddressLine1(source.getAddressLine1());
-        copy.setAddressLine2(source.getAddressLine2());
-        copy.setCity(source.getCity());
-        copy.setState(source.getState());
-        copy.setCountry(source.getCountry());
-        copy.setPostalCode(source.getPostalCode());
-        copy.setLandmark(source.getLandmark());
-        copy.setDistrict(source.getDistrict());
-        copy.setActive(true);
-        return copy;
+        return addressFactory.copy(source);
     }
 
-    private void linkSecondaryParent(Student student, StudentCreateRequest dto, Role parentRole) {
-        if (!hasText(dto.getSecondaryParentFirstName()) || !hasText(dto.getSecondaryParentMobileNumber())) {
-            return;
+    private void validateParentRequests(StudentCreateRequest request) {
+        List<StudentParentRequest> parents = effectiveParents(request);
+        long primaryCount = parents.stream().filter(p -> Boolean.TRUE.equals(p.getPrimaryContact())).count();
+        if (parents.isEmpty() || primaryCount != 1) {
+            throw new BadRequestException("Exactly one primary parent or guardian is required");
         }
-        StudentCreateRequest secondary = new StudentCreateRequest();
-        secondary.setParentFirstName(dto.getSecondaryParentFirstName());
-        secondary.setParentLastName(hasText(dto.getSecondaryParentLastName()) ? dto.getSecondaryParentLastName() : "NA");
-        secondary.setParentMobileNumber(dto.getSecondaryParentMobileNumber());
-        secondary.setParentEmail(dto.getSecondaryParentEmail());
-        secondary.setParentOccupation(dto.getSecondaryParentOccupation());
-        Parent parent = resolveOrCreateParent(secondary, parentRole);
-        StudentParent link = new StudentParent();
-        link.setStudent(student);
-        link.setParent(parent);
-        link.setRelationship(parseRelationship(dto.getSecondaryParentRelationship(), ParentRelationship.MOTHER));
-        link.setPrimaryContact(false);
-        studentParentRepository.save(link);
+        if (parents.stream().anyMatch(p -> !p.hasIdentity())) {
+            throw new BadRequestException("Each new parent or guardian requires a first name and mobile number");
+        }
+    }
+
+    private void saveParentLinks(Student student, StudentCreateRequest request) {
+        for (StudentParentRequest parentRequest : effectiveParents(request)) {
+            Parent parent = resolveOrCreateParent(parentRequest);
+            StudentParent link = new StudentParent();
+            link.setStudent(student);
+            link.setParent(parent);
+            link.setRelationship(parseRelationship(parentRequest.getRelationship(), ParentRelationship.GUARDIAN));
+            link.setPrimaryContact(Boolean.TRUE.equals(parentRequest.getPrimaryContact()));
+            link.setReceiveSms(parentRequest.getReceiveSms() == null || parentRequest.getReceiveSms());
+            link.setReceiveEmail(parentRequest.getReceiveEmail() == null || parentRequest.getReceiveEmail());
+            link.setPickupAuthorized(Boolean.TRUE.equals(parentRequest.getPickupAuthorized()));
+            link.setActive(true);
+            studentParentRepository.save(link);
+        }
+    }
+
+    private List<StudentParentRequest> effectiveParents(StudentCreateRequest request) {
+        if (request.getParents() != null && !request.getParents().isEmpty()) {
+            return request.getParents();
+        }
+        List<StudentParentRequest> parents = new ArrayList<>();
+        StudentParentRequest primary = new StudentParentRequest();
+        primary.setExistingParentId(request.getExistingParentId());
+        primary.setRelationship(request.getParentRelationship());
+        primary.setFirstName(request.getParentFirstName());
+        primary.setMiddleName(request.getParentMiddleName());
+        primary.setLastName(request.getParentLastName());
+        primary.setMobileNumber(request.getParentMobileNumber());
+        primary.setEmail(request.getParentEmail());
+        primary.setOccupation(request.getParentOccupation());
+        primary.setOrganizationName(request.getParentOrganizationName());
+        primary.setQualification(request.getParentQualification());
+        primary.setAnnualIncome(request.getAnnualIncome());
+        primary.setPrimaryContact(true);
+        parents.add(primary);
+
+        if (hasText(request.getSecondaryParentFirstName()) && hasText(request.getSecondaryParentMobileNumber())) {
+            StudentParentRequest secondary = new StudentParentRequest();
+            secondary.setRelationship(request.getSecondaryParentRelationship());
+            secondary.setFirstName(request.getSecondaryParentFirstName());
+            secondary.setLastName(request.getSecondaryParentLastName());
+            secondary.setMobileNumber(request.getSecondaryParentMobileNumber());
+            secondary.setEmail(request.getSecondaryParentEmail());
+            secondary.setOccupation(request.getSecondaryParentOccupation());
+            secondary.setPrimaryContact(false);
+            parents.add(secondary);
+        }
+        return parents;
     }
 
     private ParentRelationship parseRelationship(String raw, ParentRelationship fallback) {
@@ -898,15 +1199,6 @@ public class StudentServiceImpl implements StudentService {
         }
     }
 
-    private String generateAdmissionNumber() {
-        String year = String.valueOf(java.time.LocalDate.now().getYear());
-        String candidate;
-        do {
-            candidate = "ADM-" + year + "-" + (10000 + (System.nanoTime() % 89999));
-        } while (studentRepository.existsByAdmissionNumber(candidate));
-        return candidate;
-    }
-
     private static boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
     }
@@ -934,7 +1226,8 @@ public class StudentServiceImpl implements StudentService {
         dto.setReligion(student.getReligion());
         dto.setNationality(student.getNationality());
         dto.setMotherTongue(student.getMotherTongue());
-        dto.setCategory(student.getCategory());
+        dto.setSocialCategory(student.getSocialCategory());
+        dto.setCategory(student.getSocialCategory());
         dto.setPlaceOfBirth(student.getPlaceOfBirth());
         dto.setIdentityDocumentType(student.getIdentityDocumentType());
         dto.setIdentityDocumentNumber(student.getIdentityDocumentNumber());
@@ -954,7 +1247,9 @@ public class StudentServiceImpl implements StudentService {
             Address a = student.getCurrentAddress();
             dto.setCurrentAddressLine1(a.getAddressLine1());
             dto.setCurrentAddressLine2(a.getAddressLine2());
+            dto.setCurrentLandmark(a.getLandmark());
             dto.setCurrentCity(a.getCity());
+            dto.setCurrentDistrict(a.getDistrict());
             dto.setCurrentState(a.getState());
             dto.setCurrentPostalCode(a.getPostalCode());
         }
@@ -962,12 +1257,17 @@ public class StudentServiceImpl implements StudentService {
             Address a = student.getPermanentAddress();
             dto.setPermanentAddressLine1(a.getAddressLine1());
             dto.setPermanentAddressLine2(a.getAddressLine2());
+            dto.setPermanentLandmark(a.getLandmark());
             dto.setPermanentCity(a.getCity());
+            dto.setPermanentDistrict(a.getDistrict());
             dto.setPermanentState(a.getState());
             dto.setPermanentPostalCode(a.getPostalCode());
         }
 
         studentEnrollmentRepository.findActiveWithClassByStudentId(student.getStudentId()).ifPresent(enrollment -> {
+            if (enrollment.getAcademicYear() != null) {
+                dto.setAcademicYear(enrollment.getAcademicYear().getYearCode());
+            }
             if (enrollment.getClassEntity() != null) {
                 dto.setClassName(enrollment.getClassEntity().getClassName());
             }
@@ -993,12 +1293,15 @@ public class StudentServiceImpl implements StudentService {
         dto.setRollNumber(enrollment.getRollNumber());
         dto.setStatus(enrollment.getStatus() != null ? enrollment.getStatus().name() : null);
         if (enrollment.getAcademicYear() != null) {
+            dto.setAcademicYearId(enrollment.getAcademicYear().getAcademicYearId());
             dto.setAcademicYear(enrollment.getAcademicYear().getYearCode());
         }
         if (enrollment.getClassEntity() != null) {
+            dto.setClassId(enrollment.getClassEntity().getClassId());
             dto.setClassName(enrollment.getClassEntity().getClassName());
         }
         if (enrollment.getSection() != null) {
+            dto.setSectionId(enrollment.getSection().getSectionId());
             dto.setSectionName(enrollment.getSection().getSectionName());
         }
         if (enrollment.getCreatedOn() != null) {
@@ -1016,8 +1319,13 @@ public class StudentServiceImpl implements StudentService {
         dto.setMobileNumber(parent.getMobileNumber());
         dto.setEmail(parent.getEmail());
         dto.setOccupation(parent.getOccupation());
+        dto.setOrganizationName(parent.getOrganizationName());
+        dto.setQualification(parent.getQualification());
         dto.setRelationship(sp.getRelationship() != null ? sp.getRelationship().name() : null);
         dto.setPrimaryContact(Boolean.TRUE.equals(sp.getPrimaryContact()));
+        dto.setReceiveSms(Boolean.TRUE.equals(sp.getReceiveSms()));
+        dto.setReceiveEmail(Boolean.TRUE.equals(sp.getReceiveEmail()));
+        dto.setPickupAuthorized(Boolean.TRUE.equals(sp.getPickupAuthorized()));
         return dto;
     }
 
@@ -1026,6 +1334,12 @@ public class StudentServiceImpl implements StudentService {
             return String.valueOf(System.currentTimeMillis());
         }
         return value.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+
+    private static String extensionOf(String fileName) {
+        if (!hasText(fileName)) return null;
+        int dot = fileName.lastIndexOf('.');
+        return dot >= 0 && dot < fileName.length() - 1 ? fileName.substring(dot + 1).toLowerCase(Locale.ROOT) : null;
     }
 
     private String getCurrentUsername() {

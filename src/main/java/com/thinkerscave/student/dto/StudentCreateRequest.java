@@ -5,8 +5,11 @@ import java.time.LocalDate;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.Valid;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.util.List;
 
 @Getter
 @Setter
@@ -42,6 +45,8 @@ public class StudentCreateRequest {
 
     private String category;
 
+    private String socialCategory;
+
     private String placeOfBirth;
 
     private String identityDocumentType;
@@ -67,7 +72,6 @@ public class StudentCreateRequest {
     /** FATHER / MOTHER / GUARDIAN / … — defaults to FATHER when blank. */
     private String parentRelationship;
 
-    @NotBlank
     private String parentFirstName;
 
     private String parentMiddleName;
@@ -76,7 +80,6 @@ public class StudentCreateRequest {
 
     private String parentGender;
 
-    @NotBlank
     private String parentMobileNumber;
 
     @Email
@@ -107,6 +110,10 @@ public class StudentCreateRequest {
 
     private String secondaryParentOccupation;
 
+    /** Preferred multi-guardian contract; legacy primary/secondary fields remain supported. */
+    @Valid
+    private List<StudentParentRequest> parents;
+
     // ==========================
     // ADDRESS
     // ==========================
@@ -117,7 +124,11 @@ public class StudentCreateRequest {
 
     private String currentAddressLine2;
 
+    private String currentLandmark;
+
     private String currentCity;
+
+    private String currentDistrict;
 
     private String currentState;
 
@@ -129,7 +140,11 @@ public class StudentCreateRequest {
 
     private String permanentAddressLine2;
 
+    private String permanentLandmark;
+
     private String permanentCity;
+
+    private String permanentDistrict;
 
     private String permanentState;
 

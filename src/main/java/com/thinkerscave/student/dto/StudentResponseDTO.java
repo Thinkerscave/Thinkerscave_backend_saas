@@ -33,6 +33,8 @@ public class StudentResponseDTO {
 
     private String category;
 
+    private String socialCategory;
+
     private String placeOfBirth;
 
     private String identityDocumentType;
@@ -47,6 +49,8 @@ public class StudentResponseDTO {
 
     private String status;
 
+    private String academicYear;
+
     private String className;
 
     private String sectionName;
@@ -59,7 +63,11 @@ public class StudentResponseDTO {
 
     private String currentAddressLine2;
 
+    private String currentLandmark;
+
     private String currentCity;
+
+    private String currentDistrict;
 
     private String currentState;
 
@@ -69,7 +77,11 @@ public class StudentResponseDTO {
 
     private String permanentAddressLine2;
 
+    private String permanentLandmark;
+
     private String permanentCity;
+
+    private String permanentDistrict;
 
     private String permanentState;
 

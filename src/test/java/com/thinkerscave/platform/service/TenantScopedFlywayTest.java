@@ -42,8 +42,8 @@ class TenantScopedFlywayTest {
     }
 
     @Test
-    void latestTargetIncludesLegacyTimetableConstraintCorrection() {
-        assertThat(TenantScopedFlyway.LATEST_VERSION).isEqualTo("49");
+    void latestTargetIncludesStudentLifecycleMigrations() {
+        assertThat(TenantScopedFlyway.LATEST_VERSION).isEqualTo("54");
     }
 
     @Test
@@ -80,6 +80,37 @@ class TenantScopedFlywayTest {
                     "CREATE TABLE IF NOT EXISTS doc_collection_item",
                     "CREATE TABLE IF NOT EXISTS study_material_handover",
                     "CREATE TABLE IF NOT EXISTS study_material_handover_item");
+        }
+    }
+
+    @Test
+    void v50ThroughV52StudentMigrationsArePackaged() throws IOException {
+        for (String migration : new String[]{
+                "V50__allow_unassigned_student_admission_number.sql",
+                "V51__student_document_lifecycle_metadata.sql",
+                "V52__preserve_student_enrollment_placement_history.sql",
+                "V53__centralize_student_admission_documents.sql",
+                "V54__persist_student_import_jobs.sql"}) {
+            try (var resource = getClass().getClassLoader().getResourceAsStream("db/migration/tenant/" + migration)) {
+                assertThat(resource).as(migration).isNotNull();
+            }
+        }
+    }
+
+    @Test
+    void v53CopiesLegacyDocumentsWithoutDroppingTablesOrFiles() throws IOException {
+        try (var migration = getClass().getClassLoader().getResourceAsStream(
+                "db/migration/tenant/V53__centralize_student_admission_documents.sql")) {
+            assertThat(migration).isNotNull();
+            String sql = new String(migration.readAllBytes(), StandardCharsets.UTF_8);
+            assertThat(sql).contains(
+                    "INSERT INTO document",
+                    "FROM student_document s",
+                    "FROM admission_application_document a",
+                    "source_document_type = 'STUDENT_LEGACY'",
+                    "source_document_type = 'ADMISSION_LEGACY'",
+                    "source_document_type IN ('STUDENT_LEGACY', 'ADMISSION_LEGACY')");
+            assertThat(sql).doesNotContain("DROP TABLE", "DELETE FROM", "deleteQuietly");
         }
     }
 }

@@ -99,10 +99,16 @@ override with `SPRING_DATASOURCE_*` when environments split.
 
 ---
 
-### 4. Run the Application
+### 4. Database and Local Run Safety
+
+`dev`, `test`, and `prod` all use the same PostgreSQL database configured by the `SPRING_DATASOURCE_*` settings. There is no isolated local database. A profile name does not make writes or schema changes safe.
+
+Do not launch the service or run database-backed tests unless the database owner has approved the exact operation and confirmed a verified backup. Keep `spring.jpa.hibernate.ddl-auto=none`; never use schema generation. Flyway migrations must be explicitly approved and run only through the protected migration workflow.
+
+For source verification that does not start the service or connect to PostgreSQL:
 
 ```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=test
+./mvnw -DskipTests test
 ```
 
 ---

@@ -7,6 +7,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Getter
 @Setter
@@ -76,4 +78,22 @@ public class Document extends Auditable {
 
     @Column(name = "active")
     private Boolean active = true;
+
+        @Column(name = "verification_status", nullable = false, length = 30)
+        private String verificationStatus = "PENDING";
+
+        @Column(name = "source_document_type", length = 50)
+        private String sourceDocumentType;
+
+        @Column(name = "source_document_id")
+        private Long sourceDocumentId;
+
+        @Column(name = "source_application_document_id")
+        private Long sourceApplicationDocumentId;
+
+        @Column(name = "replaced_document_id")
+        private Long replacedDocumentId;
+
+        @Column(name = "uploaded_on")
+        private LocalDateTime uploadedOn;
 }

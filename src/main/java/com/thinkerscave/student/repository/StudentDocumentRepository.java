@@ -12,5 +12,7 @@ public interface StudentDocumentRepository extends JpaRepository<StudentDocument
 
     List<StudentDocument> findByStudentStudentIdOrderByDocumentIdDesc(Long studentId);
 
+    List<StudentDocument> findByStudentStudentIdAndActiveTrueOrderByDocumentIdDesc(Long studentId);
+
     List<StudentDocument> findByStudentStudentIdInOrderByDocumentIdDesc(Collection<Long> studentIds);
 }

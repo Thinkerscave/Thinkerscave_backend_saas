@@ -19,15 +19,8 @@ import org.hibernate.annotations.NotFoundAction;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Table(
         name = "student_enrollment",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_student_academic_year",
-                        columnNames = {
-                                "student_id",
-                                "academic_year_id"
-                        }
-                )
-        }
+        indexes = @Index(name = "idx_student_enrollment_student_year_active",
+                columnList = "student_id, academic_year_id, active")
 )
 public class StudentEnrollment extends Auditable {
 

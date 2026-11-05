@@ -12,7 +12,6 @@ import com.thinkerscave.admission.dto.response.AdmissionReportDashboardResponse.
 import com.thinkerscave.admission.dto.response.AdmissionReportDashboardResponse.RecentApplicationRow;
 import com.thinkerscave.admission.dto.response.AdmissionReportDashboardResponse.SourceBreakdownRow;
 import com.thinkerscave.admission.dto.response.AdmissionReportDashboardResponse.TrendSeries;
-import com.thinkerscave.admission.entity.AdmissionApplicationDocument;
 import com.thinkerscave.admission.entity.ApplicationAdmission;
 import com.thinkerscave.admission.entity.Inquiry;
 import com.thinkerscave.admission.entity.InquiryFollowUp;
@@ -20,7 +19,9 @@ import com.thinkerscave.admission.enums.ApplicationStatus;
 import com.thinkerscave.admission.enums.DocumentCheckStatus;
 import com.thinkerscave.admission.enums.InquiryStatus;
 import com.thinkerscave.admission.enums.LeadSource;
-import com.thinkerscave.admission.repository.AdmissionApplicationDocumentRepository;
+import com.thinkerscave.document.entity.Document;
+import com.thinkerscave.document.enums.DocumentOwnerType;
+import com.thinkerscave.document.repository.DocumentRepository;
 import com.thinkerscave.admission.repository.ApplicationAdmissionRepository;
 import com.thinkerscave.admission.repository.InquiryFollowUpRepository;
 import com.thinkerscave.admission.repository.InquiryRepository;
@@ -84,7 +85,7 @@ public class AdmissionReportServiceImpl implements AdmissionReportService {
 
     private final InquiryRepository inquiryRepository;
     private final ApplicationAdmissionRepository applicationRepository;
-    private final AdmissionApplicationDocumentRepository documentRepository;
+    private final DocumentRepository documentRepository;
     private final InquiryFollowUpRepository followUpRepository;
     private final StaffRepository staffRepository;
     private final UserRepository userRepository;
@@ -674,9 +675,10 @@ public class AdmissionReportServiceImpl implements AdmissionReportService {
         for (DocumentCheckStatus status : DocumentCheckStatus.values()) {
             counts.put(status, 0L);
         }
-        for (Object[] row : documentRepository.countByStatusForApplications(appIds)) {
-            DocumentCheckStatus status = (DocumentCheckStatus) row[0];
-            counts.put(status, ((Number) row[1]).longValue());
+        for (Document document : documentRepository.findByOwnerTypeAndOwnerIdInAndActiveTrue(
+                DocumentOwnerType.ADMISSION, appIds)) {
+            DocumentCheckStatus status = documentStatus(document.getVerificationStatus());
+            counts.merge(status, 1L, Long::sum);
         }
         long total = counts.values().stream().mapToLong(Long::longValue).sum();
         long denom = Math.max(total, 1);
@@ -711,11 +713,12 @@ public class AdmissionReportServiceImpl implements AdmissionReportService {
         }
         List<Long> ids = recent.stream().map(ApplicationAdmission::getApplicationId).toList();
         Map<Long, long[]> docStats = new HashMap<>();
-        for (AdmissionApplicationDocument doc : documentRepository.findByApplicationApplicationIdIn(ids)) {
-            Long appId = doc.getApplication().getApplicationId();
+        for (Document doc : documentRepository.findByOwnerTypeAndOwnerIdInAndActiveTrue(
+                DocumentOwnerType.ADMISSION, ids)) {
+            Long appId = doc.getOwnerId();
             long[] stats = docStats.computeIfAbsent(appId, k -> new long[2]);
             stats[0]++;
-            if (doc.getStatus() == DocumentCheckStatus.VERIFIED) {
+            if (documentStatus(doc.getVerificationStatus()) == DocumentCheckStatus.VERIFIED) {
                 stats[1]++;
             }
         }
@@ -742,6 +745,15 @@ public class AdmissionReportServiceImpl implements AdmissionReportService {
                     .build());
         }
         return rows;
+    }
+
+    private static DocumentCheckStatus documentStatus(String value) {
+        try {
+            return value == null ? DocumentCheckStatus.PENDING
+                    : DocumentCheckStatus.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            return DocumentCheckStatus.PENDING;
+        }
     }
 
     private long countFollowUps(List<InquiryFollowUp> followUps, Set<Long> inquiryIds, AdmissionReportFilterRequest filter) {

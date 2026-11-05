@@ -11,9 +11,18 @@ public class StudentSearchRequest {
 
     private String keyword;
 
+    private String rollNumber;
+
+    private String parentMobile;
+
+    private Long academicYearId;
+
     private Long classId;
 
     private Long sectionId;
+
+    /** null = all, true = has active enrollment, false = has no active enrollment. */
+    private Boolean assigned;
 
     private StudentStatus status;
 

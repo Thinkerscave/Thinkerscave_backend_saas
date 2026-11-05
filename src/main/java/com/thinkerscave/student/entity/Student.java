@@ -36,7 +36,7 @@ public class Student extends Auditable {
     @EqualsAndHashCode.Include
     private String studentCode;
 
-    @Column(name = "admission_number", nullable = false, unique = true, length = 50)
+        @Column(name = "admission_number", unique = true, length = 50)
     private String admissionNumber;
 
     @Column(name = "roll_number", length = 50)
@@ -68,6 +68,14 @@ public class Student extends Auditable {
 
     @Column(name = "category", length = 50)
     private String category;
+
+    public String getSocialCategory() {
+        return category;
+    }
+
+    public void setSocialCategory(String socialCategory) {
+        this.category = socialCategory;
+    }
 
     @Column(name = "place_of_birth", length = 120)
     private String placeOfBirth;

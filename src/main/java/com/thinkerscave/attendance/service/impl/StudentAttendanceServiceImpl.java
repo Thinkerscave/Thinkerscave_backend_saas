@@ -27,12 +27,14 @@ import com.thinkerscave.academics.entity.AcademicClass;
 import com.thinkerscave.academics.entity.AcademicSection;
 import com.thinkerscave.academics.repository.ClassRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
+import com.thinkerscave.document.entity.Document;
+import com.thinkerscave.document.enums.DocumentOwnerType;
+import com.thinkerscave.document.repository.DocumentRepository;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.student.entity.Student;
 import com.thinkerscave.student.entity.StudentEnrollment;
-import com.thinkerscave.student.repository.StudentDocumentRepository;
 import com.thinkerscave.student.repository.StudentEnrollmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -63,7 +65,7 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
     private final AttendanceFreezeService attendanceFreezeService;
         private final ModuleSettingsService moduleSettingsService;
     private final StudentEnrollmentRepository studentEnrollmentRepository;
-    private final StudentDocumentRepository studentDocumentRepository;
+        private final DocumentRepository documentRepository;
     private final StaffAttendanceDayContextService dayContextService;
         private final TeacherAttendanceAuthorizationService teacherAttendanceAuthorizationService;
     private final AttendanceEditWindowService attendanceEditWindowService;
@@ -171,9 +173,10 @@ public class StudentAttendanceServiceImpl implements StudentAttendanceService {
                 .distinct()
                 .toList();
         Map<Long, Long> result = new HashMap<>();
-        studentDocumentRepository.findByStudentStudentIdInOrderByDocumentIdDesc(studentIds).stream()
+        documentRepository.findByOwnerTypeAndOwnerIdInAndActiveTrue(DocumentOwnerType.STUDENT, studentIds).stream()
                 .filter(doc -> "PHOTO".equalsIgnoreCase(doc.getDocumentType()))
-                .forEach(doc -> result.putIfAbsent(doc.getStudent().getStudentId(), doc.getDocumentId()));
+                .sorted(java.util.Comparator.comparing(Document::getDocumentId).reversed())
+                .forEach(doc -> result.putIfAbsent(doc.getOwnerId(), doc.getDocumentId()));
         return result;
     }
 

@@ -5,5 +5,6 @@ public enum ModuleSettingValueType {
     INTEGER,
     DECIMAL,
     BOOLEAN,
-    TIME
+    TIME,
+    STRING_LIST
 }

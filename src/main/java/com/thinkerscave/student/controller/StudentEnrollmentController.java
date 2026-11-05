@@ -5,11 +5,15 @@ import com.thinkerscave.academics.repository.ClassRepository;
 import com.thinkerscave.academics.repository.SectionRepository;
 import com.thinkerscave.shared.context.OrganizationContext;
 import com.thinkerscave.shared.dto.ApiResponse;
+import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.student.dto.EnrollmentDTO;
 import com.thinkerscave.student.entity.StudentEnrollment;
 import com.thinkerscave.student.enums.EnrollmentStatus;
 import com.thinkerscave.student.repository.StudentEnrollmentRepository;
 import com.thinkerscave.student.repository.StudentRepository;
+import com.thinkerscave.student.repository.StudentTimelineRepository;
+import com.thinkerscave.student.entity.StudentTimeline;
+import com.thinkerscave.student.enums.StudentTimelineEventType;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -38,6 +42,7 @@ public class StudentEnrollmentController {
     private final AcademicYearRepository academicYearRepository;
     private final ClassRepository classRepository;
     private final SectionRepository sectionRepository;
+    private final StudentTimelineRepository timelineRepository;
 
     @GetMapping
     @Operation(summary = "Get enrollment history for a student")
@@ -70,27 +75,86 @@ public class StudentEnrollmentController {
             @PathVariable Long studentId,
             @Valid @RequestBody EnrollmentUpdateRequest request) {
 
-        // Deactivate existing active enrollment
-        enrollmentRepository.findByStudentStudentIdAndActiveTrue(studentId).ifPresent(e -> {
+        var student = studentRepository.findById(studentId)
+            .orElseThrow(() -> new com.thinkerscave.shared.exceptions.ResourceNotFoundException(
+                "Student not found: " + studentId));
+        var academicYear = academicYearRepository.findById(request.getAcademicYearId())
+            .orElseThrow(() -> new com.thinkerscave.shared.exceptions.ResourceNotFoundException(
+                "Academic year not found: " + request.getAcademicYearId()));
+        var classEntity = classRepository.findById(request.getClassId())
+            .orElseThrow(() -> new com.thinkerscave.shared.exceptions.ResourceNotFoundException(
+                "Class not found: " + request.getClassId()));
+        if (classEntity.getAcademicYear() == null
+            || !classEntity.getAcademicYear().getAcademicYearId().equals(academicYear.getAcademicYearId())) {
+            throw new BadRequestException("Class does not belong to the selected academic year");
+        }
+        if (!classEntity.isActive()) {
+            throw new BadRequestException("Cannot enroll a student in an inactive class");
+        }
+        var section = request.getSectionId() == null ? null : sectionRepository.findById(request.getSectionId())
+            .orElseThrow(() -> new com.thinkerscave.shared.exceptions.ResourceNotFoundException(
+                "Section not found: " + request.getSectionId()));
+        if (section != null && (section.getAcademicGroup() == null
+            || !section.getAcademicGroup().getAcademicGroupId().equals(classEntity.getClassId()))) {
+            throw new BadRequestException("Section does not belong to the selected class");
+        }
+
+        var activeEnrollment = enrollmentRepository.findByStudentStudentIdAndActiveTrue(studentId);
+        if (activeEnrollment.isPresent()
+            && activeEnrollment.get().getAcademicYear() != null
+            && activeEnrollment.get().getAcademicYear().getAcademicYearId().equals(academicYear.getAcademicYearId())) {
+            StudentEnrollment current = activeEnrollment.get();
+            boolean placementChanged = !java.util.Objects.equals(
+                current.getClassEntity() == null ? null : current.getClassEntity().getClassId(), classEntity.getClassId())
+                || !java.util.Objects.equals(
+                current.getSection() == null ? null : current.getSection().getSectionId(),
+                section == null ? null : section.getSectionId());
+            if (!placementChanged) {
+            current.setRollNumber(request.getRollNumber());
+            current.setRemarks(request.getRemarks());
+            return ResponseEntity.ok(ApiResponse.success("Enrollment updated", toDTO(enrollmentRepository.save(current))));
+            }
+            current.setActive(false);
+            current.setStatus(EnrollmentStatus.REASSIGNED);
+            enrollmentRepository.save(current);
+            StudentEnrollment reassigned = new StudentEnrollment();
+            reassigned.setStudent(student);
+            reassigned.setAcademicYear(academicYear);
+            reassigned.setClassEntity(classEntity);
+            reassigned.setSection(section);
+            reassigned.setRollNumber(request.getRollNumber());
+            reassigned.setRemarks(request.getRemarks());
+            reassigned.setStatus(EnrollmentStatus.ACTIVE);
+            reassigned.setActive(true);
+            StudentEnrollment saved = enrollmentRepository.save(reassigned);
+            StudentTimeline timeline = new StudentTimeline();
+            timeline.setStudent(student);
+            timeline.setEventType(StudentTimelineEventType.CLASS_CHANGED);
+            timeline.setTitle("Student enrollment reassigned");
+            timeline.setDescription("Student placement changed from " + enrollmentLocation(current)
+                + " to " + enrollmentLocation(saved) + " for academic year " + academicYear.getYearCode());
+            timelineRepository.save(timeline);
+            return ResponseEntity.ok(ApiResponse.success("Enrollment reassigned", toDTO(saved)));
+        }
+        if (enrollmentRepository.existsByStudentStudentIdAndAcademicYearAcademicYearId(
+            studentId, academicYear.getAcademicYearId())) {
+            throw new BadRequestException("Student already has enrollment history for this academic year");
+        }
+
+        activeEnrollment.ifPresent(e -> {
             e.setActive(false);
             enrollmentRepository.save(e);
         });
 
         StudentEnrollment enrollment = new StudentEnrollment();
-        enrollment.setStudent(studentRepository.findById(studentId)
-                .orElseThrow(() -> new com.thinkerscave.shared.exceptions.ResourceNotFoundException("Student not found: " + studentId)));
+        enrollment.setStudent(student);
         enrollment.setRollNumber(request.getRollNumber());
         enrollment.setStatus(EnrollmentStatus.ACTIVE);
         enrollment.setActive(true);
         enrollment.setRemarks(request.getRemarks());
-
-        academicYearRepository.findById(request.getAcademicYearId())
-                .ifPresent(enrollment::setAcademicYear);
-        classRepository.findById(request.getClassId())
-                .ifPresent(enrollment::setClassEntity);
-        if (request.getSectionId() != null) {
-            sectionRepository.findById(request.getSectionId()).ifPresent(enrollment::setSection);
-        }
+        enrollment.setAcademicYear(academicYear);
+        enrollment.setClassEntity(classEntity);
+        enrollment.setSection(section);
 
         StudentEnrollment saved = enrollmentRepository.save(enrollment);
         return ResponseEntity.ok(ApiResponse.success("Enrollment updated", toDTO(saved)));
@@ -121,13 +185,28 @@ public class StudentEnrollmentController {
         dto.setEnrollmentId(e.getEnrollmentId());
         dto.setRollNumber(e.getRollNumber());
         dto.setStatus(e.getStatus() != null ? e.getStatus().name() : null);
-        if (e.getAcademicYear() != null) dto.setAcademicYear(e.getAcademicYear().getYearCode());
-        if (e.getClassEntity() != null) dto.setClassName(e.getClassEntity().getClassName());
-        if (e.getSection() != null) dto.setSectionName(e.getSection().getSectionName());
+        if (e.getAcademicYear() != null) {
+            dto.setAcademicYearId(e.getAcademicYear().getAcademicYearId());
+            dto.setAcademicYear(e.getAcademicYear().getYearCode());
+        }
+        if (e.getClassEntity() != null) {
+            dto.setClassId(e.getClassEntity().getClassId());
+            dto.setClassName(e.getClassEntity().getClassName());
+        }
+        if (e.getSection() != null) {
+            dto.setSectionId(e.getSection().getSectionId());
+            dto.setSectionName(e.getSection().getSectionName());
+        }
         if (e.getCreatedOn() != null) {
             dto.setEnrollmentDate(e.getCreatedOn().toLocalDate().toString());
         }
         return dto;
+    }
+
+    private String enrollmentLocation(StudentEnrollment enrollment) {
+        String className = enrollment.getClassEntity() == null ? "Unassigned class" : enrollment.getClassEntity().getClassName();
+        String sectionName = enrollment.getSection() == null ? "Unassigned section" : enrollment.getSection().getSectionName();
+        return className + " / " + sectionName;
     }
 
     @Data

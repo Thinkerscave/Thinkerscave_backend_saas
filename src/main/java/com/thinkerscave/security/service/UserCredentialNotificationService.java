@@ -25,6 +25,7 @@ public class UserCredentialNotificationService {
     private final OrganizationRepository organizationRepository;
     private final OrganizationDomainRepository organizationDomainRepository;
     private final OutboundMessageService outboundMessageService;
+    private final PasswordResetService passwordResetService;
 
     @Value("${app.platform.login-url:http://localhost:4200/auth/login}")
     private String fallbackLoginUrl;
@@ -57,6 +58,37 @@ public class UserCredentialNotificationService {
             }
         };
 
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    dispatch.run();
+                }
+            });
+        } else {
+            dispatch.run();
+        }
+    }
+
+    public void sendInstitutionUserSetupInvitation(User user, String roleLabel) {
+        if (user == null || !StringUtils.hasText(user.getEmail())) {
+            return;
+        }
+        Long organizationId = OrganizationContext.getOrganizationId();
+        String organizationName = organizationId == null ? null
+                : organizationRepository.findById(organizationId).map(Organization::getOrganizationName).orElse(null);
+        String loginUrl = resolveLoginUrl(organizationId);
+        String recipientName = StringUtils.hasText(user.getFirstName()) ? user.getFirstName() : user.getDisplayName();
+        Runnable dispatch = () -> {
+            try {
+                passwordResetService.forgotPassword(user.getEmail());
+                outboundMessageService.sendInstitutionUserSetupInvitation(
+                        user.getEmail(), recipientName, roleLabel, organizationName, loginUrl);
+            } catch (Exception ex) {
+                log.error("Account setup invitation failed for role={} org={}: {}",
+                        roleLabel, organizationId, ex.getMessage(), ex);
+            }
+        };
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override

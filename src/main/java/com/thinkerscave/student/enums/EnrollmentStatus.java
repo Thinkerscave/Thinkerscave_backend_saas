@@ -4,6 +4,7 @@ public enum EnrollmentStatus {
 
     ACTIVE,
     PROMOTED,
+    REASSIGNED,
     TRANSFERRED,
     WITHDRAWN,
     GRADUATED

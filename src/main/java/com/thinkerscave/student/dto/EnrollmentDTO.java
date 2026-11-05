@@ -9,6 +9,12 @@ public class EnrollmentDTO {
 
     private Long enrollmentId;
 
+    private Long academicYearId;
+
+    private Long classId;
+
+    private Long sectionId;
+
     private String academicYear;
 
     private String className;

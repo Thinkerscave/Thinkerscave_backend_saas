@@ -19,7 +19,17 @@ public class ParentDTO {
 
     private String occupation;
 
+    private String organizationName;
+
+    private String qualification;
+
     private String relationship;
 
     private Boolean primaryContact;
+
+    private Boolean receiveSms;
+
+    private Boolean receiveEmail;
+
+    private Boolean pickupAuthorized;
 }

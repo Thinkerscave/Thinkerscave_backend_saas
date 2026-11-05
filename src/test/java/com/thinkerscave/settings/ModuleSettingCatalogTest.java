@@ -63,4 +63,18 @@ class ModuleSettingCatalogTest {
         assertThat(ModuleSettingCatalog.definition("ATTENDANCE", ModuleSettingCatalog.ALLOW_COPY_PREVIOUS)
                 .editable()).isFalse();
     }
+
+        @Test
+        void validatesAndRoundTripsTenantSocialCategoryOptions() {
+                ModuleSettingDefinition options = ModuleSettingCatalog.definition(
+                                ModuleSettingCatalog.STUDENTS, ModuleSettingCatalog.SOCIAL_CATEGORY_OPTIONS);
+                List<String> defaults = List.of("GENERAL", "OBC", "EBC", "SC", "ST", "OTHER", "PREFER_NOT_TO_SAY");
+
+                assertThat(options.defaultValue()).isEqualTo(defaults);
+                List<String> configured = List.of("GENERAL", "LOCAL_COMMUNITY", "PREFER_NOT_TO_SAY");
+                String stored = ModuleSettingCatalog.toStoredValue(options, configured);
+                assertThat(ModuleSettingCatalog.fromStoredValue(options, stored)).isEqualTo(configured);
+                assertThatThrownBy(() -> ModuleSettingCatalog.validateAndNormalize(options, List.of(1, 2)))
+                                .isInstanceOf(BadRequestException.class);
+        }
 }

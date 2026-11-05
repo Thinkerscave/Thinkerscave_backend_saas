@@ -2,6 +2,8 @@ package com.thinkerscave.admission.dto;
 
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * Extra admission form fields stored as JSON on application_admission.profile_details.
  * Core identity/parent/class columns remain first-class on ApplicationAdmission.
@@ -9,9 +11,11 @@ import lombok.Data;
 @Data
 public class ApplicationProfileDetails {
 
+    private List<AdmissionGuardianDetails> guardians;
     private String bloodGroup;
     private String religion;
     private String category;
+    private String socialCategory;
     private String nationality;
     private String identityDocumentType;
     private String identityDocumentNumber;
@@ -37,14 +41,18 @@ public class ApplicationProfileDetails {
 
     private String addressLine1;
     private String addressLine2;
+    private String landmark;
     private String city;
+    private String district;
     private String state;
     private String country;
     private String pinCode;
     private Boolean sameAsPresentAddress;
     private String permanentAddressLine1;
     private String permanentAddressLine2;
+    private String permanentLandmark;
     private String permanentCity;
+    private String permanentDistrict;
     private String permanentState;
     private String permanentCountry;
     private String permanentPinCode;

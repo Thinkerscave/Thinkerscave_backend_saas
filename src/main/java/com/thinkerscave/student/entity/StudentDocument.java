@@ -14,6 +14,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Getter
@@ -35,6 +38,22 @@ public class StudentDocument {
     @Column(name = "document_path", nullable = false, length = 255)
     private String documentPath;
 
+    @Column(name = "file_name", length = 255)
+    private String fileName;
+
+    @Column(name = "file_extension", length = 20)
+    private String fileExtension;
+
+    @Column(name = "mime_type", length = 100)
+    private String mimeType;
+
+    @Column(name = "file_size")
+    private Long fileSize;
+
+    @CreationTimestamp
+    @Column(name = "uploaded_on", nullable = false, updatable = false)
+    private LocalDateTime uploadedOn;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private DocumentCheckStatus status = DocumentCheckStatus.PENDING;
@@ -46,10 +65,16 @@ public class StudentDocument {
     @Column(name = "source_application_document_id")
     private Long sourceApplicationDocumentId;
 
+    @Column(name = "replaced_document_id")
+    private Long replacedDocumentId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_id", nullable = false)
     private Student student;
 
     @Column(name = "created_by", nullable = false, length = 50)
     private String createdBy;
+
+    @Column(name = "active", nullable = false)
+    private Boolean active = true;
 }

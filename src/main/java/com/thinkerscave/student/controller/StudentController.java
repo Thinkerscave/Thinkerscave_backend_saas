@@ -9,6 +9,7 @@ import com.thinkerscave.student.dto.TimelineCreateRequest;
 import com.thinkerscave.student.dto.TimelineDTO;
 import com.thinkerscave.student.enums.StudentStatus;
 import com.thinkerscave.student.service.StudentExcelService;
+import com.thinkerscave.student.service.StudentExportService;
 import com.thinkerscave.student.service.StudentService;
 import com.thinkerscave.academics.dto.response.LookupDTO;
 import com.thinkerscave.academics.service.AcademicsLookupService;
@@ -45,6 +46,8 @@ import java.util.stream.Collectors;
 public class StudentController {
 
 	private final StudentService studentService;
+
+	private final StudentExportService studentExportService;
 
 	private final StudentExcelService studentExcelService;
 
@@ -114,18 +117,55 @@ public class StudentController {
 	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<Page<StudentResponseDTO>>> getDirectory(
 			@RequestParam(required = false) String keyword,
+			@RequestParam(required = false) String rollNumber,
+			@RequestParam(required = false) String parentMobile,
+			@RequestParam(required = false) Long academicYearId,
 			@RequestParam(required = false) Long classId,
 			@RequestParam(required = false) Long sectionId,
+			@RequestParam(required = false) Boolean assigned,
 			@RequestParam(required = false) StudentStatus status,
 			@RequestParam(required = false) String parentName,
 			Pageable pageable) {
 		StudentSearchRequest request = new StudentSearchRequest();
 		request.setKeyword(keyword);
+		request.setRollNumber(rollNumber);
+		request.setParentMobile(parentMobile);
+		request.setAcademicYearId(academicYearId);
 		request.setClassId(classId);
 		request.setSectionId(sectionId);
+		request.setAssigned(assigned);
 		request.setStatus(status);
 		request.setParentName(parentName);
 		return ResponseEntity.ok(ApiResponse.success("Student directory loaded", studentService.searchStudents(request, pageable)));
+	}
+
+	@GetMapping(value = "/export", produces = "text/csv")
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+	@Operation(summary = "Export students matching directory filters as CSV")
+	public ResponseEntity<byte[]> exportDirectory(
+			@RequestParam(required = false) String keyword,
+			@RequestParam(required = false) String rollNumber,
+			@RequestParam(required = false) String parentMobile,
+			@RequestParam(required = false) Long academicYearId,
+			@RequestParam(required = false) Long classId,
+			@RequestParam(required = false) Long sectionId,
+			@RequestParam(required = false) Boolean assigned,
+			@RequestParam(required = false) StudentStatus status,
+			@RequestParam(required = false) String parentName) {
+		StudentSearchRequest request = new StudentSearchRequest();
+		request.setKeyword(keyword);
+		request.setRollNumber(rollNumber);
+		request.setParentMobile(parentMobile);
+		request.setAcademicYearId(academicYearId);
+		request.setClassId(classId);
+		request.setSectionId(sectionId);
+		request.setAssigned(assigned);
+		request.setStatus(status);
+		request.setParentName(parentName);
+		return ResponseEntity.ok()
+				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=students.csv")
+				.contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+				.body(studentExportService.exportCsv(request));
 	}
 
 	@Operation(summary = "Advanced student search")
@@ -187,7 +227,7 @@ public class StudentController {
 	@PutMapping("/{id}/personal")
 	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<StudentResponseDTO>> updatePersonal(@PathVariable Long id,
-			@Valid @RequestBody StudentCreateRequest dto) {
+			@Valid @RequestBody com.thinkerscave.student.dto.StudentPersonalUpdateRequest dto) {
 		log.info("Received request to update personal info for student id: {}", id);
 		return ResponseEntity
 				.ok(ApiResponse.success("Personal info updated successfully", studentService.updatePersonal(id, dto)));
@@ -248,11 +288,20 @@ public class StudentController {
 	}
 
 	@Operation(summary = "Bulk import students from Excel")
+	@PostMapping(value = "/import/preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+	public ResponseEntity<ApiResponse<com.thinkerscave.student.dto.BulkUploadResponse>> previewStudentImport(
+			@RequestPart("file") MultipartFile file) {
+		return ResponseEntity.ok(ApiResponse.success("Student import preview generated",
+				studentExcelService.previewStudents(file)));
+	}
+
+	@Operation(summary = "Bulk import students from Excel")
 	@PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
 	public ResponseEntity<ApiResponse<StudentImportJobResponse>> importStudents(@RequestPart("file") MultipartFile file) {
 		StudentImportJobResponse response = studentExcelService.importStudents(file);
-		return ResponseEntity.status(202).body(ApiResponse.success("Student import job submitted", response));
+		return ResponseEntity.ok(ApiResponse.success("Student import completed", response));
 	}
 
 	@Operation(summary = "Get student import job summary")
@@ -272,30 +321,6 @@ public class StudentController {
 				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=student_import_errors_" + jobId + ".txt")
 				.contentType(MediaType.TEXT_PLAIN)
 				.body(resource);
-	}
-
-	@Operation(summary = "Read-only alumni directory")
-	@GetMapping("/alumni")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
-	public ResponseEntity<ApiResponse<List<StudentResponseDTO>>> getAlumni(
-			@RequestParam(required = false) String keyword) {
-		StudentSearchRequest search = new StudentSearchRequest();
-		search.setStatus(StudentStatus.ALUMNI);
-		search.setKeyword(keyword);
-		List<StudentResponseDTO> data = studentService.searchStudents(search, Pageable.unpaged()).getContent();
-		return ResponseEntity.ok(ApiResponse.success("Alumni loaded", data));
-	}
-
-	@Operation(summary = "Alumni profile")
-	@GetMapping("/alumni/{studentId}")
-	@PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
-	public ResponseEntity<ApiResponse<com.thinkerscave.student.dto.StudentProfileResponse>> getAlumniProfile(
-			@PathVariable Long studentId) {
-		StudentResponseDTO student = studentService.getStudentById(studentId);
-		if (!StudentStatus.ALUMNI.name().equals(student.getStatus())) {
-			return ResponseEntity.badRequest().body(ApiResponse.error("Selected student is not an alumni"));
-		}
-		return ResponseEntity.ok(ApiResponse.success("Alumni profile loaded", studentService.getProfile360(studentId)));
 	}
 
 	@Operation(summary = "Master data: Academic years")

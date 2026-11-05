@@ -15,6 +15,8 @@ import java.util.stream.Collectors;
 
 public final class ModuleSettingCatalog {
     public static final String ATTENDANCE = "ATTENDANCE";
+    public static final String STUDENTS = "STUDENTS";
+    public static final String SOCIAL_CATEGORY_OPTIONS = "SOCIAL_CATEGORY_OPTIONS";
     public static final String ATTENDANCE_MODE = "ATTENDANCE_MODE";
     public static final String LOW_ATTENDANCE_THRESHOLD = "LOW_ATTENDANCE_THRESHOLD";
     public static final String ATTENDANCE_EDITING_POLICY = "ATTENDANCE_EDITING_POLICY";
@@ -44,7 +46,10 @@ public final class ModuleSettingCatalog {
                 definition(ATTENDANCE_WINDOW_START, ModuleSettingValueType.TIME, LocalTime.of(9, 0),
                     null, null, List.of(), false),
                 definition(ATTENDANCE_WINDOW_END, ModuleSettingValueType.TIME, LocalTime.of(17, 0),
-                    null, null, List.of(), false)
+                    null, null, List.of(), false),
+            definition(STUDENTS, SOCIAL_CATEGORY_OPTIONS, ModuleSettingValueType.STRING_LIST,
+                    List.of("GENERAL", "OBC", "EBC", "SC", "ST", "OTHER", "PREFER_NOT_TO_SAY"),
+                    null, null, List.of(), true)
     );
 
     private static final Map<String, ModuleSettingDefinition> BY_SCOPE = DEFINITIONS.stream()
@@ -95,6 +100,7 @@ public final class ModuleSettingCatalog {
                 case DECIMAL -> validateDecimal(definition, rawValue);
                 case BOOLEAN -> validateBoolean(definition, rawValue);
                 case TIME -> validateTime(definition, rawValue);
+                case STRING_LIST -> validateStringList(definition, rawValue);
             };
         } catch (NumberFormatException | ClassCastException | DateTimeParseException ex) {
             throw new BadRequestException("Invalid value for setting " + definition.key());
@@ -108,12 +114,14 @@ public final class ModuleSettingCatalog {
             case DECIMAL -> ((BigDecimal) normalized).stripTrailingZeros().toPlainString();
             case TIME -> ((LocalTime) normalized).toString();
             case INTEGER, BOOLEAN -> normalized.toString().toLowerCase(Locale.ROOT);
+            case STRING_LIST -> String.join(",", (List<String>) normalized);
         };
     }
 
     public static Object fromStoredValue(ModuleSettingDefinition definition, String value) {
         return validateAndNormalize(definition, switch (definition.valueType()) {
             case ENUM, TIME -> value;
+            case STRING_LIST -> value.isBlank() ? List.of() : List.of(value.split(","));
             case INTEGER -> Integer.valueOf(value);
             case DECIMAL -> new BigDecimal(value);
             case BOOLEAN -> switch (value) {
@@ -129,6 +137,13 @@ public final class ModuleSettingCatalog {
         return new ModuleSettingDefinition(ATTENDANCE, key, type, defaultValue,
                 minimum, maximum, allowedValues, editable);
     }
+
+        private static ModuleSettingDefinition definition(String moduleCode, String key, ModuleSettingValueType type,
+            Object defaultValue, BigDecimal minimum, BigDecimal maximum, List<String> allowedValues,
+            boolean editable) {
+        return new ModuleSettingDefinition(moduleCode, key, type, defaultValue,
+            minimum, maximum, allowedValues, editable);
+        }
 
     private static String scopeKey(String moduleCode, String key) {
         return normalizeModule(moduleCode) + ":" + (key == null ? "" : key.trim().toUpperCase(Locale.ROOT));
@@ -171,6 +186,26 @@ public final class ModuleSettingCatalog {
             throw new BadRequestException("Setting " + definition.key() + " must be a time");
         }
         return LocalTime.parse(value);
+    }
+
+    private static List<String> validateStringList(ModuleSettingDefinition definition, Object rawValue) {
+        if (!(rawValue instanceof List<?> values)) {
+            throw new BadRequestException("Setting " + definition.key() + " must be a list of strings");
+        }
+        List<String> normalized = values.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .map(String::trim)
+                .filter(value -> !value.isEmpty())
+                .map(value -> value.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9_ -]", ""))
+                .map(value -> value.replaceAll("\\s+", "_"))
+                .distinct()
+                .toList();
+        if (normalized.isEmpty() || normalized.size() > 30
+                || normalized.stream().anyMatch(value -> value.length() > 50)) {
+            throw new BadRequestException("Setting " + definition.key() + " must contain 1 to 30 labels of 50 characters or fewer");
+        }
+        return normalized;
     }
 
     private static BigDecimal numericValue(Object value) {

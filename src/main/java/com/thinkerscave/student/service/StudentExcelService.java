@@ -14,6 +14,8 @@ public interface StudentExcelService {
 
 	StudentImportJobResponse importStudents(MultipartFile file);
 
+	BulkUploadResponse previewStudents(MultipartFile file);
+
 	BulkUploadResponse getImportSummary(String jobId);
 
 	Resource downloadValidationReport(String jobId);

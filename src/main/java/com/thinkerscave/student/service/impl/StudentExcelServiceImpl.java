@@ -10,6 +10,8 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -35,8 +37,11 @@ import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
 import com.thinkerscave.student.dto.BulkUploadResponse;
 import com.thinkerscave.student.dto.StudentCreateRequest;
 import com.thinkerscave.student.dto.StudentImportJobResponse;
+import com.thinkerscave.student.entity.StudentImportJob;
 import com.thinkerscave.student.service.StudentExcelService;
 import com.thinkerscave.student.service.StudentService;
+import com.thinkerscave.student.repository.StudentRepository;
+import com.thinkerscave.student.repository.StudentImportJobRepository;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -44,22 +49,25 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class StudentExcelServiceImpl implements StudentExcelService {
 
-	private final Map<String, BulkUploadResponse> importJobs = new ConcurrentHashMap<>();
-	private final Map<String, byte[]> validationReports = new ConcurrentHashMap<>();
-
 	private final AcademicYearRepository academicYearRepository;
 	private final ClassRepository classRepository;
 	private final SectionRepository sectionRepository;
 	private final StudentService studentService;
+	private final StudentRepository studentRepository;
+	private final StudentImportJobRepository studentImportJobRepository;
 
 	// @Lazy breaks potential circular dependency via StudentService → UserService → ...
 	public StudentExcelServiceImpl(AcademicYearRepository academicYearRepository,
 			ClassRepository classRepository,
 			SectionRepository sectionRepository,
+			StudentRepository studentRepository,
+			StudentImportJobRepository studentImportJobRepository,
 			@Lazy StudentService studentService) {
 		this.academicYearRepository = academicYearRepository;
 		this.classRepository = classRepository;
 		this.sectionRepository = sectionRepository;
+		this.studentRepository = studentRepository;
+		this.studentImportJobRepository = studentImportJobRepository;
 		this.studentService = studentService;
 	}
 
@@ -134,11 +142,31 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 
 	@Override
 	public StudentImportJobResponse importStudents(MultipartFile file) {
+		String jobId = UUID.randomUUID().toString();
+		BulkUploadResponse summary = processImport(file, true);
+		StudentImportJob job = new StudentImportJob();
+		job.setJobId(jobId);
+		job.setFileName(file.getOriginalFilename());
+		job.setStatus("COMPLETED");
+		job.setTotalRecords(summary.getTotalRecords());
+		job.setSuccessCount(summary.getSuccessCount());
+		job.setFailureCount(summary.getFailureCount());
+		job.setErrorReport(String.join(System.lineSeparator(), summary.getErrors()));
+		job.setCompletedOn(java.time.LocalDateTime.now());
+		studentImportJobRepository.save(job);
+		return StudentImportJobResponse.builder().jobId(jobId).summary(summary).build();
+	}
+
+	@Override
+	public BulkUploadResponse previewStudents(MultipartFile file) {
+		return processImport(file, false);
+	}
+
+	private BulkUploadResponse processImport(MultipartFile file, boolean persistValidRows) {
 		if (file == null || file.isEmpty()) {
 			throw new FileProcessingException("Import file is empty");
 		}
 
-		String jobId = UUID.randomUUID().toString();
 		BulkUploadResponse summary = new BulkUploadResponse();
 		List<String> errors = new ArrayList<>();
 
@@ -154,6 +182,7 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 			Map<String, AcademicYear> yearCache = new ConcurrentHashMap<>();
 			Map<String, AcademicClass> classCache = new ConcurrentHashMap<>();
 			Map<String, AcademicSection> sectionCache = new ConcurrentHashMap<>();
+			Set<String> seenAdmissionNumbers = new HashSet<>();
 
 			for (int i = 1; i <= lastRowNum; i++) {
 				Row row = sheet.getRow(i);
@@ -192,6 +221,15 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 					errors.add("Row " + (i + 1) + ": missing mandatory fields "
 							+ "(First Name, Last Name, Academic Year, Class Code, Section Code, Father Name, Father Mobile)");
 					continue;
+				}
+				if (!admissionNo.isBlank()) {
+					String normalizedAdmissionNo = admissionNo.trim().toLowerCase(java.util.Locale.ROOT);
+					if (!seenAdmissionNumbers.add(normalizedAdmissionNo)
+							|| studentRepository.existsByAdmissionNumber(admissionNo.trim())) {
+						failed++;
+						errors.add("Row " + (i + 1) + ": admission number '" + admissionNo.trim() + "' is duplicated");
+						continue;
+					}
 				}
 
 				// ── Resolve Academic Year ──────────────────────────────────
@@ -247,8 +285,7 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 				// ── Build request ──────────────────────────────────────────
 				String[] fatherParts = splitName(fatherName);
 				StudentCreateRequest req = new StudentCreateRequest();
-				// Auto-generate admission number if not provided (matches frontend behavior)
-				req.setAdmissionNumber(admissionNo.isBlank() ? "ADM-" + System.currentTimeMillis() : admissionNo);
+				req.setAdmissionNumber(admissionNo.isBlank() ? null : admissionNo.trim());
 				req.setFirstName(firstName);
 				req.setMiddleName(middleName.isBlank() ? null : middleName);
 				req.setLastName(lastName);
@@ -281,9 +318,11 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 
 				// ── Persist ────────────────────────────────────────────────
 				try {
-					studentService.createStudent(req);
+					if (persistValidRows) studentService.createStudent(req);
 					success++;
-					log.info("Bulk import row {}: created student {}", i + 1, firstName + " " + lastName);
+					if (persistValidRows) {
+						log.info("Bulk import row {}: created student {}", i + 1, firstName + " " + lastName);
+					}
 				} catch (Exception ex) {
 					failed++;
 					String cause = ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName();
@@ -297,13 +336,9 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 			summary.setFailureCount(failed);
 			summary.setErrors(errors);
 
-			importJobs.put(jobId, summary);
-			String reportText = errors.isEmpty() ? "No errors — all records imported successfully."
-					: String.join(System.lineSeparator(), errors);
-			validationReports.put(jobId, reportText.getBytes(StandardCharsets.UTF_8));
-
-			log.info("Bulk import complete: total={} success={} failed={}", total, success, failed);
-			return StudentImportJobResponse.builder().jobId(jobId).summary(summary).build();
+			log.info("Bulk import {} complete: total={} validOrCreated={} failed={}",
+					persistValidRows ? "execution" : "preview", total, success, failed);
+			return summary;
 
 		} catch (IOException ex) {
 			log.error("Failed to process student import file", ex);
@@ -344,20 +379,25 @@ public class StudentExcelServiceImpl implements StudentExcelService {
 
 	@Override
 	public BulkUploadResponse getImportSummary(String jobId) {
-		BulkUploadResponse response = importJobs.get(jobId);
-		if (response == null) {
-			throw new ResourceNotFoundException("Import job not found: " + jobId);
-		}
+		StudentImportJob job = studentImportJobRepository.findById(jobId)
+				.orElseThrow(() -> new ResourceNotFoundException("Import job not found: " + jobId));
+		List<String> errors = job.getErrorReport() == null || job.getErrorReport().isBlank()
+				? List.of() : List.of(job.getErrorReport().split("\\R"));
+		BulkUploadResponse response = new BulkUploadResponse();
+		response.setTotalRecords(job.getTotalRecords());
+		response.setSuccessCount(job.getSuccessCount());
+		response.setFailureCount(job.getFailureCount());
+		response.setErrors(errors);
 		return response;
 	}
 
 	@Override
 	public Resource downloadValidationReport(String jobId) {
-		byte[] content = validationReports.get(jobId);
-		if (content == null) {
-			throw new ResourceNotFoundException("Validation report not found for job: " + jobId);
-		}
-		return new ByteArrayResource(content);
+		StudentImportJob job = studentImportJobRepository.findById(jobId)
+				.orElseThrow(() -> new ResourceNotFoundException("Validation report not found for job: " + jobId));
+		String report = job.getErrorReport() == null || job.getErrorReport().isBlank()
+				? "No errors — all records imported successfully." : job.getErrorReport();
+		return new ByteArrayResource(report.getBytes(StandardCharsets.UTF_8));
 	}
 
 	private String readCell(Row row, int index) {

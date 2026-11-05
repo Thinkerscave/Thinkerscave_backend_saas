@@ -6,7 +6,9 @@
 
 | File | Purpose |
 |------|---------|
-| `01_platform_master_seed.sql` | Platform master data only: roles, privileges, Super Admin user, menus/features baseline, code sequences, finance categories / other catalog seeds as maintained here. |
+| `01_platform_master_seed.sql` | Fresh-platform bootstrap: global catalogs plus the internal platform host/account needed by the Super Admin. It does not seed customer institutions, `tenant_registry`, tenant schemas, or institution admins; it is not a recovery script. |
+
+The seed assigns `PLATFORM` scope to its Super Admin menu tree. It also refreshes the seeded platform role's `role_permissions`, so do not run it against an existing shared database without a verified backup and explicit approval for that exact operation.
 
 Example:
 

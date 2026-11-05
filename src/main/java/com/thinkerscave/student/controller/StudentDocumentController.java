@@ -46,9 +46,24 @@ public class StudentDocumentController {
     public ResponseEntity<ApiResponse<StudentDocumentDTO>> upload(
             @RequestParam("studentId") Long studentId,
             @RequestPart("file") MultipartFile file,
-            @RequestParam(value = "documentType", required = false) String documentType) throws IOException {
-        StudentDocumentDTO dto = studentService.uploadStudentDocument(studentId, file, documentType);
+            @RequestParam(value = "documentType", required = false) String documentType,
+            @RequestParam(value = "documentName", required = false) String documentName,
+            @RequestParam(value = "remarks", required = false) String remarks) throws IOException {
+        StudentDocumentDTO dto = studentService.uploadStudentDocument(studentId, file, documentType, documentName, remarks);
         return ResponseEntity.status(201).body(ApiResponse.success("Document uploaded", dto));
+    }
+
+    @org.springframework.web.bind.annotation.PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Replace a student document while preserving the previous version")
+    @PreAuthorize("hasAnyAuthority('SUPER_ADMIN','ORGANIZATION_ADMIN','ORGANIZATION_OWNER','STAFF')")
+    public ResponseEntity<ApiResponse<StudentDocumentDTO>> replace(
+            @PathVariable Long id,
+            @RequestParam("studentId") Long studentId,
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(value = "documentName", required = false) String documentName,
+            @RequestParam(value = "remarks", required = false) String remarks) throws IOException {
+        return ResponseEntity.ok(ApiResponse.success("Document replaced",
+                studentService.replaceStudentDocument(studentId, id, file, documentName, remarks)));
     }
 
     @GetMapping("/{id}/download")
