@@ -20,6 +20,7 @@ import com.thinkerscave.platform.repository.FeatureRepository;
 import com.thinkerscave.platform.dto.response.CatalogSyncExecutionResponse;
 import com.thinkerscave.platform.dto.response.CatalogSyncStatusResponse;
 import com.thinkerscave.platform.enums.OperationStatus;
+import com.thinkerscave.shared.util.CurrentActor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -614,9 +615,9 @@ public class TenantCatalogSyncService {
                 INSERT INTO operation_audit_events
                     (event_type, actor, tenant_identifier, entity_type, entity_id,
                      execution_id, status, target_version, error_message)
-                VALUES (?, 'system', ?, 'CATALOG', ?, ?, ?, ?, ?)
-                """, eventType, tenant.getTenantIdentifier(), String.valueOf(catalogVersionId),
-                executionId, status, currentCatalogVersion(), sanitize(error));
+                VALUES (?, ?, ?, 'CATALOG', ?, ?, ?, ?, ?)
+                """, eventType, CurrentActor.resolve(), tenant.getTenantIdentifier(),
+                String.valueOf(catalogVersionId), executionId, status, currentCatalogVersion(), sanitize(error));
     }
 
     private String sanitize(String value) {

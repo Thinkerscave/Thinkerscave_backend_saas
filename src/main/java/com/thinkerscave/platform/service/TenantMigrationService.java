@@ -12,6 +12,7 @@ import com.thinkerscave.platform.repository.TenantMigrationExecutionRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.shared.util.CurrentActor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.api.MigrationInfo;
@@ -189,9 +190,9 @@ public class TenantMigrationService {
                 INSERT INTO operation_audit_events
                     (event_type, actor, tenant_identifier, entity_type, entity_id,
                      execution_id, status, target_version, error_message)
-                VALUES (?, 'system', ?, 'TENANT', ?, ?, ?, ?, ?)
-                """, type, tenant.getTenantIdentifier(), tenant.getId().toString(), execution.getId(),
-                status.name(), execution.getTargetVersion(), error);
+                VALUES (?, ?, ?, 'TENANT', ?, ?, ?, ?, ?)
+                """, type, CurrentActor.resolve(), tenant.getTenantIdentifier(), tenant.getId().toString(),
+                execution.getId(), status.name(), execution.getTargetVersion(), error);
     }
 
     private String sanitize(Exception ex) {

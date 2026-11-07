@@ -15,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.time.LocalTime;
 import java.util.*;
 
 @Component
@@ -596,17 +595,5 @@ public class TimetableReadinessEvaluator {
         List<String> capped = new ArrayList<>(details.subList(0, MAX_DETAILS));
         capped.add("…and " + (details.size() - MAX_DETAILS) + " more");
         return capped;
-    }
-
-    private static LocalTime patternStart(TimetablePlanningData data, GroupScheduleAssignment assignment) {
-        return data.getSlotsByPattern()
-                .getOrDefault(assignment.getSchedulePattern().getSchedulePatternId(), List.of())
-                .stream().map(TimetablePeriod::getStartTime).min(LocalTime::compareTo).orElse(null);
-    }
-
-    private static LocalTime patternEnd(TimetablePlanningData data, GroupScheduleAssignment assignment) {
-        return data.getSlotsByPattern()
-                .getOrDefault(assignment.getSchedulePattern().getSchedulePatternId(), List.of())
-                .stream().map(TimetablePeriod::getEndTime).max(LocalTime::compareTo).orElse(null);
     }
 }

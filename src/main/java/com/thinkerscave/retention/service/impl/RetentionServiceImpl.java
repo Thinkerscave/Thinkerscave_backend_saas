@@ -234,7 +234,7 @@ public class RetentionServiceImpl implements RetentionService {
         if (parts == null) {
             return StringUtils.hasText(cron) ? "Scheduled (" + cron + ")" : "Not scheduled";
         }
-        return String.format("Every day at %02d:%02d", parts[1], parts[2]);
+        return String.format("Every day at %02d:%02d", parts[2], parts[1]);
     }
 
     /**
@@ -243,7 +243,7 @@ public class RetentionServiceImpl implements RetentionService {
     private LocalDateTime nextDailyOccurrence(String cron) {
         Integer[] parts = parseDailyCron(cron);
         if (parts != null) {
-            LocalTime time = LocalTime.of(parts[1], parts[2], parts[0]);
+            LocalTime time = LocalTime.of(parts[2], parts[1], parts[0]);
             LocalDate today = LocalDate.now();
             LocalDateTime candidate = LocalDateTime.of(today, time);
             return candidate.isAfter(LocalDateTime.now()) ? candidate : candidate.plusDays(1);
@@ -266,7 +266,7 @@ public class RetentionServiceImpl implements RetentionService {
             int second = Integer.parseInt(fields[0]);
             int minute = Integer.parseInt(fields[1]);
             int hour = Integer.parseInt(fields[2]);
-            if (minute < 0 || minute > 59 || hour < 0 || hour > 23) {
+            if (second < 0 || second > 59 || minute < 0 || minute > 59 || hour < 0 || hour > 23) {
                 return null;
             }
             return new Integer[] { second, minute, hour };

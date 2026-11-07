@@ -161,7 +161,7 @@ public class PublicSchemaUserLookupService {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public Optional<UserSession> findSessionByRefreshToken(String refreshToken) {
-        return sessionRepository.findByRefreshToken(refreshToken)
+        return sessionRepository.findFirstByRefreshTokenOrderByLoginAtDesc(refreshToken)
                 .map(session -> {
                     User user = session.getUser();
                     user.getUserRoles().forEach(ur -> ur.getRole().getRoleType());
@@ -232,7 +232,7 @@ public class PublicSchemaUserLookupService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logout(String refreshToken, ClientEnvironment client) {
         ClientEnvironment env = client != null ? client : ClientEnvironment.empty();
-        sessionRepository.findByRefreshToken(refreshToken).ifPresent(session -> {
+        sessionRepository.findFirstByRefreshTokenOrderByLoginAtDesc(refreshToken).ifPresent(session -> {
             session.setStatus(SessionStatus.LOGGED_OUT);
             session.setLogoutAt(LocalDateTime.now());
             sessionRepository.save(session);

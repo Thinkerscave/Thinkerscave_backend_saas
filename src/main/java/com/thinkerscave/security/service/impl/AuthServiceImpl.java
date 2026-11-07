@@ -386,7 +386,7 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private ResolvedRefreshSession resolveRefreshSession(String refreshToken) {
-        Optional<UserSession> ambient = sessionRepository.findByRefreshToken(refreshToken);
+        Optional<UserSession> ambient = sessionRepository.findFirstByRefreshTokenOrderByLoginAtDesc(refreshToken);
         if (ambient.isPresent()) {
             UserSession session = ambient.get();
             return new ResolvedRefreshSession(session, initializeUserRoles(session.getUser()), false);
@@ -487,7 +487,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public void logout(String refreshToken, ClientEnvironment client) {
         ClientEnvironment env = client != null ? client : ClientEnvironment.empty();
-        Optional<UserSession> ambient = sessionRepository.findByRefreshToken(refreshToken);
+        Optional<UserSession> ambient = sessionRepository.findFirstByRefreshTokenOrderByLoginAtDesc(refreshToken);
         if (ambient.isPresent()) {
             closeSession(ambient.get(), env);
             return;

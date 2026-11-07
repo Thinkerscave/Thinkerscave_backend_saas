@@ -17,7 +17,7 @@ import java.util.Optional;
 @Repository
 public interface UserSessionRepository extends JpaRepository<UserSession, Long> {
 
-    Optional<UserSession> findByRefreshToken(String refreshToken);
+    Optional<UserSession> findFirstByRefreshTokenOrderByLoginAtDesc(String refreshToken);
 
     List<UserSession> findByUser_IdAndStatusOrderByLoginAtDesc(Long userId, SessionStatus status);
 

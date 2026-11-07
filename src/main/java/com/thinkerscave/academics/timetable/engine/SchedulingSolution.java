@@ -153,12 +153,6 @@ public class SchedulingSolution {
         return list != null && list.stream().anyMatch(p -> Objects.equals(p.getPeriodId(), periodId));
     }
 
-    public Placement placementAtSection(Long unitId, DayOfWeek day, Long periodId) {
-        List<Placement> list = unitDay.get(key(unitId, day));
-        return list == null ? null : list.stream()
-                .filter(p -> Objects.equals(p.getPeriodId(), periodId)).findFirst().orElse(null);
-    }
-
     public Placement placementAtTeacher(Long staffId, DayOfWeek day, Long periodId) {
         List<Placement> list = teacherDay.get(key(staffId, day));
         return list == null ? null : list.stream()

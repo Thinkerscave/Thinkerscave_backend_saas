@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Slf4j
@@ -67,6 +68,7 @@ public class JwtServiceImpl implements JwtService {
 
     private String buildToken(Map<String, Object> claims, String subject, long expiry) {
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .claims(claims)
                 .subject(subject)
                 .issuedAt(new Date())

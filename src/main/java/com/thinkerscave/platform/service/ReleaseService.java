@@ -13,6 +13,7 @@ import com.thinkerscave.platform.repository.TenantMigrationExecutionRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
 import com.thinkerscave.shared.exceptions.BadRequestException;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.shared.util.CurrentActor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -152,8 +153,8 @@ public class ReleaseService {
                 INSERT INTO operation_audit_events
                     (event_type, actor, entity_type, entity_id, execution_id,
                      status, target_version, error_message, details)
-                VALUES (?, 'system', 'RELEASE', ?, ?, ?, ?, ?, ?)
-                """, eventType, String.valueOf(release.getId()), release.getId(), status,
-                release.getTargetDatabaseVersion(), error, release.getReleaseVersion());
+                VALUES (?, ?, 'RELEASE', ?, ?, ?, ?, ?, ?)
+                """, eventType, CurrentActor.resolve(), String.valueOf(release.getId()), release.getId(),
+                status, release.getTargetDatabaseVersion(), error, release.getReleaseVersion());
     }
 }

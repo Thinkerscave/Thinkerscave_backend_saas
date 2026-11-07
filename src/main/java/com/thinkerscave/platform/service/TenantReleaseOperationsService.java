@@ -10,6 +10,7 @@ import com.thinkerscave.platform.repository.PlatformReleaseRepository;
 import com.thinkerscave.platform.repository.TenantMigrationExecutionRepository;
 import com.thinkerscave.platform.repository.TenantRegistryRepository;
 import com.thinkerscave.shared.exceptions.ResourceNotFoundException;
+import com.thinkerscave.shared.util.CurrentActor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -59,10 +60,11 @@ public class TenantReleaseOperationsService {
         jdbcTemplate.update("""
                 INSERT INTO operation_audit_events
                     (event_type, actor, tenant_identifier, entity_type, entity_id, status, details)
-                VALUES (?, 'system', ?, 'TENANT', ?, 'SUCCESS', ?)
+                VALUES (?, ?, ?, 'TENANT', ?, 'SUCCESS', ?)
                 """, Boolean.TRUE.equals(request.enabled())
                         ? "TENANT_MAINTENANCE_ENABLED" : "TENANT_MAINTENANCE_DISABLED",
-                saved.getTenantIdentifier(), String.valueOf(saved.getId()), request.reason());
+                CurrentActor.resolve(), saved.getTenantIdentifier(), String.valueOf(saved.getId()),
+                request.reason());
         return operation(saved);
     }
 

@@ -1551,17 +1551,6 @@ public class InquiryServiceImpl implements InquiryService {
                 && permissionService.hasPermission(user.getId(), orgId, RESOURCE_ADMISSIONS_LEADS, "MANAGE");
     }
 
-    private boolean hasAdmissionsLeadAccess(Staff staff, String privilege) {
-        if (staff == null || staff.getUser() == null || staff.getUser().getId() == null) {
-            return false;
-        }
-        Long orgId = OrganizationContext.getOrganizationId();
-        if (orgId == null) {
-            return false;
-        }
-        return permissionService.hasPermission(staff.getUser().getId(), orgId, RESOURCE_ADMISSIONS_LEADS, privilege);
-    }
-
     private User currentUser() {
         String username = currentUsername();
         if (!StringUtils.hasText(username)) {

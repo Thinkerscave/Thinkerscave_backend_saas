@@ -147,11 +147,6 @@ public class TimetablePlanningData {
         }
     }
 
-    public static String sectionLabel(AcademicSection section) {
-        String academicGroupName = section.getAcademicGroup() == null ? "" : section.getAcademicGroup().getName();
-        return (academicGroupName + " - " + section.getName()).trim();
-    }
-
     public static String staffName(Staff staff) {
         if (staff == null) return "";
         String middle = StringUtils.hasText(staff.getMiddleName()) ? " " + staff.getMiddleName() : "";

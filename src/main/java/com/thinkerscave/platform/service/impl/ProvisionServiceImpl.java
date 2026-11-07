@@ -680,22 +680,6 @@ public class ProvisionServiceImpl implements ProvisionService {
         log.info("Tenant schema validation completed: {}", schemaName);
     }
 
-    private void cleanupTenantSchema(String schemaName) {
-        if (schemaName == null || schemaName.isBlank()) {
-            return;
-        }
-        try {
-            if (isPostgres()) {
-                jdbcTemplate.execute("DROP SCHEMA IF EXISTS \"" + schemaName + "\" CASCADE");
-            } else {
-                jdbcTemplate.execute("DROP DATABASE IF EXISTS `" + schemaName + "`");
-            }
-            log.warn("Provisioning rollback cleanup executed for tenant schema={}", schemaName);
-        } catch (Exception cleanupEx) {
-            log.error("Failed to cleanup tenant schema {} after provisioning failure: {}", schemaName, cleanupEx.getMessage(), cleanupEx);
-        }
-    }
-
     private boolean isPostgres() {
         try (Connection connection = dataSource.getConnection()) {
             String product = connection.getMetaData().getDatabaseProductName();
